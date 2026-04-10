@@ -1,0 +1,17 @@
+{
+  "name": "sugarbistro-ops",
+  "version": "1.0.0",
+  "description": "小食糖營運系統 - LINE Bot + 管理後台",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@line/bot-sdk": "^9.6.0",
+    "@supabase/supabase-js": "^2.49.0",
+    "next": "^14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  }
+}
