@@ -4,8 +4,8 @@ const fmt=(n)=>"$"+Number(n||0).toLocaleString();
 const ROLES={admin:"👑總部",manager:"🏠管理",store_manager:"🏪門店主管",staff:"👤員工"};
 const DAYS=["日","一","二","三","四","五","六"];
 const LT={annual:{l:"特休",c:"#4361ee",bg:"#e6f1fb"},sick:{l:"病假",c:"#b45309",bg:"#fff8e6"},personal:{l:"事假",c:"#8a6d00",bg:"#fef9c3"},menstrual:{l:"生理假",c:"#993556",bg:"#fbeaf0"},off:{l:"例假",c:"#666",bg:"#f0f0f0"},rest:{l:"休息日",c:"#888",bg:"#f5f5f5"}};
-const ROLE_TABS={admin:["schedules","leaves","shifts","attendance","settings","settlements","deposits","employees"],manager:["schedules","leaves","shifts","attendance","settings","settlements","deposits","employees"],store_manager:["schedules","shifts"]};
-const TAB_L={schedules:"📅排班",leaves:"🙋請假",shifts:"⏰班別",attendance:"📍出勤",settings:"⚙️設定",settlements:"💰日結",deposits:"🏦存款",employees:"👥員工"};
+const ROLE_TABS={admin:["schedules","leaves","shifts","attendance","expenses","pnl","announcements","settings","settlements","deposits","employees"],manager:["schedules","leaves","shifts","attendance","expenses","pnl","settlements","deposits","employees"],store_manager:["schedules","shifts"]};
+const TAB_L={schedules:"📅排班",leaves:"🙋請假",shifts:"⏰班別",attendance:"📍出勤",expenses:"📦費用",pnl:"📊損益",announcements:"📢公告",settings:"⚙️設定",settlements:"💰日結",deposits:"🏦存款",employees:"👥員工"};
 function api(u,b){return b?fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(r=>r.json()):fetch(u).then(r=>r.json());}
 function Badge({status}){const m={matched:{bg:"#e6f9f0",c:"#0a7c42"},pending:{bg:"#fff8e6",c:"#8a6d00"},approved:{bg:"#e6f9f0",c:"#0a7c42"},rejected:{bg:"#fde8e8",c:"#b91c1c"},anomaly:{bg:"#fde8e8",c:"#b91c1c"},minor_diff:{bg:"#fff8e6",c:"#8a6d00"}};const s=m[status]||{bg:"#f0f0f0",c:"#666"};return<span style={{padding:"2px 6px",borderRadius:8,fontSize:10,background:s.bg,color:s.c}}>{status}</span>;}
 function RB({role}){const c={admin:{bg:"#fde8e8",c:"#b91c1c"},manager:{bg:"#e6f1fb",c:"#185fa5"},store_manager:{bg:"#fef9c3",c:"#8a6d00"},staff:{bg:"#e6f9f0",c:"#0a7c42"}};const s=c[role]||c.staff;return<span style={{padding:"1px 5px",borderRadius:5,fontSize:9,background:s.bg,color:s.c}}>{ROLES[role]||role}</span>;}
@@ -101,6 +101,8 @@ function Dashboard({auth,onLogout}){
   const[sf2,setSf2]=useState({store_id:"",name:"",start_time:"10:00",end_time:"20:00",break_minutes:60,work_hours:9,role:"all"});
   const[ws,setWs]=useState(()=>{const d=new Date();d.setDate(d.getDate()-d.getDay()+1);return d.toLocaleDateString("sv-SE");});
   const[pm,setPm]=useState(null);const[detailId,setDetailId]=useState(null);
+  const[exps,setExps]=useState([]);const[expSum,setExpSum]=useState({});const[pnl,setPnl]=useState(null);
+  const[anns,setAnns]=useState([]);const[newAnn,setNewAnn]=useState({title:"",content:"",priority:"normal"});const[showAnnForm,setShowAnnForm]=useState(false);
 
   useEffect(()=>{api("/api/admin/stores").then(d=>setStores(d.data||[]));},[]);
   const load=useCallback(()=>{
@@ -114,7 +116,11 @@ function Dashboard({auth,onLogout}){
       myTabs.includes("attendance")?api(`/api/admin/attendance?type=records&${p}`):Promise.resolve({data:[]}),
       myTabs.includes("settings")?api("/api/admin/attendance?type=settings"):Promise.resolve({data:{}}),
       myTabs.includes("leaves")?api(`/api/admin/leaves?${p}`):Promise.resolve({data:[]}),
-    ]).then(([s,d,e,sh,sc,at,as3,lr2])=>{setStl(s.data||[]);setSum(s.summary||{});setDep(d.data||[]);setEmps(e.data||[]);setShifts(sh.data||[]);setScheds(sc.data||[]);setAtt(at.data||[]);setAs2(as3.data||{});setLr(lr2.data||[]);setLd(false);});
+      myTabs.includes("expenses")?api(`/api/admin/expenses?month=${month}${sf?`&store_id=${sf}`:""}`):Promise.resolve({data:[],total:0,byCategory:{}}),
+      myTabs.includes("pnl")?api(`/api/admin/pnl?month=${month}${sf?`&store_id=${sf}`:""}`):Promise.resolve(null),
+      myTabs.includes("announcements")?api("/api/admin/announcements"):Promise.resolve({data:[]}),
+    ]).then(([s,d,e,sh,sc,at,as3,lr2,ex,pl2,an])=>{setStl(s.data||[]);setSum(s.summary||{});setDep(d.data||[]);setEmps(e.data||[]);setShifts(sh.data||[]);setScheds(sc.data||[]);setAtt(at.data||[]);setAs2(as3.data||{});setLr(lr2.data||[]);setExps(ex.data||[]);setExpSum({total:ex.total,byCategory:ex.byCategory});setPnl(pl2);setAnns(an.data||[]);setLd(false);});
+  },[month,sf,ws,sv,myTabs]);
   },[month,sf,ws,sv,myTabs]);
   useEffect(()=>{load();},[load]);
 
@@ -131,6 +137,9 @@ function Dashboard({auth,onLogout}){
   const pub=async()=>{const we2=new Date(new Date(ws).getTime()+6*86400000).toLocaleDateString("sv-SE");const d=await api("/api/admin/schedules",{action:"publish",week_start:ws,week_end:we2,store_id:sf||undefined});setPm(`發布${d.published||0}筆`);setTimeout(()=>setPm(null),4000);load();};
   const rvLv=async(id,st)=>{await api("/api/admin/leaves",{action:"review",request_id:id,status:st});load();};
   const upS=(k,v)=>{setAs2({...as2,[k]:v});clearTimeout(window._st);window._st=setTimeout(()=>api("/api/admin/attendance",{action:"update_settings",[k]:v}),1000);};
+  const rvExp=async(id,st)=>{await api("/api/admin/expenses",{action:"review",expense_id:id,status:st});load();};
+  const addAnn=async()=>{await api("/api/admin/announcements",{action:"create",...newAnn,created_by:auth.employee_id});setShowAnnForm(false);setNewAnn({title:"",content:"",priority:"normal"});load();};
+  const delAnn=async(id)=>{if(confirm("刪除？")){await api("/api/admin/announcements",{action:"delete",announcement_id:id});load();}};
 
   const wd=Array.from({length:7},(_,i)=>new Date(new Date(ws).getTime()+i*86400000).toLocaleDateString("sv-SE"));
   const prevW=()=>setWs(new Date(new Date(ws).getTime()-7*86400000).toLocaleDateString("sv-SE"));
@@ -189,6 +198,53 @@ function Dashboard({auth,onLogout}){
 
       {/* 出勤 */}
       {!ld&&tab==="attendance"&&<div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:550}}><thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>{["時間","員工","門市","類型","距離","遲到"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead><tbody>{att.map(a=><tr key={a.id} style={{borderBottom:"1px solid #f0eeea"}}><td style={{padding:6,fontSize:10}}>{new Date(a.timestamp).toLocaleString("zh-TW",{timeZone:"Asia/Taipei",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}</td><td style={{padding:6,fontWeight:500}}>{a.employees?.name}</td><td style={{padding:6}}>{a.stores?.name}</td><td style={{padding:6}}>{a.type==="clock_in"?"🟢上班":"🔴下班"}</td><td style={{padding:6}}>{a.distance_meters?`${Math.round(a.distance_meters)}m`:"-"}{a.is_valid?"✅":"❌"}</td><td style={{padding:6,color:a.late_minutes>0?"#b91c1c":"#0a7c42"}}>{a.late_minutes>0?`${a.late_minutes}分`:"準時"}</td></tr>)}</tbody></table></div>}
+
+      {/* 費用管理 */}
+      {!ld&&tab==="expenses"&&<div>
+        <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}><div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px",flex:1}}><div style={{fontSize:10,color:"#888"}}>本月費用總額</div><div style={{fontSize:16,fontWeight:600,color:"#b91c1c"}}>{fmt(expSum.total)}</div></div>{Object.entries(expSum.byCategory||{}).slice(0,3).map(([k,v])=><div key={k} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px",flex:1}}><div style={{fontSize:10,color:"#888"}}>{k}</div><div style={{fontSize:14,fontWeight:600}}>{fmt(v)}</div></div>)}</div>
+        <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}><thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>{["日期","門市","類型","廠商","分類","金額","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead><tbody>{exps.length===0&&<tr><td colSpan={8} style={{padding:30,textAlign:"center",color:"#ccc"}}>本月無費用紀錄</td></tr>}{exps.map(e=><tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}><td style={{padding:6}}>{e.date}</td><td style={{padding:6}}>{e.stores?.name}</td><td style={{padding:6}}>{e.expense_type==="vendor"?"📦廠商":"💰零用金"}</td><td style={{padding:6,fontWeight:500}}>{e.vendor_name||"-"}</td><td style={{padding:6}}>{e.expense_categories?.name||"-"}</td><td style={{padding:6,fontWeight:600}}>{fmt(e.amount)}</td><td style={{padding:6}}><Badge status={e.status}/></td><td style={{padding:6}}>{e.status==="pending"&&<><button onClick={()=>rvExp(e.id,"approved")} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>✅</button><button onClick={()=>rvExp(e.id,"rejected")} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>❌</button></>}</td></tr>)}</tbody></table></div>
+      </div>}
+
+      {/* 損益表 */}
+      {!ld&&tab==="pnl"&&<div style={{maxWidth:500}}>
+        <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📊 {month} 損益表</h3>
+        {pnl?<div>
+          <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:14,marginBottom:10}}>
+            <h4 style={{fontSize:13,fontWeight:500,color:"#0a7c42",marginBottom:8}}>收入</h4>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0eeea",fontSize:13}}><span>營業收入</span><b style={{color:"#0a7c42"}}>{fmt(pnl.revenue?.total)}</b></div>
+            {Object.entries(pnl.revenue?.byStore||{}).map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between",padding:"4px 0 4px 16px",fontSize:11,color:"#888"}}><span>{k}</span><span>{fmt(v)}</span></div>)}
+            <div style={{fontSize:11,color:"#888",marginTop:4}}>共 {pnl.revenue?.days||0} 天營業</div>
+          </div>
+          <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:14,marginBottom:10}}>
+            <h4 style={{fontSize:13,fontWeight:500,color:"#b91c1c",marginBottom:8}}>支出</h4>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0eeea",fontSize:13}}><span>📦 月結廠商</span><span>{fmt(pnl.expenses?.vendor)}</span></div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0eeea",fontSize:13}}><span>💰 零用金</span><span>{fmt(pnl.expenses?.petty_cash)}</span></div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0eeea",fontSize:13}}><span>👥 人事成本</span><span>{fmt(pnl.expenses?.labor)}</span></div>
+            {Object.entries(pnl.expenses?.byCategory||{}).map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between",padding:"3px 0 3px 16px",fontSize:11,color:"#888"}}><span>{k}</span><span>{fmt(v)}</span></div>)}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0 0",fontSize:13,fontWeight:600,color:"#b91c1c"}}><span>支出合計</span><span>{fmt(pnl.expenses?.total)}</span></div>
+          </div>
+          <div style={{background:Number(pnl.profit?.net||0)>=0?"#e6f9f0":"#fde8e8",borderRadius:8,padding:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",fontSize:13}}><span>毛利（收入-原物料-零用金）</span><b>{fmt(pnl.profit?.gross)}</b></div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",fontSize:15,fontWeight:700}}><span>淨利</span><span style={{color:Number(pnl.profit?.net||0)>=0?"#0a7c42":"#b91c1c"}}>{fmt(pnl.profit?.net)}</span></div>
+            <div style={{textAlign:"right",fontSize:12,color:"#888"}}>利潤率 {pnl.profit?.margin}%</div>
+          </div>
+        </div>:<div style={{background:"#fff",borderRadius:8,padding:30,textAlign:"center",color:"#ccc"}}>無資料</div>}
+      </div>}
+
+      {/* 公布欄管理 */}
+      {!ld&&tab==="announcements"&&<div>
+        <button onClick={()=>setShowAnnForm(!showAnnForm)} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:showAnnForm?"#f0f0f0":"#1a1a1a",color:showAnnForm?"#666":"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>{showAnnForm?"✕":"＋新增公告"}</button>
+        {showAnnForm&&<div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8}}>
+          <div style={{marginBottom:6}}><label style={{fontSize:10,color:"#888"}}>標題 *</label><input value={newAnn.title} onChange={e=>setNewAnn({...newAnn,title:e.target.value})} style={{width:"100%",padding:5,borderRadius:4,border:"1px solid #ddd",fontSize:12}}/></div>
+          <div style={{marginBottom:6}}><label style={{fontSize:10,color:"#888"}}>內容 *</label><textarea value={newAnn.content} onChange={e=>setNewAnn({...newAnn,content:e.target.value})} rows={3} style={{width:"100%",padding:5,borderRadius:4,border:"1px solid #ddd",fontSize:12}}/></div>
+          <div style={{marginBottom:8}}><label style={{fontSize:10,color:"#888"}}>優先級</label><select value={newAnn.priority} onChange={e=>setNewAnn({...newAnn,priority:e.target.value})} style={{padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}><option value="normal">一般</option><option value="urgent">🔴 急件</option></select></div>
+          <button onClick={addAnn} disabled={!newAnn.title||!newAnn.content} style={{padding:"5px 14px",borderRadius:4,border:"none",background:newAnn.title&&newAnn.content?"#0a7c42":"#ccc",color:"#fff",fontSize:11,cursor:"pointer"}}>發布</button>
+        </div>}
+        <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>{anns.length===0?<div style={{padding:30,textAlign:"center",color:"#ccc"}}>尚無公告</div>:anns.map(a=><div key={a.id} style={{padding:10,borderBottom:"1px solid #f0eeea",display:"flex",gap:8,alignItems:"flex-start"}}>
+          <div style={{flex:1}}>{a.priority==="urgent"&&<span style={{background:"#b91c1c",color:"#fff",padding:"1px 5px",borderRadius:3,fontSize:9,marginRight:4}}>急</span>}<b style={{fontSize:13}}>{a.title}</b><p style={{fontSize:12,color:"#555",marginTop:3}}>{a.content}</p><span style={{fontSize:10,color:"#aaa"}}>{new Date(a.created_at).toLocaleDateString("zh-TW")}</span></div>
+          <button onClick={()=>delAnn(a.id)} style={{padding:"2px 6px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
+        </div>)}</div>
+      </div>}
 
       {/* 設定 */}
       {!ld&&tab==="settings"&&<div style={{maxWidth:400}}><div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}><h3 style={{fontSize:13,fontWeight:500,marginBottom:8}}>⚙️ 打卡設定</h3>{[["late_grace_minutes","遲到寬限(分)"],["late_threshold_minutes","嚴重遲到(分)"],["early_leave_minutes","早退(分)"],["overtime_min_minutes","加班最低(分)"],["work_hours_per_day","每日工時"],["work_hours_per_week","每週工時"]].map(([k,l])=><div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"1px solid #f0eeea"}}><span style={{fontSize:12}}>{l}</span><input type="number" value={as2[k]??""} onChange={e=>upS(k,Number(e.target.value))} style={{width:50,padding:3,borderRadius:4,border:"1px solid #ddd",textAlign:"center",fontSize:12}}/></div>)}</div></div>}

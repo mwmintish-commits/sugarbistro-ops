@@ -73,6 +73,17 @@ export async function POST(request) {
   if (lateMinutes > 0) msg += `\n⏰ 遲到 ${lateMinutes} 分鐘`;
   await pushText(emp?.line_uid, msg).catch(() => {});
 
+  // 上班打卡後自動發送工作日誌連結
+  if (t.type === "clock_in" && emp?.line_uid) {
+    const baseUrl = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
+    const wlUrl = `${baseUrl}/worklog?eid=${t.employee_id}&sid=${store?.id || ""}&name=${encodeURIComponent(emp.name)}`;
+    const { lineClient } = await import("@/lib/line");
+    await lineClient.pushMessage({
+      to: emp.line_uid,
+      messages: [{ type: "template", altText: "填寫工作日誌", template: { type: "buttons", title: "📋 每日工作日誌", text: "請確認今日工作項目", actions: [{ type: "uri", label: "填寫工作日誌", uri: wlUrl }] } }],
+    }).catch(() => {});
+  }
+
   if (lateMinutes > 0) {
     const { data: mgrs } = await supabase.from("employees").select("line_uid").in("role", ["admin", "manager"]).eq("is_active", true);
     if (mgrs) for (const m of mgrs) if (m.line_uid) await pushText(m.line_uid, `⏰ 遲到｜${emp?.name}（${store?.name}）${lateMinutes}分鐘`).catch(() => {});
