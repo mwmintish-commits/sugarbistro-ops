@@ -256,7 +256,36 @@ async function handleEvent(event) {
   const text = event.message.text.trim(), rt = event.replyToken;
 
   if (text.startsWith("綁定")) { const code = text.replace(/^綁定\s*/, "").trim(); return code ? handleBinding(rt, userId, code) : replyText(rt, "格式：綁定 123456"); }
-  if (!emp) return replyText(rt, "🍯 請輸入：綁定 你的6位數綁定碼");
+
+  // 新人報到（不需要綁定就能用）
+  if (text === "新人報到") {
+    await setUserState(userId, "onboard_name", {});
+    return replyText(rt, "🍯 歡迎加入小食糖！\n\n請輸入你的姓名（全名）：");
+  }
+  if (state?.current_flow === "onboard_name") {
+    await setUserState(userId, "onboard_store", { name: text, line_uid: userId });
+    const { data: stores } = await supabase.from("stores").select("*").eq("is_active", true);
+    return replyWithQuickReply(rt, `👤 ${text}，你好！\n\n請選擇你的門市：`,
+      (stores || []).map(s => ({ type: "action", action: { type: "message", label: s.name, text: `報到門市:${s.name}` } }))
+    );
+  }
+  if (text.startsWith("報到門市:") && state?.current_flow === "onboard_store") {
+    const storeName = text.replace("報到門市:", "");
+    const store = await matchStore(storeName);
+    const d = state.flow_data;
+    const token = crypto.randomBytes(16).toString("hex");
+    await supabase.from("onboarding_records").insert({
+      line_uid: userId, name: d.name, store_id: store?.id, store_name: store?.name || storeName, token,
+    });
+    await clearUserState(userId);
+    const url = `${process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app"}/onboarding?token=${token}`;
+    return lineClient.replyMessage({ replyToken: rt, messages: [
+      { type: "text", text: `✅ 新人報到登記\n\n👤 ${d.name}\n🏠 ${store?.name || storeName}\n\n接下來請閱讀員工守則並完成電子簽署：` },
+      { type: "template", altText: "員工守則簽署", template: { type: "buttons", title: "📋 員工行為規範與工作守則", text: "請閱讀完整內容並簽署確認", actions: [{ type: "uri", label: "開始閱讀並簽署", uri: url }] } },
+    ]});
+  }
+
+  if (!emp) return replyText(rt, "🍯 歡迎！\n\n新員工請輸入「新人報到」\n已有帳號請輸入「綁定 你的6位數綁定碼」");
   if (text === "取消") { await clearUserState(userId); return replyWithQuickReply(rt, "已取消", getMenu(emp.role)); }
 
   // 打卡
