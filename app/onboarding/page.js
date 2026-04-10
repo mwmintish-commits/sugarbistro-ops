@@ -43,14 +43,23 @@ export default function Page() {
   const [agreed, setAgreed] = useState(false);
   const [sub, setSub] = useState(false);
   const [done, setDone] = useState(false);
+  const [handbook, setHandbook] = useState(HB);
 
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("token");
     if (!t) { setErr("缺少Token"); setLd(false); return; }
     setTk(t);
-    fetch("/api/onboarding?token=" + t).then(r => r.json()).then(d => {
+    Promise.all([
+      fetch("/api/onboarding?token=" + t).then(r => r.json()),
+      fetch("/api/admin/system?key=handbook").then(r => r.json()).catch(() => ({ data: null })),
+    ]).then(([d, hbData]) => {
       if (d.error) setErr(d.error);
       else { setRec(d.data); if (d.data.status === "signed") setDone(true); }
+      if (hbData.data && Array.isArray(hbData.data)) {
+        setHandbook(hbData.data.map(ch => ({
+          t: ch.title, s: [{ h: "", i: ch.items || [] }], w: ch.title.includes("最高") || ch.title.includes("零容忍")
+        })));
+      }
       setLd(false);
     }).catch(() => { setErr("載入失敗"); setLd(false); });
   }, []);
@@ -94,7 +103,7 @@ export default function Page() {
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: "14px 12px", marginBottom: 12 }}>
             <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, textAlign: "center" }}>📋 員工行為規範與工作守則</h3>
             <p style={{ fontSize: 12, lineHeight: 1.8, color: "#444", marginBottom: 12 }}>本守則為全體同仁共同承諾，<b>到職日起即受本規範約束</b>。</p>
-            {HB.map((ch, ci) => (
+            {handbook.map((ch, ci) => (
               <div key={ci} style={{ marginBottom: 14 }}>
                 <h3 style={{ fontSize: 12, fontWeight: 600, padding: "5px 8px", borderRadius: 5, background: ch.w ? "#fde8e8" : "#faf8f5", color: ch.w ? "#b91c1c" : "#1a1a1a", marginBottom: 5 }}>{ch.t}</h3>
                 {ch.s.map((sec, si) => (

@@ -82,6 +82,110 @@ function EmpDetail({ empId, onClose }) {
   );
 }
 
+const DEFAULT_HB = [
+  { title: "一、出勤、排班與請假", items: ["準時上班：應提前5分鐘到崗。", "依公司系統進行上下班打卡，不得代打。", "事假、病假至少提前4小時通知主管。", "換班須提前告知主管並經書面同意。"] },
+  { title: "二、儀容與服裝規定", items: ["穿著公司制服保持整潔。", "穿著防滑包趾鞋。", "長髮必須紮起。", "指甲保持短乾淨。"] },
+  { title: "三、食品衛生安全規範", items: ["接觸食品前洗手至少20秒。", "冷藏7°C以下，冷凍-18°C以下。", "生熟食分開保存。", "身體不適須告知主管。"] },
+  { title: "四、服務態度與顧客應對", items: ["面對顧客主動親切微笑服務。", "投訴保持冷靜傾聽。", "超出能力通知主管。"] },
+  { title: "五、金錢與財務誠信", items: ["收款必須依POS系統操作。", "折扣免單退款需主管授權。", "竊盜舞弊一律解僱追訴。"] },
+  { title: "六、手機與社群媒體", items: ["工作期間禁止於服務區使用手機。", "禁止發布門市內部照片影片。"] },
+  { title: "七、職場環境", items: ["禁止霸凌歧視性騷擾。", "禁止洩露公司機密。"] },
+  { title: "八、違規等級", items: ["輕微→口頭警告", "中度→書面警告", "嚴重→停職或解僱", "零容忍→立即解僱+法律追訴"] },
+  { title: "九、申訴舉報", items: ["向主管書面申訴5個工作日回覆。", "公司禁止任何報復行為。"] },
+  { title: "十、生效簽署", items: ["本規範自2026年起施行。", "公司保有隨時修訂之權利。"] },
+];
+
+function Settings({ stores, as2, upS }) {
+  const [hb, setHb] = useState(null);
+  const [hbLoading, setHbLoading] = useState(true);
+  const [hbSaving, setHbSaving] = useState(false);
+  const [hbMsg, setHbMsg] = useState("");
+  const [editCh, setEditCh] = useState(null);
+
+  useEffect(() => {
+    ap("/api/admin/system?key=handbook").then(r => {
+      setHb(r.data || DEFAULT_HB);
+      setHbLoading(false);
+    });
+  }, []);
+
+  const saveHb = async () => {
+    setHbSaving(true);
+    await ap("/api/admin/system", { key: "handbook", value: hb });
+    setHbMsg("✅ 已儲存"); setHbSaving(false);
+    setTimeout(() => setHbMsg(""), 3000);
+  };
+
+  const updateChapter = (idx, field, val) => {
+    const n = [...hb]; n[idx] = { ...n[idx], [field]: val }; setHb(n);
+  };
+  const updateItem = (ci, ii, val) => {
+    const n = [...hb]; const items = [...n[ci].items]; items[ii] = val; n[ci] = { ...n[ci], items }; setHb(n);
+  };
+  const addItem = (ci) => {
+    const n = [...hb]; n[ci] = { ...n[ci], items: [...n[ci].items, ""] }; setHb(n);
+  };
+  const removeItem = (ci, ii) => {
+    const n = [...hb]; n[ci] = { ...n[ci], items: n[ci].items.filter((_, i) => i !== ii) }; setHb(n);
+  };
+  const addChapter = () => {
+    setHb([...hb, { title: "新章節", items: [""] }]);
+  };
+  const removeChapter = (ci) => {
+    if (confirm("確定刪除此章節？")) setHb(hb.filter((_, i) => i !== ci));
+  };
+
+  return (
+    <div style={{ maxWidth: 700 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"⚙️ 打卡設定"}</h3>
+        {[["late_grace_minutes", "遲到寬限(分)"], ["late_threshold_minutes", "嚴重遲到(分)"], ["early_leave_minutes", "早退(分)"], ["overtime_min_minutes", "加班最低(分)"]].map(([k, l]) => (
+          <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0eeea" }}>
+            <span style={{ fontSize: 12 }}>{l}</span>
+            <input type="number" value={as2[k] || ""} onChange={e => upS(k, Number(e.target.value))} style={{ width: 50, padding: 3, borderRadius: 4, border: "1px solid #ddd", textAlign: "center", fontSize: 12 }} />
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 500 }}>{"📋 員工守則 / 工作合約"}</h3>
+          <div style={{ display: "flex", gap: 4 }}>
+            <button onClick={addChapter} style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid #ddd", background: "transparent", fontSize: 10, cursor: "pointer" }}>{"＋章節"}</button>
+            <button onClick={saveHb} disabled={hbSaving} style={{ padding: "3px 10px", borderRadius: 4, border: "none", background: hbSaving ? "#ccc" : "#0a7c42", color: "#fff", fontSize: 10, cursor: "pointer" }}>{hbSaving ? "..." : "💾 儲存守則"}</button>
+          </div>
+        </div>
+        {hbMsg && <div style={{ fontSize: 11, color: "#0a7c42", marginBottom: 6 }}>{hbMsg}</div>}
+        {hbLoading ? <p style={{ color: "#ccc" }}>載入中...</p> : hb && hb.map((ch, ci) => (
+          <div key={ci} style={{ marginBottom: 8, border: "1px solid #e8e6e1", borderRadius: 6, overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 8px", background: "#faf8f5", cursor: "pointer" }} onClick={() => setEditCh(editCh === ci ? null : ci)}>
+              <span style={{ fontSize: 12, fontWeight: 500, flex: 1 }}>{ch.title}</span>
+              <span style={{ fontSize: 10, color: "#888" }}>{ch.items.length + "項"}</span>
+              <button onClick={(e) => { e.stopPropagation(); removeChapter(ci); }} style={{ padding: "1px 4px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 9, color: "#b91c1c" }}>🗑</button>
+              <span style={{ fontSize: 10 }}>{editCh === ci ? "▲" : "▼"}</span>
+            </div>
+            {editCh === ci && (
+              <div style={{ padding: 8 }}>
+                <div style={{ marginBottom: 6 }}>
+                  <label style={{ fontSize: 10, color: "#888" }}>章節標題</label>
+                  <input value={ch.title} onChange={e => updateChapter(ci, "title", e.target.value)} style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12 }} />
+                </div>
+                {ch.items.map((item, ii) => (
+                  <div key={ii} style={{ display: "flex", gap: 4, marginBottom: 3 }}>
+                    <input value={item} onChange={e => updateItem(ci, ii, e.target.value)} style={{ flex: 1, padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} />
+                    <button onClick={() => removeItem(ci, ii)} style={{ padding: "1px 4px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 9, color: "#b91c1c" }}>✕</button>
+                  </div>
+                ))}
+                <button onClick={() => addItem(ci)} style={{ padding: "2px 8px", borderRadius: 3, border: "1px dashed #ccc", background: "transparent", cursor: "pointer", fontSize: 10, color: "#888", marginTop: 2 }}>{"＋ 新增項目"}</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LoginPage({ onLogin }) {
   const [step, setStep] = useState("phone"); const [phone, setPhone] = useState(""); const [code, setCode] = useState(""); const [msg, setMsg] = useState(""); const [ld, setLd] = useState(false);
   const send = async () => { setLd(true); setMsg(""); const r = await ap("/api/auth", { action: "send_code", phone }); setLd(false); if (r.success) { setStep("code"); setMsg("✅ 驗證碼已發送到LINE"); } else setMsg("❌ " + r.error); };
@@ -273,7 +377,11 @@ function Dashboard({ auth, onLogout }) {
           <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
             {[["all", "全部"], ["petty_cash", "💰零用金"], ["vendor", "📦月結單據"], ["hq_advance", "🏢總部代付"]].map(([k, l]) => <button key={k} onClick={() => setExpType(k)} style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid #ddd", background: expType === k ? "#1a1a1a" : "#fff", color: expType === k ? "#fff" : "#666", fontSize: 11, cursor: "pointer" }}>{l}</button>)}
           </div>
-          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}><div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "8px 12px", flex: 1 }}><div style={{ fontSize: 10, color: "#888" }}>篩選費用</div><div style={{ fontSize: 16, fontWeight: 600, color: "#b91c1c" }}>{fmt(exps.filter(e => expType === "all" || e.expense_type === expType).reduce((s, e) => s + Number(e.amount || 0), 0))}</div></div></div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
+            <div style={{ background: "#fff8e6", borderRadius: 8, padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#8a6d00" }}>💰 零用金</div><div style={{ fontSize: 15, fontWeight: 600 }}>{fmt(exps.filter(e => e.expense_type === "petty_cash").reduce((s, e) => s + Number(e.amount || 0), 0))}</div></div>
+            <div style={{ background: "#e6f1fb", borderRadius: 8, padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#185fa5" }}>📦 月結單據</div><div style={{ fontSize: 15, fontWeight: 600 }}>{fmt(exps.filter(e => e.expense_type === "vendor").reduce((s, e) => s + Number(e.amount || 0), 0))}</div></div>
+            <div style={{ background: "#fde8e8", borderRadius: 8, padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#b91c1c" }}>🏢 總部代付</div><div style={{ fontSize: 15, fontWeight: 600 }}>{fmt(exps.filter(e => e.expense_type === "hq_advance").reduce((s, e) => s + Number(e.amount || 0), 0))}</div></div>
+          </div>
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["日期", "門市", "類型", "廠商", "金額", "狀態", "操作"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead><tbody>{exps.filter(e => expType === "all" || e.expense_type === expType).length === 0 && <tr><td colSpan={7} style={{ padding: 30, textAlign: "center", color: "#ccc" }}>無紀錄</td></tr>}{exps.filter(e => expType === "all" || e.expense_type === expType).map(e => <tr key={e.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{e.date}</td><td style={{ padding: 6 }}>{e.stores ? e.stores.name : ""}</td><td style={{ padding: 6 }}>{e.expense_type === "vendor" ? "📦月結" : e.expense_type === "hq_advance" ? "🏢總部代付" : "💰零用金"}</td><td style={{ padding: 6, fontWeight: 500 }}>{e.vendor_name || "-"}</td><td style={{ padding: 6, fontWeight: 600 }}>{fmt(e.amount)}</td><td style={{ padding: 6 }}><Badge status={e.status} /></td><td style={{ padding: 6 }}>{e.status === "pending" && <span><button onClick={() => rvExp(e.id, "approved")} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#0a7c42", color: "#fff", fontSize: 9, cursor: "pointer", marginRight: 2 }}>✅</button><button onClick={() => rvExp(e.id, "rejected")} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#b91c1c", color: "#fff", fontSize: 9, cursor: "pointer" }}>❌</button></span>}</td></tr>)}</tbody></table></div>
         </div>}
 
@@ -327,7 +435,7 @@ function Dashboard({ auth, onLogout }) {
           </div>
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 14, marginBottom: 10 }}>
             <h4 style={{ fontSize: 13, color: "#b91c1c", marginBottom: 8 }}>支出</h4>
-            <Row l="月結廠商" v={fmt(pnl.expenses ? pnl.expenses.vendor : 0)} /><Row l="零用金" v={fmt(pnl.expenses ? pnl.expenses.petty_cash : 0)} /><Row l="人事成本" v={fmt(pnl.expenses ? pnl.expenses.labor : 0)} />
+            <Row l="月結廠商" v={fmt(pnl.expenses ? pnl.expenses.vendor : 0)} /><Row l="零用金" v={fmt(pnl.expenses ? pnl.expenses.petty_cash : 0)} /><Row l="總部代付" v={fmt(pnl.expenses ? pnl.expenses.hq_advance : 0)} /><Row l="人事成本" v={fmt(pnl.expenses ? pnl.expenses.labor : 0)} />
             <Row l="支出合計" v={<b style={{ color: "#b91c1c" }}>{fmt(pnl.expenses ? pnl.expenses.total : 0)}</b>} />
           </div>
           <div style={{ background: (pnl.profit ? pnl.profit.net : 0) >= 0 ? "#e6f9f0" : "#fde8e8", borderRadius: 8, padding: 14 }}>
@@ -350,20 +458,7 @@ function Dashboard({ auth, onLogout }) {
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1" }}>{anns.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#ccc" }}>尚無公告</div> : anns.map(a => <div key={a.id} style={{ padding: 10, borderBottom: "1px solid #f0eeea", display: "flex", gap: 8 }}><div style={{ flex: 1 }}><b style={{ fontSize: 13 }}>{a.title}</b><p style={{ fontSize: 12, color: "#555", marginTop: 3 }}>{a.content}</p></div><button onClick={() => delAnn(a.id)} style={{ padding: "2px 6px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 10, color: "#b91c1c" }}>🗑</button></div>)}</div>
         </div>}
 
-        {!ld && tab === "settings" && <div style={{ maxWidth: 600 }}>
-          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"⚙️ 打卡設定"}</h3>
-            {[["late_grace_minutes", "遲到寬限(分)"], ["late_threshold_minutes", "嚴重遲到(分)"], ["early_leave_minutes", "早退(分)"], ["overtime_min_minutes", "加班最低(分)"]].map(([k, l]) => <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0eeea" }}><span style={{ fontSize: 12 }}>{l}</span><input type="number" value={as2[k] || ""} onChange={e => upS(k, Number(e.target.value))} style={{ width: 50, padding: 3, borderRadius: 4, border: "1px solid #ddd", textAlign: "center", fontSize: 12 }} /></div>)}
-          </div>
-          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"📋 員工守則 / 工作合約"}</h3>
-            <p style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>修改後將套用到所有新人報到頁面。目前內容為 10 章員工行為規範與工作守則。</p>
-            <div style={{ display: "flex", gap: 6 }}>
-              <a href="/onboarding?token=preview" target="_blank" style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #4361ee", color: "#4361ee", fontSize: 11, textDecoration: "none", cursor: "pointer" }}>{"📄 預覽目前守則"}</a>
-              <button onClick={() => { const c = prompt("如需更新守則內容，請將新版守則文字貼在此處（或聯繫系統管理員更新）："); if (c) alert("已收到，請聯繫系統管理員更新程式碼中的守則內容。"); }} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd", background: "transparent", fontSize: 11, cursor: "pointer" }}>{"✏️ 更新守則內容"}</button>
-            </div>
-          </div>
-        </div>}
+        {!ld && tab === "settings" && <Settings stores={stores} as2={as2} upS={upS} />}
 
         {!ld && tab === "settlements" && <div>
           <div style={{ display: "flex", gap: 6, marginBottom: 8 }}><div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "8px 12px", flex: 1 }}><div style={{ fontSize: 10, color: "#888" }}>淨額</div><div style={{ fontSize: 16, fontWeight: 600, color: "#0a7c42" }}>{fmt(sum.total_net_sales)}</div></div><div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "8px 12px", flex: 1 }}><div style={{ fontSize: 10, color: "#888" }}>應存</div><div style={{ fontSize: 16, fontWeight: 600, color: "#b45309" }}>{fmt(sum.total_cash_to_deposit)}</div></div></div>
