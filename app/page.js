@@ -4,9 +4,9 @@ const fmt = (n) => "$" + Number(n || 0).toLocaleString();
 const ROLES = { admin: "👑總部", manager: "🏠管理", store_manager: "🏪門店主管", staff: "👤員工" };
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
 const LT = { annual: { l: "特休", c: "#4361ee", bg: "#e6f1fb" }, sick: { l: "病假", c: "#b45309", bg: "#fff8e6" }, personal: { l: "事假", c: "#8a6d00", bg: "#fef9c3" }, menstrual: { l: "生理假", c: "#993556", bg: "#fbeaf0" }, off: { l: "例假", c: "#666", bg: "#f0f0f0" }, rest: { l: "休息日", c: "#888", bg: "#f5f5f5" } };
-const ROLE_TABS = { admin: ["employees", "schedules", "leaves", "attendance", "payroll", "settlements", "deposits", "expenses", "pnl", "shifts", "worklogs", "announcements", "settings"], manager: ["employees", "schedules", "leaves", "attendance", "payroll", "settlements", "deposits", "expenses", "pnl", "shifts", "worklogs"], store_manager: ["schedules", "shifts", "worklogs"] };
-const TAB_L = { employees: "👥員工", schedules: "📅排班", leaves: "🙋請假", attendance: "📍出勤", payroll: "💰薪資", settlements: "💰日結", deposits: "🏦存款", expenses: "📦費用", pnl: "📊損益", shifts: "⏰班別", worklogs: "📋日誌", announcements: "📢公告", settings: "⚙️設定" };
-const TAB_GROUPS = { "人資": ["employees", "schedules", "leaves", "attendance", "payroll"], "財務": ["settlements", "deposits", "expenses", "pnl"], "管理": ["shifts", "worklogs", "announcements", "settings"] };
+const ROLE_TABS = { admin: ["employees", "schedules", "leaves", "attendance", "payroll", "settlements", "deposits", "expenses", "pnl", "shifts", "worklogs", "announcements", "settings"], manager: ["employees", "schedules", "leaves", "attendance", "payroll", "settlements", "deposits", "expenses", "pnl", "shifts", "worklogs"], store_manager: ["schedules", "leaves", "store_staff", "worklogs", "announcements", "settlements", "deposits", "expenses"] };
+const TAB_L = { employees: "👥員工", schedules: "📅排班", leaves: "🙋請假", attendance: "📍出勤", payroll: "💰薪資", settlements: "💰日結", deposits: "🏦存款", expenses: "📦費用", pnl: "📊損益", shifts: "⏰班別", worklogs: "📋日誌", announcements: "📢公告", settings: "⚙️設定", store_staff: "👥本店員工" };
+const TAB_GROUPS = { "人資": ["employees", "store_staff", "schedules", "leaves", "attendance", "payroll"], "財務": ["settlements", "deposits", "expenses", "pnl"], "管理": ["shifts", "worklogs", "announcements", "settings"] };
 function ap(u, b) { return b ? fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).then(r => r.json()) : fetch(u).then(r => r.json()); }
 function Badge({ status }) { const m = { matched: { bg: "#e6f9f0", c: "#0a7c42" }, pending: { bg: "#fff8e6", c: "#8a6d00" }, approved: { bg: "#e6f9f0", c: "#0a7c42" }, rejected: { bg: "#fde8e8", c: "#b91c1c" }, anomaly: { bg: "#fde8e8", c: "#b91c1c" } }; const s = m[status] || { bg: "#f0f0f0", c: "#666" }; return <span style={{ padding: "2px 6px", borderRadius: 8, fontSize: 10, background: s.bg, color: s.c }}>{status}</span>; }
 function RB({ role }) { const c = { admin: { bg: "#fde8e8", c: "#b91c1c" }, manager: { bg: "#e6f1fb", c: "#185fa5" }, store_manager: { bg: "#fef9c3", c: "#8a6d00" }, staff: { bg: "#e6f9f0", c: "#0a7c42" } }; const s = c[role] || c.staff; return <span style={{ padding: "1px 5px", borderRadius: 5, fontSize: 9, background: s.bg, color: s.c }}>{ROLES[role] || role}</span>; }
@@ -200,7 +200,8 @@ function Settings({ stores, as2, upS }) {
   );
 }
 
-function WorklogMgr({ stores, sf, month, load }) {
+function WorklogMgr({ stores, sf, month, load, role }) {
+  const canEdit = role === "admin" || role === "manager";
   const [wlStore, setWlStore] = useState(sf || (stores[0] ? stores[0].id : ""));
   const [templates, setTemplates] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -246,14 +247,14 @@ function WorklogMgr({ stores, sf, month, load }) {
       </div>
 
       {wlStore && <div>
-        <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center", background: "#e6f1fb", borderRadius: 6, padding: "6px 10px" }}>
+        {canEdit && <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center", background: "#e6f1fb", borderRadius: 6, padding: "6px 10px" }}>
           <span style={{ fontSize: 11, color: "#185fa5" }}>{"📋 複製到："}</span>
           <select value={copyTarget} onChange={e => setCopyTarget(e.target.value)} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}>
             <option value="">選擇目標門市</option>
             {stores.filter(s => s.id !== wlStore).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <button onClick={copyAll} disabled={!copyTarget} style={{ padding: "3px 10px", borderRadius: 4, border: "none", background: copyTarget ? "#4361ee" : "#ccc", color: "#fff", fontSize: 10, cursor: "pointer" }}>全部複製</button>
-        </div>
+        </div>}
 
         {wlLd ? <p style={{ color: "#ccc", textAlign: "center", padding: 20 }}>載入中...</p> : <div>
           {Object.entries(grouped).map(([group, items]) => (
@@ -267,8 +268,8 @@ function WorklogMgr({ stores, sf, month, load }) {
                       {t.role !== "all" && <span style={{ fontSize: 9, background: "#fef9c3", color: "#8a6d00", padding: "1px 4px", borderRadius: 3, marginLeft: 4 }}>{t.role}</span>}
                     </span>
                     <span style={{ fontSize: 9, color: "#888" }}>{t.category}</span>
-                    {copyTarget && <button onClick={() => copyItem(t)} style={{ padding: "1px 6px", borderRadius: 3, border: "1px solid #4361ee", background: "transparent", color: "#4361ee", cursor: "pointer", fontSize: 9 }}>{"📋複製"}</button>}
-                    <button onClick={() => delTemplate(t.id)} style={{ padding: "1px 4px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 9, color: "#b91c1c" }}>🗑</button>
+                    {canEdit && copyTarget && <button onClick={() => copyItem(t)} style={{ padding: "1px 6px", borderRadius: 3, border: "1px solid #4361ee", background: "transparent", color: "#4361ee", cursor: "pointer", fontSize: 9 }}>{"📋複製"}</button>}
+                    {canEdit && <button onClick={() => delTemplate(t.id)} style={{ padding: "1px 4px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 9, color: "#b91c1c" }}>🗑</button>}
                   </div>
                 ))}
                 {items.length === 0 && <div style={{ padding: 12, textAlign: "center", color: "#ccc", fontSize: 11 }}>無項目</div>}
@@ -278,7 +279,7 @@ function WorklogMgr({ stores, sf, month, load }) {
 
           {Object.keys(grouped).length === 0 && <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 30, textAlign: "center", color: "#ccc" }}>此門市尚無工作項目</div>}
 
-          <div style={{ background: "#fff", borderRadius: 8, border: "2px dashed #ddd", padding: 10, marginTop: 10 }}>
+          {canEdit && <div style={{ background: "#fff", borderRadius: 8, border: "2px dashed #ddd", padding: 10, marginTop: 10 }}>
             <h4 style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>{"＋ 新增工作項目"}</h4>
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
               <select value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} style={{ padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option>開店準備</option><option>營業中</option><option>打烊作業</option><option>清潔消毒</option><option>食材管理</option></select>
@@ -289,7 +290,7 @@ function WorklogMgr({ stores, sf, month, load }) {
               <input value={newItem.item} onChange={e => setNewItem({ ...newItem, item: e.target.value })} placeholder="輸入工作項目" onKeyDown={e => e.key === "Enter" && addTemplate()} style={{ flex: 1, padding: "5px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12 }} />
               <button onClick={addTemplate} disabled={!newItem.item} style={{ padding: "5px 14px", borderRadius: 4, border: "none", background: newItem.item ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>新增</button>
             </div>
-          </div>
+          </div>}
 
           <h4 style={{ fontSize: 13, fontWeight: 600, marginTop: 16, marginBottom: 6 }}>{"📝 員工提交紀錄"}</h4>
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
@@ -448,6 +449,29 @@ function Dashboard({ auth, onLogout }) {
           </div>
         </div>}
 
+        {!ld && tab === "store_staff" && <div>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{"👥 本店員工聯絡資料"}</h3>
+          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
+            {fe.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#ccc" }}>無員工</div> : fe.map(e => (
+              <div key={e.id} style={{ padding: 12, borderBottom: "1px solid #f0eeea" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{e.name}</span>
+                  <RB role={e.role} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, fontSize: 12 }}>
+                  <Row l="手機" v={e.phone || "-"} />
+                  <Row l="Email" v={e.email || "-"} />
+                  <Row l="生日" v={e.birthday || "-"} />
+                  <Row l="LINE" v={e.line_uid ? "✅" : "未綁定"} />
+                </div>
+                <div style={{ marginTop: 4, padding: 6, background: "#fef9c3", borderRadius: 4, fontSize: 11 }}>
+                  <b>{"🆘 緊急聯絡人："}</b>{(e.emergency_contact || "-") + " " + (e.emergency_phone || "") + "（" + (e.emergency_relation || "") + "）"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>}
+
         {!ld && tab === "leaves" && <div>
           <div style={{ background: "#e6f1fb", borderRadius: 6, padding: 8, marginBottom: 10, fontSize: 11, color: "#185fa5" }}>{"💡 員工提交的預休/請假申請會自動顯示在排班表上（黃色虛線標記），方便排班時參考。核准後自動排入班表。"}</div>
           {pl.length > 0 && <div style={{ background: "#fff8e6", borderRadius: 8, padding: 10, marginBottom: 10 }}>
@@ -483,7 +507,7 @@ function Dashboard({ auth, onLogout }) {
 
         {!ld && tab === "attendance" && <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["時間", "員工", "門市", "類型", "距離", "遲到"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead><tbody>{att.map(a => <tr key={a.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6, fontSize: 10 }}>{new Date(a.timestamp).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</td><td style={{ padding: 6, fontWeight: 500 }}>{a.employees ? a.employees.name : ""}</td><td style={{ padding: 6 }}>{a.stores ? a.stores.name : ""}</td><td style={{ padding: 6 }}>{a.type === "clock_in" ? "🟢上班" : "🔴下班"}</td><td style={{ padding: 6 }}>{a.distance_meters ? Math.round(a.distance_meters) + "m" : "-"}</td><td style={{ padding: 6, color: a.late_minutes > 0 ? "#b91c1c" : "#0a7c42" }}>{a.late_minutes > 0 ? a.late_minutes + "分" : "準時"}</td></tr>)}</tbody></table></div>}
 
-        {!ld && tab === "worklogs" && <WorklogMgr stores={stores} sf={sf} month={month} load={load} />}
+        {!ld && tab === "worklogs" && <WorklogMgr stores={stores} sf={sf} month={month} load={load} role={auth.role} />}
 
         {!ld && tab === "expenses" && <div>
           <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
