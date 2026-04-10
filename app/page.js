@@ -1,461 +1,126 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-
 const fmt = (n) => "$" + Number(n || 0).toLocaleString();
 const ROLES = { admin: "👑 總部", manager: "🏠 管理", staff: "👤 員工" };
-const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
+const DAYS = ["日","一","二","三","四","五","六"];
+const LT = { annual:{l:"特休",c:"#4361ee",bg:"#e6f1fb"}, sick:{l:"病假",c:"#b45309",bg:"#fff8e6"}, personal:{l:"事假",c:"#8a6d00",bg:"#fef9c3"}, menstrual:{l:"生理假",c:"#993556",bg:"#fbeaf0"}, off:{l:"例假",c:"#666",bg:"#f0f0f0"}, rest:{l:"休息日",c:"#888",bg:"#f5f5f5"} };
+function api(u,b){return b?fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(r=>r.json()):fetch(u).then(r=>r.json());}
+function Badge({status}){const m={matched:{bg:"#e6f9f0",c:"#0a7c42"},minor_diff:{bg:"#fff8e6",c:"#8a6d00"},anomaly:{bg:"#fde8e8",c:"#b91c1c"},pending:{bg:"#f0f0f0",c:"#666"},approved:{bg:"#e6f9f0",c:"#0a7c42"},rejected:{bg:"#fde8e8",c:"#b91c1c"}};const s=m[status]||m.pending;return <span style={{padding:"2px 6px",borderRadius:8,fontSize:10,background:s.bg,color:s.c}}>{status}</span>;}
+function RB({role}){const c={admin:{bg:"#fde8e8",c:"#b91c1c"},manager:{bg:"#e6f1fb",c:"#185fa5"},staff:{bg:"#e6f9f0",c:"#0a7c42"}};const s=c[role]||c.staff;return <span style={{padding:"1px 5px",borderRadius:5,fontSize:9,background:s.bg,color:s.c}}>{ROLES[role]}</span>;}
 
-function Card({ label, value, sub, color }) {
-  return <div style={{ background: "#fff", borderRadius: 12, padding: "14px 18px", border: "1px solid #e8e6e1", flex: "1 1 130px", minWidth: 130 }}>
-    <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>{label}</div>
-    <div style={{ fontSize: 20, fontWeight: 600, color: color || "#1a1a1a" }}>{value}</div>
-    {sub && <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{sub}</div>}
-  </div>;
-}
+export default function Admin(){
+  const [tab,setTab]=useState("schedules");const[stores,setStores]=useState([]);const[sf,setSf]=useState("");
+  const[month,setMonth]=useState(()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;});
+  const[sv,setSv]=useState("week");const[stl,setStl]=useState([]);const[sum,setSum]=useState({});const[dep,setDep]=useState([]);
+  const[emps,setEmps]=useState([]);const[shifts,setShifts]=useState([]);const[scheds,setScheds]=useState([]);
+  const[att,setAtt]=useState([]);const[as,setAs]=useState({});const[lr,setLr]=useState([]);const[ld,setLd]=useState(false);
+  const[si,setSi]=useState(null);const[saf,setSaf]=useState(false);const[ne,setNe]=useState({name:"",store_id:"",role:"staff",phone:""});
+  const[nbc,setNbc]=useState(null);const[ssf,setSsf]=useState(false);const[es,setEs]=useState(null);
+  const[sf2,setSf2]=useState({store_id:"",name:"",start_time:"10:00",end_time:"20:00",break_minutes:60,work_hours:9,role:"all"});
+  const[ws,setWs]=useState(()=>{const d=new Date();d.setDate(d.getDate()-d.getDay()+1);return d.toLocaleDateString("sv-SE");});
+  const[pm,setPm]=useState(null);
 
-function Badge({ status }) {
-  const m = { matched: { bg: "#e6f9f0", c: "#0a7c42", t: "✅吻合" }, minor_diff: { bg: "#fff8e6", c: "#8a6d00", t: "⚠️差異" }, anomaly: { bg: "#fde8e8", c: "#b91c1c", t: "🚨異常" }, pending: { bg: "#f0f0f0", c: "#666", t: "⏳待核" } };
-  const s = m[status] || m.pending;
-  return <span style={{ padding: "2px 10px", borderRadius: 12, fontSize: 12, fontWeight: 500, background: s.bg, color: s.c }}>{s.t}</span>;
-}
+  useEffect(()=>{api("/api/admin/stores").then(d=>setStores(d.data||[]));},[]);
 
-function RoleBadge({ role }) {
-  const c = { admin: { bg: "#fde8e8", c: "#b91c1c" }, manager: { bg: "#e6f1fb", c: "#185fa5" }, staff: { bg: "#e6f9f0", c: "#0a7c42" } };
-  const s = c[role] || c.staff;
-  return <span style={{ padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 500, background: s.bg, color: s.c }}>{ROLES[role]}</span>;
-}
+  const load=useCallback(()=>{
+    setLd(true);const p=new URLSearchParams();if(month)p.set("month",month);if(sf)p.set("store_id",sf);
+    const we2=new Date(new Date(ws).getTime()+6*86400000).toLocaleDateString("sv-SE");
+    const sp=sv==="week"?`week_start=${ws}&week_end=${we2}${sf?`&store_id=${sf}`:""}`:`month=${month}${sf?`&store_id=${sf}`:""}`;
+    Promise.all([api(`/api/admin/settlements?${p}`),api(`/api/admin/deposits?${p}`),api("/api/admin/employees"),api(`/api/admin/shifts${sf?`?store_id=${sf}`:""}`),api(`/api/admin/schedules?${sp}`),api(`/api/admin/attendance?type=records&${p}`),api("/api/admin/attendance?type=settings"),api(`/api/admin/leaves?${p}`)]).then(([s,d,e,sh,sc,at2,as2,lr2])=>{setStl(s.data||[]);setSum(s.summary||{});setDep(d.data||[]);setEmps(e.data||[]);setShifts(sh.data||[]);setScheds(sc.data||[]);setAtt(at2.data||[]);setAs(as2.data||{});setLr(lr2.data||[]);setLd(false);});
+  },[month,sf,ws,sv]);
+  useEffect(()=>{load();},[load]);
 
-export default function Admin() {
-  const [tab, setTab] = useState("schedules");
-  const [stores, setStores] = useState([]);
-  const [storeFilter, setStoreFilter] = useState("");
-  const [month, setMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; });
-  const [settlements, setSettlements] = useState([]);
-  const [summary, setSummary] = useState({});
-  const [deposits, setDeposits] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [shifts, setShifts] = useState([]);
-  const [schedules, setSchedules] = useState([]);
-  const [attendance, setAttendance] = useState([]);
-  const [attSettings, setAttSettings] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newEmp, setNewEmp] = useState({ name: "", store_id: "", role: "staff", phone: "" });
-  const [newBindCode, setNewBindCode] = useState(null);
-  const [showShiftForm, setShowShiftForm] = useState(false);
-  const [newShift, setNewShift] = useState({ store_id: "", name: "", start_time: "10:00", end_time: "20:00", break_minutes: 60, work_hours: 9, role: "all" });
-  const [weekStart, setWeekStart] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1);
-    return d.toLocaleDateString("sv-SE");
-  });
-  const [scheduleForm, setScheduleForm] = useState({ employee_id: "", shift_id: "", date: "" });
-  const [publishMsg, setPublishMsg] = useState(null);
+  const addEmp=async()=>{const d=await api("/api/admin/employees",{action:"create",...ne});if(d.bind_code){setNbc(d.bind_code);load();}};
+  const regen=async(id)=>{const d=await api("/api/admin/employees",{action:"generate_bind_code",employee_id:id});if(d.bind_code)alert("綁定碼："+d.bind_code);load();};
+  const saveShift=async()=>{if(es)await api("/api/admin/shifts",{action:"update",shift_id:es,...sf2});else await api("/api/admin/shifts",{action:"create",...sf2});setSsf(false);setEs(null);load();};
+  const delShift=async(id)=>{if(confirm("刪除？")){await api("/api/admin/shifts",{action:"delete",shift_id:id});load();}};
+  const editShift=(s)=>{setEs(s.id);setSf2({store_id:s.store_id,name:s.name,start_time:s.start_time,end_time:s.end_time,break_minutes:s.break_minutes,work_hours:s.work_hours,role:s.role});setSsf(true);};
+  const addSch=async(eid,sid,date)=>{const sh=shifts.find(s=>s.id===sid);await api("/api/admin/schedules",{action:"create",employee_id:eid,store_id:sh?.store_id||sf,shift_id:sid,date});load();};
+  const addLv=async(eid,date,lt,hd)=>{await api("/api/admin/schedules",{action:"add_leave",employee_id:eid,date,leave_type:lt,half_day:hd||null});load();};
+  const delSch=async(id)=>{await api("/api/admin/schedules",{action:"delete",schedule_id:id});load();};
+  const pub=async()=>{const we2=new Date(new Date(ws).getTime()+6*86400000).toLocaleDateString("sv-SE");const d=await api("/api/admin/schedules",{action:"publish",week_start:ws,week_end:we2,store_id:sf||undefined});setPm(`發布${d.published||0}筆，通知${d.notified||0}人`);setTimeout(()=>setPm(null),5000);load();};
+  const rvLv=async(id,st)=>{await api("/api/admin/leaves",{action:"review",request_id:id,status:st});load();};
+  const upS=(k,v)=>{setAs({...as,[k]:v});clearTimeout(window._st);window._st=setTimeout(()=>api("/api/admin/attendance",{action:"update_settings",[k]:v}),1000);};
 
-  useEffect(() => { fetch("/api/admin/stores").then(r => r.json()).then(d => setStores(d.data || [])); }, []);
+  const wd=Array.from({length:7},(_,i)=>new Date(new Date(ws).getTime()+i*86400000).toLocaleDateString("sv-SE"));
+  const prevW=()=>setWs(new Date(new Date(ws).getTime()-7*86400000).toLocaleDateString("sv-SE"));
+  const nextW=()=>setWs(new Date(new Date(ws).getTime()+7*86400000).toLocaleDateString("sv-SE"));
 
-  const loadData = useCallback(() => {
-    setLoading(true);
-    const p = new URLSearchParams();
-    if (month) p.set("month", month);
-    if (storeFilter) p.set("store_id", storeFilter);
-    const wp = new URLSearchParams();
-    const ws = weekStart;
-    const we = new Date(new Date(ws).getTime() + 6 * 86400000).toLocaleDateString("sv-SE");
-    wp.set("week_start", ws); wp.set("week_end", we);
-    if (storeFilter) wp.set("store_id", storeFilter);
+  const getMD=()=>{const[y,m]=month.split("-").map(Number);const f=new Date(y,m-1,1);const sd=f.getDay();const ds=[];for(let i=-sd;i<42-sd&&ds.length<42;i++){const d=new Date(y,m-1,1+i);ds.push({date:d.toLocaleDateString("sv-SE"),inM:d.getMonth()===m-1});}return ds;};
 
-    Promise.all([
-      fetch(`/api/admin/settlements?${p}`).then(r => r.json()),
-      fetch(`/api/admin/deposits?${p}`).then(r => r.json()),
-      fetch(`/api/admin/employees`).then(r => r.json()),
-      fetch(`/api/admin/shifts${storeFilter ? `?store_id=${storeFilter}` : ""}`).then(r => r.json()),
-      fetch(`/api/admin/schedules?${wp}`).then(r => r.json()),
-      fetch(`/api/admin/attendance?type=records&${p}`).then(r => r.json()),
-      fetch(`/api/admin/attendance?type=settings`).then(r => r.json()),
-    ]).then(([s, d, e, sh, sc, at, as]) => {
-      setSettlements(s.data || []); setSummary(s.summary || {}); setDeposits(d.data || []);
-      setEmployees(e.data || []); setShifts(sh.data || []); setSchedules(sc.data || []);
-      setAttendance(at.data || []); setAttSettings(as.data || {}); setLoading(false);
-    });
-  }, [month, storeFilter, weekStart]);
+  const ae=emps.filter(e=>e.is_active);const fe=sf?ae.filter(e=>e.store_id===sf||e.role==="admin"):ae;
+  const pl=lr.filter(l=>l.status==="pending");
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const ts=(id)=>({padding:"5px 12px",borderRadius:7,border:"none",cursor:"pointer",fontSize:11,fontWeight:tab===id?600:400,background:tab===id?"#1a1a1a":"transparent",color:tab===id?"#fff":"#888",whiteSpace:"nowrap",position:"relative"});
 
-  // ===== 員工操作 =====
-  const addEmployee = async () => {
-    const res = await fetch("/api/admin/employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", ...newEmp }) });
-    const d = await res.json(); if (d.bind_code) { setNewBindCode(d.bind_code); loadData(); }
-  };
-  const regenerateCode = async (id) => {
-    const res = await fetch("/api/admin/employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "generate_bind_code", employee_id: id }) });
-    const d = await res.json(); if (d.bind_code) { alert(`綁定碼：${d.bind_code}\n員工在 LINE 輸入：綁定 ${d.bind_code}`); loadData(); }
+  const renderCell=(emp,date)=>{
+    const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);
+    if(sc){
+      if(sc.type==="leave"){const lt=LT[sc.leave_type]||LT.off;return<div style={{background:lt.bg,borderRadius:4,padding:"2px 3px",fontSize:9,position:"relative"}}><div style={{color:lt.c,fontWeight:500}}>{lt.l}{sc.half_day?`(${sc.half_day==="am"?"上":"下"})`:""}</div><button onClick={()=>delSch(sc.id)} style={{position:"absolute",top:0,right:1,background:"none",border:"none",cursor:"pointer",fontSize:8,color:"#ccc"}}>✕</button></div>;}
+      return<div style={{background:sc.published?"#e6f9f0":"#fff8e6",borderRadius:4,padding:"2px 3px",fontSize:9,position:"relative"}}><div style={{fontWeight:500}}>{sc.shifts?.name}</div><div style={{color:"#888"}}>{sc.shifts?.start_time?.slice(0,5)}~{sc.shifts?.end_time?.slice(0,5)}</div>{!sc.published&&<span style={{fontSize:7,color:"#8a6d00"}}>未發布</span>}<button onClick={()=>delSch(sc.id)} style={{position:"absolute",top:0,right:1,background:"none",border:"none",cursor:"pointer",fontSize:8,color:"#ccc"}}>✕</button></div>;
+    }
+    return<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else addSch(emp.id,v,date);}} style={{width:"100%",padding:"1px",borderRadius:3,border:"1px dashed #ddd",fontSize:9,color:"#ccc",background:"transparent",cursor:"pointer"}}><option value="">＋</option><optgroup label="班別">{shifts.filter(s=>!sf||s.store_id===sf).map(s=><option key={s.id} value={s.id}>{s.name} {s.start_time?.slice(0,5)}~{s.end_time?.slice(0,5)}</option>)}</optgroup><optgroup label="休假">{Object.entries(LT).map(([k,v])=><option key={k} value={`leave:${k}`}>{v.l}</option>)}</optgroup></select>;
   };
 
-  // ===== 班別操作 =====
-  const addShift = async () => {
-    await fetch("/api/admin/shifts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", ...newShift }) });
-    setShowShiftForm(false); loadData();
-  };
-  const deleteShift = async (id) => {
-    if (!confirm("確定刪除此班別？")) return;
-    await fetch("/api/admin/shifts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", shift_id: id }) });
-    loadData();
-  };
-
-  // ===== 排班操作 =====
-  const addSchedule = async (empId, shiftId, date) => {
-    const shift = shifts.find(s => s.id === shiftId);
-    await fetch("/api/admin/schedules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create", employee_id: empId, store_id: shift?.store_id || storeFilter, shift_id: shiftId, date }) });
-    loadData();
-  };
-  const deleteSchedule = async (id) => {
-    await fetch("/api/admin/schedules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", schedule_id: id }) });
-    loadData();
-  };
-  const publishSchedules = async () => {
-    const we = new Date(new Date(weekStart).getTime() + 6 * 86400000).toLocaleDateString("sv-SE");
-    const res = await fetch("/api/admin/schedules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "publish", week_start: weekStart, week_end: we, store_id: storeFilter || undefined }) });
-    const d = await res.json();
-    setPublishMsg(`已發布 ${d.published || 0} 筆排班，通知 ${d.notified || 0} 位員工`);
-    setTimeout(() => setPublishMsg(null), 5000);
-    loadData();
-  };
-
-  // ===== 打卡設定 =====
-  const updateSettings = async (key, value) => {
-    await fetch("/api/admin/attendance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_settings", [key]: value }) });
-    loadData();
-  };
-
-  // 週日期陣列
-  const weekDates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(new Date(weekStart).getTime() + i * 86400000);
-    return d.toLocaleDateString("sv-SE");
-  });
-
-  const prevWeek = () => { setWeekStart(new Date(new Date(weekStart).getTime() - 7 * 86400000).toLocaleDateString("sv-SE")); };
-  const nextWeek = () => { setWeekStart(new Date(new Date(weekStart).getTime() + 7 * 86400000).toLocaleDateString("sv-SE")); };
-
-  const activeEmployees = employees.filter(e => e.is_active);
-  const filteredEmployees = storeFilter ? activeEmployees.filter(e => e.store_id === storeFilter || e.role === "admin") : activeEmployees;
-
-  const ts = (id) => ({ padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: tab === id ? 600 : 400, background: tab === id ? "#1a1a1a" : "transparent", color: tab === id ? "#fff" : "#888", whiteSpace: "nowrap" });
-
-  return (
-    <div style={{ minHeight: "100vh", background: "#faf8f5", fontFamily: "system-ui, 'Noto Sans TC', sans-serif" }}>
-      {/* Header */}
-      <div style={{ background: "#fff", borderBottom: "1px solid #e8e6e1", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 22 }}>🍯</span>
-          <div><div style={{ fontSize: 15, fontWeight: 600 }}>小食糖管理後台</div></div>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <input type="month" value={month} onChange={e => setMonth(e.target.value)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 12 }} />
-          <select value={storeFilter} onChange={e => setStoreFilter(e.target.value)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 12 }}>
-            <option value="">全部門市</option>
-            {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+  return(
+    <div style={{minHeight:"100vh",background:"#faf8f5",fontFamily:"system-ui,'Noto Sans TC',sans-serif"}}>
+      <div style={{background:"#fff",borderBottom:"1px solid #e8e6e1",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
+        <div style={{display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:18}}>🍯</span><span style={{fontSize:13,fontWeight:600}}>小食糖後台</span></div>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+          <input type="month" value={month} onChange={e=>setMonth(e.target.value)} style={{padding:"3px 6px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}/>
+          <select value={sf} onChange={e=>setSf(e.target.value)} style={{padding:"3px 6px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}><option value="">全部門市</option>{stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
         </div>
       </div>
-
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "16px 12px" }}>
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: 4, marginBottom: 14, overflowX: "auto", paddingBottom: 4 }}>
-          {[["schedules", "📅 排班"], ["shifts", "⏰ 班別"], ["attendance", "📍 出勤"], ["settings", "⚙️ 設定"], ["settlements", "💰 日結"], ["deposits", "🏦 存款"], ["employees", "👥 員工"]].map(([id, label]) =>
-            <button key={id} style={ts(id)} onClick={() => setTab(id)}>{label}</button>
-          )}
+      <div style={{maxWidth:1200,margin:"0 auto",padding:"12px 8px"}}>
+        <div style={{display:"flex",gap:3,marginBottom:10,overflowX:"auto",paddingBottom:3}}>
+          {[["schedules","📅排班"],["leaves","🙋請假"],["shifts","⏰班別"],["attendance","📍出勤"],["settings","⚙️設定"],["settlements","💰日結"],["deposits","🏦存款"],["employees","👥員工"]].map(([id,l])=><button key={id} style={ts(id)} onClick={()=>setTab(id)}>{l}{id==="leaves"&&pl.length>0&&<span style={{position:"absolute",top:-3,right:-3,background:"#b91c1c",color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:9,display:"flex",alignItems:"center",justifyContent:"center"}}>{pl.length}</span>}</button>)}
         </div>
+        {ld&&<div style={{textAlign:"center",padding:30,color:"#aaa"}}>載入中...</div>}
 
-        {loading && <div style={{ textAlign: "center", padding: 40, color: "#aaa" }}>載入中...</div>}
-
-        {/* ==================== 排班表 ==================== */}
-        {!loading && tab === "schedules" && (
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-              <button onClick={prevWeek} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", cursor: "pointer" }}>◀ 上週</button>
-              <span style={{ fontSize: 14, fontWeight: 500 }}>{weekStart} ~ {weekDates[6]}</span>
-              <button onClick={nextWeek} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", cursor: "pointer" }}>下週 ▶</button>
-              <button onClick={publishSchedules} style={{ padding: "6px 16px", borderRadius: 8, border: "none", background: "#0a7c42", color: "#fff", cursor: "pointer", fontSize: 13, marginLeft: "auto" }}>📢 發布班表通知員工</button>
-            </div>
-            {publishMsg && <div style={{ background: "#e6f9f0", color: "#0a7c42", padding: "8px 14px", borderRadius: 8, fontSize: 13, marginBottom: 10 }}>{publishMsg}</div>}
-
-            {/* 排班表格 */}
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 800 }}>
-                <thead><tr style={{ background: "#faf8f5", borderBottom: "1px solid #e8e6e1" }}>
-                  <th style={{ padding: "10px 8px", textAlign: "left", fontWeight: 500, color: "#666", minWidth: 80, position: "sticky", left: 0, background: "#faf8f5", zIndex: 1 }}>員工</th>
-                  {weekDates.map((d, i) => (
-                    <th key={d} style={{ padding: "10px 6px", textAlign: "center", fontWeight: 500, color: i === 0 || i === 6 ? "#b91c1c" : "#666", minWidth: 100 }}>
-                      {d.slice(5)}<br /><span style={{ fontSize: 11 }}>（{DAYS[new Date(d).getDay()]}）</span>
-                    </th>
-                  ))}
-                </tr></thead>
-                <tbody>
-                  {filteredEmployees.map(emp => (
-                    <tr key={emp.id} style={{ borderBottom: "1px solid #f0eeea" }}>
-                      <td style={{ padding: "8px", fontWeight: 500, fontSize: 13, position: "sticky", left: 0, background: "#fff", zIndex: 1 }}>
-                        {emp.name}<br /><RoleBadge role={emp.role} />
-                      </td>
-                      {weekDates.map(date => {
-                        const sch = schedules.find(s => s.employee_id === emp.id && s.date === date);
-                        return (
-                          <td key={date} style={{ padding: "4px", textAlign: "center", verticalAlign: "top" }}>
-                            {sch ? (
-                              <div style={{ background: sch.published ? "#e6f9f0" : "#fff8e6", borderRadius: 6, padding: "4px 6px", fontSize: 11, position: "relative" }}>
-                                <div style={{ fontWeight: 500 }}>{sch.shifts?.name}</div>
-                                <div style={{ color: "#888" }}>{sch.shifts?.start_time?.slice(0, 5)}~{sch.shifts?.end_time?.slice(0, 5)}</div>
-                                {!sch.published && <span style={{ fontSize: 9, color: "#8a6d00" }}>未發布</span>}
-                                <button onClick={() => deleteSchedule(sch.id)} style={{ position: "absolute", top: 1, right: 3, background: "none", border: "none", cursor: "pointer", fontSize: 10, color: "#ccc" }}>✕</button>
-                              </div>
-                            ) : (
-                              <select onChange={e => { if (e.target.value) { addSchedule(emp.id, e.target.value, date); e.target.value = ""; } }} style={{ width: "100%", padding: "4px", borderRadius: 6, border: "1px dashed #ddd", fontSize: 11, color: "#ccc", background: "transparent", cursor: "pointer" }}>
-                                <option value="">＋</option>
-                                {shifts.filter(s => !storeFilter || s.store_id === storeFilter).map(s => (
-                                  <option key={s.id} value={s.id}>{s.name} {s.start_time?.slice(0, 5)}~{s.end_time?.slice(0, 5)}</option>
-                                ))}
-                              </select>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {!storeFilter && <p style={{ fontSize: 12, color: "#999", marginTop: 8 }}>💡 建議先選擇門市再排班，班別會根據門市篩選</p>}
+        {/* 排班 */}
+        {!ld&&tab==="schedules"&&<div>
+          <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:8,flexWrap:"wrap"}}>
+            <button onClick={()=>setSv("week")} style={{padding:"3px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="week"?"#1a1a1a":"#fff",color:sv==="week"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>週</button>
+            <button onClick={()=>setSv("month")} style={{padding:"3px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="month"?"#1a1a1a":"#fff",color:sv==="month"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>月</button>
+            {sv==="week"&&<><button onClick={prevW} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>◀</button><span style={{fontSize:12,fontWeight:500}}>{ws}~{wd[6]}</span><button onClick={nextW} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>▶</button></>}
+            <button onClick={pub} style={{padding:"4px 12px",borderRadius:5,border:"none",background:"#0a7c42",color:"#fff",cursor:"pointer",fontSize:11,marginLeft:"auto"}}>📢 發布</button>
           </div>
-        )}
+          {pm&&<div style={{background:"#e6f9f0",color:"#0a7c42",padding:"5px 10px",borderRadius:5,fontSize:11,marginBottom:6}}>{pm}</div>}
 
-        {/* ==================== 班別設定 ==================== */}
-        {!loading && tab === "shifts" && (
-          <div>
-            <button onClick={() => setShowShiftForm(!showShiftForm)} style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #ddd", background: showShiftForm ? "#f0f0f0" : "#1a1a1a", color: showShiftForm ? "#666" : "#fff", fontSize: 13, cursor: "pointer", marginBottom: 12 }}>
-              {showShiftForm ? "✕ 取消" : "＋ 新增班別"}
-            </button>
-            {showShiftForm && (
-              <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", padding: 18, marginBottom: 12 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
-                  <div>
-                    <label style={{ fontSize: 12, color: "#888", display: "block", marginBottom: 3 }}>門市 *</label>
-                    <select value={newShift.store_id} onChange={e => setNewShift({ ...newShift, store_id: e.target.value })} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }}>
-                      <option value="">選擇門市</option>
-                      {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, color: "#888", display: "block", marginBottom: 3 }}>班別名稱 *</label>
-                    <input value={newShift.name} onChange={e => setNewShift({ ...newShift, name: e.target.value })} placeholder="例：早班" style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, color: "#888", display: "block", marginBottom: 3 }}>角色</label>
-                    <select value={newShift.role} onChange={e => setNewShift({ ...newShift, role: e.target.value })} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }}>
-                      <option value="all">全場</option><option value="外場">外場</option><option value="內場">內場</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, color: "#888", display: "block", marginBottom: 3 }}>上班時間</label>
-                    <input type="time" value={newShift.start_time} onChange={e => setNewShift({ ...newShift, start_time: e.target.value })} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, color: "#888", display: "block", marginBottom: 3 }}>下班時間</label>
-                    <input type="time" value={newShift.end_time} onChange={e => setNewShift({ ...newShift, end_time: e.target.value })} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, color: "#888", display: "block", marginBottom: 3 }}>休息(分鐘)</label>
-                    <input type="number" value={newShift.break_minutes} onChange={e => setNewShift({ ...newShift, break_minutes: Number(e.target.value) })} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }} />
-                  </div>
-                </div>
-                <button onClick={addShift} disabled={!newShift.store_id || !newShift.name} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: newShift.store_id && newShift.name ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 13, cursor: "pointer" }}>建立班別</button>
-              </div>
-            )}
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead><tr style={{ background: "#faf8f5", borderBottom: "1px solid #e8e6e1" }}>
-                  {["門市", "班別名稱", "時間", "休息", "工時", "角色", "操作"].map(h => <th key={h} style={{ padding: "10px 8px", textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}
-                </tr></thead>
-                <tbody>
-                  {shifts.length === 0 && <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "#ccc" }}>尚無班別，請先新增</td></tr>}
-                  {shifts.map(s => (
-                    <tr key={s.id} style={{ borderBottom: "1px solid #f0eeea" }}>
-                      <td style={{ padding: "10px 8px", fontWeight: 500 }}>{s.stores?.name}</td>
-                      <td style={{ padding: "10px 8px" }}>{s.name}</td>
-                      <td style={{ padding: "10px 8px" }}>{s.start_time?.slice(0, 5)} ~ {s.end_time?.slice(0, 5)}</td>
-                      <td style={{ padding: "10px 8px" }}>{s.break_minutes} 分</td>
-                      <td style={{ padding: "10px 8px" }}>{s.work_hours} hr</td>
-                      <td style={{ padding: "10px 8px" }}>{s.role}</td>
-                      <td style={{ padding: "10px 8px" }}><button onClick={() => deleteShift(s.id)} style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 11, color: "#b91c1c" }}>刪除</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+          {sv==="week"&&<div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:700}}><thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}><th style={{padding:"7px 5px",textAlign:"left",fontWeight:500,color:"#666",minWidth:60,position:"sticky",left:0,background:"#faf8f5",zIndex:1}}>員工</th>{wd.map((d,i)=><th key={d} style={{padding:"7px 3px",textAlign:"center",fontWeight:500,color:i===0||i===6?"#b91c1c":"#666",minWidth:85}}>{d.slice(5)}<br/>({DAYS[new Date(d).getDay()]})</th>)}</tr></thead><tbody>{fe.map(emp=><tr key={emp.id} style={{borderBottom:"1px solid #f0eeea"}}><td style={{padding:"5px",fontWeight:500,fontSize:11,position:"sticky",left:0,background:"#fff",zIndex:1}}>{emp.name}<br/><RB role={emp.role}/></td>{wd.map(date=><td key={date} style={{padding:"2px",textAlign:"center",verticalAlign:"top"}}>{renderCell(emp,date)}</td>)}</tr>)}</tbody></table></div>}
 
-        {/* ==================== 出勤紀錄 ==================== */}
-        {!loading && tab === "attendance" && (
-          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 700 }}>
-              <thead><tr style={{ background: "#faf8f5", borderBottom: "1px solid #e8e6e1" }}>
-                {["時間", "員工", "門市", "類型", "距離", "狀態", "遲到"].map(h => <th key={h} style={{ padding: "10px 8px", textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {attendance.length === 0 && <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "#ccc" }}>尚無出勤紀錄</td></tr>}
-                {attendance.map(a => (
-                  <tr key={a.id} style={{ borderBottom: "1px solid #f0eeea" }}>
-                    <td style={{ padding: "10px 8px", whiteSpace: "nowrap", fontSize: 12 }}>{new Date(a.timestamp).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
-                    <td style={{ padding: "10px 8px", fontWeight: 500 }}>{a.employees?.name}</td>
-                    <td style={{ padding: "10px 8px" }}>{a.stores?.name}</td>
-                    <td style={{ padding: "10px 8px" }}>{a.type === "clock_in" ? "🟢 上班" : "🔴 下班"}</td>
-                    <td style={{ padding: "10px 8px" }}>{a.distance_meters ? `${Math.round(a.distance_meters)}m` : "-"}</td>
-                    <td style={{ padding: "10px 8px" }}>{a.is_valid ? <span style={{ color: "#0a7c42" }}>✅</span> : <span style={{ color: "#b91c1c" }}>❌ 異常</span>}</td>
-                    <td style={{ padding: "10px 8px", color: a.late_minutes > 0 ? "#b91c1c" : "#0a7c42" }}>{a.late_minutes > 0 ? `${a.late_minutes}分` : "準時"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          {sv==="month"&&<div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:10,tableLayout:"fixed"}}><thead><tr style={{background:"#faf8f5"}}>{DAYS.map((d,i)=><th key={d} style={{padding:"6px 3px",textAlign:"center",color:i===0||i===6?"#b91c1c":"#666",fontWeight:500}}>{d}</th>)}</tr></thead><tbody>{Array.from({length:6},(_,wk)=>{const md=getMD();const row=md.slice(wk*7,wk*7+7);if(!row.length||!row.some(d=>d.inM))return null;return<tr key={wk}>{row.map(({date,inM})=>{const ds=scheds.filter(s=>s.date===date);return<td key={date} style={{padding:3,verticalAlign:"top",border:"1px solid #f0eeea",minHeight:50,opacity:inM?1:0.3}}><div style={{fontSize:10,fontWeight:500,color:"#666",marginBottom:1}}>{parseInt(date.split("-")[2])}</div>{ds.slice(0,3).map(s=>{if(s.type==="leave"){const lt=LT[s.leave_type]||LT.off;return<div key={s.id} style={{background:lt.bg,borderRadius:2,padding:"0 2px",fontSize:8,marginBottom:1,color:lt.c,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{s.employees?.name} {lt.l}</div>;}return<div key={s.id} style={{background:s.published?"#e6f9f0":"#fff8e6",borderRadius:2,padding:"0 2px",fontSize:8,marginBottom:1,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{s.employees?.name} {s.shifts?.name}</div>;})}{ds.length>3&&<div style={{fontSize:8,color:"#999"}}>+{ds.length-3}</div>}</td>;})}</tr>;})}</tbody></table></div>}
+        </div>}
 
-        {/* ==================== 打卡設定 ==================== */}
-        {!loading && tab === "settings" && (
-          <div style={{ maxWidth: 500 }}>
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", padding: 18 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 500, marginBottom: 14 }}>⚙️ 打卡設定（台灣勞基法標準）</h3>
-              {[
-                { key: "late_grace_minutes", label: "遲到寬限（分鐘）", desc: "在此分鐘內打卡不算遲到" },
-                { key: "late_threshold_minutes", label: "嚴重遲到（分鐘）", desc: "超過此分鐘視為嚴重遲到" },
-                { key: "early_leave_minutes", label: "早退認定（分鐘）", desc: "提前幾分鐘以上算早退" },
-                { key: "overtime_min_minutes", label: "加班最低（分鐘）", desc: "超時幾分鐘以上才計入加班" },
-                { key: "work_hours_per_day", label: "每日正常工時", desc: "法定 8 小時" },
-                { key: "work_hours_per_week", label: "每週正常工時", desc: "法定 40 小時" },
-              ].map(item => (
-                <div key={item.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #f0eeea" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{item.label}</div>
-                    <div style={{ fontSize: 11, color: "#999" }}>{item.desc}</div>
-                  </div>
-                  <input type="number" value={attSettings[item.key] ?? ""} onChange={e => {
-                    const v = Number(e.target.value);
-                    setAttSettings({ ...attSettings, [item.key]: v });
-                    clearTimeout(window._settingsTimer);
-                    window._settingsTimer = setTimeout(() => updateSettings(item.key, v), 1000);
-                  }} style={{ width: 70, padding: "6px 8px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, textAlign: "center" }} />
-                </div>
-              ))}
-              <div style={{ marginTop: 14, padding: 12, background: "#f0eeea", borderRadius: 8, fontSize: 12, color: "#666" }}>
-                加班費率：前 2 小時 1.34 倍，後 2 小時 1.67 倍<br />
-                休息：連續工作 4 小時以上至少休 30 分鐘
-              </div>
-            </div>
-          </div>
-        )}
+        {/* 請假 */}
+        {!ld&&tab==="leaves"&&<div>
+          {pl.length>0&&<div style={{background:"#fff8e6",border:"1px solid #fbbf2440",borderRadius:8,padding:12,marginBottom:10}}><h3 style={{fontSize:13,fontWeight:500,marginBottom:8}}>⏳ 待審核（{pl.length}）</h3>{pl.map(l=><div key={l.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid #f0eeea",flexWrap:"wrap"}}><span style={{fontWeight:500,fontSize:12}}>{l.employees?.name}</span><span style={{fontSize:11,color:LT[l.leave_type]?.c}}>{LT[l.leave_type]?.l}</span><span style={{fontSize:11}}>{l.start_date}{l.end_date!==l.start_date?` ~ ${l.end_date}`:""}{l.half_day?`（${l.half_day==="am"?"上午":"下午"}）`:""}</span><div style={{marginLeft:"auto",display:"flex",gap:3}}><button onClick={()=>rvLv(l.id,"approved")} style={{padding:"3px 10px",borderRadius:5,border:"none",background:"#0a7c42",color:"#fff",fontSize:11,cursor:"pointer"}}>✅核准</button><button onClick={()=>rvLv(l.id,"rejected")} style={{padding:"3px 10px",borderRadius:5,border:"none",background:"#b91c1c",color:"#fff",fontSize:11,cursor:"pointer"}}>❌駁回</button></div></div>)}</div>}
+          <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}><thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>{["員工","假別","日期","半天","狀態","時間"].map(h=><th key={h} style={{padding:7,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead><tbody>{lr.map(l=><tr key={l.id} style={{borderBottom:"1px solid #f0eeea"}}><td style={{padding:7,fontWeight:500}}>{l.employees?.name}</td><td style={{padding:7,color:LT[l.leave_type]?.c}}>{LT[l.leave_type]?.l||l.leave_type}</td><td style={{padding:7}}>{l.start_date}{l.end_date!==l.start_date?`~${l.end_date}`:""}</td><td style={{padding:7}}>{l.half_day?l.half_day==="am"?"上午":"下午":"全日"}</td><td style={{padding:7}}><Badge status={l.status}/></td><td style={{padding:7,fontSize:10,color:"#888"}}>{new Date(l.created_at).toLocaleString("zh-TW",{timeZone:"Asia/Taipei",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}</td></tr>)}</tbody></table></div>
+        </div>}
 
-        {/* ==================== 日結紀錄 ==================== */}
-        {!loading && tab === "settlements" && (
-          <div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-              <Card label="營業淨額" value={fmt(summary.total_net_sales)} sub={`${summary.count || 0}筆`} color="#0a7c42" />
-              <Card label="現金" value={fmt(summary.total_cash)} />
-              <Card label="應存" value={fmt(summary.total_cash_to_deposit)} color="#b45309" />
-            </div>
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 800 }}>
-                <thead><tr style={{ background: "#faf8f5", borderBottom: "1px solid #e8e6e1" }}>
-                  {["日期", "門市", "結單人", "淨額", "現金", "TWQR", "UberEat", "應存", "📷"].map(h => <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}
-                </tr></thead>
-                <tbody>
-                  {settlements.map(s => (
-                    <tr key={s.id} style={{ borderBottom: "1px solid #f0eeea" }}>
-                      <td style={{ padding: "8px 6px" }}>{s.date}</td>
-                      <td style={{ padding: "8px 6px", fontWeight: 500 }}>{s.stores?.name}</td>
-                      <td style={{ padding: "8px 6px" }}>{s.cashier_name || "-"}</td>
-                      <td style={{ padding: "8px 6px", fontWeight: 600, color: "#0a7c42" }}>{fmt(s.net_sales)}</td>
-                      <td style={{ padding: "8px 6px" }}>{fmt(s.cash_amount)}</td>
-                      <td style={{ padding: "8px 6px" }}>{fmt(s.twqr_amount)}</td>
-                      <td style={{ padding: "8px 6px" }}>{fmt(s.uber_eat_amount)}</td>
-                      <td style={{ padding: "8px 6px", color: "#b45309" }}>{fmt(s.cash_to_deposit)}</td>
-                      <td style={{ padding: "8px 6px" }}>{s.image_url && <button onClick={() => setSelectedImage(s.image_url)} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 11 }}>📷</button>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        {/* 班別 */}
+        {!ld&&tab==="shifts"&&<div>
+          <button onClick={()=>{setSsf(!ssf);setEs(null);setSf2({store_id:"",name:"",start_time:"10:00",end_time:"20:00",break_minutes:60,work_hours:9,role:"all"});}} style={{padding:"5px 14px",borderRadius:6,border:"1px solid #ddd",background:ssf?"#f0f0f0":"#1a1a1a",color:ssf?"#666":"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>{ssf?"✕":"＋ 新增"}</button>
+          {ssf&&<div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:14,marginBottom:8}}><div style={{fontSize:12,fontWeight:500,marginBottom:8}}>{es?"✏️ 編輯":"＋ 新增"}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>{[["store_id","門市","select"],["name","名稱","text"],["role","角色","role"],["start_time","上班","time"],["end_time","下班","time"],["break_minutes","休息(分)","number"]].map(([k,l,t])=><div key={k}><label style={{fontSize:10,color:"#888"}}>{l}</label>{t==="select"?<select value={sf2[k]} onChange={e=>setSf2({...sf2,[k]:e.target.value})} style={{width:"100%",padding:"5px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}><option value="">選擇</option>{stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>:t==="role"?<select value={sf2[k]} onChange={e=>setSf2({...sf2,[k]:e.target.value})} style={{width:"100%",padding:"5px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}><option value="all">全場</option><option value="外場">外場</option><option value="內場">內場</option></select>:<input type={t} value={sf2[k]} onChange={e=>setSf2({...sf2,[k]:t==="number"?Number(e.target.value):e.target.value})} style={{width:"100%",padding:"5px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}/>}</div>)}</div><button onClick={saveShift} style={{padding:"5px 16px",borderRadius:5,border:"none",background:"#0a7c42",color:"#fff",fontSize:11,cursor:"pointer"}}>{es?"💾 儲存":"建立"}</button></div>}
+          <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}><thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>{["門市","班別","時間","休息","角色","操作"].map(h=><th key={h} style={{padding:7,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead><tbody>{shifts.map(s=><tr key={s.id} style={{borderBottom:"1px solid #f0eeea"}}><td style={{padding:7}}>{s.stores?.name}</td><td style={{padding:7,fontWeight:500}}>{s.name}</td><td style={{padding:7}}>{s.start_time?.slice(0,5)}~{s.end_time?.slice(0,5)}</td><td style={{padding:7}}>{s.break_minutes}分</td><td style={{padding:7}}>{s.role}</td><td style={{padding:7}}><button onClick={()=>editShift(s)} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,marginRight:3}}>✏️</button><button onClick={()=>delShift(s.id)} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button></td></tr>)}</tbody></table></div>
+        </div>}
 
-        {/* ==================== 存款紀錄 ==================== */}
-        {!loading && tab === "deposits" && (
-          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 700 }}>
-              <thead><tr style={{ background: "#faf8f5", borderBottom: "1px solid #e8e6e1" }}>
-                {["日期", "門市", "匯款人", "金額", "應存", "差異", "狀態", "📷"].map(h => <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {deposits.map(d => (
-                  <tr key={d.id} style={{ borderBottom: "1px solid #f0eeea" }}>
-                    <td style={{ padding: "8px 6px" }}>{d.deposit_date}</td>
-                    <td style={{ padding: "8px 6px", fontWeight: 500 }}>{d.stores?.name}</td>
-                    <td style={{ padding: "8px 6px" }}>{d.depositor_name || "-"}</td>
-                    <td style={{ padding: "8px 6px", fontWeight: 600 }}>{fmt(d.amount)}</td>
-                    <td style={{ padding: "8px 6px" }}>{fmt(d.expected_cash)}</td>
-                    <td style={{ padding: "8px 6px", color: Math.abs(d.difference) <= 500 ? "#0a7c42" : "#b91c1c" }}>{d.difference >= 0 ? "+" : ""}{fmt(d.difference)}</td>
-                    <td style={{ padding: "8px 6px" }}><Badge status={d.status} /></td>
-                    <td style={{ padding: "8px 6px" }}>{d.image_url && <button onClick={() => setSelectedImage(d.image_url)} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 11 }}>📷</button>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* 出勤 */}
+        {!ld&&tab==="attendance"&&<div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:600}}><thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>{["時間","員工","門市","類型","距離","遲到"].map(h=><th key={h} style={{padding:7,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead><tbody>{att.map(a=><tr key={a.id} style={{borderBottom:"1px solid #f0eeea"}}><td style={{padding:7,fontSize:10}}>{new Date(a.timestamp).toLocaleString("zh-TW",{timeZone:"Asia/Taipei",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}</td><td style={{padding:7,fontWeight:500}}>{a.employees?.name}</td><td style={{padding:7}}>{a.stores?.name}</td><td style={{padding:7}}>{a.type==="clock_in"?"🟢上班":"🔴下班"}</td><td style={{padding:7}}>{a.distance_meters?`${Math.round(a.distance_meters)}m`:"-"}{a.is_valid?"✅":"❌"}</td><td style={{padding:7,color:a.late_minutes>0?"#b91c1c":"#0a7c42"}}>{a.late_minutes>0?`${a.late_minutes}分`:"準時"}</td></tr>)}</tbody></table></div>}
 
-        {/* ==================== 員工管理 ==================== */}
-        {!loading && tab === "employees" && (
-          <div>
-            <button onClick={() => { setShowAddForm(!showAddForm); setNewBindCode(null); }} style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #ddd", background: showAddForm ? "#f0f0f0" : "#1a1a1a", color: showAddForm ? "#666" : "#fff", fontSize: 13, cursor: "pointer", marginBottom: 12 }}>{showAddForm ? "✕ 取消" : "＋ 新增員工"}</button>
-            {showAddForm && (
-              <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", padding: 18, marginBottom: 12 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-                  <div><label style={{ fontSize: 12, color: "#888" }}>姓名 *</label><input value={newEmp.name} onChange={e => setNewEmp({ ...newEmp, name: e.target.value })} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }} /></div>
-                  <div><label style={{ fontSize: 12, color: "#888" }}>電話</label><input value={newEmp.phone} onChange={e => setNewEmp({ ...newEmp, phone: e.target.value })} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }} /></div>
-                  <div><label style={{ fontSize: 12, color: "#888" }}>門市</label><select value={newEmp.store_id} onChange={e => setNewEmp({ ...newEmp, store_id: e.target.value })} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }}><option value="">總部</option>{stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                  <div><label style={{ fontSize: 12, color: "#888" }}>角色</label><select value={newEmp.role} onChange={e => setNewEmp({ ...newEmp, role: e.target.value })} style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }}><option value="staff">👤 員工</option><option value="manager">🏠 管理</option><option value="admin">👑 總部</option></select></div>
-                </div>
-                <button onClick={addEmployee} disabled={!newEmp.name} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: newEmp.name ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 13, cursor: "pointer" }}>建立 + 產生綁定碼</button>
-                {newBindCode && <div style={{ marginTop: 10, padding: 14, background: "#e6f9f0", borderRadius: 8 }}><div style={{ fontSize: 13, fontWeight: 600, color: "#0a7c42" }}>✅ 綁定碼：<span style={{ fontSize: 22, letterSpacing: 4 }}>{newBindCode}</span></div><div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>員工在 LINE 輸入：綁定 {newBindCode}</div></div>}
-              </div>
-            )}
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead><tr style={{ background: "#faf8f5", borderBottom: "1px solid #e8e6e1" }}>
-                  {["姓名", "角色", "門市", "LINE", "綁定碼", "操作"].map(h => <th key={h} style={{ padding: "8px", textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}
-                </tr></thead>
-                <tbody>
-                  {employees.map(e => (
-                    <tr key={e.id} style={{ borderBottom: "1px solid #f0eeea", opacity: e.is_active ? 1 : 0.4 }}>
-                      <td style={{ padding: "8px", fontWeight: 500 }}>{e.name}</td>
-                      <td style={{ padding: "8px" }}><RoleBadge role={e.role} /></td>
-                      <td style={{ padding: "8px" }}>{e.stores?.name || "總部"}</td>
-                      <td style={{ padding: "8px" }}>{e.line_uid ? <span style={{ color: "#0a7c42" }}>✅</span> : "未綁定"}</td>
-                      <td style={{ padding: "8px", fontFamily: "monospace" }}>{e.bind_code || "-"}</td>
-                      <td style={{ padding: "8px" }}>{!e.line_uid && <button onClick={() => regenerateCode(e.id)} style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 11 }}>🔄 綁定碼</button>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        {/* 設定 */}
+        {!ld&&tab==="settings"&&<div style={{maxWidth:420}}><div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:14}}><h3 style={{fontSize:13,fontWeight:500,marginBottom:10}}>⚙️ 打卡設定</h3>{[["late_grace_minutes","遲到寬限(分)"],["late_threshold_minutes","嚴重遲到(分)"],["early_leave_minutes","早退認定(分)"],["overtime_min_minutes","加班最低(分)"],["work_hours_per_day","每日工時"],["work_hours_per_week","每週工時"]].map(([k,l])=><div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #f0eeea"}}><span style={{fontSize:12}}>{l}</span><input type="number" value={as[k]??""} onChange={e=>upS(k,Number(e.target.value))} style={{width:55,padding:4,borderRadius:5,border:"1px solid #ddd",textAlign:"center",fontSize:12}}/></div>)}</div></div>}
+
+        {/* 日結 */}
+        {!ld&&tab==="settlements"&&<div><div style={{display:"flex",gap:6,marginBottom:10}}><div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 14px",flex:1}}><div style={{fontSize:10,color:"#888"}}>淨額</div><div style={{fontSize:16,fontWeight:600,color:"#0a7c42"}}>{fmt(sum.total_net_sales)}</div></div><div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 14px",flex:1}}><div style={{fontSize:10,color:"#888"}}>應存</div><div style={{fontSize:16,fontWeight:600,color:"#b45309"}}>{fmt(sum.total_cash_to_deposit)}</div></div></div><div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}><thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>{["日期","門市","淨額","現金","應存","📷"].map(h=><th key={h} style={{padding:"7px 5px",textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead><tbody>{stl.map(s=><tr key={s.id} style={{borderBottom:"1px solid #f0eeea"}}><td style={{padding:"7px 5px"}}>{s.date}</td><td style={{padding:"7px 5px",fontWeight:500}}>{s.stores?.name}</td><td style={{padding:"7px 5px",color:"#0a7c42",fontWeight:600}}>{fmt(s.net_sales)}</td><td style={{padding:"7px 5px"}}>{fmt(s.cash_amount)}</td><td style={{padding:"7px 5px",color:"#b45309"}}>{fmt(s.cash_to_deposit)}</td><td style={{padding:"7px 5px"}}>{s.image_url&&<button onClick={()=>setSi(s.image_url)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:9}}>📷</button>}</td></tr>)}</tbody></table></div></div>}
+
+        {/* 存款 */}
+        {!ld&&tab==="deposits"&&<div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}><thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>{["日期","門市","金額","應存","差異","狀態"].map(h=><th key={h} style={{padding:7,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead><tbody>{dep.map(d=><tr key={d.id} style={{borderBottom:"1px solid #f0eeea"}}><td style={{padding:7}}>{d.deposit_date}</td><td style={{padding:7,fontWeight:500}}>{d.stores?.name}</td><td style={{padding:7,fontWeight:600}}>{fmt(d.amount)}</td><td style={{padding:7}}>{fmt(d.expected_cash)}</td><td style={{padding:7,color:Math.abs(d.difference)<=500?"#0a7c42":"#b91c1c"}}>{d.difference>=0?"+":""}{fmt(d.difference)}</td><td style={{padding:7}}><Badge status={d.status}/></td></tr>)}</tbody></table></div>}
+
+        {/* 員工 */}
+        {!ld&&tab==="employees"&&<div><button onClick={()=>{setSaf(!saf);setNbc(null);}} style={{padding:"5px 14px",borderRadius:6,border:"1px solid #ddd",background:saf?"#f0f0f0":"#1a1a1a",color:saf?"#666":"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>{saf?"✕":"＋新增"}</button>{saf&&<div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:14,marginBottom:8}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}><div><label style={{fontSize:10,color:"#888"}}>姓名*</label><input value={ne.name} onChange={e=>setNe({...ne,name:e.target.value})} style={{width:"100%",padding:"5px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}/></div><div><label style={{fontSize:10,color:"#888"}}>門市</label><select value={ne.store_id} onChange={e=>setNe({...ne,store_id:e.target.value})} style={{width:"100%",padding:"5px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}><option value="">總部</option>{stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div><div><label style={{fontSize:10,color:"#888"}}>角色</label><select value={ne.role} onChange={e=>setNe({...ne,role:e.target.value})} style={{width:"100%",padding:"5px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}><option value="staff">員工</option><option value="manager">管理</option><option value="admin">總部</option></select></div><div><label style={{fontSize:10,color:"#888"}}>電話</label><input value={ne.phone} onChange={e=>setNe({...ne,phone:e.target.value})} style={{width:"100%",padding:"5px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}/></div></div><button onClick={addEmp} disabled={!ne.name} style={{padding:"5px 14px",borderRadius:5,border:"none",background:ne.name?"#0a7c42":"#ccc",color:"#fff",fontSize:11,cursor:"pointer"}}>建立</button>{nbc&&<div style={{marginTop:6,padding:8,background:"#e6f9f0",borderRadius:5,fontSize:12}}><b style={{color:"#0a7c42"}}>綁定碼：{nbc}</b><br/><span style={{fontSize:10}}>員工輸入：綁定 {nbc}</span></div>}</div>}<div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}><thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>{["姓名","角色","門市","LINE","操作"].map(h=><th key={h} style={{padding:7,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead><tbody>{emps.map(e=><tr key={e.id} style={{borderBottom:"1px solid #f0eeea",opacity:e.is_active?1:0.4}}><td style={{padding:7,fontWeight:500}}>{e.name}</td><td style={{padding:7}}><RB role={e.role}/></td><td style={{padding:7}}>{e.stores?.name||"總部"}</td><td style={{padding:7}}>{e.line_uid?<span style={{color:"#0a7c42"}}>✅</span>:<span style={{fontSize:10}}>{e.bind_code||"未綁"}</span>}</td><td style={{padding:7}}>{!e.line_uid&&<button onClick={()=>regen(e.id)} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:9}}>🔄</button>}</td></tr>)}</tbody></table></div></div>}
       </div>
-
-      {/* Image Modal */}
-      {selectedImage && (
-        <div onClick={() => setSelectedImage(null)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "pointer", padding: 20 }}>
-          <img src={selectedImage} alt="" style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: 12, objectFit: "contain" }} />
-        </div>
-      )}
+      {si&&<div onClick={()=>setSi(null)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,cursor:"pointer",padding:12}}><img src={si} alt="" style={{maxWidth:"90vw",maxHeight:"85vh",borderRadius:8}}/></div>}
     </div>
   );
 }
