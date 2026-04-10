@@ -93,9 +93,9 @@ export async function POST(request) {
     }).eq("id", employee_id).select("*, stores(name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
 
-    // 如果已有 LINE UID，直接通知
+    // 通知員工帳號已啟用
     if (data.line_uid) {
-      await pushText(data.line_uid, `✅ 你的帳號已啟用！\n\n👤 ${data.name}\n🏠 ${data.stores?.name || "總部"}\n\n輸入「選單」查看功能列表`).catch(() => {});
+      await pushText(data.line_uid, `✅ 帳號已啟用！\n\n👤 ${data.name}\n🏠 ${data.stores?.name || "總部"}\n🔑 綁定碼：${bindCode}\n\n你已經可以使用系統了，輸入「選單」查看功能列表。\n\n如需重新綁定請輸入：綁定 ${bindCode}`).catch(() => {});
     }
 
     return Response.json({ data, bind_code: bindCode });

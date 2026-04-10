@@ -72,12 +72,20 @@ export async function POST(request) {
       await pushText(record.line_uid, `✅ 簽署完成！\n\n👤 ${record.name}\n🏠 ${record.store_name}\n📧 合約副本已寄至 ${email}\n\n⏳ 請等待總部核發帳號權限`).catch(() => {});
     }
 
-    // 通知總部
+    // 通知總部（含後台連結）
+    const baseUrl = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
     const { data: admins } = await supabase.from("employees").select("line_uid").eq("role", "admin").eq("is_active", true);
     if (admins) {
+      const { lineClient } = await import("@/lib/line");
       for (const a of admins) {
         if (a.line_uid && a.line_uid !== record.line_uid) {
-          await pushText(a.line_uid, `🆕 新人完成簽署\n👤 ${record.name}\n🏠 ${record.store_name}\n📱 ${phone}\n📧 ${email}\n\n⏳ 請到後台「員工管理」啟用帳號`).catch(() => {});
+          await lineClient.pushMessage({
+            to: a.line_uid,
+            messages: [
+              { type: "text", text: `🆕 新人完成簽署\n👤 ${record.name}\n🏠 ${record.store_name}\n📱 ${phone}\n📧 ${email}\n\n⏳ 請到後台啟用帳號` },
+              { type: "template", altText: "前往員工管理", template: { type: "buttons", title: "👥 員工管理", text: "點擊下方按鈕前往後台啟用新人帳號", actions: [{ type: "uri", label: "前往後台啟用", uri: baseUrl }] } },
+            ],
+          }).catch(() => {});
         }
       }
     }

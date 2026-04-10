@@ -23,14 +23,19 @@ function LoginPage({onLogin}){
 }
 
 // ===== 員工詳情彈窗 =====
+const TIERS_R = [[1,"27,470"],[2,"27,471~28,800"],[3,"28,801~30,300"],[4,"30,301~31,800"],[5,"31,801~33,300"],[6,"33,301~34,800"],[7,"34,801~36,300"],[8,"36,301~38,200"],[9,"38,201~40,100"],[10,"40,101~42,000"],[11,"42,001~43,900"],[12,"43,901~45,800"]];
+const TIERS_P = [[1,"~11,100"],[2,"11,101~12,540"],[3,"12,541~13,500"],[4,"13,501~15,840"],[5,"15,841~16,500"],[6,"16,501~17,280"],[7,"17,281~17,880"],[8,"17,881~19,047"],[9,"19,048~20,008"],[10,"20,009~21,009"],[11,"21,010~22,000"],[12,"22,001~23,100"]];
+
 function EmpDetail({empId,onClose}){
   const[d,setD]=useState(null);const[ld,setLd]=useState(true);const[editing,setEditing]=useState(false);
-  const[form,setForm]=useState({insurance_tier:"",insurance_start_date:"",hourly_rate:"",monthly_salary:"",employment_type:""});
-  useEffect(()=>{api(`/api/admin/employees?id=${empId}`).then(r=>{setD(r);if(r.data){setForm({insurance_tier:r.data.insurance_tier||"",insurance_start_date:r.data.insurance_start_date||"",hourly_rate:r.data.hourly_rate||"",monthly_salary:r.data.monthly_salary||"",employment_type:r.data.employment_type||"regular"});}setLd(false);});},[empId]);
-  const save=async()=>{await api("/api/admin/employees",{action:"update",employee_id:empId,...form,insurance_tier:form.insurance_tier?Number(form.insurance_tier):null,hourly_rate:form.hourly_rate?Number(form.hourly_rate):null,monthly_salary:form.monthly_salary?Number(form.monthly_salary):null});setEditing(false);api(`/api/admin/employees?id=${empId}`).then(r=>setD(r));};
+  const[form,setForm]=useState({insurance_tier:"",insurance_start_date:"",hourly_rate:"",monthly_salary:"",employment_type:"",role:""});
+  const reload=()=>api(`/api/admin/employees?id=${empId}`).then(r=>{setD(r);if(r.data){setForm({insurance_tier:r.data.insurance_tier||"",insurance_start_date:r.data.insurance_start_date||"",hourly_rate:r.data.hourly_rate||"",monthly_salary:r.data.monthly_salary||"",employment_type:r.data.employment_type||"regular",role:r.data.role||"staff"});}setLd(false);});
+  useEffect(()=>{reload();},[empId]);
+  const save=async()=>{await api("/api/admin/employees",{action:"update",employee_id:empId,...form,insurance_tier:form.insurance_tier?Number(form.insurance_tier):null,hourly_rate:form.hourly_rate?Number(form.hourly_rate):null,monthly_salary:form.monthly_salary?Number(form.monthly_salary):null});setEditing(false);reload();};
+  const tiers=form.employment_type==="parttime"?TIERS_P:TIERS_R;
 
   if(ld)return<div style={modal}><div style={mbox}><p>載入中...</p></div></div>;
-  const e=d?.data,ob=d?.onboarding,ins=d?.insurance;
+  const e=d?.data,ins=d?.insurance;
   return<div style={modal} onClick={onClose}><div style={mbox} onClick={ev=>ev.stopPropagation()}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
       <h2 style={{fontSize:16,fontWeight:600}}>👤 {e?.name}</h2>
@@ -38,15 +43,26 @@ function EmpDetail({empId,onClose}){
     </div>
 
     <div style={sec}><h4 style={sh}>基本資料</h4>
-      <Row l="角色" v={<RB role={e?.role}/>}/><Row l="門市" v={e?.stores?.name||"總部"}/><Row l="手機" v={e?.phone}/><Row l="Email" v={e?.email}/>
+      <Row l="門市" v={e?.stores?.name||"總部"}/><Row l="手機" v={e?.phone}/><Row l="Email" v={e?.email}/>
       <Row l="生日" v={e?.birthday}/><Row l="身分證" v={e?.id_number}/><Row l="緊急聯絡" v={`${e?.emergency_contact||""} ${e?.emergency_phone||""} (${e?.emergency_relation||""})`}/>
+    </div>
+
+    <div style={sec}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h4 style={sh}>角色權限</h4><button onClick={()=>setEditing(!editing)} style={{fontSize:11,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"transparent",cursor:"pointer"}}>{editing?"取消":"✏️ 編輯"}</button></div>
+      {!editing?<>
+        <Row l="目前角色" v={<RB role={e?.role}/>}/>
+        <Row l="帳號狀態" v={e?.is_active?<span style={{color:"#0a7c42"}}>✅ 啟用中</span>:<span style={{color:"#b91c1c"}}>⏳ 待啟用</span>}/>
+        <Row l="LINE" v={e?.line_uid?"✅ 已綁定":"未綁定"}/>
+      </>:<div style={{marginTop:6}}>
+        <label style={{fontSize:10,color:"#888"}}>角色</label>
+        <select value={form.role} onChange={ev=>setForm({...form,role:ev.target.value})} style={{...inp,marginBottom:6}}>
+          <option value="staff">👤 員工</option><option value="store_manager">🏪 門店主管</option><option value="manager">🏠 管理</option><option value="admin">👑 總部</option>
+        </select>
+      </div>}
     </div>
 
     <div style={sec}><h4 style={sh}>在職資訊</h4>
       <Row l="到職日" v={e?.hire_date||"未設定"}/><Row l="年資" v={`${d?.service_months||0} 個月`}/><Row l="類型" v={e?.employment_type==="parttime"?"兼職":"一般"}/>
       <Row l="合約簽署" v={e?.contract_signed?`✅ ${new Date(e.contract_signed_at).toLocaleDateString("zh-TW")}`:"❌ 未簽署"}/>
-      <Row l="帳號狀態" v={e?.is_active?<span style={{color:"#0a7c42"}}>✅ 啟用中</span>:<span style={{color:"#b91c1c"}}>⏳ 待啟用</span>}/>
-      <Row l="LINE" v={e?.line_uid?"✅ 已綁定":"未綁定"}/>
     </div>
 
     <div style={sec}><h4 style={sh}>特休假額度（{new Date().getFullYear()}年）</h4>
@@ -54,22 +70,37 @@ function EmpDetail({empId,onClose}){
       {d?.leave_balance&&<><Row l="已用特休" v={`${d.leave_balance.annual_used||0} 天`}/><Row l="已用病假" v={`${d.leave_balance.sick_used||0} / ${d.leave_balance.sick_leave||30} 天`}/><Row l="已用事假" v={`${d.leave_balance.personal_used||0} / ${d.leave_balance.personal_leave||14} 天`}/></>}
     </div>
 
-    <div style={sec}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h4 style={sh}>勞健保設定</h4><button onClick={()=>setEditing(!editing)} style={{fontSize:11,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"transparent",cursor:"pointer"}}>{editing?"取消":"✏️ 編輯"}</button></div>
+    <div style={sec}><h4 style={sh}>勞保設定</h4>
       {!editing?<>
-        <Row l="投保類型" v={e?.employment_type==="parttime"?"兼職":"一般"}/><Row l="投保級距" v={e?.insurance_tier?`第${e.insurance_tier}級`:"未設定"}/>
-        <Row l="加保日期" v={e?.insurance_start_date||"未設定"}/>{ins&&<><Row l="投保薪資" v={fmt(ins.insured_salary)}/><Row l="勞保自付" v={fmt(ins.labor_self)}/><Row l="健保自付" v={fmt(ins.health_self)}/></>}
-        <Row l="月薪" v={e?.monthly_salary?fmt(e.monthly_salary):"未設定"}/><Row l="時薪" v={e?.hourly_rate?fmt(e.hourly_rate):"未設定"}/>
-      </>:<div style={{marginTop:8}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-          <div><label style={{fontSize:10,color:"#888"}}>投保類型</label><select value={form.employment_type} onChange={ev=>setForm({...form,employment_type:ev.target.value})} style={inp}><option value="regular">一般</option><option value="parttime">兼職</option></select></div>
-          <div><label style={{fontSize:10,color:"#888"}}>投保級距</label><select value={form.insurance_tier} onChange={ev=>setForm({...form,insurance_tier:ev.target.value})} style={inp}><option value="">未設定</option>{[1,2,3,4,5,6,7,8,9,10,11,12].map(i=><option key={i} value={i}>第{i}級</option>)}</select></div>
-          <div><label style={{fontSize:10,color:"#888"}}>加保日期</label><input type="date" value={form.insurance_start_date} onChange={ev=>setForm({...form,insurance_start_date:ev.target.value})} style={inp}/></div>
-          <div><label style={{fontSize:10,color:"#888"}}>月薪</label><input type="number" value={form.monthly_salary} onChange={ev=>setForm({...form,monthly_salary:ev.target.value})} style={inp}/></div>
-          <div><label style={{fontSize:10,color:"#888"}}>時薪</label><input type="number" value={form.hourly_rate} onChange={ev=>setForm({...form,hourly_rate:ev.target.value})} style={inp}/></div>
-        </div>
-        <button onClick={save} style={{marginTop:8,padding:"6px 16px",borderRadius:6,border:"none",background:"#0a7c42",color:"#fff",fontSize:12,cursor:"pointer"}}>💾 儲存</button>
-      </div>}
+        <Row l="投保類型" v={e?.employment_type==="parttime"?"兼職":"一般"}/>
+        <Row l="投保級距" v={e?.insurance_tier?`第${e.insurance_tier}級（${tiers.find(t=>t[0]===e.insurance_tier)?.[1]||""}）`:"未設定"}/>
+        <Row l="加保日期" v={e?.insurance_start_date||"未設定"}/>
+        {ins&&<><Row l="投保薪資" v={fmt(ins.insured_salary)}/><Row l="勞保自付額" v={fmt(ins.labor_self)+"/月"}/><Row l="勞保雇主負擔" v={fmt(ins.labor_employer)+"/月"}/></>}
+      </>:null}
     </div>
+
+    <div style={sec}><h4 style={sh}>健保設定</h4>
+      {!editing?<>
+        {ins?<><Row l="健保自付額" v={fmt(ins.health_self)+"/月"}/><Row l="健保雇主負擔" v={fmt(ins.health_employer)+"/月"}/></>:<Row l="狀態" v="未設定投保級距"/>}
+      </>:null}
+    </div>
+
+    <div style={sec}><h4 style={sh}>薪資設定</h4>
+      {!editing?<>
+        <Row l="月薪" v={e?.monthly_salary?fmt(e.monthly_salary):"未設定"}/><Row l="時薪" v={e?.hourly_rate?fmt(e.hourly_rate):"未設定"}/>
+      </>:null}
+    </div>
+
+    {editing&&<div style={sec}><h4 style={sh}>編輯勞健保與薪資</h4>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+        <div><label style={{fontSize:10,color:"#888"}}>投保類型</label><select value={form.employment_type} onChange={ev=>setForm({...form,employment_type:ev.target.value,insurance_tier:""})} style={inp}><option value="regular">一般</option><option value="parttime">兼職</option></select></div>
+        <div><label style={{fontSize:10,color:"#888"}}>投保級距</label><select value={form.insurance_tier} onChange={ev=>setForm({...form,insurance_tier:ev.target.value})} style={inp}><option value="">未設定</option>{tiers.map(([i,r])=><option key={i} value={i}>第{i}級（{r}）</option>)}</select></div>
+        <div><label style={{fontSize:10,color:"#888"}}>加保日期</label><input type="date" value={form.insurance_start_date} onChange={ev=>setForm({...form,insurance_start_date:ev.target.value})} style={inp}/></div>
+        <div><label style={{fontSize:10,color:"#888"}}>月薪</label><input type="number" value={form.monthly_salary} onChange={ev=>setForm({...form,monthly_salary:ev.target.value})} style={inp}/></div>
+        <div><label style={{fontSize:10,color:"#888"}}>時薪</label><input type="number" value={form.hourly_rate} onChange={ev=>setForm({...form,hourly_rate:ev.target.value})} style={inp}/></div>
+      </div>
+      <button onClick={save} style={{marginTop:8,width:"100%",padding:"8px",borderRadius:6,border:"none",background:"#0a7c42",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>💾 儲存所有變更</button>
+    </div>}
   </div></div>;
 }
 const modal={position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,padding:16};
