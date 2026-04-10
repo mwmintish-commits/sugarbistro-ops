@@ -4,8 +4,9 @@ const fmt = (n) => "$" + Number(n || 0).toLocaleString();
 const ROLES = { admin: "👑總部", manager: "🏠管理", store_manager: "🏪門店主管", staff: "👤員工" };
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
 const LT = { annual: { l: "特休", c: "#4361ee", bg: "#e6f1fb" }, sick: { l: "病假", c: "#b45309", bg: "#fff8e6" }, personal: { l: "事假", c: "#8a6d00", bg: "#fef9c3" }, menstrual: { l: "生理假", c: "#993556", bg: "#fbeaf0" }, off: { l: "例假", c: "#666", bg: "#f0f0f0" }, rest: { l: "休息日", c: "#888", bg: "#f5f5f5" } };
-const ROLE_TABS = { admin: ["schedules", "leaves", "shifts", "attendance", "worklogs", "expenses", "pnl", "announcements", "settings", "settlements", "deposits", "employees"], manager: ["schedules", "leaves", "shifts", "attendance", "worklogs", "expenses", "pnl", "settlements", "deposits", "employees"], store_manager: ["schedules", "shifts", "worklogs"] };
-const TAB_L = { schedules: "📅排班", leaves: "🙋請假", shifts: "⏰班別", attendance: "📍出勤", worklogs: "📋日誌", expenses: "📦費用", pnl: "📊損益", announcements: "📢公告", settings: "⚙️設定", settlements: "💰日結", deposits: "🏦存款", employees: "👥員工" };
+const ROLE_TABS = { admin: ["employees", "schedules", "leaves", "attendance", "payroll", "settlements", "deposits", "expenses", "pnl", "shifts", "worklogs", "announcements", "settings"], manager: ["employees", "schedules", "leaves", "attendance", "payroll", "settlements", "deposits", "expenses", "pnl", "shifts", "worklogs"], store_manager: ["schedules", "shifts", "worklogs"] };
+const TAB_L = { employees: "👥員工", schedules: "📅排班", leaves: "🙋請假", attendance: "📍出勤", payroll: "💰薪資", settlements: "💰日結", deposits: "🏦存款", expenses: "📦費用", pnl: "📊損益", shifts: "⏰班別", worklogs: "📋日誌", announcements: "📢公告", settings: "⚙️設定" };
+const TAB_GROUPS = { "人資": ["employees", "schedules", "leaves", "attendance", "payroll"], "財務": ["settlements", "deposits", "expenses", "pnl"], "管理": ["shifts", "worklogs", "announcements", "settings"] };
 function ap(u, b) { return b ? fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).then(r => r.json()) : fetch(u).then(r => r.json()); }
 function Badge({ status }) { const m = { matched: { bg: "#e6f9f0", c: "#0a7c42" }, pending: { bg: "#fff8e6", c: "#8a6d00" }, approved: { bg: "#e6f9f0", c: "#0a7c42" }, rejected: { bg: "#fde8e8", c: "#b91c1c" }, anomaly: { bg: "#fde8e8", c: "#b91c1c" } }; const s = m[status] || { bg: "#f0f0f0", c: "#666" }; return <span style={{ padding: "2px 6px", borderRadius: 8, fontSize: 10, background: s.bg, color: s.c }}>{status}</span>; }
 function RB({ role }) { const c = { admin: { bg: "#fde8e8", c: "#b91c1c" }, manager: { bg: "#e6f1fb", c: "#185fa5" }, store_manager: { bg: "#fef9c3", c: "#8a6d00" }, staff: { bg: "#e6f9f0", c: "#0a7c42" } }; const s = c[role] || c.staff; return <span style={{ padding: "1px 5px", borderRadius: 5, fontSize: 9, background: s.bg, color: s.c }}>{ROLES[role] || role}</span>; }
@@ -117,6 +118,8 @@ function Dashboard({ auth, onLogout }) {
   const [anns, setAnns] = useState([]); const [newAnn, setNewAnn] = useState({ title: "", content: "", priority: "normal", store_id: "" }); const [showAnnForm, setShowAnnForm] = useState(false);
   const [wlogs, setWlogs] = useState([]); const [wltemplates, setWltemplates] = useState([]); const [showWlForm, setShowWlForm] = useState(false);
   const [newWl, setNewWl] = useState({ store_id: "", category: "開店準備", item: "", role: "all", shift_type: "opening", sort_order: 0 });
+  const [expType, setExpType] = useState("all");
+  const [payrollData, setPayrollData] = useState([]);
 
   useEffect(() => { ap("/api/admin/stores").then(d => setStores(d.data || [])); }, []);
   const load = useCallback(() => {
@@ -186,8 +189,16 @@ function Dashboard({ auth, onLogout }) {
         </div>
       </div>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "12px 8px" }}>
-        <div style={{ display: "flex", gap: 3, marginBottom: 10, overflowX: "auto", paddingBottom: 3 }}>
-          {myTabs.map(id => <button key={id} style={{ padding: "5px 12px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 11, fontWeight: tab === id ? 600 : 400, background: tab === id ? "#1a1a1a" : "transparent", color: tab === id ? "#fff" : "#888", whiteSpace: "nowrap" }} onClick={() => setTab(id)}>{TAB_L[id]}</button>)}
+        <div style={{ display: "flex", gap: 2, marginBottom: 10, overflowX: "auto", paddingBottom: 3, alignItems: "center" }}>
+          {Object.entries(TAB_GROUPS).map(([group, tabs]) => {
+            const visible = tabs.filter(id => myTabs.includes(id));
+            if (visible.length === 0) return null;
+            return <span key={group} style={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <span style={{ fontSize: 9, color: "#aaa", padding: "0 4px", whiteSpace: "nowrap" }}>{group}</span>
+              {visible.map(id => <button key={id} style={{ padding: "5px 10px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 11, fontWeight: tab === id ? 600 : 400, background: tab === id ? "#1a1a1a" : "transparent", color: tab === id ? "#fff" : "#888", whiteSpace: "nowrap" }} onClick={() => setTab(id)}>{TAB_L[id]}</button>)}
+              <span style={{ borderLeft: "1px solid #ddd", height: 16, margin: "0 2px" }} />
+            </span>;
+          })}
         </div>
         {ld && <div style={{ textAlign: "center", padding: 30, color: "#aaa" }}>載入中...</div>}
 
@@ -249,7 +260,7 @@ function Dashboard({ auth, onLogout }) {
           </div>
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto", marginBottom: 14 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["門市", "分類", "角色", "時段", "項目", ""].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
-              <tbody>{wltemplates.length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: "center", color: "#ccc" }}>尚無項目</td></tr> : wltemplates.map(t => <tr key={t.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{stores.find(s => s.id === t.store_id) ? stores.find(s => s.id === t.store_id).name : "-"}</td><td style={{ padding: 6, fontWeight: 500 }}>{t.category}</td><td style={{ padding: 6 }}>{t.role === "all" ? "全員" : t.role}</td><td style={{ padding: 6 }}>{t.shift_type === "closing" ? "打烊" : t.shift_type === "during" ? "營業" : "開店"}</td><td style={{ padding: 6 }}>{t.item}</td><td style={{ padding: 4 }}><button onClick={() => delWlTemplate(t.id)} style={{ padding: "1px 5px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 9, color: "#b91c1c" }}>🗑</button></td></tr>)}</tbody></table>
+              <tbody>{wltemplates.filter(t => !sf || t.store_id === sf).length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: "center", color: "#ccc" }}>尚無項目</td></tr> : wltemplates.filter(t => !sf || t.store_id === sf).map(t => <tr key={t.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{stores.find(s => s.id === t.store_id) ? stores.find(s => s.id === t.store_id).name : "-"}</td><td style={{ padding: 6, fontWeight: 500 }}>{t.category}</td><td style={{ padding: 6 }}>{t.role === "all" ? "全員" : t.role}</td><td style={{ padding: 6 }}>{t.shift_type === "closing" ? "打烊" : t.shift_type === "during" ? "營業" : "開店"}</td><td style={{ padding: 6 }}>{t.item}</td><td style={{ padding: 4 }}><button onClick={() => delWlTemplate(t.id)} style={{ padding: "1px 5px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 9, color: "#b91c1c" }}>🗑</button></td></tr>)}</tbody></table>
           </div>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{"📝 員工提交紀錄"}</h3>
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
@@ -259,8 +270,53 @@ function Dashboard({ auth, onLogout }) {
         </div>}
 
         {!ld && tab === "expenses" && <div>
-          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}><div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "8px 12px", flex: 1 }}><div style={{ fontSize: 10, color: "#888" }}>本月費用</div><div style={{ fontSize: 16, fontWeight: 600, color: "#b91c1c" }}>{fmt(expSum.total)}</div></div></div>
-          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["日期", "門市", "類型", "廠商", "金額", "狀態", "操作"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead><tbody>{exps.length === 0 && <tr><td colSpan={7} style={{ padding: 30, textAlign: "center", color: "#ccc" }}>無紀錄</td></tr>}{exps.map(e => <tr key={e.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{e.date}</td><td style={{ padding: 6 }}>{e.stores ? e.stores.name : ""}</td><td style={{ padding: 6 }}>{e.expense_type === "vendor" ? "廠商" : "零用金"}</td><td style={{ padding: 6, fontWeight: 500 }}>{e.vendor_name || "-"}</td><td style={{ padding: 6, fontWeight: 600 }}>{fmt(e.amount)}</td><td style={{ padding: 6 }}><Badge status={e.status} /></td><td style={{ padding: 6 }}>{e.status === "pending" && <span><button onClick={() => rvExp(e.id, "approved")} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#0a7c42", color: "#fff", fontSize: 9, cursor: "pointer", marginRight: 2 }}>✅</button><button onClick={() => rvExp(e.id, "rejected")} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#b91c1c", color: "#fff", fontSize: 9, cursor: "pointer" }}>❌</button></span>}</td></tr>)}</tbody></table></div>
+          <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+            {[["all", "全部"], ["petty_cash", "💰零用金"], ["vendor", "📦月結單據"], ["hq_advance", "🏢總部代付"]].map(([k, l]) => <button key={k} onClick={() => setExpType(k)} style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid #ddd", background: expType === k ? "#1a1a1a" : "#fff", color: expType === k ? "#fff" : "#666", fontSize: 11, cursor: "pointer" }}>{l}</button>)}
+          </div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}><div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "8px 12px", flex: 1 }}><div style={{ fontSize: 10, color: "#888" }}>篩選費用</div><div style={{ fontSize: 16, fontWeight: 600, color: "#b91c1c" }}>{fmt(exps.filter(e => expType === "all" || e.expense_type === expType).reduce((s, e) => s + Number(e.amount || 0), 0))}</div></div></div>
+          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["日期", "門市", "類型", "廠商", "金額", "狀態", "操作"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead><tbody>{exps.filter(e => expType === "all" || e.expense_type === expType).length === 0 && <tr><td colSpan={7} style={{ padding: 30, textAlign: "center", color: "#ccc" }}>無紀錄</td></tr>}{exps.filter(e => expType === "all" || e.expense_type === expType).map(e => <tr key={e.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{e.date}</td><td style={{ padding: 6 }}>{e.stores ? e.stores.name : ""}</td><td style={{ padding: 6 }}>{e.expense_type === "vendor" ? "📦月結" : e.expense_type === "hq_advance" ? "🏢總部代付" : "💰零用金"}</td><td style={{ padding: 6, fontWeight: 500 }}>{e.vendor_name || "-"}</td><td style={{ padding: 6, fontWeight: 600 }}>{fmt(e.amount)}</td><td style={{ padding: 6 }}><Badge status={e.status} /></td><td style={{ padding: 6 }}>{e.status === "pending" && <span><button onClick={() => rvExp(e.id, "approved")} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#0a7c42", color: "#fff", fontSize: 9, cursor: "pointer", marginRight: 2 }}>✅</button><button onClick={() => rvExp(e.id, "rejected")} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#b91c1c", color: "#fff", fontSize: 9, cursor: "pointer" }}>❌</button></span>}</td></tr>)}</tbody></table></div>
+        </div>}
+
+        {!ld && tab === "payroll" && <div>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{"💰 " + month + " 薪資核算"}</h3>
+          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+              <thead><tr style={{ background: "#faf8f5" }}>{["員工", "門市", "類型", "底薪/時薪", "出勤天數", "應發薪資", "勞保扣", "健保扣", "實發薪資"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
+              <tbody>{ae.length === 0 ? <tr><td colSpan={9} style={{ padding: 30, textAlign: "center", color: "#ccc" }}>無員工</td></tr> : ae.map(e => {
+                const workDays = att.filter(a => a.employees && a.employees.name === e.name && a.type === "clock_in").length;
+                const basePay = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate) * workDays * 8 : 0);
+                const laborSelf = e.labor_tier ? (TIERS_R.find(t => t[0] === e.labor_tier) ? [690, 723, 761, 799, 836, 874, 912, 959, 1007, 1055, 1103, 1150][e.labor_tier - 1] || 0 : 0) : 0;
+                const healthSelf = e.health_tier ? [438, 459, 483, 507, 531, 555, 579, 609, 640, 670, 700, 730][e.health_tier - 1] || 0 : 0;
+                const netPay = basePay - laborSelf - healthSelf;
+                return <tr key={e.id} style={{ borderBottom: "1px solid #f0eeea" }}>
+                  <td style={{ padding: 6, fontWeight: 500 }}>{e.name}</td>
+                  <td style={{ padding: 6 }}>{e.stores ? e.stores.name : "總部"}</td>
+                  <td style={{ padding: 6 }}>{e.employment_type === "parttime" ? "兼職" : "一般"}</td>
+                  <td style={{ padding: 6 }}>{e.monthly_salary ? "月薪 " + fmt(e.monthly_salary) : e.hourly_rate ? "時薪 " + fmt(e.hourly_rate) : "未設定"}</td>
+                  <td style={{ padding: 6 }}>{workDays + "天"}</td>
+                  <td style={{ padding: 6, fontWeight: 600 }}>{fmt(basePay)}</td>
+                  <td style={{ padding: 6, color: "#b45309" }}>{laborSelf > 0 ? "-" + fmt(laborSelf) : "-"}</td>
+                  <td style={{ padding: 6, color: "#0a7c42" }}>{healthSelf > 0 ? "-" + fmt(healthSelf) : "-"}</td>
+                  <td style={{ padding: 6, fontWeight: 700, color: "#1a1a1a", fontSize: 13 }}>{fmt(netPay)}</td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div>
+          <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "10px 14px", flex: 1 }}>
+              <div style={{ fontSize: 10, color: "#888" }}>應發合計</div>
+              <div style={{ fontSize: 18, fontWeight: 600 }}>{fmt(ae.reduce((s, e) => { const wd = att.filter(a => a.employees && a.employees.name === e.name && a.type === "clock_in").length; return s + (e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate) * wd * 8 : 0)); }, 0))}</div>
+            </div>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "10px 14px", flex: 1 }}>
+              <div style={{ fontSize: 10, color: "#888" }}>扣除合計</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#b91c1c" }}>{fmt(ae.reduce((s, e) => { const ls = e.labor_tier ? [690, 723, 761, 799, 836, 874, 912, 959, 1007, 1055, 1103, 1150][e.labor_tier - 1] || 0 : 0; const hs = e.health_tier ? [438, 459, 483, 507, 531, 555, 579, 609, 640, 670, 700, 730][e.health_tier - 1] || 0 : 0; return s + ls + hs; }, 0))}</div>
+            </div>
+            <div style={{ background: "#e6f9f0", borderRadius: 8, padding: "10px 14px", flex: 1 }}>
+              <div style={{ fontSize: 10, color: "#888" }}>實發合計</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#0a7c42" }}>{fmt(ae.reduce((s, e) => { const wd = att.filter(a => a.employees && a.employees.name === e.name && a.type === "clock_in").length; const bp = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate) * wd * 8 : 0); const ls = e.labor_tier ? [690, 723, 761, 799, 836, 874, 912, 959, 1007, 1055, 1103, 1150][e.labor_tier - 1] || 0 : 0; const hs = e.health_tier ? [438, 459, 483, 507, 531, 555, 579, 609, 640, 670, 700, 730][e.health_tier - 1] || 0 : 0; return s + bp - ls - hs; }, 0))}</div>
+            </div>
+          </div>
+          <p style={{ fontSize: 10, color: "#999", marginTop: 8 }}>{"* 出勤天數依本月打卡紀錄計算｜時薪以每天8小時估算｜勞健保自付額依一般人員級距"}</p>
         </div>}
 
         {!ld && tab === "pnl" && pnl && <div style={{ maxWidth: 500 }}>
@@ -294,7 +350,20 @@ function Dashboard({ auth, onLogout }) {
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1" }}>{anns.length === 0 ? <div style={{ padding: 30, textAlign: "center", color: "#ccc" }}>尚無公告</div> : anns.map(a => <div key={a.id} style={{ padding: 10, borderBottom: "1px solid #f0eeea", display: "flex", gap: 8 }}><div style={{ flex: 1 }}><b style={{ fontSize: 13 }}>{a.title}</b><p style={{ fontSize: 12, color: "#555", marginTop: 3 }}>{a.content}</p></div><button onClick={() => delAnn(a.id)} style={{ padding: "2px 6px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 10, color: "#b91c1c" }}>🗑</button></div>)}</div>
         </div>}
 
-        {!ld && tab === "settings" && <div style={{ maxWidth: 400 }}><div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12 }}><h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"⚙️ 打卡設定"}</h3>{[["late_grace_minutes", "遲到寬限(分)"], ["late_threshold_minutes", "嚴重遲到(分)"], ["early_leave_minutes", "早退(分)"], ["overtime_min_minutes", "加班最低(分)"]].map(([k, l]) => <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0eeea" }}><span style={{ fontSize: 12 }}>{l}</span><input type="number" value={as2[k] || ""} onChange={e => upS(k, Number(e.target.value))} style={{ width: 50, padding: 3, borderRadius: 4, border: "1px solid #ddd", textAlign: "center", fontSize: 12 }} /></div>)}</div></div>}
+        {!ld && tab === "settings" && <div style={{ maxWidth: 600 }}>
+          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"⚙️ 打卡設定"}</h3>
+            {[["late_grace_minutes", "遲到寬限(分)"], ["late_threshold_minutes", "嚴重遲到(分)"], ["early_leave_minutes", "早退(分)"], ["overtime_min_minutes", "加班最低(分)"]].map(([k, l]) => <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0eeea" }}><span style={{ fontSize: 12 }}>{l}</span><input type="number" value={as2[k] || ""} onChange={e => upS(k, Number(e.target.value))} style={{ width: 50, padding: 3, borderRadius: 4, border: "1px solid #ddd", textAlign: "center", fontSize: 12 }} /></div>)}
+          </div>
+          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"📋 員工守則 / 工作合約"}</h3>
+            <p style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>修改後將套用到所有新人報到頁面。目前內容為 10 章員工行為規範與工作守則。</p>
+            <div style={{ display: "flex", gap: 6 }}>
+              <a href="/onboarding?token=preview" target="_blank" style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #4361ee", color: "#4361ee", fontSize: 11, textDecoration: "none", cursor: "pointer" }}>{"📄 預覽目前守則"}</a>
+              <button onClick={() => { const c = prompt("如需更新守則內容，請將新版守則文字貼在此處（或聯繫系統管理員更新）："); if (c) alert("已收到，請聯繫系統管理員更新程式碼中的守則內容。"); }} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd", background: "transparent", fontSize: 11, cursor: "pointer" }}>{"✏️ 更新守則內容"}</button>
+            </div>
+          </div>
+        </div>}
 
         {!ld && tab === "settlements" && <div>
           <div style={{ display: "flex", gap: 6, marginBottom: 8 }}><div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "8px 12px", flex: 1 }}><div style={{ fontSize: 10, color: "#888" }}>淨額</div><div style={{ fontSize: 16, fontWeight: 600, color: "#0a7c42" }}>{fmt(sum.total_net_sales)}</div></div><div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "8px 12px", flex: 1 }}><div style={{ fontSize: 10, color: "#888" }}>應存</div><div style={{ fontSize: 16, fontWeight: 600, color: "#b45309" }}>{fmt(sum.total_cash_to_deposit)}</div></div></div>

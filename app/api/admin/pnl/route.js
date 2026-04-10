@@ -26,6 +26,7 @@ export async function GET(request) {
 
   const vendorTotal = (expenses || []).filter(e => e.expense_type === "vendor").reduce((s, e) => s + Number(e.amount || 0), 0);
   const pettyTotal = (expenses || []).filter(e => e.expense_type === "petty_cash").reduce((s, e) => s + Number(e.amount || 0), 0);
+  const hqAdvanceTotal = (expenses || []).filter(e => e.expense_type === "hq_advance").reduce((s, e) => s + Number(e.amount || 0), 0);
   const expenseByCategory = {};
   for (const e of expenses || []) {
     const cat = e.expense_categories?.name || "未分類";
@@ -38,7 +39,7 @@ export async function GET(request) {
   const laborTotal = (payrolls || []).reduce((s, p) => s + Number(p.net_salary || 0), 0);
   const laborInsurance = (payrolls || []).reduce((s, p) => s + Number(p.labor_insurance_self || 0) + Number(p.health_insurance_self || 0), 0);
 
-  const totalExpense = vendorTotal + pettyTotal + laborTotal;
+  const totalExpense = vendorTotal + pettyTotal + hqAdvanceTotal + laborTotal;
   const grossProfit = totalRevenue - vendorTotal - pettyTotal;
   const netProfit = totalRevenue - totalExpense;
 
@@ -52,6 +53,7 @@ export async function GET(request) {
     expenses: {
       vendor: vendorTotal,
       petty_cash: pettyTotal,
+      hq_advance: hqAdvanceTotal,
       labor: laborTotal,
       labor_insurance: laborInsurance,
       total: totalExpense,

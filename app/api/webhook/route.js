@@ -261,7 +261,7 @@ async function handleEvent(event) {
         const imgUrl = await uploadImage(b64, "expenses", `${d.expense_type}_${d.store_name}_${Date.now()}`);
         const expData = { ...d, amount: r.total_amount || 0, vendor_name: r.vendor_name, date: r.date, description: r.items?.map(i => i.name).join("、"), category_suggestion: r.category_suggestion || "其他", image_url: imgUrl, ai_raw_data: r };
         await setUserState(uid2, "expense_confirm", expData);
-        const typeLabel = d.expense_type === "vendor" ? "📦 月結單據" : "💰 零用金";
+        const typeLabel = d.expense_type === "vendor" ? "📦 月結單據" : d.expense_type === "hq_advance" ? "🏢 總部代付" : "💰 零用金";
         await pushText(uid2, `${typeLabel}辨識結果\n━━━━━━━━━━━━━━\n🏠 ${d.store_name}\n🏢 ${r.vendor_name || "未知"}\n📅 ${r.date || "今日"}\n💰 ${fmt(r.total_amount)}\n📋 分類：${r.category_suggestion}\n${r.items?.map(i => `　▸ ${i.name} ${fmt(i.amount)}`).join("\n") || ""}`);
         await lineClient.pushMessage({ to: uid2, messages: [{ type: "text", text: "確認送出？", quickReply: { items: [
           { type: "action", action: { type: "message", label: "✅ 確認", text: "確認費用" } },
@@ -347,11 +347,16 @@ async function handleEvent(event) {
     await setUserState(userId, "expense_select_store", { employee_id: emp.id, employee_name: emp.name, expense_type: "petty_cash" });
     return replyWithQuickReply(rt, "💰 零用金回報\n👤 " + emp.name + "\n\n選擇門市：", stores.map(s => ({ type: "action", action: { type: "message", label: s.name, text: `費用門市:${s.name}` } })));
   }
+  if (text === "總部代付") {
+    const { data: stores } = await supabase.from("stores").select("*").eq("is_active", true);
+    await setUserState(userId, "expense_select_store", { employee_id: emp.id, employee_name: emp.name, expense_type: "hq_advance" });
+    return replyWithQuickReply(rt, "🏢 總部代付回報\n👤 " + emp.name + "\n\n選擇門市：", stores.map(s => ({ type: "action", action: { type: "message", label: s.name, text: `費用門市:${s.name}` } })));
+  }
   if (text.startsWith("費用門市:") && state?.current_flow === "expense_select_store") {
     const store = await matchStore(text.replace("費用門市:", ""));
     if (!store) return replyText(rt, "❌ 找不到門市");
     await setUserState(userId, "expense_photo", { ...state.flow_data, store_id: store.id, store_name: store.name });
-    const label = state.flow_data.expense_type === "vendor" ? "廠商送貨單" : "零用金收據";
+    const label = state.flow_data.expense_type === "vendor" ? "廠商送貨單" : state.flow_data.expense_type === "hq_advance" ? "總部代付單據" : "零用金收據";
     return replyText(rt, `🏠 ${store.name}\n\n📸 請拍照上傳${label}`);
   }
   if (text === "確認費用" && state?.current_flow === "expense_confirm") {
@@ -367,7 +372,7 @@ async function handleEvent(event) {
     });
     await clearUserState(userId);
     const { data: admins } = await supabase.from("employees").select("line_uid").eq("role", "admin").eq("is_active", true);
-    if (admins) for (const a of admins) if (a.line_uid && a.line_uid !== userId) await pushText(a.line_uid, `📦 ${d.expense_type === "vendor" ? "月結單據" : "零用金"}\n${d.store_name}｜${d.employee_name}\n${d.vendor_name || ""} ${fmt(d.amount)}\n📋 ${d.category_suggestion}`).catch(() => {});
+    if (admins) for (const a of admins) if (a.line_uid && a.line_uid !== userId) await pushText(a.line_uid, `📦 ${d.expense_type === "vendor" ? "月結單據" : d.expense_type === "hq_advance" ? "總部代付" : "零用金"}\n${d.store_name}｜${d.employee_name}\n${d.vendor_name || ""} ${fmt(d.amount)}\n📋 ${d.category_suggestion}`).catch(() => {});
     return replyWithQuickReply(rt, `✅ 已儲存！\n${d.vendor_name || ""} ${fmt(d.amount)}`, getMenu(emp.role));
   }
 
@@ -377,6 +382,7 @@ async function handleEvent(event) {
       ...getMenu(emp.role),
       { type: "action", action: { type: "message", label: "📦 月結單據", text: "月結單據" } },
       { type: "action", action: { type: "message", label: "💰 零用金", text: "零用金" } },
+      { type: "action", action: { type: "message", label: "🏢 總部代付", text: "總部代付" } },
     ].slice(0, 13));
   }
 
