@@ -215,9 +215,10 @@ function Settings({ stores, as2, upS }) {
   );
 }
 
-function WorklogMgr({ stores, sf, month, load, role }) {
+function WorklogMgr({ stores, sf, month, load, role, lockedStore }) {
   const canEdit = role === "admin" || role === "manager";
-  const [wlStore, setWlStore] = useState(sf || (stores[0] ? stores[0].id : ""));
+  const visibleStores = lockedStore ? stores.filter(s => s.id === lockedStore) : stores;
+  const [wlStore, setWlStore] = useState(lockedStore || sf || (stores[0] ? stores[0].id : ""));
   const [templates, setTemplates] = useState([]);
   const [logs, setLogs] = useState([]);
   const [wlLd, setWlLd] = useState(true);
@@ -258,7 +259,7 @@ function WorklogMgr({ stores, sf, month, load, role }) {
     <div>
       <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
         <span style={{ fontSize: 12, fontWeight: 600 }}>{"📋 選擇門市："}</span>
-        {stores.map(s => <button key={s.id} onClick={() => setWlStore(s.id)} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: wlStore === s.id ? "#1a1a1a" : "#fff", color: wlStore === s.id ? "#fff" : "#666", fontSize: 12, cursor: "pointer", fontWeight: wlStore === s.id ? 600 : 400 }}>{s.name}</button>)}
+        {visibleStores.map(s => <button key={s.id} onClick={() => setWlStore(s.id)} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: wlStore === s.id ? "#1a1a1a" : "#fff", color: wlStore === s.id ? "#fff" : "#666", fontSize: 12, cursor: "pointer", fontWeight: wlStore === s.id ? 600 : 400 }}>{s.name}</button>)}
       </div>
 
       {wlStore && <div>
@@ -518,20 +519,21 @@ function Dashboard({ auth, onLogout }) {
         </div>}
 
         {!ld && tab === "shifts" && <div>
-          <button onClick={() => { setSsf(!ssf); setEs(null); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: ssf ? "#f0f0f0" : "#1a1a1a", color: ssf ? "#666" : "#fff", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>{ssf ? "✕" : "＋"}</button>
+          <button onClick={() => { setSsf(!ssf); setEs(null); setSf2({ ...sf2, store_id: sf || sf2.store_id }); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: ssf ? "#f0f0f0" : "#1a1a1a", color: ssf ? "#666" : "#fff", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>{ssf ? "✕" : "＋"}</button>
           {ssf && <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 8 }}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 6 }}>
-            <div><label style={{ fontSize: 10, color: "#888" }}>門市</label><select value={sf2.store_id} onChange={e => setSf2({ ...sf2, store_id: e.target.value })} style={{ width: "100%", padding: "4px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="">選擇</option>{stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+            {auth.role === "store_manager" ? <div><label style={{ fontSize: 10, color: "#888" }}>門市</label><div style={{ padding: 4, fontSize: 11, fontWeight: 500 }}>{auth.store_name || "本店"}</div></div> : <div><label style={{ fontSize: 10, color: "#888" }}>門市</label><select value={sf2.store_id} onChange={e => setSf2({ ...sf2, store_id: e.target.value })} style={{ width: "100%", padding: "4px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="">選擇</option>{stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>}
             <div><label style={{ fontSize: 10, color: "#888" }}>名稱</label><input value={sf2.name} onChange={e => setSf2({ ...sf2, name: e.target.value })} style={{ width: "100%", padding: "4px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} /></div>
+            <div><label style={{ fontSize: 10, color: "#888" }}>角色</label><select value={sf2.role} onChange={e => setSf2({ ...sf2, role: e.target.value })} style={{ width: "100%", padding: "4px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="all">全場</option><option value="外場">外場</option><option value="內場">內場</option><option value="吧台">吧台</option><option value="烘焙">烘焙</option></select></div>
             <div><label style={{ fontSize: 10, color: "#888" }}>上班</label><input type="time" value={sf2.start_time} onChange={e => setSf2({ ...sf2, start_time: e.target.value })} style={{ width: "100%", padding: "4px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} /></div>
             <div><label style={{ fontSize: 10, color: "#888" }}>下班</label><input type="time" value={sf2.end_time} onChange={e => setSf2({ ...sf2, end_time: e.target.value })} style={{ width: "100%", padding: "4px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} /></div>
             <div><label style={{ fontSize: 10, color: "#888" }}>休息(分)</label><input type="number" value={sf2.break_minutes} onChange={e => setSf2({ ...sf2, break_minutes: Number(e.target.value) })} style={{ width: "100%", padding: "4px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} /></div>
           </div><button onClick={saveShift} style={{ padding: "4px 14px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer" }}>{es ? "💾" : "建立"}</button></div>}
-          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["門市", "班別", "時間", "休息", "操作"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead><tbody>{shifts.map(s => <tr key={s.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{s.stores ? s.stores.name : ""}</td><td style={{ padding: 6, fontWeight: 500 }}>{s.name}</td><td style={{ padding: 6 }}>{(s.start_time || "").slice(0, 5) + "~" + (s.end_time || "").slice(0, 5)}</td><td style={{ padding: 6 }}>{s.break_minutes + "分"}</td><td style={{ padding: 6 }}><button onClick={() => editShift(s)} style={{ padding: "1px 5px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 10, marginRight: 2 }}>✏️</button><button onClick={() => delShift(s.id)} style={{ padding: "1px 5px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 10, color: "#b91c1c" }}>🗑</button></td></tr>)}</tbody></table></div>
+          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["門市", "班別", "角色", "時間", "休息", "操作"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead><tbody>{shifts.map(s => <tr key={s.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{s.stores ? s.stores.name : ""}</td><td style={{ padding: 6, fontWeight: 500 }}>{s.name}</td><td style={{ padding: 6 }}>{s.role === "all" ? "全場" : s.role || "全場"}</td><td style={{ padding: 6 }}>{(s.start_time || "").slice(0, 5) + "~" + (s.end_time || "").slice(0, 5)}</td><td style={{ padding: 6 }}>{s.break_minutes + "分"}</td><td style={{ padding: 6 }}><button onClick={() => editShift(s)} style={{ padding: "1px 5px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 10, marginRight: 2 }}>✏️</button><button onClick={() => delShift(s.id)} style={{ padding: "1px 5px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 10, color: "#b91c1c" }}>🗑</button></td></tr>)}</tbody></table></div>
         </div>}
 
         {!ld && tab === "attendance" && <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["時間", "員工", "門市", "類型", "距離", "遲到"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead><tbody>{att.map(a => <tr key={a.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6, fontSize: 10 }}>{new Date(a.timestamp).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</td><td style={{ padding: 6, fontWeight: 500 }}>{a.employees ? a.employees.name : ""}</td><td style={{ padding: 6 }}>{a.stores ? a.stores.name : ""}</td><td style={{ padding: 6 }}>{a.type === "clock_in" ? "🟢上班" : "🔴下班"}</td><td style={{ padding: 6 }}>{a.distance_meters ? Math.round(a.distance_meters) + "m" : "-"}</td><td style={{ padding: 6, color: a.late_minutes > 0 ? "#b91c1c" : "#0a7c42" }}>{a.late_minutes > 0 ? a.late_minutes + "分" : "準時"}</td></tr>)}</tbody></table></div>}
 
-        {!ld && tab === "worklogs" && <WorklogMgr stores={stores} sf={sf} month={month} load={load} role={auth.role} />}
+        {!ld && tab === "worklogs" && <WorklogMgr stores={stores} sf={sf} month={month} load={load} role={auth.role} lockedStore={auth.role === "store_manager" ? sf : ""} />}
 
         {!ld && tab === "expenses" && <div>
           <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
