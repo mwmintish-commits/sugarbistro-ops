@@ -186,13 +186,16 @@ function Settings({ stores, as2, upS }) {
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
         <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"📊 各門市營業目標"}</h3>
         <p style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>設定後會顯示在員工工作日誌上，自動計算達標率。</p>
-        {stores.map(s => (
+        {stores.map(s => {
+          const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+          const autoMonthly = (s.daily_target || 0) * daysInMonth;
+          return (
           <div key={s.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0eeea" }}>
             <span style={{ fontSize: 12, fontWeight: 500, width: 80 }}>{s.name}</span>
-            <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>日營業目標</label><input type="number" defaultValue={s.daily_target || ""} onBlur={e => { if (e.target.value) ap("/api/admin/stores", { action: "update_targets", store_id: s.id, daily_target: Number(e.target.value), monthly_target: s.monthly_target || 0 }); }} style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "center" }} /></div>
-            <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>月營業目標</label><input type="number" defaultValue={s.monthly_target || ""} onBlur={e => { if (e.target.value) ap("/api/admin/stores", { action: "update_targets", store_id: s.id, daily_target: s.daily_target || 0, monthly_target: Number(e.target.value) }); }} style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "center" }} /></div>
-          </div>
-        ))}
+            <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>日營業目標</label><input type="number" defaultValue={s.daily_target || ""} onBlur={e => { ap("/api/admin/stores", { action: "update_targets", store_id: s.id, daily_target: Number(e.target.value || 0), monthly_target: Number(e.target.value || 0) * daysInMonth }); }} style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "center" }} /></div>
+            <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>{"月目標（自動 ×" + daysInMonth + "天）"}</label><div style={{ padding: "4px 0", fontSize: 12, fontWeight: 600, textAlign: "center" }}>{"$" + autoMonthly.toLocaleString()}</div></div>
+          </div>);
+        })}
       </div>
 
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>

@@ -35,7 +35,9 @@ export default function WorkLogPage() {
       const store = (st.data || []).find(s => s.id === sid);
       const todayS = (stl.data || []).find(s => s.date === today);
       const monthS = (stl.data || []).reduce((s, r) => s + Number(r.net_sales || 0), 0);
-      setRevenue({ dt: store ? Number(store.daily_target || 0) : 0, mt: store ? Number(store.monthly_target || 0) : 0, ta: todayS ? Number(todayS.net_sales || 0) : 0, mm: monthS });
+      const dailyT = store ? Number(store.daily_target || 0) : 0;
+      const daysInMonth = new Date(parseInt(thisMonth.split("-")[0]), parseInt(thisMonth.split("-")[1]), 0).getDate();
+      setRevenue({ dt: dailyT, mt: dailyT * daysInMonth, ta: todayS ? Number(todayS.net_sales || 0) : 0, mm: monthS });
       if (l.data?.items) {
         const c = {};
         for (const item of l.data.items) c[item] = true;
