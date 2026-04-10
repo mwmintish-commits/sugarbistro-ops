@@ -121,7 +121,6 @@ function Dashboard({auth,onLogout}){
       myTabs.includes("announcements")?api("/api/admin/announcements"):Promise.resolve({data:[]}),
     ]).then(([s,d,e,sh,sc,at,as3,lr2,ex,pl2,an])=>{setStl(s.data||[]);setSum(s.summary||{});setDep(d.data||[]);setEmps(e.data||[]);setShifts(sh.data||[]);setScheds(sc.data||[]);setAtt(at.data||[]);setAs2(as3.data||{});setLr(lr2.data||[]);setExps(ex.data||[]);setExpSum({total:ex.total,byCategory:ex.byCategory});setPnl(pl2);setAnns(an.data||[]);setLd(false);});
   },[month,sf,ws,sv,myTabs]);
-  },[month,sf,ws,sv,myTabs]);
   useEffect(()=>{load();},[load]);
 
   const addEmp=async()=>{const d=await api("/api/admin/employees",{action:"create",...ne});if(d.bind_code){setNbc(d.bind_code);load();}};
