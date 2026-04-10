@@ -7,14 +7,17 @@ export async function GET(request) {
   const employee_id = searchParams.get("employee_id");
   const month = searchParams.get("month");
 
-  let query = supabase.from("leave_requests").select("*, employees(name, line_uid, stores(name))").order("created_at", { ascending: false });
+  let query = supabase.from("leave_requests").select("*, employees(name, store_id, line_uid, stores(name))").order("created_at", { ascending: false });
   if (status) query = query.eq("status", status);
   if (employee_id) query = query.eq("employee_id", employee_id);
   if (month) query = query.gte("start_date", `${month}-01`).lte("start_date", `${month}-31`);
 
   const { data, error } = await query.limit(100);
   if (error) return Response.json({ error: error.message }, { status: 500 });
-  return Response.json({ data });
+
+  const store_id = searchParams.get("store_id");
+  const filtered = store_id ? (data || []).filter(l => l.employees && l.employees.store_id === store_id) : data;
+  return Response.json({ data: filtered });
 }
 
 export async function POST(request) {
