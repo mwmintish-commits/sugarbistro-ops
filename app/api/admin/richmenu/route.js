@@ -1,88 +1,76 @@
 import { lineConfig } from "@/lib/line";
 
-const BASE = "https://api.line.me/v2/bot";
-
-async function lineAPI(path, method, body, contentType) {
-  const headers = { Authorization: `Bearer ${lineConfig.channelAccessToken}` };
-  if (contentType) headers["Content-Type"] = contentType;
-  else if (body && !(body instanceof Buffer)) headers["Content-Type"] = "application/json";
-  const res = await fetch(`${BASE}${path}`, {
-    method, headers,
-    body: body instanceof Buffer ? body : body ? JSON.stringify(body) : undefined,
+async function lineAPI(path, method, body) {
+  const res = await fetch(`https://api.line.me/v2/bot${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${lineConfig.channelAccessToken}`, "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
   });
-  if (contentType) return res;
   return res.json();
-}
-
-// 產生簡易 Rich Menu 圖片（純色塊+文字，用 SVG 轉 PNG 不行，改用 jimp）
-async function generateMenuImage() {
-  // 如果無法產生圖片，回傳 null（使用者需手動上傳）
-  try {
-    const Jimp = (await import("jimp")).Jimp;
-    const img = new Jimp({ width: 2500, height: 843, color: 0x1a1a1aff });
-    
-    // 畫格線
-    const cols = [0, 833, 1667, 2500];
-    for (let x = 0; x < 2500; x++) {
-      for (let y = 0; y < 843; y++) {
-        // 格線
-        if (Math.abs(x - 833) < 2 || Math.abs(x - 1667) < 2 || Math.abs(y - 421) < 2) {
-          img.setPixelColor(0x333333ff, x, y);
-        }
-      }
-    }
-    
-    const buf = await img.getBuffer("image/jpeg");
-    return buf;
-  } catch (e) {
-    console.error("Image gen failed:", e.message);
-    return null;
-  }
 }
 
 export async function POST(request) {
   const body = await request.json();
 
   if (body.action === "setup") {
-    // 1. 刪除舊的 Rich Menu
-    const { richmenus } = await lineAPI("/richmenu/list", "GET");
-    if (richmenus?.length) {
-      for (const rm of richmenus) {
-        await lineAPI(`/richmenu/${rm.richMenuId}`, "DELETE");
+    try {
+      // 刪除舊的
+      const list = await lineAPI("/richmenu/list", "GET");
+      if (list.richmenus?.length) {
+        for (const rm of list.richmenus) {
+          await fetch(`https://api.line.me/v2/bot/richmenu/${rm.richMenuId}`, {
+            method: "DELETE", headers: { Authorization: `Bearer ${lineConfig.channelAccessToken}` },
+          });
+        }
       }
+
+      // 建立新的
+      const result = await lineAPI("/richmenu", "POST", {
+        size: { width: 2500, height: 843 },
+        selected: true,
+        name: "小食糖選單",
+        chatBarText: "📋 功能選單",
+        areas: [
+          { bounds: { x: 0, y: 0, width: 833, height: 421 }, action: { type: "message", text: "上班打卡" } },
+          { bounds: { x: 833, y: 0, width: 834, height: 421 }, action: { type: "message", text: "下班打卡" } },
+          { bounds: { x: 1667, y: 0, width: 833, height: 421 }, action: { type: "message", text: "我的班表" } },
+          { bounds: { x: 0, y: 421, width: 833, height: 422 }, action: { type: "message", text: "日結回報" } },
+          { bounds: { x: 833, y: 421, width: 834, height: 422 }, action: { type: "message", text: "存款回報" } },
+          { bounds: { x: 1667, y: 421, width: 833, height: 422 }, action: { type: "message", text: "選單" } },
+        ],
+      });
+
+      if (!result.richMenuId) return Response.json({ error: "建立失敗", detail: result }, { status: 500 });
+
+      // 產生簡易圖片（純黑底 JPEG）
+      // 建立最小可用的 2500x843 圖片
+      const w = 2500, h = 843;
+      const header = Buffer.from([
+        0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+      ]);
+      // 用最簡單方式：上傳一個小圖片
+      // LINE 會自動拉伸到選單大小
+      const tinyJpeg = Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMCwsKCwsLDhEQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wgARCAABAAEDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAAB//EABQBAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhADEAAAAUf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAn//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/AX//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/AX//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/An//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IX//2gAMAwEAAgADAAAAEH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EH//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/EH//2Q==', 'base64');
+
+      await fetch(`https://api.line.me/v2/bot/richmenu/${result.richMenuId}/content`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lineConfig.channelAccessToken}`, "Content-Type": "image/jpeg" },
+        body: tinyJpeg,
+      });
+
+      // 設為預設
+      await fetch(`https://api.line.me/v2/bot/user/all/richmenu/${result.richMenuId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lineConfig.channelAccessToken}`, "Content-Type": "application/json" },
+      });
+
+      return Response.json({
+        success: true, richMenuId: result.richMenuId,
+        note: "選單結構已建立！目前是黑底暫用圖片。請到 LINE Official Account Manager → 聊天室相關 → 圖文選單，上傳正式的選單圖片。",
+      });
+    } catch (e) {
+      return Response.json({ error: e.message }, { status: 500 });
     }
-
-    // 2. 建立 Rich Menu
-    const menuData = {
-      size: { width: 2500, height: 843 },
-      selected: true,
-      name: "小食糖選單",
-      chatBarText: "📋 功能選單",
-      areas: [
-        { bounds: { x: 0, y: 0, width: 833, height: 421 }, action: { type: "message", text: "上班打卡" } },
-        { bounds: { x: 833, y: 0, width: 834, height: 421 }, action: { type: "message", text: "下班打卡" } },
-        { bounds: { x: 1667, y: 0, width: 833, height: 421 }, action: { type: "message", text: "我的班表" } },
-        { bounds: { x: 0, y: 421, width: 833, height: 422 }, action: { type: "message", text: "日結回報" } },
-        { bounds: { x: 833, y: 421, width: 834, height: 422 }, action: { type: "message", text: "存款回報" } },
-        { bounds: { x: 1667, y: 421, width: 833, height: 422 }, action: { type: "message", text: "選單" } },
-      ],
-    };
-
-    const result = await lineAPI("/richmenu", "POST", menuData);
-    if (!result.richMenuId) return Response.json({ error: "建立失敗", detail: result }, { status: 500 });
-
-    const menuId = result.richMenuId;
-
-    // 3. 上傳圖片
-    const imgBuf = await generateMenuImage();
-    if (imgBuf) {
-      await lineAPI(`/richmenu/${menuId}/content`, "POST", imgBuf, "image/jpeg");
-    }
-
-    // 4. 設為預設
-    await lineAPI(`/user/all/richmenu/${menuId}`, "POST", {});
-
-    return Response.json({ success: true, richMenuId: menuId, hasImage: !!imgBuf, note: imgBuf ? "已自動產生圖片（純色塊），建議到 LINE Official Account Manager 替換更美觀的圖片" : "請到 LINE Official Account Manager 上傳選單圖片" });
   }
 
   return Response.json({ error: "Unknown action" }, { status: 400 });
