@@ -48,6 +48,12 @@ export async function POST(request) {
   const currentTime = taipeiNow.toTimeString().slice(0, 5);
 
   const { data: schedule } = await supabase.from("schedules").select("*, shifts(*)").eq("employee_id", t.employee_id).eq("date", today).single();
+
+  // 無排班不可打卡
+  if (!schedule) return Response.json({ error: "今日無排班，無法打卡。請確認排班表。" }, { status: 403 });
+
+  // 位置異常不可打卡
+  if (distance !== null && !isValid) return Response.json({ error: `位置異常（距門市${distance}m，超出${store.radius_m || 200}m），無法打卡。` }, { status: 403 });
   const { data: settings } = await supabase.from("attendance_settings").select("*").limit(1).single();
 
   let lateMinutes = 0;
