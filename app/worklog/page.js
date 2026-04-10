@@ -14,7 +14,9 @@ export default function WorkLogPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [shiftType, setShiftType] = useState("opening");
+  const [revenue, setRevenue] = useState({ dt: 0, mt: 0, ta: 0, mm: 0 });
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+  const thisMonth = today.slice(0, 7);
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -25,9 +27,15 @@ export default function WorkLogPage() {
       fetch("/api/admin/worklogs?type=templates&store_id=" + sid).then(r => r.json()),
       fetch("/api/admin/worklogs?type=log&employee_id=" + eid + "&date=" + today).then(r => r.json()),
       fetch("/api/admin/announcements").then(r => r.json()),
-    ]).then(([t, l, a]) => {
+      fetch("/api/admin/stores").then(r => r.json()).catch(() => ({ data: [] })),
+      fetch("/api/admin/settlements?store_id=" + sid + "&month=" + thisMonth).then(r => r.json()).catch(() => ({ data: [] })),
+    ]).then(([t, l, a, st, stl]) => {
       setTemplates(t.data || []);
       setAnnouncements(a.data || []);
+      const store = (st.data || []).find(s => s.id === sid);
+      const todayS = (stl.data || []).find(s => s.date === today);
+      const monthS = (stl.data || []).reduce((s, r) => s + Number(r.net_sales || 0), 0);
+      setRevenue({ dt: store ? Number(store.daily_target || 0) : 0, mt: store ? Number(store.monthly_target || 0) : 0, ta: todayS ? Number(todayS.net_sales || 0) : 0, mm: monthS });
       if (l.data?.items) {
         const c = {};
         for (const item of l.data.items) c[item] = true;
@@ -88,6 +96,24 @@ export default function WorkLogPage() {
           ))}
         </div>
       )}
+
+      {/* 切換：開店/打烊 */}
+      {(revenue.dt > 0 || revenue.mt > 0) && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
+        <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 8, textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: "#888" }}>今日營收 / 目標</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: revenue.dt > 0 && revenue.ta >= revenue.dt ? "#0a7c42" : "#b91c1c" }}>{"$" + revenue.ta.toLocaleString()}</div>
+          {revenue.dt > 0 && <div style={{ fontSize: 11, color: "#888" }}>{"目標 $" + revenue.dt.toLocaleString()}</div>}
+          {revenue.dt > 0 && <div style={{ marginTop: 4, height: 6, background: "#f0f0f0", borderRadius: 3, overflow: "hidden" }}><div style={{ height: "100%", width: Math.min(100, Math.round(revenue.ta / revenue.dt * 100)) + "%", background: revenue.ta >= revenue.dt ? "#0a7c42" : "#fbbf24", borderRadius: 3 }} /></div>}
+          {revenue.dt > 0 && <div style={{ fontSize: 12, fontWeight: 600, color: revenue.ta >= revenue.dt ? "#0a7c42" : "#b45309", marginTop: 2 }}>{Math.round(revenue.ta / revenue.dt * 100) + "% 達標率"}</div>}
+        </div>
+        <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 8, textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: "#888" }}>本月累積 / 目標</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: revenue.mt > 0 && revenue.mm >= revenue.mt ? "#0a7c42" : "#1a1a1a" }}>{"$" + revenue.mm.toLocaleString()}</div>
+          {revenue.mt > 0 && <div style={{ fontSize: 11, color: "#888" }}>{"目標 $" + revenue.mt.toLocaleString()}</div>}
+          {revenue.mt > 0 && <div style={{ marginTop: 4, height: 6, background: "#f0f0f0", borderRadius: 3, overflow: "hidden" }}><div style={{ height: "100%", width: Math.min(100, Math.round(revenue.mm / revenue.mt * 100)) + "%", background: revenue.mm >= revenue.mt ? "#0a7c42" : "#4361ee", borderRadius: 3 }} /></div>}
+          {revenue.mt > 0 && <div style={{ fontSize: 12, fontWeight: 600, color: revenue.mm >= revenue.mt ? "#0a7c42" : "#185fa5", marginTop: 2 }}>{Math.round(revenue.mm / revenue.mt * 100) + "% 達標率"}</div>}
+        </div>
+      </div>}
 
       {/* 切換：開店/打烊 */}
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>

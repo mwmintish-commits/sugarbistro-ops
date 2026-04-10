@@ -4,7 +4,7 @@ const fmt = (n) => "$" + Number(n || 0).toLocaleString();
 const ROLES = { admin: "👑總部", manager: "🏠管理", store_manager: "🏪門店主管", staff: "👤員工" };
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
 const LT = { annual: { l: "特休", c: "#4361ee", bg: "#e6f1fb" }, sick: { l: "病假", c: "#b45309", bg: "#fff8e6" }, personal: { l: "事假", c: "#8a6d00", bg: "#fef9c3" }, menstrual: { l: "生理假", c: "#993556", bg: "#fbeaf0" }, off: { l: "例假", c: "#666", bg: "#f0f0f0" }, rest: { l: "休息日", c: "#888", bg: "#f5f5f5" } };
-const ROLE_TABS = { admin: ["employees", "schedules", "leaves", "attendance", "payroll", "settlements", "deposits", "expenses", "pnl", "shifts", "worklogs", "announcements", "settings"], manager: ["employees", "schedules", "leaves", "attendance", "payroll", "settlements", "deposits", "expenses", "pnl", "shifts", "worklogs"], store_manager: ["schedules", "leaves", "store_staff", "worklogs", "announcements", "settlements", "deposits", "expenses"] };
+const ROLE_TABS = { admin: ["employees", "schedules", "leaves", "attendance", "payroll", "settlements", "deposits", "expenses", "pnl", "shifts", "worklogs", "announcements", "settings"], manager: ["employees", "schedules", "leaves", "attendance", "payroll", "settlements", "deposits", "expenses", "pnl", "shifts", "worklogs"], store_manager: ["schedules", "leaves", "store_staff", "shifts", "worklogs", "announcements", "settlements", "deposits", "expenses"] };
 const TAB_L = { employees: "👥員工", schedules: "📅排班", leaves: "🙋請假", attendance: "📍出勤", payroll: "💰薪資", settlements: "💰日結", deposits: "🏦存款", expenses: "📦費用", pnl: "📊損益", shifts: "⏰班別", worklogs: "📋日誌", announcements: "📢公告", settings: "⚙️設定", store_staff: "👥本店員工" };
 const TAB_GROUPS = { "人資": ["employees", "store_staff", "schedules", "leaves", "attendance", "payroll"], "財務": ["settlements", "deposits", "expenses", "pnl"], "管理": ["shifts", "worklogs", "announcements", "settings"] };
 function ap(u, b) { return b ? fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).then(r => r.json()) : fetch(u).then(r => r.json()); }
@@ -179,6 +179,18 @@ function Settings({ stores, as2, upS }) {
                 <button onClick={() => addItem(ci)} style={{ padding: "2px 8px", borderRadius: 3, border: "1px dashed #ccc", background: "transparent", cursor: "pointer", fontSize: 10, color: "#888", marginTop: 2 }}>{"＋ 新增項目"}</button>
               </div>
             )}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"📊 各門市營業目標"}</h3>
+        <p style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>設定後會顯示在員工工作日誌上，自動計算達標率。</p>
+        {stores.map(s => (
+          <div key={s.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0eeea" }}>
+            <span style={{ fontSize: 12, fontWeight: 500, width: 80 }}>{s.name}</span>
+            <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>日營業目標</label><input type="number" defaultValue={s.daily_target || ""} onBlur={e => { if (e.target.value) ap("/api/admin/stores", { action: "update_targets", store_id: s.id, daily_target: Number(e.target.value), monthly_target: s.monthly_target || 0 }); }} style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "center" }} /></div>
+            <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>月營業目標</label><input type="number" defaultValue={s.monthly_target || ""} onBlur={e => { if (e.target.value) ap("/api/admin/stores", { action: "update_targets", store_id: s.id, daily_target: s.daily_target || 0, monthly_target: Number(e.target.value) }); }} style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "center" }} /></div>
           </div>
         ))}
       </div>
@@ -581,7 +593,7 @@ function Dashboard({ auth, onLogout }) {
         </div>}
 
         {!ld && tab === "announcements" && <div>
-          <button onClick={() => setShowAnnForm(!showAnnForm)} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: showAnnForm ? "#f0f0f0" : "#1a1a1a", color: showAnnForm ? "#666" : "#fff", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>{showAnnForm ? "✕" : "＋新增公告"}</button>
+          {(auth.role === "admin" || auth.role === "manager") && <button onClick={() => setShowAnnForm(!showAnnForm)} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: showAnnForm ? "#f0f0f0" : "#1a1a1a", color: showAnnForm ? "#666" : "#fff", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>{showAnnForm ? "✕" : "＋新增公告"}</button>}
           {showAnnForm && <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 8 }}>
             <div style={{ marginBottom: 6 }}><label style={{ fontSize: 10, color: "#888" }}>標題*</label><input value={newAnn.title} onChange={e => setNewAnn({ ...newAnn, title: e.target.value })} style={{ width: "100%", padding: 5, borderRadius: 4, border: "1px solid #ddd", fontSize: 12 }} /></div>
             <div style={{ marginBottom: 6 }}><label style={{ fontSize: 10, color: "#888" }}>內容*</label><textarea value={newAnn.content} onChange={e => setNewAnn({ ...newAnn, content: e.target.value })} rows={3} style={{ width: "100%", padding: 5, borderRadius: 4, border: "1px solid #ddd", fontSize: 12 }} /></div>
