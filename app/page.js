@@ -56,12 +56,12 @@ function EmpDetail({empId,onClose}){
       <div style={{marginTop:4}}><label style={{fontSize:10,color:"#888"}}>投保類型</label><select value={form.employment_type} onChange={ev=>setForm({...form,employment_type:ev.target.value,labor_tier:"",health_tier:""})} style={inp}><option value="regular">一般</option><option value="parttime">兼職</option></select></div>
     </div>
     <div style={{...sec,border:"2px solid #b45309"}}><h4 style={{...sh,color:"#b45309"}}>🛡️ 勞保設定</h4>
-      <label style={{fontSize:10,color:"#888"}}>勞保級距</label><select value={form.labor_tier} onChange={ev=>setForm({...form,labor_tier:ev.target.value})} style={inp}><option value="">未設定</option>{tiers.map(([i,r])=><option key={i} value={i}>第{i}級（${r}）</option>)}</select>
+      <label style={{fontSize:10,color:"#888"}}>勞保級距</label><select value={form.labor_tier} onChange={ev=>setForm({...form,labor_tier:ev.target.value})} style={inp}><option value="">未設定</option>{tiers.map(([i,r])=><option key={i} value={i}>第{i}級（{"$"}{r}）</option>)}</select>
       <div style={{marginTop:4}}><label style={{fontSize:10,color:"#888"}}>勞保加保日期</label><input type="date" value={form.labor_start_date} onChange={ev=>setForm({...form,labor_start_date:ev.target.value})} style={inp}/></div>
       {li&&<div style={{marginTop:6,padding:6,background:"#fff8e6",borderRadius:4,fontSize:11}}>投保薪資：{fmt(li.insured_salary)}｜<b>自付：{fmt(li.labor_self)}/月</b>｜雇主：{fmt(li.labor_employer)}/月</div>}
     </div>
     <div style={{...sec,border:"2px solid #0a7c42"}}><h4 style={{...sh,color:"#0a7c42"}}>🏥 健保設定</h4>
-      <label style={{fontSize:10,color:"#888"}}>健保級距</label><select value={form.health_tier} onChange={ev=>setForm({...form,health_tier:ev.target.value})} style={inp}><option value="">未設定</option>{tiers.map(([i,r])=><option key={i} value={i}>第{i}級（${r}）</option>)}</select>
+      <label style={{fontSize:10,color:"#888"}}>健保級距</label><select value={form.health_tier} onChange={ev=>setForm({...form,health_tier:ev.target.value})} style={inp}><option value="">未設定</option>{tiers.map(([i,r])=><option key={i} value={i}>第{i}級（{"$"}{r}）</option>)}</select>
       <div style={{marginTop:4}}><label style={{fontSize:10,color:"#888"}}>健保加保日期</label><input type="date" value={form.health_start_date} onChange={ev=>setForm({...form,health_start_date:ev.target.value})} style={inp}/></div>
       {hi&&<div style={{marginTop:6,padding:6,background:"#e6f9f0",borderRadius:4,fontSize:11}}>投保薪資：{fmt(hi.insured_salary)}｜<b>自付：{fmt(hi.health_self)}/月</b>｜雇主：{fmt(hi.health_employer)}/月</div>}
     </div>
