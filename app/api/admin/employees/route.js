@@ -37,27 +37,27 @@ export async function GET(request) {
     const months = calcServiceMonths(emp.hire_date);
     const annualLeave = calcAnnualLeave(months, emp.employment_type);
 
-    // 取保險級距
-    let insurance = null;
-    if (emp.insurance_tier) {
-      const { data } = await supabase.from("insurance_tiers").select("*").eq("tier_level", emp.insurance_tier).eq("employment_type", emp.employment_type).single();
-      insurance = data;
+    // 取勞保級距
+    let laborIns = null;
+    if (emp.labor_tier) {
+      const { data } = await supabase.from("insurance_tiers").select("*").eq("tier_level", emp.labor_tier).eq("employment_type", emp.employment_type).single();
+      laborIns = data;
+    }
+    // 取健保級距
+    let healthIns = null;
+    if (emp.health_tier) {
+      const { data } = await supabase.from("insurance_tiers").select("*").eq("tier_level", emp.health_tier).eq("employment_type", emp.employment_type).single();
+      healthIns = data;
     }
 
-    // 取報到紀錄
     const { data: onboarding } = await supabase.from("onboarding_records").select("*").eq("auto_employee_id", id).single();
-
-    // 取假別使用
     const year = new Date().getFullYear();
     const { data: leaveBalance } = await supabase.from("leave_balances").select("*").eq("employee_id", id).eq("year", year).single();
 
     return Response.json({
-      data: emp,
-      service_months: months,
-      annual_leave_days: annualLeave,
-      insurance,
-      onboarding,
-      leave_balance: leaveBalance,
+      data: emp, service_months: months, annual_leave_days: annualLeave,
+      labor_insurance: laborIns, health_insurance: healthIns,
+      onboarding, leave_balance: leaveBalance,
     });
   }
 

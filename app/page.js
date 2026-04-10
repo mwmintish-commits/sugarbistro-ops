@@ -4,8 +4,8 @@ const fmt=(n)=>"$"+Number(n||0).toLocaleString();
 const ROLES={admin:"👑總部",manager:"🏠管理",store_manager:"🏪門店主管",staff:"👤員工"};
 const DAYS=["日","一","二","三","四","五","六"];
 const LT={annual:{l:"特休",c:"#4361ee",bg:"#e6f1fb"},sick:{l:"病假",c:"#b45309",bg:"#fff8e6"},personal:{l:"事假",c:"#8a6d00",bg:"#fef9c3"},menstrual:{l:"生理假",c:"#993556",bg:"#fbeaf0"},off:{l:"例假",c:"#666",bg:"#f0f0f0"},rest:{l:"休息日",c:"#888",bg:"#f5f5f5"}};
-const ROLE_TABS={admin:["schedules","leaves","shifts","attendance","expenses","pnl","announcements","settings","settlements","deposits","employees"],manager:["schedules","leaves","shifts","attendance","expenses","pnl","settlements","deposits","employees"],store_manager:["schedules","shifts"]};
-const TAB_L={schedules:"📅排班",leaves:"🙋請假",shifts:"⏰班別",attendance:"📍出勤",expenses:"📦費用",pnl:"📊損益",announcements:"📢公告",settings:"⚙️設定",settlements:"💰日結",deposits:"🏦存款",employees:"👥員工"};
+const ROLE_TABS={admin:["schedules","leaves","shifts","attendance","worklogs","expenses","pnl","announcements","settings","settlements","deposits","employees"],manager:["schedules","leaves","shifts","attendance","worklogs","expenses","pnl","settlements","deposits","employees"],store_manager:["schedules","shifts","worklogs"]};
+const TAB_L={schedules:"📅排班",leaves:"🙋請假",shifts:"⏰班別",attendance:"📍出勤",worklogs:"📋日誌",expenses:"📦費用",pnl:"📊損益",announcements:"📢公告",settings:"⚙️設定",settlements:"💰日結",deposits:"🏦存款",employees:"👥員工"};
 function api(u,b){return b?fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(r=>r.json()):fetch(u).then(r=>r.json());}
 function Badge({status}){const m={matched:{bg:"#e6f9f0",c:"#0a7c42"},pending:{bg:"#fff8e6",c:"#8a6d00"},approved:{bg:"#e6f9f0",c:"#0a7c42"},rejected:{bg:"#fde8e8",c:"#b91c1c"},anomaly:{bg:"#fde8e8",c:"#b91c1c"},minor_diff:{bg:"#fff8e6",c:"#8a6d00"}};const s=m[status]||{bg:"#f0f0f0",c:"#666"};return<span style={{padding:"2px 6px",borderRadius:8,fontSize:10,background:s.bg,color:s.c}}>{status}</span>;}
 function RB({role}){const c={admin:{bg:"#fde8e8",c:"#b91c1c"},manager:{bg:"#e6f1fb",c:"#185fa5"},store_manager:{bg:"#fef9c3",c:"#8a6d00"},staff:{bg:"#e6f9f0",c:"#0a7c42"}};const s=c[role]||c.staff;return<span style={{padding:"1px 5px",borderRadius:5,fontSize:9,background:s.bg,color:s.c}}>{ROLES[role]||role}</span>;}
@@ -28,13 +28,13 @@ const TIERS_P=[[1,"~11,100"],[2,"11,101~12,540"],[3,"12,541~13,500"],[4,"13,501~
 
 function EmpDetail({empId,onClose}){
   const[d,setD]=useState(null);const[ld,setLd]=useState(true);const[saving,setSaving]=useState(false);const[msg,setMsg]=useState("");
-  const[form,setForm]=useState({role:"",employment_type:"",insurance_tier:"",insurance_start_date:"",hourly_rate:"",monthly_salary:""});
-  const reload=()=>api(`/api/admin/employees?id=${empId}`).then(r=>{setD(r);if(r.data)setForm({role:r.data.role||"staff",employment_type:r.data.employment_type||"regular",insurance_tier:r.data.insurance_tier||"",insurance_start_date:r.data.insurance_start_date||"",hourly_rate:r.data.hourly_rate||"",monthly_salary:r.data.monthly_salary||""});setLd(false);});
+  const[form,setForm]=useState({role:"",employment_type:"",labor_tier:"",health_tier:"",labor_start_date:"",health_start_date:"",hourly_rate:"",monthly_salary:""});
+  const reload=()=>api(`/api/admin/employees?id=${empId}`).then(r=>{setD(r);if(r.data)setForm({role:r.data.role||"staff",employment_type:r.data.employment_type||"regular",labor_tier:r.data.labor_tier||"",health_tier:r.data.health_tier||"",labor_start_date:r.data.labor_start_date||"",health_start_date:r.data.health_start_date||"",hourly_rate:r.data.hourly_rate||"",monthly_salary:r.data.monthly_salary||""});setLd(false);});
   useEffect(()=>{reload();},[empId]);
-  const save=async()=>{setSaving(true);setMsg("");await api("/api/admin/employees",{action:"update",employee_id:empId,role:form.role,employment_type:form.employment_type,insurance_tier:form.insurance_tier?Number(form.insurance_tier):null,insurance_start_date:form.insurance_start_date||null,hourly_rate:form.hourly_rate?Number(form.hourly_rate):null,monthly_salary:form.monthly_salary?Number(form.monthly_salary):null});setMsg("✅ 已儲存");setSaving(false);reload();};
+  const save=async()=>{setSaving(true);setMsg("");await api("/api/admin/employees",{action:"update",employee_id:empId,role:form.role,employment_type:form.employment_type,labor_tier:form.labor_tier?Number(form.labor_tier):null,health_tier:form.health_tier?Number(form.health_tier):null,labor_start_date:form.labor_start_date||null,health_start_date:form.health_start_date||null,hourly_rate:form.hourly_rate?Number(form.hourly_rate):null,monthly_salary:form.monthly_salary?Number(form.monthly_salary):null});setMsg("✅ 已儲存");setSaving(false);reload();};
   const tiers=form.employment_type==="parttime"?TIERS_P:TIERS_R;
   if(ld)return<div style={modal}><div style={mbox}><p>載入中...</p></div></div>;
-  const e=d?.data,ins=d?.insurance;
+  const e=d?.data,li=d?.labor_insurance,hi=d?.health_insurance;
   return<div style={modal} onClick={onClose}><div style={mbox} onClick={ev=>ev.stopPropagation()}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
       <h2 style={{fontSize:16,fontWeight:600}}>👤 {e?.name}</h2>
@@ -44,35 +44,33 @@ function EmpDetail({empId,onClose}){
       <Row l="門市" v={e?.stores?.name||"總部"}/><Row l="手機" v={e?.phone}/><Row l="Email" v={e?.email}/>
       <Row l="生日" v={e?.birthday}/><Row l="身分證" v={e?.id_number}/>
       <Row l="緊急聯絡" v={`${e?.emergency_contact||""} ${e?.emergency_phone||""} (${e?.emergency_relation||""})`}/>
-      <Row l="LINE" v={e?.line_uid?"✅ 已綁定":"未綁定"}/><Row l="帳號" v={e?.is_active?<span style={{color:"#0a7c42"}}>✅啟用</span>:<span style={{color:"#b91c1c"}}>⏳待啟用</span>}/>
+      <Row l="LINE" v={e?.line_uid?"✅已綁定":"未綁定"}/><Row l="帳號" v={e?.is_active?<span style={{color:"#0a7c42"}}>✅啟用</span>:<span style={{color:"#b91c1c"}}>⏳待啟用</span>}/>
     </div>
     <div style={sec}><h4 style={sh}>在職資訊</h4>
       <Row l="到職日" v={e?.hire_date||"未設定"}/><Row l="年資" v={`${d?.service_months||0}個月`}/>
-      <Row l="合約" v={e?.contract_signed?`✅ ${new Date(e.contract_signed_at).toLocaleDateString("zh-TW")}`:"❌ 未簽"}/>
+      <Row l="合約" v={e?.contract_signed?`✅ ${new Date(e.contract_signed_at).toLocaleDateString("zh-TW")}`:"❌未簽"}/>
     </div>
-    <div style={sec}><h4 style={sh}>特休假（{new Date().getFullYear()}年）</h4>
-      <Row l="年資特休" v={`${d?.annual_leave_days||0}天`}/>
-      {d?.leave_balance&&<><Row l="已用特休" v={`${d.leave_balance.annual_used||0}天`}/><Row l="已用病假" v={`${d.leave_balance.sick_used||0}/${d.leave_balance.sick_leave||30}天`}/></>}
+    <div style={sec}><h4 style={sh}>特休假（{new Date().getFullYear()}年）</h4><Row l="年資特休" v={`${d?.annual_leave_days||0}天`}/></div>
+    <div style={{...sec,border:"2px solid #4361ee"}}><h4 style={{...sh,color:"#4361ee"}}>✏️ 角色權限</h4>
+      <select value={form.role} onChange={ev=>setForm({...form,role:ev.target.value})} style={inp}><option value="staff">👤員工</option><option value="store_manager">🏪門店主管</option><option value="manager">🏠管理</option><option value="admin">👑總部</option></select>
+      <div style={{marginTop:4}}><label style={{fontSize:10,color:"#888"}}>投保類型</label><select value={form.employment_type} onChange={ev=>setForm({...form,employment_type:ev.target.value,labor_tier:"",health_tier:""})} style={inp}><option value="regular">一般</option><option value="parttime">兼職</option></select></div>
     </div>
-
-    {/* 可編輯區域 */}
-    <div style={{...sec,border:"2px solid #4361ee"}}>
-      <h4 style={{...sh,color:"#4361ee"}}>✏️ 角色 / 勞健保 / 薪資設定</h4>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:8}}>
-        <div><label style={{fontSize:10,color:"#888"}}>角色權限</label><select value={form.role} onChange={ev=>setForm({...form,role:ev.target.value})} style={inp}><option value="staff">👤員工</option><option value="store_manager">🏪門店主管</option><option value="manager">🏠管理</option><option value="admin">👑總部</option></select></div>
-        <div><label style={{fontSize:10,color:"#888"}}>投保類型</label><select value={form.employment_type} onChange={ev=>setForm({...form,employment_type:ev.target.value,insurance_tier:""})} style={inp}><option value="regular">一般</option><option value="parttime">兼職</option></select></div>
-        <div style={{gridColumn:"span 2"}}><label style={{fontSize:10,color:"#888"}}>投保級距</label><select value={form.insurance_tier} onChange={ev=>setForm({...form,insurance_tier:ev.target.value})} style={inp}><option value="">未設定</option>{tiers.map(([i,r])=><option key={i} value={i}>第{i}級（${r}）</option>)}</select></div>
-        <div><label style={{fontSize:10,color:"#888"}}>加保日期</label><input type="date" value={form.insurance_start_date} onChange={ev=>setForm({...form,insurance_start_date:ev.target.value})} style={inp}/></div>
-        <div><label style={{fontSize:10,color:"#888"}}>月薪</label><input type="number" value={form.monthly_salary} onChange={ev=>setForm({...form,monthly_salary:ev.target.value})} placeholder="0" style={inp}/></div>
-        <div><label style={{fontSize:10,color:"#888"}}>時薪</label><input type="number" value={form.hourly_rate} onChange={ev=>setForm({...form,hourly_rate:ev.target.value})} placeholder="0" style={inp}/></div>
-      </div>
-      {ins&&<div style={{marginTop:8,padding:8,background:"#f0f0f0",borderRadius:6,fontSize:11}}>
-        <b>投保薪資：</b>{fmt(ins.insured_salary)}<br/>
-        <b>勞保自付：</b>{fmt(ins.labor_self)}/月｜雇主：{fmt(ins.labor_employer)}/月<br/>
-        <b>健保自付：</b>{fmt(ins.health_self)}/月｜雇主：{fmt(ins.health_employer)}/月
-      </div>}
-      <button onClick={save} disabled={saving} style={{marginTop:8,width:"100%",padding:"8px",borderRadius:6,border:"none",background:saving?"#ccc":"#0a7c42",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>{saving?"儲存中...":"💾 儲存變更"}</button>
-      {msg&&<p style={{textAlign:"center",fontSize:12,color:"#0a7c42",marginTop:4}}>{msg}</p>}
+    <div style={{...sec,border:"2px solid #b45309"}}><h4 style={{...sh,color:"#b45309"}}>🛡️ 勞保設定</h4>
+      <label style={{fontSize:10,color:"#888"}}>勞保級距</label><select value={form.labor_tier} onChange={ev=>setForm({...form,labor_tier:ev.target.value})} style={inp}><option value="">未設定</option>{tiers.map(([i,r])=><option key={i} value={i}>第{i}級（${r}）</option>)}</select>
+      <div style={{marginTop:4}}><label style={{fontSize:10,color:"#888"}}>勞保加保日期</label><input type="date" value={form.labor_start_date} onChange={ev=>setForm({...form,labor_start_date:ev.target.value})} style={inp}/></div>
+      {li&&<div style={{marginTop:6,padding:6,background:"#fff8e6",borderRadius:4,fontSize:11}}>投保薪資：{fmt(li.insured_salary)}｜<b>自付：{fmt(li.labor_self)}/月</b>｜雇主：{fmt(li.labor_employer)}/月</div>}
+    </div>
+    <div style={{...sec,border:"2px solid #0a7c42"}}><h4 style={{...sh,color:"#0a7c42"}}>🏥 健保設定</h4>
+      <label style={{fontSize:10,color:"#888"}}>健保級距</label><select value={form.health_tier} onChange={ev=>setForm({...form,health_tier:ev.target.value})} style={inp}><option value="">未設定</option>{tiers.map(([i,r])=><option key={i} value={i}>第{i}級（${r}）</option>)}</select>
+      <div style={{marginTop:4}}><label style={{fontSize:10,color:"#888"}}>健保加保日期</label><input type="date" value={form.health_start_date} onChange={ev=>setForm({...form,health_start_date:ev.target.value})} style={inp}/></div>
+      {hi&&<div style={{marginTop:6,padding:6,background:"#e6f9f0",borderRadius:4,fontSize:11}}>投保薪資：{fmt(hi.insured_salary)}｜<b>自付：{fmt(hi.health_self)}/月</b>｜雇主：{fmt(hi.health_employer)}/月</div>}
+    </div>
+    <div style={{...sec,border:"2px solid #666"}}><h4 style={{...sh,color:"#666"}}>💰 薪資設定</h4>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}><div><label style={{fontSize:10,color:"#888"}}>月薪</label><input type="number" value={form.monthly_salary} onChange={ev=>setForm({...form,monthly_salary:ev.target.value})} style={inp}/></div><div><label style={{fontSize:10,color:"#888"}}>時薪</label><input type="number" value={form.hourly_rate} onChange={ev=>setForm({...form,hourly_rate:ev.target.value})} style={inp}/></div></div>
+      {(li||hi)&&<div style={{marginTop:6,padding:6,background:"#f0f0f0",borderRadius:4,fontSize:11}}>每月扣除：勞保 {fmt(li?.labor_self||0)} + 健保 {fmt(hi?.health_self||0)} = <b>{fmt((li?.labor_self||0)+(hi?.health_self||0))}</b></div>}
+    </div>
+    <button onClick={save} disabled={saving} style={{width:"100%",padding:"10px",borderRadius:8,border:"none",background:saving?"#ccc":"#0a7c42",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>{saving?"儲存中...":"💾 儲存所有變更"}</button>
+    {msg&&<p style={{textAlign:"center",fontSize:12,color:"#0a7c42",marginTop:4}}>{msg}</p>}
     </div>
   </div></div>;
 }
@@ -106,7 +104,9 @@ function Dashboard({auth,onLogout}){
   const[ws,setWs]=useState(()=>{const d=new Date();d.setDate(d.getDate()-d.getDay()+1);return d.toLocaleDateString("sv-SE");});
   const[pm,setPm]=useState(null);const[detailId,setDetailId]=useState(null);
   const[exps,setExps]=useState([]);const[expSum,setExpSum]=useState({});const[pnl,setPnl]=useState(null);
-  const[anns,setAnns]=useState([]);const[newAnn,setNewAnn]=useState({title:"",content:"",priority:"normal"});const[showAnnForm,setShowAnnForm]=useState(false);
+  const[anns,setAnns]=useState([]);const[newAnn,setNewAnn]=useState({title:"",content:"",priority:"normal",store_id:null});const[showAnnForm,setShowAnnForm]=useState(false);
+  const[wlogs,setWlogs]=useState([]);const[wltemplates,setWltemplates]=useState([]);const[showWlForm,setShowWlForm]=useState(false);
+  const[newWl,setNewWl]=useState({store_id:"",category:"開店準備",item:"",role:"all",shift_type:"opening",sort_order:0});
 
   useEffect(()=>{api("/api/admin/stores").then(d=>setStores(d.data||[]));},[]);
   const load=useCallback(()=>{
@@ -123,7 +123,9 @@ function Dashboard({auth,onLogout}){
       myTabs.includes("expenses")?api(`/api/admin/expenses?month=${month}${sf?`&store_id=${sf}`:""}`):Promise.resolve({data:[],total:0,byCategory:{}}),
       myTabs.includes("pnl")?api(`/api/admin/pnl?month=${month}${sf?`&store_id=${sf}`:""}`):Promise.resolve(null),
       myTabs.includes("announcements")?api("/api/admin/announcements"):Promise.resolve({data:[]}),
-    ]).then(([s,d,e,sh,sc,at,as3,lr2,ex,pl2,an])=>{setStl(s.data||[]);setSum(s.summary||{});setDep(d.data||[]);setEmps(e.data||[]);setShifts(sh.data||[]);setScheds(sc.data||[]);setAtt(at.data||[]);setAs2(as3.data||{});setLr(lr2.data||[]);setExps(ex.data||[]);setExpSum({total:ex.total,byCategory:ex.byCategory});setPnl(pl2);setAnns(an.data||[]);setLd(false);});
+      myTabs.includes("worklogs")?api(`/api/admin/worklogs?month=${month}${sf?`&store_id=${sf}`:""}`):Promise.resolve({data:[]}),
+      myTabs.includes("worklogs")?api(`/api/admin/worklogs?type=templates${sf?`&store_id=${sf}`:""}`):Promise.resolve({data:[]}),
+    ]).then(([s,d,e,sh,sc,at,as3,lr2,ex,pl2,an,wl,wlt])=>{setStl(s.data||[]);setSum(s.summary||{});setDep(d.data||[]);setEmps(e.data||[]);setShifts(sh.data||[]);setScheds(sc.data||[]);setAtt(at.data||[]);setAs2(as3.data||{});setLr(lr2.data||[]);setExps(ex.data||[]);setExpSum({total:ex.total,byCategory:ex.byCategory});setPnl(pl2);setAnns(an.data||[]);setWlogs(wl.data||[]);setWltemplates(wlt.data||[]);setLd(false);});
   },[month,sf,ws,sv,myTabs]);
   useEffect(()=>{load();},[load]);
 
@@ -143,6 +145,8 @@ function Dashboard({auth,onLogout}){
   const rvExp=async(id,st)=>{await api("/api/admin/expenses",{action:"review",expense_id:id,status:st});load();};
   const addAnn=async()=>{await api("/api/admin/announcements",{action:"create",...newAnn,created_by:auth.employee_id});setShowAnnForm(false);setNewAnn({title:"",content:"",priority:"normal"});load();};
   const delAnn=async(id)=>{if(confirm("刪除？")){await api("/api/admin/announcements",{action:"delete",announcement_id:id});load();}};
+  const addWlTemplate=async()=>{if(!newWl.item||!newWl.store_id)return;await api("/api/admin/worklogs",{action:"add_template",...newWl});setNewWl({...newWl,item:""});load();};
+  const delWlTemplate=async(id)=>{await api("/api/admin/worklogs",{action:"delete_template",template_id:id});load();};
 
   const wd=Array.from({length:7},(_,i)=>new Date(new Date(ws).getTime()+i*86400000).toLocaleDateString("sv-SE"));
   const prevW=()=>setWs(new Date(new Date(ws).getTime()-7*86400000).toLocaleDateString("sv-SE"));
@@ -202,6 +206,44 @@ function Dashboard({auth,onLogout}){
       {/* 出勤 */}
       {!ld&&tab==="attendance"&&<div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:550}}><thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>{["時間","員工","門市","類型","距離","遲到"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead><tbody>{att.map(a=><tr key={a.id} style={{borderBottom:"1px solid #f0eeea"}}><td style={{padding:6,fontSize:10}}>{new Date(a.timestamp).toLocaleString("zh-TW",{timeZone:"Asia/Taipei",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}</td><td style={{padding:6,fontWeight:500}}>{a.employees?.name}</td><td style={{padding:6}}>{a.stores?.name}</td><td style={{padding:6}}>{a.type==="clock_in"?"🟢上班":"🔴下班"}</td><td style={{padding:6}}>{a.distance_meters?`${Math.round(a.distance_meters)}m`:"-"}{a.is_valid?"✅":"❌"}</td><td style={{padding:6,color:a.late_minutes>0?"#b91c1c":"#0a7c42"}}>{a.late_minutes>0?`${a.late_minutes}分`:"準時"}</td></tr>)}</tbody></table></div>}
 
+      {/* 工作日誌管理 */}
+      {!ld&&tab==="worklogs"&&<div>
+        <h3 style={{fontSize:13,fontWeight:600,marginBottom:8}}>📋 工作日誌模板管理</h3>
+        <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:10}}>
+          <h4 style={{fontSize:12,fontWeight:500,marginBottom:6}}>＋ 新增工作項目</h4>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:6}}>
+            <div><label style={{fontSize:10,color:"#888"}}>門市 *</label><select value={newWl.store_id} onChange={e=>setNewWl({...newWl,store_id:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}><option value="">選擇</option>{stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+            <div><label style={{fontSize:10,color:"#888"}}>分類</label><select value={newWl.category} onChange={e=>setNewWl({...newWl,category:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}><option>開店準備</option><option>營業中</option><option>打烊作業</option><option>清潔消毒</option><option>食材管理</option></select></div>
+            <div><label style={{fontSize:10,color:"#888"}}>角色</label><select value={newWl.role} onChange={e=>setNewWl({...newWl,role:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}><option value="all">全員</option><option value="吧台">吧台</option><option value="內場">內場</option><option value="烘焙">烘焙</option><option value="外場">外場</option></select></div>
+            <div><label style={{fontSize:10,color:"#888"}}>時段</label><select value={newWl.shift_type} onChange={e=>setNewWl({...newWl,shift_type:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}><option value="opening">開店</option><option value="during">營業中</option><option value="closing">打烊</option></select></div>
+            <div style={{gridColumn:"span 2"}}><label style={{fontSize:10,color:"#888"}}>工作項目 *</label><input value={newWl.item} onChange={e=>setNewWl({...newWl,item:e.target.value})} placeholder="例：確認冷藏冷凍溫度" style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}/></div>
+          </div>
+          <button onClick={addWlTemplate} disabled={!newWl.item||!newWl.store_id} style={{padding:"4px 14px",borderRadius:4,border:"none",background:newWl.item&&newWl.store_id?"#0a7c42":"#ccc",color:"#fff",fontSize:11,cursor:"pointer"}}>新增</button>
+        </div>
+        <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto",marginBottom:14}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}><thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>{["門市","分類","角色","時段","工作項目",""].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+          <tbody>{wltemplates.length===0?<tr><td colSpan={6} style={{padding:20,textAlign:"center",color:"#ccc"}}>尚無工作項目</td></tr>:wltemplates.map(t=><tr key={t.id} style={{borderBottom:"1px solid #f0eeea"}}>
+            <td style={{padding:6}}>{stores.find(s=>s.id===t.store_id)?.name||"-"}</td>
+            <td style={{padding:6,fontWeight:500}}>{t.category}</td>
+            <td style={{padding:6}}>{t.role==="all"?"全員":t.role}</td>
+            <td style={{padding:6}}>{t.shift_type==="opening"?"開店":t.shift_type==="during"?"營業":"打烊"}</td>
+            <td style={{padding:6}}>{t.item}</td>
+            <td style={{padding:4}}><button onClick={()=>delWlTemplate(t.id)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:9,color:"#b91c1c"}}>🗑</button></td>
+          </tr>)}</tbody></table>
+        </div>
+        <h3 style={{fontSize:13,fontWeight:600,marginBottom:8}}>📝 員工提交紀錄</h3>
+        <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}><thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>{["日期","員工","門市","完成項目","備註"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+          <tbody>{wlogs.length===0?<tr><td colSpan={5} style={{padding:20,textAlign:"center",color:"#ccc"}}>本月無提交紀錄</td></tr>:wlogs.map(l=><tr key={l.id} style={{borderBottom:"1px solid #f0eeea"}}>
+            <td style={{padding:6}}>{l.date}</td>
+            <td style={{padding:6,fontWeight:500}}>{l.employees?.name}</td>
+            <td style={{padding:6}}>{l.stores?.name}</td>
+            <td style={{padding:6}}>{(l.items||[]).length}項</td>
+            <td style={{padding:6,fontSize:10,color:"#888",maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.notes||"-"}</td>
+          </tr>)}</tbody></table>
+        </div>
+      </div>}
+
       {/* 費用管理 */}
       {!ld&&tab==="expenses"&&<div>
         <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}><div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px",flex:1}}><div style={{fontSize:10,color:"#888"}}>本月費用總額</div><div style={{fontSize:16,fontWeight:600,color:"#b91c1c"}}>{fmt(expSum.total)}</div></div>{Object.entries(expSum.byCategory||{}).slice(0,3).map(([k,v])=><div key={k} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px",flex:1}}><div style={{fontSize:10,color:"#888"}}>{k}</div><div style={{fontSize:14,fontWeight:600}}>{fmt(v)}</div></div>)}</div>
@@ -240,11 +282,14 @@ function Dashboard({auth,onLogout}){
         {showAnnForm&&<div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8}}>
           <div style={{marginBottom:6}}><label style={{fontSize:10,color:"#888"}}>標題 *</label><input value={newAnn.title} onChange={e=>setNewAnn({...newAnn,title:e.target.value})} style={{width:"100%",padding:5,borderRadius:4,border:"1px solid #ddd",fontSize:12}}/></div>
           <div style={{marginBottom:6}}><label style={{fontSize:10,color:"#888"}}>內容 *</label><textarea value={newAnn.content} onChange={e=>setNewAnn({...newAnn,content:e.target.value})} rows={3} style={{width:"100%",padding:5,borderRadius:4,border:"1px solid #ddd",fontSize:12}}/></div>
-          <div style={{marginBottom:8}}><label style={{fontSize:10,color:"#888"}}>優先級</label><select value={newAnn.priority} onChange={e=>setNewAnn({...newAnn,priority:e.target.value})} style={{padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}><option value="normal">一般</option><option value="urgent">🔴 急件</option></select></div>
+          <div style={{display:"flex",gap:6,marginBottom:8}}>
+            <div style={{flex:1}}><label style={{fontSize:10,color:"#888"}}>指定門市</label><select value={newAnn.store_id||""} onChange={e=>setNewAnn({...newAnn,store_id:e.target.value||null})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}><option value="">全部門市</option>{stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+            <div style={{flex:1}}><label style={{fontSize:10,color:"#888"}}>優先級</label><select value={newAnn.priority} onChange={e=>setNewAnn({...newAnn,priority:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}><option value="normal">一般</option><option value="urgent">🔴急件</option></select></div>
+          </div>
           <button onClick={addAnn} disabled={!newAnn.title||!newAnn.content} style={{padding:"5px 14px",borderRadius:4,border:"none",background:newAnn.title&&newAnn.content?"#0a7c42":"#ccc",color:"#fff",fontSize:11,cursor:"pointer"}}>發布</button>
         </div>}
         <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>{anns.length===0?<div style={{padding:30,textAlign:"center",color:"#ccc"}}>尚無公告</div>:anns.map(a=><div key={a.id} style={{padding:10,borderBottom:"1px solid #f0eeea",display:"flex",gap:8,alignItems:"flex-start"}}>
-          <div style={{flex:1}}>{a.priority==="urgent"&&<span style={{background:"#b91c1c",color:"#fff",padding:"1px 5px",borderRadius:3,fontSize:9,marginRight:4}}>急</span>}<b style={{fontSize:13}}>{a.title}</b><p style={{fontSize:12,color:"#555",marginTop:3}}>{a.content}</p><span style={{fontSize:10,color:"#aaa"}}>{new Date(a.created_at).toLocaleDateString("zh-TW")}</span></div>
+          <div style={{flex:1}}>{a.priority==="urgent"&&<span style={{background:"#b91c1c",color:"#fff",padding:"1px 5px",borderRadius:3,fontSize:9,marginRight:4}}>急</span>}{a.store_id&&<span style={{background:"#e6f1fb",color:"#185fa5",padding:"1px 5px",borderRadius:3,fontSize:9,marginRight:4}}>{stores.find(s=>s.id===a.store_id)?.name||"指定門市"}</span>}<b style={{fontSize:13}}>{a.title}</b><p style={{fontSize:12,color:"#555",marginTop:3}}>{a.content}</p><span style={{fontSize:10,color:"#aaa"}}>{new Date(a.created_at).toLocaleDateString("zh-TW")}</span></div>
           <button onClick={()=>delAnn(a.id)} style={{padding:"2px 6px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
         </div>)}</div>
       </div>}
