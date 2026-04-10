@@ -182,6 +182,122 @@ function Settings({ stores, as2, upS }) {
           </div>
         ))}
       </div>
+
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"📱 LINE 選單設定"}</h3>
+        <p style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>員工在 LINE 輸入「選單」時，依據角色顯示不同功能按鈕。</p>
+        <div style={{ fontSize: 11, lineHeight: 2 }}>
+          <div><b>👤 員工：</b>上班打卡、下班打卡、我的班表、請假申請、日結回報、存款回報</div>
+          <div><b>🏪 門店主管：</b>以上 + 月結單據、零用金</div>
+          <div><b>🏠 管理：</b>以上 + 總部代付、今日營收</div>
+          <div><b>👑 總部：</b>全部功能</div>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <a href="/setup" target="_blank" style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #4361ee", color: "#4361ee", fontSize: 11, textDecoration: "none" }}>{"🚀 設定 LINE 常駐選單（Rich Menu）"}</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorklogMgr({ stores, sf, month, load }) {
+  const [wlStore, setWlStore] = useState(sf || (stores[0] ? stores[0].id : ""));
+  const [templates, setTemplates] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [wlLd, setWlLd] = useState(true);
+  const [newItem, setNewItem] = useState({ category: "開店準備", item: "", role: "all", shift_type: "opening" });
+  const [copyTarget, setCopyTarget] = useState("");
+
+  const loadWl = () => {
+    if (!wlStore) return;
+    setWlLd(true);
+    Promise.all([
+      ap("/api/admin/worklogs?type=templates&store_id=" + wlStore),
+      ap("/api/admin/worklogs?month=" + month + "&store_id=" + wlStore),
+    ]).then(([t, l]) => { setTemplates(t.data || []); setLogs(l.data || []); setWlLd(false); });
+  };
+  useEffect(() => { loadWl(); }, [wlStore, month]);
+
+  const addTemplate = async () => {
+    if (!newItem.item) return;
+    await ap("/api/admin/worklogs", { action: "add_template", store_id: wlStore, ...newItem });
+    setNewItem({ ...newItem, item: "" }); loadWl();
+  };
+  const delTemplate = async (id) => { await ap("/api/admin/worklogs", { action: "delete_template", template_id: id }); loadWl(); };
+  const copyItem = async (t) => {
+    if (!copyTarget) { alert("請先選擇目標門市"); return; }
+    await ap("/api/admin/worklogs", { action: "add_template", store_id: copyTarget, category: t.category, item: t.item, role: t.role, shift_type: t.shift_type, sort_order: t.sort_order });
+    alert("已複製到 " + (stores.find(s => s.id === copyTarget) ? stores.find(s => s.id === copyTarget).name : "目標門市"));
+  };
+  const copyAll = async () => {
+    if (!copyTarget || copyTarget === wlStore) return;
+    const d = await ap("/api/admin/worklogs", { action: "copy_to_store", from_store_id: wlStore, to_store_id: copyTarget });
+    alert("已複製 " + (d.count || 0) + " 個項目"); loadWl();
+  };
+
+  const grouped = {};
+  for (const t of templates) { const k = t.shift_type === "closing" ? "打烊作業" : "開店/營業"; if (!grouped[k]) grouped[k] = []; grouped[k].push(t); }
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ fontSize: 12, fontWeight: 600 }}>{"📋 選擇門市："}</span>
+        {stores.map(s => <button key={s.id} onClick={() => setWlStore(s.id)} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: wlStore === s.id ? "#1a1a1a" : "#fff", color: wlStore === s.id ? "#fff" : "#666", fontSize: 12, cursor: "pointer", fontWeight: wlStore === s.id ? 600 : 400 }}>{s.name}</button>)}
+      </div>
+
+      {wlStore && <div>
+        <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center", background: "#e6f1fb", borderRadius: 6, padding: "6px 10px" }}>
+          <span style={{ fontSize: 11, color: "#185fa5" }}>{"📋 複製到："}</span>
+          <select value={copyTarget} onChange={e => setCopyTarget(e.target.value)} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}>
+            <option value="">選擇目標門市</option>
+            {stores.filter(s => s.id !== wlStore).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <button onClick={copyAll} disabled={!copyTarget} style={{ padding: "3px 10px", borderRadius: 4, border: "none", background: copyTarget ? "#4361ee" : "#ccc", color: "#fff", fontSize: 10, cursor: "pointer" }}>全部複製</button>
+        </div>
+
+        {wlLd ? <p style={{ color: "#ccc", textAlign: "center", padding: 20 }}>載入中...</p> : <div>
+          {Object.entries(grouped).map(([group, items]) => (
+            <div key={group} style={{ marginBottom: 12 }}>
+              <h4 style={{ fontSize: 13, fontWeight: 600, color: group === "打烊作業" ? "#b45309" : "#0a7c42", marginBottom: 6 }}>{group === "打烊作業" ? "🌙 " : "☀️ "}{group}</h4>
+              <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1" }}>
+                {items.map(t => (
+                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderBottom: "1px solid #f0eeea" }}>
+                    <span style={{ fontSize: 11, flex: 1 }}>
+                      <span style={{ fontWeight: 500 }}>{t.item}</span>
+                      {t.role !== "all" && <span style={{ fontSize: 9, background: "#fef9c3", color: "#8a6d00", padding: "1px 4px", borderRadius: 3, marginLeft: 4 }}>{t.role}</span>}
+                    </span>
+                    <span style={{ fontSize: 9, color: "#888" }}>{t.category}</span>
+                    {copyTarget && <button onClick={() => copyItem(t)} style={{ padding: "1px 6px", borderRadius: 3, border: "1px solid #4361ee", background: "transparent", color: "#4361ee", cursor: "pointer", fontSize: 9 }}>{"📋複製"}</button>}
+                    <button onClick={() => delTemplate(t.id)} style={{ padding: "1px 4px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 9, color: "#b91c1c" }}>🗑</button>
+                  </div>
+                ))}
+                {items.length === 0 && <div style={{ padding: 12, textAlign: "center", color: "#ccc", fontSize: 11 }}>無項目</div>}
+              </div>
+            </div>
+          ))}
+
+          {Object.keys(grouped).length === 0 && <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 30, textAlign: "center", color: "#ccc" }}>此門市尚無工作項目</div>}
+
+          <div style={{ background: "#fff", borderRadius: 8, border: "2px dashed #ddd", padding: 10, marginTop: 10 }}>
+            <h4 style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>{"＋ 新增工作項目"}</h4>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+              <select value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} style={{ padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option>開店準備</option><option>營業中</option><option>打烊作業</option><option>清潔消毒</option><option>食材管理</option></select>
+              <select value={newItem.role} onChange={e => setNewItem({ ...newItem, role: e.target.value })} style={{ padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="all">全員</option><option value="吧台">吧台</option><option value="內場">內場</option><option value="烘焙">烘焙</option><option value="外場">外場</option></select>
+              <select value={newItem.shift_type} onChange={e => setNewItem({ ...newItem, shift_type: e.target.value })} style={{ padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="opening">開店</option><option value="during">營業中</option><option value="closing">打烊</option></select>
+            </div>
+            <div style={{ display: "flex", gap: 4 }}>
+              <input value={newItem.item} onChange={e => setNewItem({ ...newItem, item: e.target.value })} placeholder="輸入工作項目" onKeyDown={e => e.key === "Enter" && addTemplate()} style={{ flex: 1, padding: "5px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12 }} />
+              <button onClick={addTemplate} disabled={!newItem.item} style={{ padding: "5px 14px", borderRadius: 4, border: "none", background: newItem.item ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>新增</button>
+            </div>
+          </div>
+
+          <h4 style={{ fontSize: 13, fontWeight: 600, marginTop: 16, marginBottom: 6 }}>{"📝 員工提交紀錄"}</h4>
+          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["日期", "員工", "完成", "備註"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
+              <tbody>{logs.length === 0 ? <tr><td colSpan={4} style={{ padding: 16, textAlign: "center", color: "#ccc" }}>本月無紀錄</td></tr> : logs.map(l => <tr key={l.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{l.date}</td><td style={{ padding: 6, fontWeight: 500 }}>{l.employees ? l.employees.name : ""}</td><td style={{ padding: 6 }}>{(l.items || []).length + "項"}</td><td style={{ padding: 6, fontSize: 10, color: "#888" }}>{l.notes || "-"}</td></tr>)}</tbody></table>
+          </div>
+        </div>}
+      </div>}
     </div>
   );
 }
@@ -341,37 +457,7 @@ function Dashboard({ auth, onLogout }) {
 
         {!ld && tab === "attendance" && <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["時間", "員工", "門市", "類型", "距離", "遲到"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead><tbody>{att.map(a => <tr key={a.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6, fontSize: 10 }}>{new Date(a.timestamp).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</td><td style={{ padding: 6, fontWeight: 500 }}>{a.employees ? a.employees.name : ""}</td><td style={{ padding: 6 }}>{a.stores ? a.stores.name : ""}</td><td style={{ padding: 6 }}>{a.type === "clock_in" ? "🟢上班" : "🔴下班"}</td><td style={{ padding: 6 }}>{a.distance_meters ? Math.round(a.distance_meters) + "m" : "-"}</td><td style={{ padding: 6, color: a.late_minutes > 0 ? "#b91c1c" : "#0a7c42" }}>{a.late_minutes > 0 ? a.late_minutes + "分" : "準時"}</td></tr>)}</tbody></table></div>}
 
-        {!ld && tab === "worklogs" && <div>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{"📋 工作日誌模板管理"}</h3>
-          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 10 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 6 }}>
-              <div><label style={{ fontSize: 10, color: "#888" }}>門市*</label><select value={newWl.store_id} onChange={e => setNewWl({ ...newWl, store_id: e.target.value })} style={{ width: "100%", padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="">選擇</option>{stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-              <div><label style={{ fontSize: 10, color: "#888" }}>分類</label><select value={newWl.category} onChange={e => setNewWl({ ...newWl, category: e.target.value })} style={{ width: "100%", padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option>開店準備</option><option>營業中</option><option>打烊作業</option><option>清潔消毒</option><option>食材管理</option></select></div>
-              <div><label style={{ fontSize: 10, color: "#888" }}>角色</label><select value={newWl.role} onChange={e => setNewWl({ ...newWl, role: e.target.value })} style={{ width: "100%", padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="all">全員</option><option value="吧台">吧台</option><option value="內場">內場</option><option value="烘焙">烘焙</option><option value="外場">外場</option></select></div>
-              <div><label style={{ fontSize: 10, color: "#888" }}>時段</label><select value={newWl.shift_type} onChange={e => setNewWl({ ...newWl, shift_type: e.target.value })} style={{ width: "100%", padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="opening">開店</option><option value="during">營業中</option><option value="closing">打烊</option></select></div>
-              <div style={{ gridColumn: "span 2" }}><label style={{ fontSize: 10, color: "#888" }}>工作項目*</label><input value={newWl.item} onChange={e => setNewWl({ ...newWl, item: e.target.value })} placeholder="例：確認冷藏冷凍溫度" style={{ width: "100%", padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} /></div>
-            </div>
-            <button onClick={addWlTemplate} disabled={!newWl.item || !newWl.store_id} style={{ padding: "4px 14px", borderRadius: 4, border: "none", background: newWl.item && newWl.store_id ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>新增</button>
-          </div>
-          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 10 }}>
-            <h4 style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>{"📋 複製工作項目到其他門市"}</h4>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <select value={copyFrom} onChange={e => setCopyFrom(e.target.value)} style={{ flex: 1, padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="">來源門市</option>{stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-              <span style={{ fontSize: 12 }}>{"→"}</span>
-              <select value={copyTo} onChange={e => setCopyTo(e.target.value)} style={{ flex: 1, padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="">目標門市</option>{stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-              <button onClick={copyTemplates} disabled={!copyFrom || !copyTo || copyFrom === copyTo} style={{ padding: "4px 12px", borderRadius: 4, border: "none", background: copyFrom && copyTo && copyFrom !== copyTo ? "#4361ee" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>複製</button>
-            </div>
-          </div>
-          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto", marginBottom: 14 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["門市", "分類", "角色", "時段", "項目", ""].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
-              <tbody>{wltemplates.filter(t => !sf || t.store_id === sf).length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: "center", color: "#ccc" }}>尚無項目</td></tr> : wltemplates.filter(t => !sf || t.store_id === sf).map(t => <tr key={t.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{stores.find(s => s.id === t.store_id) ? stores.find(s => s.id === t.store_id).name : "-"}</td><td style={{ padding: 6, fontWeight: 500 }}>{t.category}</td><td style={{ padding: 6 }}>{t.role === "all" ? "全員" : t.role}</td><td style={{ padding: 6 }}>{t.shift_type === "closing" ? "打烊" : t.shift_type === "during" ? "營業" : "開店"}</td><td style={{ padding: 6 }}>{t.item}</td><td style={{ padding: 4 }}><button onClick={() => delWlTemplate(t.id)} style={{ padding: "1px 5px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 9, color: "#b91c1c" }}>🗑</button></td></tr>)}</tbody></table>
-          </div>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{"📝 員工提交紀錄"}</h3>
-          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["日期", "員工", "門市", "完成", "備註"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
-              <tbody>{wlogs.length === 0 ? <tr><td colSpan={5} style={{ padding: 20, textAlign: "center", color: "#ccc" }}>本月無紀錄</td></tr> : wlogs.map(l => <tr key={l.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{l.date}</td><td style={{ padding: 6, fontWeight: 500 }}>{l.employees ? l.employees.name : ""}</td><td style={{ padding: 6 }}>{l.stores ? l.stores.name : ""}</td><td style={{ padding: 6 }}>{(l.items || []).length + "項"}</td><td style={{ padding: 6, fontSize: 10, color: "#888" }}>{l.notes || "-"}</td></tr>)}</tbody></table>
-          </div>
-        </div>}
+        {!ld && tab === "worklogs" && <WorklogMgr stores={stores} sf={sf} month={month} load={load} />}
 
         {!ld && tab === "expenses" && <div>
           <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
