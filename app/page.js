@@ -422,6 +422,7 @@ function Dashboard({ auth, onLogout }) {
         <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
           <input type="month" value={month} onChange={e => setMonth(e.target.value)} style={{ padding: "3px 6px", borderRadius: 5, border: "1px solid #ddd", fontSize: 11 }} />
           {auth.role !== "store_manager" && <select value={sf} onChange={e => setSf(e.target.value)} style={{ padding: "3px 6px", borderRadius: 5, border: "1px solid #ddd", fontSize: 11 }}><option value="">全部門市</option>{stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>}
+          {auth.role === "store_manager" && <span style={{ padding: "3px 8px", borderRadius: 5, background: "#e6f1fb", color: "#185fa5", fontSize: 11, fontWeight: 500 }}>{"🏠 " + (auth.store_name || stores.find(s => s.id === sf)?.name || "本店")}</span>}
           <button onClick={onLogout} style={{ padding: "3px 10px", borderRadius: 5, border: "1px solid #ddd", background: "transparent", fontSize: 11, cursor: "pointer", color: "#b91c1c" }}>登出</button>
         </div>
       </div>
@@ -440,25 +441,33 @@ function Dashboard({ auth, onLogout }) {
         {ld && <div style={{ textAlign: "center", padding: 30, color: "#aaa" }}>載入中...</div>}
 
         {!ld && tab === "schedules" && <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 8, flexWrap: "wrap" }}>
             <button onClick={() => setSv("week")} style={{ padding: "3px 10px", borderRadius: 5, border: "1px solid #ddd", background: sv === "week" ? "#1a1a1a" : "#fff", color: sv === "week" ? "#fff" : "#666", fontSize: 11, cursor: "pointer" }}>週</button>
-            <button onClick={prevW} style={{ padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: 11 }}>◀</button>
+            <button onClick={() => setSv("month")} style={{ padding: "3px 10px", borderRadius: 5, border: "1px solid #ddd", background: sv === "month" ? "#1a1a1a" : "#fff", color: sv === "month" ? "#fff" : "#666", fontSize: 11, cursor: "pointer" }}>月</button>
+            {sv === "week" && <><button onClick={prevW} style={{ padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: 11 }}>◀</button>
             <span style={{ fontSize: 12, fontWeight: 500 }}>{ws + "~" + wd[6]}</span>
-            <button onClick={nextW} style={{ padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: 11 }}>▶</button>
+            <button onClick={nextW} style={{ padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: 11 }}>▶</button></>}
+            {sv === "month" && <span style={{ fontSize: 12, fontWeight: 500 }}>{month}</span>}
             <button onClick={pub} style={{ padding: "4px 12px", borderRadius: 5, border: "none", background: "#0a7c42", color: "#fff", cursor: "pointer", fontSize: 11, marginLeft: "auto" }}>{"📢 發布"}</button>
           </div>
           {pm && <div style={{ background: "#e6f9f0", color: "#0a7c42", padding: "4px 10px", borderRadius: 5, fontSize: 11, marginBottom: 6 }}>{pm}</div>}
           <div style={{ display: "flex", gap: 8, marginBottom: 6, fontSize: 10, color: "#888" }}>
             <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#e6f9f0", border: "1px solid #ccc", marginRight: 3 }} />已發布</span>
             <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#fff8e6", border: "1px solid #ccc", marginRight: 3 }} />未發布</span>
-            <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#fef9c3", border: "1px dashed #d4a017", marginRight: 3 }} />員工預休申請（待核准）</span>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#fef9c3", border: "1px dashed #d4a017", marginRight: 3 }} />預休申請</span>
           </div>
-          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
+          {sv === "week" && <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, minWidth: 700 }}>
               <thead><tr style={{ background: "#faf8f5", borderBottom: "1px solid #e8e6e1" }}><th style={{ padding: "7px 5px", textAlign: "left", fontWeight: 500, color: "#666", minWidth: 60, position: "sticky", left: 0, background: "#faf8f5", zIndex: 1 }}>員工</th>{wd.map((d, i) => <th key={d} style={{ padding: "7px 3px", textAlign: "center", fontWeight: 500, color: i === 0 || i === 6 ? "#b91c1c" : "#666", minWidth: 85 }}>{d.slice(5) + "(" + DAYS[new Date(d).getDay()] + ")"}</th>)}</tr></thead>
               <tbody>{fe.map(emp => <tr key={emp.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: "5px", fontWeight: 500, fontSize: 11, position: "sticky", left: 0, background: "#fff", zIndex: 1 }}>{emp.name}<br /><RB role={emp.role} /></td>{wd.map(date => <td key={date} style={{ padding: "2px", textAlign: "center", verticalAlign: "top" }}>{renderCell(emp, date)}</td>)}</tr>)}</tbody>
             </table>
-          </div>
+          </div>}
+          {sv === "month" && <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, tableLayout: "fixed" }}>
+              <thead><tr style={{ background: "#faf8f5" }}>{DAYS.map((d, i) => <th key={d} style={{ padding: "6px 3px", textAlign: "center", color: i === 0 || i === 6 ? "#b91c1c" : "#666", fontWeight: 500 }}>{d}</th>)}</tr></thead>
+              <tbody>{(() => { const [y, m] = month.split("-").map(Number); const f = new Date(y, m - 1, 1); const sd = f.getDay(); const daysInMonth = new Date(y, m, 0).getDate(); const rows = []; let cells = []; for (let i = 0; i < sd; i++) cells.push(<td key={"e" + i} style={{ padding: 3, border: "1px solid #f0eeea" }} />); for (let d = 1; d <= daysInMonth; d++) { const date = y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0"); const ds = scheds.filter(s => s.date === date); cells.push(<td key={date} style={{ padding: 3, verticalAlign: "top", border: "1px solid #f0eeea", minHeight: 40 }}><div style={{ fontSize: 10, fontWeight: 500, color: "#666" }}>{d}</div>{ds.slice(0, 4).map(s => { if (s.type === "leave") { const lt = LT[s.leave_type] || LT.off; return <div key={s.id} style={{ background: lt.bg, borderRadius: 2, padding: "0 2px", fontSize: 8, marginBottom: 1, color: lt.c, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{(s.employees ? s.employees.name : "") + " " + lt.l}</div>; } return <div key={s.id} style={{ background: s.published ? "#e6f9f0" : "#fff8e6", borderRadius: 2, padding: "0 2px", fontSize: 8, marginBottom: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{(s.employees ? s.employees.name : "") + " " + (s.shifts ? s.shifts.name : "")}</div>; })}{ds.length > 4 && <div style={{ fontSize: 8, color: "#999" }}>{"+" + (ds.length - 4)}</div>}</td>); if (cells.length === 7) { rows.push(<tr key={"r" + rows.length}>{cells}</tr>); cells = []; } } while (cells.length < 7) cells.push(<td key={"f" + cells.length} style={{ padding: 3, border: "1px solid #f0eeea" }} />); if (cells.length) rows.push(<tr key={"r" + rows.length}>{cells}</tr>); return rows; })()}</tbody>
+            </table>
+          </div>}
         </div>}
 
         {!ld && tab === "store_staff" && <div>

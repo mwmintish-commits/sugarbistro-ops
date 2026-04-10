@@ -160,6 +160,10 @@ function stepPrompt(step, data) {
 }
 
 async function startSettlement(rt, emp) {
+  if (emp.store_id && emp.stores) {
+    await setUserState(emp.line_uid, "settlement_photo", { employee_name: emp.name, employee_id: emp.id, store_id: emp.store_id, store_name: emp.stores.name });
+    return replyText(rt, `💰 日結回報\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 拍照上傳 POS 日結單`);
+  }
   const { data: stores } = await supabase.from("stores").select("*").eq("is_active", true);
   await setUserState(emp.line_uid, "settlement_select_store", { employee_name: emp.name, employee_id: emp.id });
   return replyWithQuickReply(rt, `💰 日結回報\n👤 ${emp.name}\n\n選擇門市：`, (stores||[]).map(s => ({ type: "action", action: { type: "message", label: s.name, text: `日結門市:${s.name}` } })));
@@ -224,7 +228,7 @@ async function confirmSettlement(uid, emp) {
 }
 
 // ===== 存款 =====
-async function startDeposit(rt,emp){const{data:stores}=await supabase.from("stores").select("*").eq("is_active",true);await setUserState(emp.line_uid,"deposit_select_store",{employee_name:emp.name,employee_id:emp.id});return replyWithQuickReply(rt,`🏦 存款回報\n👤 ${emp.name}`,stores.map(s=>({type:"action",action:{type:"message",label:s.name,text:`存款門市:${s.name}`}})));}
+async function startDeposit(rt,emp){if(emp.store_id&&emp.stores){await setUserState(emp.line_uid,"deposit_photo",{employee_name:emp.name,employee_id:emp.id,store_id:emp.store_id,store_name:emp.stores.name});return replyText(rt,`🏦 存款回報\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 拍照上傳存款單`);}const{data:stores}=await supabase.from("stores").select("*").eq("is_active",true);await setUserState(emp.line_uid,"deposit_select_store",{employee_name:emp.name,employee_id:emp.id});return replyWithQuickReply(rt,`🏦 存款回報\n👤 ${emp.name}`,stores.map(s=>({type:"action",action:{type:"message",label:s.name,text:`存款門市:${s.name}`}})));}
 async function handleDepStore(rt,uid,name,state){const store=await matchStore(name);if(!store)return replyText(rt,"❌");const{data:last}=await supabase.from("deposits").select("deposit_date").eq("store_id",store.id).order("deposit_date",{ascending:false}).limit(1).single();await setUserState(uid,"deposit_photo",{...state.flow_data,store_id:store.id,store_name:store.name,period_start:last?new Date(new Date(last.deposit_date).getTime()+86400000).toISOString().split("T")[0]:null});return replyText(rt,`🏦 ${store.name}\n📸 拍照上傳存款單`);}
 async function handleDepImg(event,emp,state){const uid=event.source.userId;await replyText(event.replyToken,"🏦 辨識中...");try{const b64=await downloadImageAsBase64(event.message.id);const r=await analyzeDepositSlip(b64);if(!r){await pushText(uid,"❌");return;}const d=state.flow_data,depDate=r.deposit_date||new Date().toISOString().split("T")[0],pStart=d.period_start||new Date(Date.now()-7*86400000).toISOString().split("T")[0];const{data:stls}=await supabase.from("daily_settlements").select("cash_to_deposit,cash_amount,petty_cash_reserved").eq("store_id",d.store_id).gte("date",pStart).lte("date",depDate);const exp=(stls||[]).reduce((s,r)=>s+Number(r.cash_to_deposit||(Number(r.cash_amount||0)-Number(r.petty_cash_reserved||0))),0);const amt=r.deposit_amount||0,diff=amt-exp,abs=Math.abs(diff);let st,em,tx;if(abs<=500){st="matched";em="✅";tx="吻合";}else if(abs<=2000){st="minor_diff";em="⚠️";tx="小差異";}else{st="anomaly";em="🚨";tx="異常";}const img=await uploadImage(b64,"deposits",`${d.store_name}_${depDate}_${Date.now()}`);await supabase.from("deposits").insert({store_id:d.store_id,deposit_date:depDate,amount:amt,bank_name:r.bank_name,bank_branch:r.bank_branch,account_number:r.account_number,depositor_name:d.employee_name,roc_date:r.roc_date,period_start:pStart,period_end:depDate,expected_cash:exp,difference:diff,status:st,image_url:img,ai_raw_data:r,submitted_by:d.employee_id});await pushText(uid,`🏦 ${d.store_name}\n存款${fmt(amt)} vs 應存${fmt(exp)}\n${em} ${tx}`);if(st!=="matched"){const{data:adm}=await supabase.from("employees").select("line_uid").eq("role","admin").eq("is_active",true);if(adm)for(const a of adm)if(a.line_uid)await pushText(a.line_uid,`${em} 存款${tx} ${d.store_name}｜${d.employee_name}\n${fmt(amt)} vs ${fmt(exp)}`).catch(()=>{});}await clearUserState(uid);}catch(e){await pushText(uid,"❌ "+e.message);}}
 
@@ -327,16 +331,28 @@ async function handleEvent(event) {
 
   // 月結單據
   if (text === "月結單據") {
+    if (emp.store_id && emp.stores) {
+      await setUserState(userId, "expense_photo", { employee_id: emp.id, employee_name: emp.name, expense_type: "vendor", store_id: emp.store_id, store_name: emp.stores.name });
+      return replyText(rt, `📦 月結廠商單據\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 請拍照上傳廠商送貨單`);
+    }
     const { data: stores } = await supabase.from("stores").select("*").eq("is_active", true);
     await setUserState(userId, "expense_select_store", { employee_id: emp.id, employee_name: emp.name, expense_type: "vendor" });
     return replyWithQuickReply(rt, "📦 月結廠商單據\n👤 " + emp.name + "\n\n選擇門市：", stores.map(s => ({ type: "action", action: { type: "message", label: s.name, text: `費用門市:${s.name}` } })));
   }
   if (text === "零用金") {
+    if (emp.store_id && emp.stores) {
+      await setUserState(userId, "expense_photo", { employee_id: emp.id, employee_name: emp.name, expense_type: "petty_cash", store_id: emp.store_id, store_name: emp.stores.name });
+      return replyText(rt, `💰 零用金回報\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 請拍照上傳零用金收據`);
+    }
     const { data: stores } = await supabase.from("stores").select("*").eq("is_active", true);
     await setUserState(userId, "expense_select_store", { employee_id: emp.id, employee_name: emp.name, expense_type: "petty_cash" });
     return replyWithQuickReply(rt, "💰 零用金回報\n👤 " + emp.name + "\n\n選擇門市：", stores.map(s => ({ type: "action", action: { type: "message", label: s.name, text: `費用門市:${s.name}` } })));
   }
   if (text === "總部代付") {
+    if (emp.store_id && emp.stores) {
+      await setUserState(userId, "expense_photo", { employee_id: emp.id, employee_name: emp.name, expense_type: "hq_advance", store_id: emp.store_id, store_name: emp.stores.name });
+      return replyText(rt, `🏢 總部代付回報\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 請拍照上傳總部代付單據`);
+    }
     const { data: stores } = await supabase.from("stores").select("*").eq("is_active", true);
     await setUserState(userId, "expense_select_store", { employee_id: emp.id, employee_name: emp.name, expense_type: "hq_advance" });
     return replyWithQuickReply(rt, "🏢 總部代付回報\n👤 " + emp.name + "\n\n選擇門市：", stores.map(s => ({ type: "action", action: { type: "message", label: s.name, text: `費用門市:${s.name}` } })));
