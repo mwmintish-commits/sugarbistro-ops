@@ -395,7 +395,11 @@ function Dashboard({ auth, onLogout }) {
       if (sc.type === "leave") { const lt = LT[sc.leave_type] || LT.off; return <div style={{ background: lt.bg, borderRadius: 4, padding: "2px 3px", fontSize: 9, position: "relative" }}><div style={{ color: lt.c, fontWeight: 500 }}>{lt.l}</div><button onClick={() => delSch(sc.id)} style={{ position: "absolute", top: 0, right: 1, background: "none", border: "none", cursor: "pointer", fontSize: 8, color: "#ccc" }}>✕</button></div>; }
       return <div style={{ background: sc.published ? "#e6f9f0" : "#fff8e6", borderRadius: 4, padding: "2px 3px", fontSize: 9, position: "relative" }}><div style={{ fontWeight: 500 }}>{sc.shifts ? sc.shifts.name : ""}</div><div style={{ color: "#888" }}>{sc.shifts ? (sc.shifts.start_time || "").slice(0, 5) + "~" + (sc.shifts.end_time || "").slice(0, 5) : ""}</div><button onClick={() => delSch(sc.id)} style={{ position: "absolute", top: 0, right: 1, background: "none", border: "none", cursor: "pointer", fontSize: 8, color: "#ccc" }}>✕</button></div>;
     }
-    return <select onChange={e => { const v = e.target.value; e.target.value = ""; if (!v) return; if (v.startsWith("leave:")) addLv(emp.id, date, v.split(":")[1]); else addSch(emp.id, v, date); }} style={{ width: "100%", padding: "1px", borderRadius: 3, border: "1px dashed #ddd", fontSize: 9, color: "#ccc", background: "transparent", cursor: "pointer" }}><option value="">+</option><optgroup label="班別">{shifts.filter(s => !sf || s.store_id === sf).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</optgroup><optgroup label="休假">{Object.entries(LT).map(([k, v]) => <option key={k} value={"leave:" + k}>{v.l}</option>)}</optgroup></select>;
+    const pendingLr = lr.find(l => l.employee_id === emp.id && l.status === "pending" && l.start_date <= date && l.end_date >= date);
+    return <div>
+      {pendingLr && <div style={{ background: "#fef9c3", borderRadius: 3, padding: "1px 3px", fontSize: 8, color: "#8a6d00", marginBottom: 1, border: "1px dashed #d4a017" }}>{"⏳ " + (LT[pendingLr.leave_type] ? LT[pendingLr.leave_type].l : "預休")}</div>}
+      <select onChange={e => { const v = e.target.value; e.target.value = ""; if (!v) return; if (v.startsWith("leave:")) addLv(emp.id, date, v.split(":")[1]); else addSch(emp.id, v, date); }} style={{ width: "100%", padding: "1px", borderRadius: 3, border: "1px dashed #ddd", fontSize: 9, color: "#ccc", background: "transparent", cursor: "pointer" }}><option value="">+</option><optgroup label="班別">{shifts.filter(s => !sf || s.store_id === sf).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</optgroup><optgroup label="休假">{Object.entries(LT).map(([k, v]) => <option key={k} value={"leave:" + k}>{v.l}</option>)}</optgroup></select>
+    </div>;
   };
 
   return (
@@ -431,6 +435,11 @@ function Dashboard({ auth, onLogout }) {
             <button onClick={pub} style={{ padding: "4px 12px", borderRadius: 5, border: "none", background: "#0a7c42", color: "#fff", cursor: "pointer", fontSize: 11, marginLeft: "auto" }}>{"📢 發布"}</button>
           </div>
           {pm && <div style={{ background: "#e6f9f0", color: "#0a7c42", padding: "4px 10px", borderRadius: 5, fontSize: 11, marginBottom: 6 }}>{pm}</div>}
+          <div style={{ display: "flex", gap: 8, marginBottom: 6, fontSize: 10, color: "#888" }}>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#e6f9f0", border: "1px solid #ccc", marginRight: 3 }} />已發布</span>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#fff8e6", border: "1px solid #ccc", marginRight: 3 }} />未發布</span>
+            <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: "#fef9c3", border: "1px dashed #d4a017", marginRight: 3 }} />員工預休申請（待核准）</span>
+          </div>
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, minWidth: 700 }}>
               <thead><tr style={{ background: "#faf8f5", borderBottom: "1px solid #e8e6e1" }}><th style={{ padding: "7px 5px", textAlign: "left", fontWeight: 500, color: "#666", minWidth: 60, position: "sticky", left: 0, background: "#faf8f5", zIndex: 1 }}>員工</th>{wd.map((d, i) => <th key={d} style={{ padding: "7px 3px", textAlign: "center", fontWeight: 500, color: i === 0 || i === 6 ? "#b91c1c" : "#666", minWidth: 85 }}>{d.slice(5) + "(" + DAYS[new Date(d).getDay()] + ")"}</th>)}</tr></thead>
@@ -440,7 +449,24 @@ function Dashboard({ auth, onLogout }) {
         </div>}
 
         {!ld && tab === "leaves" && <div>
-          {pl.length > 0 && <div style={{ background: "#fff8e6", borderRadius: 8, padding: 10, marginBottom: 10 }}><h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>{"⏳ 待審核（" + pl.length + "）"}</h3>{pl.map(l => <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 0", borderBottom: "1px solid #f0eeea", flexWrap: "wrap", fontSize: 12 }}><b>{l.employees ? l.employees.name : ""}</b><span>{l.start_date}</span><div style={{ marginLeft: "auto", display: "flex", gap: 3 }}><button onClick={() => rvLv(l.id, "approved")} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 10, cursor: "pointer" }}>✅</button><button onClick={() => rvLv(l.id, "rejected")} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: "#b91c1c", color: "#fff", fontSize: 10, cursor: "pointer" }}>❌</button></div></div>)}</div>}
+          <div style={{ background: "#e6f1fb", borderRadius: 6, padding: 8, marginBottom: 10, fontSize: 11, color: "#185fa5" }}>{"💡 員工提交的預休/請假申請會自動顯示在排班表上（黃色虛線標記），方便排班時參考。核准後自動排入班表。"}</div>
+          {pl.length > 0 && <div style={{ background: "#fff8e6", borderRadius: 8, padding: 10, marginBottom: 10 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>{"⏳ 待審核（" + pl.length + "）"}</h3>
+            {pl.map(l => <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 0", borderBottom: "1px solid #f0eeea", flexWrap: "wrap", fontSize: 12 }}>
+              <b>{l.employees ? l.employees.name : ""}</b>
+              <span style={{ color: LT[l.leave_type] ? LT[l.leave_type].c : "#666", background: LT[l.leave_type] ? LT[l.leave_type].bg : "#f0f0f0", padding: "1px 6px", borderRadius: 4, fontSize: 10 }}>{LT[l.leave_type] ? LT[l.leave_type].l : l.leave_type}</span>
+              <span>{l.start_date}{l.end_date !== l.start_date ? " ~ " + l.end_date : ""}{l.half_day ? (l.half_day === "am" ? "（上午）" : "（下午）") : ""}</span>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 3 }}>
+                <button onClick={() => rvLv(l.id, "approved")} style={{ padding: "3px 10px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 10, cursor: "pointer" }}>{"✅ 核准"}</button>
+                <button onClick={() => rvLv(l.id, "rejected")} style={{ padding: "3px 10px", borderRadius: 4, border: "none", background: "#b91c1c", color: "#fff", fontSize: 10, cursor: "pointer" }}>{"❌ 駁回"}</button>
+              </div>
+            </div>)}
+          </div>}
+          {lr.filter(l => l.status !== "pending").length > 0 && <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["員工", "假別", "日期", "狀態"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
+            <tbody>{lr.filter(l => l.status !== "pending").map(l => <tr key={l.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6, fontWeight: 500 }}>{l.employees ? l.employees.name : ""}</td><td style={{ padding: 6 }}>{LT[l.leave_type] ? LT[l.leave_type].l : l.leave_type}</td><td style={{ padding: 6 }}>{l.start_date}{l.end_date !== l.start_date ? " ~ " + l.end_date : ""}</td><td style={{ padding: 6 }}><Badge status={l.status} /></td></tr>)}</tbody></table>
+          </div>}
+          {lr.length === 0 && <div style={{ background: "#fff", borderRadius: 8, padding: 30, textAlign: "center", color: "#ccc" }}>本月無請假紀錄</div>}
         </div>}
 
         {!ld && tab === "shifts" && <div>
