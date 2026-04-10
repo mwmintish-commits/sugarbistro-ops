@@ -157,6 +157,8 @@ function Dashboard({ auth, onLogout }) {
   const delAnn = async (id) => { if (confirm("刪除？")) { await ap("/api/admin/announcements", { action: "delete", announcement_id: id }); load(); } };
   const addWlTemplate = async () => { if (!newWl.item || !newWl.store_id) return; await ap("/api/admin/worklogs", { action: "add_template", ...newWl }); setNewWl({ ...newWl, item: "" }); load(); };
   const delWlTemplate = async (id) => { await ap("/api/admin/worklogs", { action: "delete_template", template_id: id }); load(); };
+  const [copyFrom, setCopyFrom] = useState(""); const [copyTo, setCopyTo] = useState("");
+  const copyTemplates = async () => { if (!copyFrom || !copyTo || copyFrom === copyTo) return; const d = await ap("/api/admin/worklogs", { action: "copy_to_store", from_store_id: copyFrom, to_store_id: copyTo }); alert("已複製 " + (d.count || 0) + " 個項目"); load(); };
 
   const wd = Array.from({ length: 7 }, (_, i) => new Date(new Date(ws).getTime() + i * 86400000).toLocaleDateString("sv-SE"));
   const prevW = () => setWs(new Date(new Date(ws).getTime() - 7 * 86400000).toLocaleDateString("sv-SE"));
@@ -236,9 +238,18 @@ function Dashboard({ auth, onLogout }) {
             </div>
             <button onClick={addWlTemplate} disabled={!newWl.item || !newWl.store_id} style={{ padding: "4px 14px", borderRadius: 4, border: "none", background: newWl.item && newWl.store_id ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>新增</button>
           </div>
+          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 10 }}>
+            <h4 style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>{"📋 複製工作項目到其他門市"}</h4>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <select value={copyFrom} onChange={e => setCopyFrom(e.target.value)} style={{ flex: 1, padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="">來源門市</option>{stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+              <span style={{ fontSize: 12 }}>{"→"}</span>
+              <select value={copyTo} onChange={e => setCopyTo(e.target.value)} style={{ flex: 1, padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="">目標門市</option>{stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+              <button onClick={copyTemplates} disabled={!copyFrom || !copyTo || copyFrom === copyTo} style={{ padding: "4px 12px", borderRadius: 4, border: "none", background: copyFrom && copyTo && copyFrom !== copyTo ? "#4361ee" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>複製</button>
+            </div>
+          </div>
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto", marginBottom: 14 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["門市", "分類", "角色", "時段", "項目", ""].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
-              <tbody>{wltemplates.length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: "center", color: "#ccc" }}>尚無項目</td></tr> : wltemplates.map(t => <tr key={t.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{stores.find(s => s.id === t.store_id) ? stores.find(s => s.id === t.store_id).name : "-"}</td><td style={{ padding: 6, fontWeight: 500 }}>{t.category}</td><td style={{ padding: 6 }}>{t.role === "all" ? "全員" : t.role}</td><td style={{ padding: 6 }}>{t.shift_type === "opening" ? "開店" : t.shift_type === "during" ? "營業" : "打烊"}</td><td style={{ padding: 6 }}>{t.item}</td><td style={{ padding: 4 }}><button onClick={() => delWlTemplate(t.id)} style={{ padding: "1px 5px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 9, color: "#b91c1c" }}>🗑</button></td></tr>)}</tbody></table>
+              <tbody>{wltemplates.length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: "center", color: "#ccc" }}>尚無項目</td></tr> : wltemplates.map(t => <tr key={t.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{stores.find(s => s.id === t.store_id) ? stores.find(s => s.id === t.store_id).name : "-"}</td><td style={{ padding: 6, fontWeight: 500 }}>{t.category}</td><td style={{ padding: 6 }}>{t.role === "all" ? "全員" : t.role}</td><td style={{ padding: 6 }}>{t.shift_type === "closing" ? "打烊" : t.shift_type === "during" ? "營業" : "開店"}</td><td style={{ padding: 6 }}>{t.item}</td><td style={{ padding: 4 }}><button onClick={() => delWlTemplate(t.id)} style={{ padding: "1px 5px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", cursor: "pointer", fontSize: 9, color: "#b91c1c" }}>🗑</button></td></tr>)}</tbody></table>
           </div>
           <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{"📝 員工提交紀錄"}</h3>
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>

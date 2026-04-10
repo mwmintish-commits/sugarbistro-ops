@@ -54,5 +54,15 @@ export async function POST(request) {
     return Response.json({ success: true });
   }
 
+  if (body.action === "copy_to_store") {
+    const { from_store_id, to_store_id } = body;
+    const { data: templates } = await supabase.from("work_log_templates").select("*").eq("store_id", from_store_id).eq("is_active", true);
+    if (!templates || templates.length === 0) return Response.json({ error: "來源門市無模板" }, { status: 400 });
+    const copies = templates.map(t => ({ store_id: to_store_id, category: t.category, item: t.item, sort_order: t.sort_order, role: t.role, shift_type: t.shift_type }));
+    const { data, error } = await supabase.from("work_log_templates").insert(copies).select();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ data, count: copies.length });
+  }
+
   return Response.json({ error: "Unknown action" }, { status: 400 });
 }
