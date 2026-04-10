@@ -1,73 +1,62 @@
 import { lineConfig } from "@/lib/line";
 
-async function lineAPI(path, method, body) {
-  const res = await fetch(`https://api.line.me/v2/bot${path}`, {
-    method,
-    headers: { Authorization: `Bearer ${lineConfig.channelAccessToken}`, "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  return res.json();
-}
-
 export async function POST(request) {
   const body = await request.json();
 
   if (body.action === "setup") {
+    const items = body.items || [
+      { label: "上班打卡", text: "上班打卡" },
+      { label: "下班打卡", text: "下班打卡" },
+      { label: "我的班表", text: "我的班表" },
+      { label: "日結回報", text: "日結回報" },
+      { label: "存款回報", text: "存款回報" },
+      { label: "選單", text: "選單" },
+    ];
+
+    const headers = { Authorization: "Bearer " + lineConfig.channelAccessToken, "Content-Type": "application/json" };
+
     try {
       // 刪除舊的
-      const list = await lineAPI("/richmenu/list", "GET");
-      if (list.richmenus?.length) {
+      const listRes = await fetch("https://api.line.me/v2/bot/richmenu/list", { headers });
+      const list = await listRes.json();
+      if (list.richmenus) {
         for (const rm of list.richmenus) {
-          await fetch(`https://api.line.me/v2/bot/richmenu/${rm.richMenuId}`, {
-            method: "DELETE", headers: { Authorization: `Bearer ${lineConfig.channelAccessToken}` },
-          });
+          await fetch("https://api.line.me/v2/bot/richmenu/" + rm.richMenuId, { method: "DELETE", headers });
         }
       }
 
-      // 建立新的
-      const result = await lineAPI("/richmenu", "POST", {
-        size: { width: 2500, height: 843 },
-        selected: true,
-        name: "小食糖選單",
-        chatBarText: "📋 功能選單",
-        areas: [
-          { bounds: { x: 0, y: 0, width: 833, height: 421 }, action: { type: "message", text: "上班打卡" } },
-          { bounds: { x: 833, y: 0, width: 834, height: 421 }, action: { type: "message", text: "下班打卡" } },
-          { bounds: { x: 1667, y: 0, width: 833, height: 421 }, action: { type: "message", text: "我的班表" } },
-          { bounds: { x: 0, y: 421, width: 833, height: 422 }, action: { type: "message", text: "日結回報" } },
-          { bounds: { x: 833, y: 421, width: 834, height: 422 }, action: { type: "message", text: "存款回報" } },
-          { bounds: { x: 1667, y: 421, width: 833, height: 422 }, action: { type: "message", text: "選單" } },
-        ],
-      });
+      // 建立選單結構（2行3列）
+      const W = 2500, H = 843, CW = Math.floor(W / 3), RH = Math.floor(H / 2);
+      const areas = items.slice(0, 6).map((item, i) => ({
+        bounds: { x: (i % 3) * CW, y: Math.floor(i / 3) * RH, width: CW, height: RH },
+        action: { type: "message", text: item.text },
+      }));
 
+      const createRes = await fetch("https://api.line.me/v2/bot/richmenu", {
+        method: "POST", headers,
+        body: JSON.stringify({
+          size: { width: W, height: H }, selected: true,
+          name: "小食糖選單", chatBarText: "📋 功能選單",
+          areas,
+        }),
+      });
+      const result = await createRes.json();
       if (!result.richMenuId) return Response.json({ error: "建立失敗", detail: result }, { status: 500 });
 
-      // 產生簡易圖片（純黑底 JPEG）
-      // 建立最小可用的 2500x843 圖片
-      const w = 2500, h = 843;
-      const header = Buffer.from([
-        0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
-      ]);
-      // 用最簡單方式：上傳一個小圖片
-      // LINE 會自動拉伸到選單大小
-      const tinyJpeg = Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMCwsKCwsLDhEQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wgARCAABAAEDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAAB//EABQBAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhADEAAAAUf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAn//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/AX//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/AX//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/An//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IX//2gAMAwEAAgADAAAAEH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EH//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/EH//2Q==', 'base64');
-
-      await fetch(`https://api.line.me/v2/bot/richmenu/${result.richMenuId}/content`, {
+      // 上傳最小圖片（黑底，用戶可到 LINE 後台替換）
+      const tinyJpeg = Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMCwsKCwsLDhEQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wgARCAABAAEDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAAB//EABQBAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhADEAAAAUf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAn//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/AX//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/AX//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/An//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IX//2gAMAwEAAgADAAAAEH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EH//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/EH//2Q==", "base64");
+      await fetch("https://api.line.me/v2/bot/richmenu/" + result.richMenuId + "/content", {
         method: "POST",
-        headers: { Authorization: `Bearer ${lineConfig.channelAccessToken}`, "Content-Type": "image/jpeg" },
+        headers: { Authorization: "Bearer " + lineConfig.channelAccessToken, "Content-Type": "image/jpeg" },
         body: tinyJpeg,
       });
 
       // 設為預設
-      await fetch(`https://api.line.me/v2/bot/user/all/richmenu/${result.richMenuId}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${lineConfig.channelAccessToken}`, "Content-Type": "application/json" },
+      await fetch("https://api.line.me/v2/bot/user/all/richmenu/" + result.richMenuId, {
+        method: "POST", headers,
       });
 
-      return Response.json({
-        success: true, richMenuId: result.richMenuId,
-        note: "選單結構已建立！目前是黑底暫用圖片。請到 LINE Official Account Manager → 聊天室相關 → 圖文選單，上傳正式的選單圖片。",
-      });
+      return Response.json({ success: true, richMenuId: result.richMenuId });
     } catch (e) {
       return Response.json({ error: e.message }, { status: 500 });
     }
