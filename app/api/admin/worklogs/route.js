@@ -16,23 +16,44 @@ export async function GET(request) {
 
   // 協作日誌：取得某門市某日的所有項目狀態
   if (type === "collab") {
-    let { data: items } = await supabase.from("work_log_items").select("*").eq("store_id", store_id).eq("date", date).order("created_at");
+    const freq = searchParams.get("frequency") || "daily";
+    let { data: items } = await supabase.from("work_log_items").select("*").eq("store_id", store_id).eq("date", date).eq("frequency", freq).order("created_at");
     
     // 如果當日還沒初始化，從模板建立
     if (!items || items.length === 0) {
-      const { data: templates } = await supabase.from("work_log_templates").select("*").eq("store_id", store_id).eq("is_active", true).order("sort_order");
+      let tq = supabase.from("work_log_templates").select("*").eq("store_id", store_id).eq("is_active", true).order("sort_order");
+      
+      if (freq === "daily") {
+        tq = tq.eq("frequency", "daily");
+      } else if (freq === "weekly") {
+        const dow = new Date(date).getDay();
+        tq = tq.eq("frequency", "weekly").eq("weekday", dow);
+      } else if (freq === "monthly") {
+        const dom = new Date(date).getDate();
+        tq = tq.eq("frequency", "monthly");
+      }
+
+      const { data: templates } = await tq;
       if (templates && templates.length > 0) {
         const newItems = templates.map(t => ({
-          store_id, date, template_id: t.id, item_name: t.item, category: t.category, shift_type: t.shift_type || "opening",
+          store_id, date, template_id: t.id, item_name: t.item, category: t.category, 
+          shift_type: t.shift_type || "opening", frequency: freq,
+          requires_value: t.requires_value, value_label: t.value_label, value_min: t.value_min, value_max: t.value_max,
         }));
-        const { data: created } = await supabase.from("work_log_items").insert(newItems).select();
+        // work_log_items may not have these columns yet, filter nulls
+        const cleanItems = newItems.map(i => {
+          const o = { store_id: i.store_id, date: i.date, template_id: i.template_id, item_name: i.item_name, category: i.category, shift_type: i.shift_type, frequency: i.frequency };
+          return o;
+        });
+        const { data: created } = await supabase.from("work_log_items").insert(cleanItems).select();
         items = created || [];
       }
     }
 
     const total = (items || []).length;
     const done = (items || []).filter(i => i.completed).length;
-    return Response.json({ data: items, summary: { total, done, percent: total > 0 ? Math.round(done / total * 100) : 0 } });
+    const abnormal = (items || []).filter(i => i.is_abnormal).length;
+    return Response.json({ data: items, summary: { total, done, abnormal, percent: total > 0 ? Math.round(done / total * 100) : 0 } });
   }
 
   if (type === "log") {
@@ -66,10 +87,21 @@ export async function POST(request) {
 
   // 協作：勾選/取消勾選單一項目
   if (body.action === "toggle_item") {
-    const { item_id, employee_id, employee_name, completed } = body;
+    const { item_id, employee_id, employee_name, completed, value } = body;
     const updates = { completed };
     if (completed) { updates.completed_by = employee_id; updates.completed_by_name = employee_name; updates.completed_at = new Date().toISOString(); }
     else { updates.completed_by = null; updates.completed_by_name = null; updates.completed_at = null; }
+    if (value !== undefined) {
+      updates.value = value;
+      // 取得模板的min/max判斷異常
+      const { data: item } = await supabase.from("work_log_items").select("template_id").eq("id", item_id).single();
+      if (item?.template_id) {
+        const { data: tpl } = await supabase.from("work_log_templates").select("value_min, value_max").eq("id", item.template_id).single();
+        if (tpl && (tpl.value_min !== null || tpl.value_max !== null)) {
+          updates.is_abnormal = (tpl.value_min !== null && value < tpl.value_min) || (tpl.value_max !== null && value > tpl.value_max);
+        }
+      }
+    }
     const { data, error } = await supabase.from("work_log_items").update(updates).eq("id", item_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
@@ -92,8 +124,25 @@ export async function POST(request) {
   }
 
   if (body.action === "add_template") {
-    const { store_id, category, item, sort_order, role, shift_type } = body;
-    const { data } = await supabase.from("work_log_templates").insert({ store_id, category, item, sort_order: sort_order || 0, role: role || "all", shift_type: shift_type || "opening" }).select().single();
+    const { store_id, category, item, sort_order, role, shift_type, frequency, weekday, month_day, requires_value, value_label, value_min, value_max } = body;
+    const { data } = await supabase.from("work_log_templates").insert({ store_id, category, item, sort_order: sort_order || 0, role: role || "all", shift_type: shift_type || "opening", frequency: frequency || "daily", weekday, month_day, requires_value: requires_value || false, value_label, value_min, value_max }).select().single();
+    return Response.json({ data });
+  }
+
+  if (body.action === "report_incident") {
+    const { store_id, employee_id, employee_name, type, description, image_url } = body;
+    const { data, error } = await supabase.from("incident_reports").insert({ store_id, employee_id, employee_name, type, description, image_url }).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    // 通知主管和總部
+    const { data: mgrs } = await supabase.from("employees").select("line_uid").in("role", ["admin", "manager"]).eq("is_active", true);
+    const { pushText } = await import("@/lib/line");
+    if (mgrs) for (const m of mgrs) if (m.line_uid) await pushText(m.line_uid, "⚠️ 異常回報\n" + employee_name + "\n類型：" + type + "\n" + (description || "")).catch(() => {});
+    return Response.json({ data });
+  }
+
+  if (body.action === "resolve_incident") {
+    const { incident_id, resolution, resolved_by } = body;
+    const { data } = await supabase.from("incident_reports").update({ status: "resolved", resolution, resolved_by, resolved_at: new Date().toISOString() }).eq("id", incident_id).select().single();
     return Response.json({ data });
   }
 

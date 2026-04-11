@@ -196,6 +196,14 @@ function Settings({ stores, as2, upS }) {
       </div>
 
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"📋 工作日誌權限"}</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div><div style={{ fontSize: 12 }}>允許門店主管修改日誌模板</div><div style={{ fontSize: 10, color: "#888" }}>開啟後主管可新增/刪除本店工作項目</div></div>
+          <button onClick={() => { const curr = document.getElementById("wl-perm-btn").dataset.on === "true"; const next = !curr; ap("/api/admin/system", { key: "worklog_manager_edit", value: next }).then(() => { document.getElementById("wl-perm-btn").dataset.on = String(next); document.getElementById("wl-perm-btn").style.background = next ? "#0a7c42" : "#ccc"; document.getElementById("wl-perm-btn").textContent = next ? "ON" : "OFF"; }); }} id="wl-perm-btn" data-on="true" style={{ padding: "4px 12px", borderRadius: 12, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", minWidth: 44 }}>ON</button>
+        </div>
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"⚙️ 打卡設定"}</h3>
         {[["late_grace_minutes", "遲到寬限(分)"], ["late_threshold_minutes", "嚴重遲到(分)"], ["early_leave_minutes", "早退(分)"], ["overtime_min_minutes", "加班最低(分)"]].map(([k, l]) => (
           <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0eeea" }}>
@@ -356,14 +364,15 @@ function LeavesMgr({ lr, pl, rvLv, sf, month, stores, LT }) {
 }
 
 function WorklogMgr({ stores, sf, month, load, role, lockedStore }) {
-  const canEdit = role === "admin" || role === "manager";
+  const canEdit = role === "admin" || role === "manager" || (role === "store_manager" && wlMgrPerm);
   const visibleStores = lockedStore ? stores.filter(s => s.id === lockedStore) : stores;
   const [wlStore, setWlStore] = useState(lockedStore || sf || (stores[0] ? stores[0].id : ""));
   const [templates, setTemplates] = useState([]);
   const [logs, setLogs] = useState([]);
   const [wlLd, setWlLd] = useState(true);
-  const [newItem, setNewItem] = useState({ category: "開店準備", item: "", role: "all", shift_type: "opening" });
+  const [newItem, setNewItem] = useState({ category: "開店準備", item: "", role: "all", shift_type: "opening", frequency: "daily", weekday: "", requires_value: false, value_label: "", value_min: "", value_max: "" });
   const [copyTarget, setCopyTarget] = useState("");
+  const [wlMgrPerm, setWlMgrPerm] = useState(false);
 
   const loadWl = () => {
     if (!wlStore) return;
@@ -371,7 +380,8 @@ function WorklogMgr({ stores, sf, month, load, role, lockedStore }) {
     Promise.all([
       ap("/api/admin/worklogs?type=templates&store_id=" + wlStore),
       ap("/api/admin/worklogs?month=" + month + "&store_id=" + wlStore),
-    ]).then(([t, l]) => { setTemplates(t.data || []); setLogs(l.data || []); setWlLd(false); });
+      ap("/api/admin/system?key=worklog_manager_edit").catch(() => ({ data: true })),
+    ]).then(([t, l, perm]) => { setTemplates(t.data || []); setLogs(l.data || []); setWlMgrPerm(perm.data === true || perm.data === "true"); setWlLd(false); });
   };
   useEffect(() => { loadWl(); }, [wlStore, month]);
 
@@ -422,6 +432,9 @@ function WorklogMgr({ stores, sf, month, load, role, lockedStore }) {
                     <span style={{ fontSize: 11, flex: 1 }}>
                       <span style={{ fontWeight: 500 }}>{t.item}</span>
                       {t.role !== "all" && <span style={{ fontSize: 9, background: "#fef9c3", color: "#8a6d00", padding: "1px 4px", borderRadius: 3, marginLeft: 4 }}>{t.role}</span>}
+                      {t.frequency === "weekly" && <span style={{ fontSize: 9, background: "#e6f1fb", color: "#185fa5", padding: "1px 4px", borderRadius: 3, marginLeft: 4 }}>{"週" + (t.weekday !== null ? ["日","一","二","三","四","五","六"][t.weekday] : "")}</span>}
+                      {t.frequency === "monthly" && <span style={{ fontSize: 9, background: "#fde8e8", color: "#b91c1c", padding: "1px 4px", borderRadius: 3, marginLeft: 4 }}>月</span>}
+                      {t.requires_value && <span style={{ fontSize: 9, background: "#e6f9f0", color: "#0a7c42", padding: "1px 4px", borderRadius: 3, marginLeft: 4 }}>{"📊" + (t.value_label || "")}</span>}
                     </span>
                     <span style={{ fontSize: 9, color: "#888" }}>{t.category}</span>
                     {canEdit && copyTarget && <button onClick={() => copyItem(t)} style={{ padding: "1px 6px", borderRadius: 3, border: "1px solid #4361ee", background: "transparent", color: "#4361ee", cursor: "pointer", fontSize: 9 }}>{"📋複製"}</button>}
@@ -438,13 +451,23 @@ function WorklogMgr({ stores, sf, month, load, role, lockedStore }) {
           {canEdit && <div style={{ background: "#fff", borderRadius: 8, border: "2px dashed #ddd", padding: 10, marginTop: 10 }}>
             <h4 style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>{"＋ 新增工作項目"}</h4>
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
-              <select value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} style={{ padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option>開店準備</option><option>營業中</option><option>打烊作業</option><option>清潔消毒</option><option>食材管理</option></select>
-              <select value={newItem.role} onChange={e => setNewItem({ ...newItem, role: e.target.value })} style={{ padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="all">全員</option><option value="吧台">吧台</option><option value="內場">內場</option><option value="烘焙">烘焙</option><option value="外場">外場</option></select>
-              <select value={newItem.shift_type} onChange={e => setNewItem({ ...newItem, shift_type: e.target.value })} style={{ padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="opening">開店</option><option value="during">營業中</option><option value="closing">打烊</option></select>
+              <select value={newItem.frequency} onChange={e => setNewItem({ ...newItem, frequency: e.target.value })} style={{ padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="daily">每日</option><option value="weekly">週清</option><option value="monthly">月清</option></select>
+              {newItem.frequency === "weekly" && <select value={newItem.weekday} onChange={e => setNewItem({ ...newItem, weekday: e.target.value })} style={{ padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="">星期</option><option value="1">一</option><option value="2">二</option><option value="3">三</option><option value="4">四</option><option value="5">五</option><option value="6">六</option><option value="0">日</option></select>}
+              <select value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })} style={{ padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option>開店準備</option><option>營業中</option><option>打烊作業</option><option>清潔消毒</option><option>食材管理</option><option>溫度記錄</option><option>盤點</option><option>設備維護</option><option>週清潔</option><option>月清潔</option></select>
+              <select value={newItem.shift_type} onChange={e => setNewItem({ ...newItem, shift_type: e.target.value })} style={{ padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}><option value="opening">開店</option><option value="during">營業中</option><option value="closing">打烊</option><option value="daily_check">檢查</option></select>
             </div>
-            <div style={{ display: "flex", gap: 4 }}>
-              <input value={newItem.item} onChange={e => setNewItem({ ...newItem, item: e.target.value })} placeholder="輸入工作項目" onKeyDown={e => e.key === "Enter" && addTemplate()} style={{ flex: 1, padding: "5px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12 }} />
+            <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+              <input value={newItem.item} onChange={e => setNewItem({ ...newItem, item: e.target.value })} placeholder="工作項目名稱" onKeyDown={e => e.key === "Enter" && addTemplate()} style={{ flex: 1, padding: "5px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12 }} />
               <button onClick={addTemplate} disabled={!newItem.item} style={{ padding: "5px 14px", borderRadius: 4, border: "none", background: newItem.item ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>新增</button>
+            </div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 10 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 2, cursor: "pointer" }}><input type="checkbox" checked={newItem.requires_value} onChange={e => setNewItem({ ...newItem, requires_value: e.target.checked })} />需輸入數值</label>
+              {newItem.requires_value && <>
+                <input value={newItem.value_label} onChange={e => setNewItem({ ...newItem, value_label: e.target.value })} placeholder="單位(如°C)" style={{ width: 50, padding: 2, borderRadius: 3, border: "1px solid #ddd", fontSize: 10 }} />
+                <input type="number" value={newItem.value_min} onChange={e => setNewItem({ ...newItem, value_min: e.target.value })} placeholder="最小" style={{ width: 40, padding: 2, borderRadius: 3, border: "1px solid #ddd", fontSize: 10 }} />
+                <span>~</span>
+                <input type="number" value={newItem.value_max} onChange={e => setNewItem({ ...newItem, value_max: e.target.value })} placeholder="最大" style={{ width: 40, padding: 2, borderRadius: 3, border: "1px solid #ddd", fontSize: 10 }} />
+              </>}
             </div>
           </div>}
 
