@@ -93,5 +93,66 @@ export async function POST(request) {
     return Response.json({ success: true });
   }
 
+  // 6步驟報到完成（現有員工）
+  if (body.action === "complete") {
+    const { token, signature_name, birthday, id_number, phone, email, address,
+      emergency_contact, emergency_phone, emergency_relation,
+      bank_name, bank_account,
+      health_check_url, id_card_url, handbook_signature, contract_signature } = body;
+
+    // 找員工（by bind_code or token）
+    let emp = null;
+    const { data: byCode } = await supabase.from("employees")
+      .select("id, name, store_id, line_uid, stores(name)")
+      .eq("bind_code", token).single();
+    if (byCode) emp = byCode;
+
+    if (!emp) {
+      const { data: byRecord } = await supabase.from("onboarding_records")
+        .select("auto_employee_id").eq("token", token).single();
+      if (byRecord?.auto_employee_id) {
+        const { data: e } = await supabase.from("employees")
+          .select("id, name, store_id, line_uid, stores(name)")
+          .eq("id", byRecord.auto_employee_id).single();
+        emp = e;
+      }
+    }
+
+    if (!emp) return Response.json({ error: "找不到員工" }, { status: 404 });
+
+    // 更新員工資料
+    await supabase.from("employees").update({
+      phone, email, birthday, id_number, address,
+      emergency_contact, emergency_phone,
+      bank_name, bank_account,
+      contract_signed: true, handbook_signed: true, bonus_policy_signed: true,
+      onboarding_completed: true, onboarding_step: 5,
+    }).eq("id", emp.id);
+
+    // 儲存文件
+    const docs = [
+      { doc_type: "health_check", file_url: health_check_url },
+      { doc_type: "id_card", file_url: id_card_url },
+      { doc_type: "handbook_sign", signature_url: handbook_signature, signed_at: new Date().toISOString() },
+      { doc_type: "contract_sign", signature_url: contract_signature, signed_at: new Date().toISOString() },
+    ];
+    for (const d of docs) {
+      if (d.file_url || d.signature_url) {
+        await supabase.from("employee_documents").insert({ employee_id: emp.id, ...d });
+      }
+    }
+
+    // 通知
+    if (emp.line_uid) {
+      await pushText(emp.line_uid, "✅ 報到完成！\n👤 " + emp.name + "\n📝 合約已簽署，可以開始打卡了。").catch(() => {});
+    }
+    const { data: admins } = await supabase.from("employees").select("line_uid").eq("role", "admin").eq("is_active", true);
+    for (const a of admins || []) {
+      if (a.line_uid) await pushText(a.line_uid, "🆕 " + emp.name + " 已完成6步驟報到（含合約+體檢+守則簽署）").catch(() => {});
+    }
+
+    return Response.json({ success: true });
+  }
+
   return Response.json({ error: "Unknown action" }, { status: 400 });
 }
