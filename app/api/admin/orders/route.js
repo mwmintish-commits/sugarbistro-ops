@@ -18,7 +18,20 @@ export async function GET(request) {
   const { data } = await q.limit(200);
 
   const unpaid = (data || []).filter(o => o.payment_status !== "paid").reduce((s, o) => s + Number(o.total_amount || 0) - Number(o.paid_amount || 0), 0);
-  return Response.json({ data, summary: { count: (data || []).length, unpaid } });
+
+  // ✦22 帳齡分析
+  const today = new Date();
+  const aging = { current: 0, d30: 0, d60: 0, d90: 0, over90: 0 };
+  for (const o of (data || []).filter(o => o.payment_status !== "paid")) {
+    const amt = Number(o.total_amount || 0) - Number(o.paid_amount || 0);
+    const days = Math.floor((today - new Date(o.order_date)) / 86400000);
+    if (days <= 30) aging.current += amt;
+    else if (days <= 60) aging.d30 += amt;
+    else if (days <= 90) aging.d60 += amt;
+    else aging.over90 += amt;
+  }
+
+  return Response.json({ data, summary: { count: (data || []).length, unpaid, aging } });
 }
 
 export async function POST(request) {

@@ -123,5 +123,74 @@ export async function POST(request) {
     return Response.json({ success: true });
   }
 
+  // ✦16 班表範本：儲存
+  if (action === "save_template") {
+    const { name, store_id, template_data, created_by } = body;
+    const { data, error } = await supabase.from("schedule_templates").insert({
+      name, store_id, template_data, created_by
+    }).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ data });
+  }
+
+  // ✦16 班表範本：套用
+  if (action === "apply_template") {
+    const { template_id, week_start } = body;
+    const { data: tpl } = await supabase.from("schedule_templates").select("*").eq("id", template_id).single();
+    if (!tpl) return Response.json({ error: "範本不存在" }, { status: 404 });
+    let applied = 0;
+    for (const entry of tpl.template_data || []) {
+      const date = new Date(new Date(week_start).getTime() + entry.day_of_week * 86400000).toLocaleDateString("sv-SE");
+      await supabase.from("schedules").upsert({
+        employee_id: entry.employee_id, store_id: tpl.store_id, shift_id: entry.shift_id,
+        date, type: entry.type || "shift", leave_type: entry.leave_type, status: "scheduled"
+      }, { onConflict: "employee_id,date" });
+      applied++;
+    }
+    return Response.json({ success: true, applied });
+  }
+
+  // ✦16 班表範本：列表
+  if (action === "list_templates") {
+    const { data } = await supabase.from("schedule_templates").select("*")
+      .eq("store_id", body.store_id).order("created_at", { ascending: false });
+    return Response.json({ data });
+  }
+
+  // ✦16 班表範本：刪除
+  if (action === "delete_template") {
+    await supabase.from("schedule_templates").delete().eq("id", body.template_id);
+    return Response.json({ success: true });
+  }
+
+  // ✦17 調班申請
+  if (action === "create_swap") {
+    const { requester_id, target_id, date_a, date_b } = body;
+    const { data } = await supabase.from("swap_requests").insert({
+      requester_id, target_id, date_a, date_b
+    }).select().single();
+    return Response.json({ data });
+  }
+
+  if (action === "review_swap") {
+    const { swap_id, status, approved_by } = body;
+    const { data: swap } = await supabase.from("swap_requests").select("*").eq("id", swap_id).single();
+    if (!swap) return Response.json({ error: "Not found" }, { status: 404 });
+
+    if (status === "approved") {
+      // 交換排班
+      const { data: schA } = await supabase.from("schedules").select("*")
+        .eq("employee_id", swap.requester_id).eq("date", swap.date_a).single();
+      const { data: schB } = await supabase.from("schedules").select("*")
+        .eq("employee_id", swap.target_id).eq("date", swap.date_b).single();
+      if (schA && schB) {
+        await supabase.from("schedules").update({ employee_id: swap.target_id }).eq("id", schA.id);
+        await supabase.from("schedules").update({ employee_id: swap.requester_id }).eq("id", schB.id);
+      }
+    }
+    await supabase.from("swap_requests").update({ status, approved_by, approved_at: new Date().toISOString() }).eq("id", swap_id);
+    return Response.json({ success: true });
+  }
+
   return Response.json({ error: "Unknown action" }, { status: 400 });
 }

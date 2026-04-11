@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, auditLog } from "@/lib/supabase";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -65,6 +65,7 @@ export async function POST(request) {
     }).eq("id", expense_id).select("*, employees:submitted_by(name)").single();
 
     if (updateErr) return Response.json({ error: updateErr.message }, { status: 500 });
+    await auditLog(reviewed_by, null, "expense_" + status, "expense", expense_id, { amount: data?.amount, vendor: data?.vendor_name });
 
     // 核准時自動建立撥款紀錄
     if (status === "approved" && data) {

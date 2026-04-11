@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, auditLog } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
 function generateBindCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
@@ -141,6 +141,7 @@ export async function POST(request) {
     delete updates.action;
     const { data, error } = await supabase.from("employees").update(updates).eq("id", employee_id).select("*, stores(name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
+    await auditLog(null, null, "employee_update", "employee", employee_id, updates);
     return Response.json({ data });
   }
 

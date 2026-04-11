@@ -90,6 +90,7 @@ export default function AdminPage() {
   const [attView, setAttView] = useState("records");
   const [amendments, setAmendments] = useState([]);
   const [monthlyReport, setMonthlyReport] = useState([]);
+  const [reminders, setReminders] = useState([]);
   const pl = lr.filter(l => l.status === "pending");
   const ae = emps.filter(e => e.is_active);
 
@@ -127,7 +128,7 @@ export default function AdminPage() {
       ap("/api/admin/attendance?summary=true&" + p),
       ap("/api/admin/leaves?" + p),
       ap("/api/admin/expenses?" + p + "&type=" + expType),
-      myTabs.includes("pnl") ? ap("/api/admin/pnl?month=" + month + (sf ? "&store_id=" + sf : "")) : Promise.resolve(null),
+      myTabs.includes("pnl") ? ap("/api/admin/pnl?month=" + month + "&compare=stores" + (sf ? "&store_id=" + sf : "")) : Promise.resolve(null),
       ap("/api/admin/announcements"),
     ]).then(([s,d,e,shs,sc,at2,as3,lr2,ex,pl2,an]) => {
       setStl(s.data||[]); setSum(s.summary||{}); setDep(d.data||[]);
@@ -170,6 +171,10 @@ export default function AdminPage() {
     if (myTabs.includes("production")) {
       ap("/api/admin/production?month=" + month)
         .then(r => { setProdList(r.data||[]); setProdSum(r.summary||{}); });
+    }
+    // 系統提醒
+    if (myTabs.includes("dashboard")) {
+      ap("/api/admin/reminders").then(r => setReminders(r.data||[])).catch(() => {});
     }
   }, [month, sf, sv, ws, myTabs.join(","), expType]);
 
@@ -340,61 +345,62 @@ export default function AdminPage() {
         {/* DASHBOARD */}
         {!ld && tab === "dashboard" && (
           <div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:12}}>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"10px 12px"}}>
-                <div style={{fontSize:10,color:"#888"}}>本月營收</div>
-                <div style={{fontSize:20,fontWeight:700,color:"#0a7c42"}}>{fmt(sum.total_net_sales)}</div>
-              </div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"10px 12px"}}>
-                <div style={{fontSize:10,color:"#888"}}>待審核</div>
-                <div style={{fontSize:20,fontWeight:700,color:"#b45309"}}>{pl.length}</div>
-              </div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"10px 12px"}}>
-                <div style={{fontSize:10,color:"#888"}}>在職員工</div>
-                <div style={{fontSize:20,fontWeight:700}}>{ae.length}</div>
-              </div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"10px 12px"}}>
-                <div style={{fontSize:10,color:"#888"}}>待撥款</div>
-                <div style={{fontSize:20,fontWeight:700,color:"#b91c1c"}}>{fmt(pmtSum.pending)}</div>
-              </div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"10px 12px"}}>
-                <div style={{fontSize:10,color:"#888"}}>應收帳款</div>
-                <div style={{fontSize:20,fontWeight:700,color:"#b45309"}}>{fmt(orderSum.unpaid)}</div>
-              </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:6,marginBottom:10}}>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>本月營收</div><div style={{fontSize:18,fontWeight:700,color:"#0a7c42"}}>{fmt(sum.total_net_sales)}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>待審(假+費用)</div><div style={{fontSize:18,fontWeight:700,color:"#b45309"}}>{pl.length + exps.filter(e=>e.status==="pending").length}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>在職員工</div><div style={{fontSize:18,fontWeight:700}}>{ae.length}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>待撥款</div><div style={{fontSize:18,fontWeight:700,color:"#b91c1c"}}>{fmt(pmtSum.pending)}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>應收帳款</div><div style={{fontSize:18,fontWeight:700,color:"#b45309"}}>{fmt(orderSum.unpaid)}</div></div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
-                <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>📊 門市營收</h4>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+              {/* 門市營收達成率 */}
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10}}>
+                <h4 style={{fontSize:11,fontWeight:600,marginBottom:6}}>📊 門市營收達成率</h4>
                 {stores.map(s => {
+                  const [my,mm] = month.split("-").map(Number);
+                  const dim = new Date(my,mm,0).getDate();
                   const rev = stl.filter(r => r.store_id === s.id).reduce((a,r) => a + Number(r.net_sales||0), 0);
-                  const target = (s.daily_target||0) * new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate();
+                  const target = (s.daily_target||0) * dim;
                   const pct = target > 0 ? Math.round(rev/target*100) : 0;
                   return (
-                    <div key={s.id} style={{marginBottom:6}}>
-                      <div style={{display:"flex",justifyContent:"space-between",fontSize:11}}>
-                        <span>{s.name}</span>
-                        <span style={{fontWeight:600}}>{fmt(rev)}</span>
-                      </div>
-                      {target > 0 && (
-                        <div style={{height:5,background:"#f0f0f0",borderRadius:3,marginTop:2}}>
-                          <div style={{height:"100%",width:Math.min(100,pct)+"%",background:pct>=100?"#0a7c42":pct>=70?"#fbbf24":"#b91c1c",borderRadius:3}} />
-                        </div>
-                      )}
+                    <div key={s.id} style={{marginBottom:5}}>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:10}}><span>{s.name}</span><span style={{fontWeight:600}}>{fmt(rev)}{target>0&&<span style={{color:"#888",fontWeight:400}}>{" / "+fmt(target)+" ("+pct+"%)"}</span>}</span></div>
+                      {target > 0 && <div style={{height:5,background:"#f0f0f0",borderRadius:3,marginTop:1}}><div style={{height:"100%",width:Math.min(100,pct)+"%",background:pct>=100?"#0a7c42":pct>=70?"#fbbf24":"#b91c1c",borderRadius:3}} /></div>}
                     </div>
                   );
                 })}
               </div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
-                <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>⚠️ 異常通報</h4>
-                {dep.filter(d => d.status === "anomaly").map(d => (
-                  <div key={d.id} style={{fontSize:11,padding:"3px 0",color:"#b91c1c"}}>
-                    {"🚨 存款 " + (d.stores?d.stores.name:"") + " 差" + fmt(d.difference)}
-                  </div>
-                ))}
-                {dep.filter(d=>d.status==="anomaly").length===0 && att.filter(a=>a.late_minutes>30).length===0 && (
-                  <div style={{fontSize:11,color:"#ccc",textAlign:"center",padding:10}}>✅ 無異常</div>
-                )}
+
+              {/* 待辦集中 */}
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10}}>
+                <h4 style={{fontSize:11,fontWeight:600,marginBottom:6}}>📋 待辦事項</h4>
+                {pl.length>0&&<div style={{fontSize:10,padding:"2px 0",color:"#b45309"}}>{"🙋 待審請假 "+pl.length+" 筆"}</div>}
+                {exps.filter(e=>e.status==="pending").length>0&&<div style={{fontSize:10,padding:"2px 0",color:"#b45309"}}>{"📦 待審費用 "+exps.filter(e=>e.status==="pending").length+" 筆"}</div>}
+                {otRecords.filter(r=>r.status==="pending").length>0&&<div style={{fontSize:10,padding:"2px 0",color:"#b45309"}}>{"⏱ 待審加班 "+otRecords.filter(r=>r.status==="pending").length+" 筆"}</div>}
+                {amendments.filter(a=>a.status==="pending").length>0&&<div style={{fontSize:10,padding:"2px 0",color:"#b45309"}}>{"🔧 待審補登 "+amendments.filter(a=>a.status==="pending").length+" 筆"}</div>}
+                {dep.filter(d=>d.status==="anomaly").length>0&&<div style={{fontSize:10,padding:"2px 0",color:"#b91c1c"}}>{"🚨 存款異常 "+dep.filter(d=>d.status==="anomaly").length+" 筆"}</div>}
+                {pl.length===0&&exps.filter(e=>e.status==="pending").length===0&&otRecords.filter(r=>r.status==="pending").length===0&&<div style={{fontSize:10,color:"#ccc",textAlign:"center",padding:8}}>✅ 無待辦</div>}
               </div>
+            </div>
+
+            {/* 🔔 系統提醒 */}
+            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10,marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <h4 style={{fontSize:11,fontWeight:600}}>🔔 系統提醒</h4>
+                <button onClick={async()=>{await ap("/api/admin/reminders",{action:"generate"});load();}}
+                  style={{padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:9,cursor:"pointer"}}>🔄 檢查</button>
+              </div>
+              {(reminders||[]).length===0
+                ? <div style={{fontSize:10,color:"#ccc",textAlign:"center",padding:6}}>✅ 無提醒</div>
+                : (reminders||[]).map(r=>(
+                  <div key={r.id} style={{fontSize:10,padding:"3px 0",borderBottom:"1px solid #f0eeea",display:"flex",gap:4}}>
+                    <span style={{flex:1}}>{r.message}</span>
+                    <button onClick={async()=>{await ap("/api/admin/reminders",{action:"dismiss",reminder_id:r.id});load();}}
+                      style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"#ccc"}}>✕</button>
+                  </div>
+                ))
+              }
             </div>
           </div>
         )}
@@ -1011,23 +1017,72 @@ export default function AdminPage() {
 
         {/* PNL */}
         {!ld && tab === "pnl" && pnl && (
-          <div style={{maxWidth:500}}>
+          <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"📊 "+month+" 損益表"}</h3>
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:14,marginBottom:10}}>
-              <h4 style={{fontSize:13,color:"#0a7c42",marginBottom:8}}>收入</h4>
-              <Row l="門市營收" v={<b style={{color:"#0a7c42"}}>{fmt(pnl.revenue?pnl.revenue.total:0)}</b>} />
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
+              <div style={{background:"#e6f9f0",borderRadius:8,padding:10,textAlign:"center"}}>
+                <div style={{fontSize:9,color:"#0a7c42"}}>總收入</div>
+                <div style={{fontSize:18,fontWeight:700,color:"#0a7c42"}}>{fmt(pnl.profit?.total_income)}</div>
+              </div>
+              <div style={{background:"#fde8e8",borderRadius:8,padding:10,textAlign:"center"}}>
+                <div style={{fontSize:9,color:"#b91c1c"}}>總支出</div>
+                <div style={{fontSize:18,fontWeight:700,color:"#b91c1c"}}>{fmt(pnl.expenses?.total)}</div>
+              </div>
+              <div style={{background:pnl.profit?.net>=0?"#e6f9f0":"#fde8e8",borderRadius:8,padding:10,textAlign:"center"}}>
+                <div style={{fontSize:9}}>淨利（{pnl.profit?.margin}%）</div>
+                <div style={{fontSize:18,fontWeight:700,color:pnl.profit?.net>=0?"#0a7c42":"#b91c1c"}}>{fmt(pnl.profit?.net)}</div>
+              </div>
             </div>
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:14,marginBottom:10}}>
-              <h4 style={{fontSize:13,color:"#b91c1c",marginBottom:8}}>支出</h4>
-              <Row l="月結廠商" v={fmt(pnl.expenses?pnl.expenses.vendor:0)} />
-              <Row l="零用金" v={fmt(pnl.expenses?pnl.expenses.petty_cash:0)} />
-              <Row l="總部代付" v={fmt(pnl.expenses?pnl.expenses.hq_advance:0)} />
-              <Row l="人事成本" v={fmt(pnl.expenses?pnl.expenses.labor:0)} />
-              <Row l="加班費" v={fmt(otSum.totalAmount||0)} />
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
+                <h4 style={{fontSize:12,color:"#0a7c42",marginBottom:6}}>收入明細</h4>
+                <Row l="門市營收" v={<b>{fmt(pnl.revenue?.total)}</b>} />
+                {pnl.revenue?.b2b > 0 && <Row l="B2B批發" v={fmt(pnl.revenue.b2b)} />}
+                {pnl.revenue?.oem > 0 && <Row l="OEM代工" v={fmt(pnl.revenue.oem)} />}
+              </div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
+                <h4 style={{fontSize:12,color:"#b91c1c",marginBottom:6}}>支出明細</h4>
+                <Row l="月結廠商" v={fmt(pnl.expenses?.vendor)} />
+                <Row l="零用金" v={fmt(pnl.expenses?.petty_cash)} />
+                {pnl.expenses?.hq_advance > 0 && <Row l="總部代付" v={fmt(pnl.expenses.hq_advance)} />}
+                <Row l="人事成本" v={fmt(pnl.expenses?.labor)} />
+              </div>
             </div>
-            <div style={{background:"#e6f9f0",borderRadius:8,padding:14}}>
-              <Row l="淨利" v={<b style={{fontSize:16,color:"#0a7c42"}}>{fmt((pnl.revenue?pnl.revenue.total:0)-(pnl.expenses?pnl.expenses.total:0)-(otSum.totalAmount||0))}</b>} />
-            </div>
+            {/* ✦26 門市比較 */}
+            {pnl.storeComparison && pnl.storeComparison.length > 0 && (
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:10}}>
+                <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>🏠 門市別比較</h4>
+                <div style={{display:"grid",gridTemplateColumns:"repeat("+pnl.storeComparison.length+",1fr)",gap:6}}>
+                  {pnl.storeComparison.map(s=>(
+                    <div key={s.name} style={{textAlign:"center",padding:6,background:"#faf8f5",borderRadius:6}}>
+                      <div style={{fontSize:11,fontWeight:600,marginBottom:4}}>{s.name}</div>
+                      <div style={{fontSize:10}}>收入 <b style={{color:"#0a7c42"}}>{fmt(s.revenue)}</b></div>
+                      <div style={{fontSize:10}}>支出 <b style={{color:"#b91c1c"}}>{fmt(s.expense)}</b></div>
+                      <div style={{fontSize:12,fontWeight:700,color:s.profit>=0?"#0a7c42":"#b91c1c",marginTop:2}}>{fmt(s.profit)}</div>
+                      <div style={{fontSize:9,color:"#888"}}>{s.margin}%</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* ✦27 趨勢圖 */}
+            {pnl.trend && pnl.trend.length > 0 && (
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
+                <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>📈 營收趨勢（近6月）</h4>
+                <div style={{display:"flex",alignItems:"flex-end",gap:4,height:100}}>
+                  {(() => {
+                    const maxR = Math.max(...pnl.trend.map(t=>t.revenue), 1);
+                    return pnl.trend.map(t => (
+                      <div key={t.month} style={{flex:1,textAlign:"center"}}>
+                        <div style={{fontSize:9,fontWeight:600,marginBottom:2}}>{t.revenue>0?fmt(t.revenue):""}</div>
+                        <div style={{height:Math.max(4, t.revenue/maxR*80),background:t.month===month?"#0a7c42":"#d1e7dd",borderRadius:3,minHeight:4}} />
+                        <div style={{fontSize:8,color:"#888",marginTop:2}}>{t.month.slice(5)}</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1237,7 +1292,10 @@ export default function AdminPage() {
                 const title = prompt("公告標題："); if(!title) return;
                 const content = prompt("公告內容："); if(!content) return;
                 const priority = confirm("是否為急件？") ? "urgent" : "normal";
-                await ap("/api/admin/announcements",{action:"create",title,content,priority});
+                const push_line = confirm("同步推送到員工LINE？");
+                const r = await ap("/api/admin/announcements",{action:"create",title,content,priority,push_line,created_by:auth.employee_id});
+                if (r.line_sent) alert("公告已建立，LINE推送 " + r.line_sent + " 位");
+                else alert("公告已建立");
                 load();
               }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
                 ＋新增公告
