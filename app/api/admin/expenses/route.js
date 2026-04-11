@@ -48,7 +48,18 @@ export async function POST(request) {
     const { expense_id, status, reviewed_by } = body;
     const { data } = await supabase.from("expenses").update({
       status, reviewed_by, reviewed_at: new Date().toISOString(),
-    }).eq("id", expense_id).select().single();
+    }).eq("id", expense_id).select("*, employees:submitted_by(name)").single();
+
+    // 核准時自動建立撥款紀錄
+    if (status === "approved" && data) {
+      const pmtType = data.expense_type === "vendor" ? "vendor" : data.expense_type === "hq_advance" ? "hq_advance" : "petty_cash";
+      await supabase.from("payments").insert({
+        type: pmtType, reference_id: data.id, store_id: data.store_id,
+        employee_id: data.submitted_by, amount: data.amount,
+        recipient: data.employees?.name || data.vendor_name || data.submitted_by_name || "",
+        month_key: data.month_key, notes: (data.expense_type === "vendor" ? "月結-" : data.expense_type === "hq_advance" ? "代付-" : "零用金-") + (data.vendor_name || ""),
+      }).catch(() => {});
+    }
     return Response.json({ data });
   }
 

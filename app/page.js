@@ -93,6 +93,24 @@ function EmpDetail({ empId, onClose }) {
         </select>
         <button onClick={async () => { if (!confirm("確定解除LINE綁定？員工需重新輸入綁定碼")) return; await ap("/api/admin/employees", { action: "update", employee_id: empId, line_uid: null }); const d2 = await ap("/api/admin/employees", { action: "generate_bind_code", employee_id: empId }); alert("已解除，新綁定碼：" + (d2.bind_code || "")); reload(); }} style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #b45309", background: "transparent", color: "#b45309", fontSize: 10, cursor: "pointer" }}>{"🔓 解除LINE"}</button>
         <button onClick={async () => { const ph = prompt("輸入新手機號碼："); if (ph) { await ap("/api/admin/employees", { action: "update", employee_id: empId, phone: ph }); alert("已更新"); reload(); } }} style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #666", background: "transparent", color: "#666", fontSize: 10, cursor: "pointer" }}>{"📱 換手機"}</button>
+        <button onClick={async () => {
+          const lastDay = prompt("離職日期（YYYY-MM-DD）：");
+          if (!lastDay) return;
+          const reason = prompt("離職原因（選填）：") || "";
+          const r = await ap("/api/admin/leave-balances?employee_id=" + empId + "&year=" + new Date().getFullYear());
+          const remaining = r.data ? r.data.annual_remaining || 0 : 0;
+          const emp2 = d.data;
+          const dailyPay = emp2.monthly_salary ? Math.round(emp2.monthly_salary / 30) : (emp2.hourly_rate ? emp2.hourly_rate * 8 : 0);
+          const settlement = remaining * dailyPay;
+          const months = d.service_months || 0;
+          const notice = months < 3 ? 0 : months < 12 ? 10 : months < 36 ? 20 : 30;
+          if (!confirm(emp2.name + " 離職作業\n\n📅 離職日：" + lastDay + "\n📋 原因：" + (reason || "無") + "\n⏰ 法定預告期：" + notice + "天\n🏖 未休特休：" + remaining + "天\n💰 特休折算：$" + settlement.toLocaleString() + "\n\n確定執行？")) return;
+          await ap("/api/admin/employees", { action: "update", employee_id: empId, resignation_date: lastDay, resignation_reason: reason, last_working_date: lastDay, line_uid: null, is_active: false });
+          if (settlement > 0) await ap("/api/admin/payments", { action: "create", type: "leave_settlement", employee_id: empId, amount: settlement, recipient: emp2.name, notes: "離職特休結算 " + remaining + "天", month_key: lastDay.slice(0, 7) });
+          const d3 = await ap("/api/admin/employees", { action: "generate_bind_code", employee_id: empId });
+          alert("離職作業完成\n✅ LINE已解除\n✅ 帳號已停用\n✅ 特休$" + settlement.toLocaleString() + "已加入撥款");
+          onClose();
+        }} style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #b91c1c", background: "transparent", color: "#b91c1c", fontSize: 10, cursor: "pointer" }}>{"🚪 離職作業"}</button>
       </div>
     </div></div>
   );
@@ -118,13 +136,13 @@ function Settings({ stores, as2, upS }) {
   const [hbMsg, setHbMsg] = useState("");
   const [editCh, setEditCh] = useState(null);
   const [hols, setHols] = useState([]);
+  const [companyName, setCompanyName] = useState("小食糖 Sugar Bistro");
+  const [newStore, setNewStore] = useState({ name: "", address: "" });
 
   useEffect(() => {
-    ap("/api/admin/system?key=handbook").then(r => {
-      setHb(r.data || DEFAULT_HB);
-      setHbLoading(false);
-    });
+    ap("/api/admin/system?key=handbook").then(r => { setHb(r.data || DEFAULT_HB); setHbLoading(false); });
     ap("/api/admin/holidays?year=" + new Date().getFullYear()).then(r => setHols(r.data || [])).catch(() => {});
+    ap("/api/admin/system?key=company_name").then(r => { if (r.data) setCompanyName(r.data); });
   }, []);
 
   const saveHb = async () => {
@@ -155,6 +173,28 @@ function Settings({ stores, as2, upS }) {
 
   return (
     <div style={{ maxWidth: 700 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"🏢 公司設定"}</h3>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input value={companyName} onChange={e => setCompanyName(e.target.value)} style={{ flex: 1, padding: "5px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12 }} />
+          <button onClick={() => ap("/api/admin/system", { key: "company_name", value: companyName }).then(() => alert("已儲存"))} style={{ padding: "5px 12px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer" }}>{"💾"}</button>
+        </div>
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"🏠 門市管理"}</h3>
+        {stores.map(s => <div key={s.id} style={{ display: "flex", gap: 4, alignItems: "center", padding: "4px 0", borderBottom: "1px solid #f0eeea", fontSize: 11 }}>
+          <span style={{ fontWeight: 500, flex: 1 }}>{s.name}</span>
+          <span style={{ color: "#888" }}>{s.address || "未設定地址"}</span>
+          <button onClick={() => { const n = prompt("修改門市名稱：", s.name); if (n) ap("/api/admin/stores", { action: "update_targets", store_id: s.id, name: n }).then(() => { alert("已更新"); location.reload(); }); }} style={{ padding: "1px 6px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", fontSize: 9, cursor: "pointer" }}>{"✏️"}</button>
+        </div>)}
+        <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+          <input value={newStore.name} onChange={e => setNewStore({ ...newStore, name: e.target.value })} placeholder="新門市名稱" style={{ flex: 1, padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} />
+          <input value={newStore.address} onChange={e => setNewStore({ ...newStore, address: e.target.value })} placeholder="地址" style={{ flex: 2, padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} />
+          <button onClick={() => { if (!newStore.name) return; ap("/api/admin/stores", { action: "create", name: newStore.name, address: newStore.address }).then(() => { setNewStore({ name: "", address: "" }); alert("已新增"); location.reload(); }); }} style={{ padding: "4px 10px", borderRadius: 4, border: "none", background: newStore.name ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>{"＋"}</button>
+        </div>
+      </div>
+
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"⚙️ 打卡設定"}</h3>
         {[["late_grace_minutes", "遲到寬限(分)"], ["late_threshold_minutes", "嚴重遲到(分)"], ["early_leave_minutes", "早退(分)"], ["overtime_min_minutes", "加班最低(分)"]].map(([k, l]) => (
@@ -233,11 +273,11 @@ function Settings({ stores, as2, upS }) {
       </div>
 
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
-        <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"🗓 " + new Date().getFullYear() + " 國定假日（" + hols.length + "天）"}</h3>
+        <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"🗓 " + new Date().getFullYear() + " 國定假日（" + hols.filter(h => h.is_active !== false).length + "/" + hols.length + "天啟用）"}</h3>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {hols.map(h => <span key={h.id} style={{ padding: "3px 8px", borderRadius: 4, background: "#fde8e8", color: "#b91c1c", fontSize: 10 }}>{h.date.slice(5) + " " + h.name}</span>)}
+          {hols.map(h => <button key={h.id} onClick={() => { const next = h.is_active === false ? true : false; ap("/api/admin/system", { key: "hol_" + h.id, value: next }); setHols(hols.map(x => x.id === h.id ? { ...x, is_active: next } : x)); }} style={{ padding: "3px 8px", borderRadius: 4, background: h.is_active === false ? "#f0f0f0" : "#fde8e8", color: h.is_active === false ? "#ccc" : "#b91c1c", fontSize: 10, cursor: "pointer", border: "1px solid " + (h.is_active === false ? "#ddd" : "#f5c6c6"), textDecoration: h.is_active === false ? "line-through" : "none" }}>{h.date.slice(5) + " " + h.name}</button>)}
         </div>
-        <p style={{ fontSize: 10, color: "#888", marginTop: 6 }}>{"* 排班月曆自動標記紅色，出勤給付雙倍薪"}</p>
+        <p style={{ fontSize: 10, color: "#888", marginTop: 6 }}>{"* 點擊可啟用/停用，停用的假日不會在排班上標紅、不計雙倍薪"}</p>
       </div>
 
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
@@ -699,7 +739,7 @@ function Dashboard({ auth, onLogout }) {
             <div style={{ background: "#e6f1fb", borderRadius: 8, padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#185fa5" }}>📦 月結</div><div style={{ fontSize: 15, fontWeight: 600 }}>{fmt(exps.filter(e => e.expense_type === "vendor").reduce((s, e) => s + Number(e.amount || 0), 0))}</div></div>
             <div style={{ background: "#fde8e8", borderRadius: 8, padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#b91c1c" }}>🏢 總部代付</div><div style={{ fontSize: 15, fontWeight: 600 }}>{fmt(exps.filter(e => e.expense_type === "hq_advance").reduce((s, e) => s + Number(e.amount || 0), 0))}</div></div>
           </div>
-          {(() => { const filtered = exps.filter(e => (expType === "all" || e.expense_type === expType) && (!expSearch || (e.vendor_name || "").includes(expSearch) || (e.description || "").includes(expSearch))); return <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["日期", "門市", "類型", "廠商/說明", "金額", "狀態", "操作"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead><tbody>{filtered.length === 0 && <tr><td colSpan={7} style={{ padding: 30, textAlign: "center", color: "#ccc" }}>無紀錄</td></tr>}{filtered.map(e => <tr key={e.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{e.date}</td><td style={{ padding: 6 }}>{e.stores ? e.stores.name : ""}</td><td style={{ padding: 6 }}>{e.expense_type === "vendor" ? "📦月結" : e.expense_type === "hq_advance" ? "🏢代付" : "💰零用金"}</td><td style={{ padding: 6 }}><div style={{ fontWeight: 500 }}>{e.vendor_name || "-"}</div>{e.description && <div style={{ fontSize: 9, color: "#888" }}>{e.description}</div>}</td><td style={{ padding: 6, fontWeight: 600 }}>{fmt(e.amount)}</td><td style={{ padding: 6 }}><Badge status={e.status} /></td><td style={{ padding: 6 }}>{e.status === "pending" && <span><button onClick={() => rvExp(e.id, "approved")} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#0a7c42", color: "#fff", fontSize: 9, cursor: "pointer", marginRight: 2 }}>✅</button><button onClick={() => rvExp(e.id, "rejected")} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#b91c1c", color: "#fff", fontSize: 9, cursor: "pointer" }}>❌</button></span>}</td></tr>)}</tbody></table></div>; })()}
+          {(() => { const filtered = exps.filter(e => (expType === "all" || e.expense_type === expType) && (!expSearch || (e.vendor_name || "").includes(expSearch) || (e.description || "").includes(expSearch))); return <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["日期", "門市", "類型", "廠商/說明", "提交人", "金額", "狀態", "操作"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead><tbody>{filtered.length === 0 && <tr><td colSpan={8} style={{ padding: 30, textAlign: "center", color: "#ccc" }}>無紀錄</td></tr>}{filtered.map(e => <tr key={e.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{e.date}</td><td style={{ padding: 6 }}>{e.stores ? e.stores.name : ""}</td><td style={{ padding: 6 }}>{e.expense_type === "vendor" ? "📦月結" : e.expense_type === "hq_advance" ? "🏢代付" : "💰零用金"}</td><td style={{ padding: 6 }}><div style={{ fontWeight: 500 }}>{e.vendor_name || "-"}</div>{e.description && <div style={{ fontSize: 9, color: "#888" }}>{e.description}</div>}</td><td style={{ padding: 6, fontSize: 10 }}>{e.submitted_by_name || (e.employees ? e.employees.name : "-")}</td><td style={{ padding: 6, fontWeight: 600 }}>{e.image_url ? <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setSi(e.image_url)}>{fmt(e.amount)}</span> : fmt(e.amount)}</td><td style={{ padding: 6 }}><Badge status={e.status} /></td><td style={{ padding: 6 }}>{e.status === "pending" && <span><button onClick={() => rvExp(e.id, "approved")} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#0a7c42", color: "#fff", fontSize: 9, cursor: "pointer", marginRight: 2 }}>✅</button><button onClick={() => rvExp(e.id, "rejected")} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#b91c1c", color: "#fff", fontSize: 9, cursor: "pointer" }}>❌</button></span>}</td></tr>)}</tbody></table></div>; })()}
         </div>}
 
         {!ld && tab === "overtime" && <div>
