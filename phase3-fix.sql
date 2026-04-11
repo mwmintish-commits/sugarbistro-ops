@@ -22,3 +22,5 @@ UPDATE expenses SET submitted_by_name = e.name
 FROM employees e WHERE expenses.submitted_by = e.id AND expenses.submitted_by_name IS NULL;
 
 SELECT '✅ Phase 3 修正完成' AS result;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS category_suggestion TEXT;
+-- Update existing

@@ -739,6 +739,24 @@ function Dashboard({ auth, onLogout }) {
             <div style={{ background: "#e6f1fb", borderRadius: 8, padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#185fa5" }}>📦 月結</div><div style={{ fontSize: 15, fontWeight: 600 }}>{fmt(exps.filter(e => e.expense_type === "vendor").reduce((s, e) => s + Number(e.amount || 0), 0))}</div></div>
             <div style={{ background: "#fde8e8", borderRadius: 8, padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#b91c1c" }}>🏢 總部代付</div><div style={{ fontSize: 15, fontWeight: 600 }}>{fmt(exps.filter(e => e.expense_type === "hq_advance").reduce((s, e) => s + Number(e.amount || 0), 0))}</div></div>
           </div>
+          {(() => {
+            const catTotals = {}; exps.forEach(e => { const c = e.category_suggestion || e.expense_categories?.name || "未分類"; catTotals[c] = (catTotals[c] || 0) + Number(e.amount || 0); });
+            const sorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+            const total = sorted.reduce((s, [, v]) => s + v, 0);
+            const colors = ["#4361ee", "#0a7c42", "#b45309", "#b91c1c", "#8a6d00", "#993556", "#185fa5", "#666"];
+            return sorted.length > 0 ? <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 8 }}>
+              <h4 style={{ fontSize: 12, fontWeight: 500, marginBottom: 8 }}>{"📊 費用分類佔比"}</h4>
+              <div style={{ height: 12, borderRadius: 6, overflow: "hidden", display: "flex", marginBottom: 8 }}>
+                {sorted.map(([cat, amt], i) => <div key={cat} style={{ width: (amt / total * 100) + "%", background: colors[i % colors.length], minWidth: 2 }} title={cat + " " + fmt(amt)} />)}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {sorted.slice(0, 8).map(([cat, amt], i) => <div key={cat} style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: colors[i % colors.length] }} />
+                  <span>{cat}</span><span style={{ fontWeight: 600 }}>{fmt(amt)}</span><span style={{ color: "#888" }}>{"(" + Math.round(amt / total * 100) + "%)"}</span>
+                </div>)}
+              </div>
+            </div> : null;
+          })()}
           {(() => { const filtered = exps.filter(e => (expType === "all" || e.expense_type === expType) && (!expSearch || (e.vendor_name || "").includes(expSearch) || (e.description || "").includes(expSearch))); return <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["日期", "門市", "類型", "廠商/說明", "提交人", "金額", "狀態", "操作"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead><tbody>{filtered.length === 0 && <tr><td colSpan={8} style={{ padding: 30, textAlign: "center", color: "#ccc" }}>無紀錄</td></tr>}{filtered.map(e => <tr key={e.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{e.date}</td><td style={{ padding: 6 }}>{e.stores ? e.stores.name : ""}</td><td style={{ padding: 6 }}>{e.expense_type === "vendor" ? "📦月結" : e.expense_type === "hq_advance" ? "🏢代付" : "💰零用金"}</td><td style={{ padding: 6 }}><div style={{ fontWeight: 500 }}>{e.vendor_name || "-"}</div>{e.description && <div style={{ fontSize: 9, color: "#888" }}>{e.description}</div>}</td><td style={{ padding: 6, fontSize: 10 }}>{e.submitted_by_name || (e.employees ? e.employees.name : "-")}</td><td style={{ padding: 6, fontWeight: 600 }}>{e.image_url ? <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setSi(e.image_url)}>{fmt(e.amount)}</span> : fmt(e.amount)}</td><td style={{ padding: 6 }}><Badge status={e.status} /></td><td style={{ padding: 6 }}>{e.status === "pending" && <span><button onClick={() => rvExp(e.id, "approved")} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#0a7c42", color: "#fff", fontSize: 9, cursor: "pointer", marginRight: 2 }}>✅</button><button onClick={() => rvExp(e.id, "rejected")} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#b91c1c", color: "#fff", fontSize: 9, cursor: "pointer" }}>❌</button></span>}</td></tr>)}</tbody></table></div>; })()}
         </div>}
 

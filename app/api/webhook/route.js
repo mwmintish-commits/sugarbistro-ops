@@ -261,10 +261,13 @@ async function handleEvent(event) {
         if (!r) { await pushText(uid2, "❌ 辨識失敗，請重新拍照"); return; }
         const d = state.flow_data;
         const imgUrl = await uploadImage(b64, "expenses", `${d.expense_type}_${d.store_name}_${Date.now()}`);
-        const expData = { ...d, amount: r.total_amount || 0, vendor_name: r.vendor_name, date: r.date, description: r.items?.map(i => i.name).join("、"), category_suggestion: r.category_suggestion || "其他", image_url: imgUrl, ai_raw_data: r };
+        const expData = { ...d, amount: r.total_amount || 0, vendor_name: r.vendor_name, date: r.date, description: r.description || r.items?.map(i => i.name).join("、"), category_suggestion: r.category_suggestion || "其他", image_url: imgUrl, ai_raw_data: r, is_prepaid: r.is_prepaid || false, prepaid_months: r.prepaid_months || 1, prepaid_start: r.prepaid_start || (r.date || "").slice(0, 7) };
         await setUserState(uid2, "expense_confirm", expData);
         const typeLabel = d.expense_type === "vendor" ? "📦 月結單據" : d.expense_type === "hq_advance" ? "🏢 總部代付" : "💰 零用金";
-        await pushText(uid2, `${typeLabel}辨識結果\n━━━━━━━━━━━━━━\n🏠 ${d.store_name}\n🏢 ${r.vendor_name || "未知"}\n📅 ${r.date || "今日"}\n💰 ${fmt(r.total_amount)}\n📋 分類：${r.category_suggestion}\n${r.items?.map(i => `　▸ ${i.name} ${fmt(i.amount)}`).join("\n") || ""}`);
+        let msg = `${typeLabel}辨識結果\n━━━━━━━━━━━━━━\n🏠 ${d.store_name}\n🏢 ${r.vendor_name || "未知"}\n📅 ${r.date || "今日"}\n💰 ${fmt(r.total_amount)}\n📋 分類：${r.category_suggestion}`;
+        if (r.items?.length) msg += "\n" + r.items.map(i => "　▸ " + i.name + " " + fmt(i.amount)).join("\n");
+        if (r.is_prepaid && r.prepaid_months > 1) msg += "\n\n📆 預付費用：分攤" + r.prepaid_months + "個月（每月" + fmt(Math.round(r.total_amount / r.prepaid_months)) + "）";
+        await pushText(uid2, msg);
         await lineClient.pushMessage({ to: uid2, messages: [{ type: "text", text: "確認送出？", quickReply: { items: [
           { type: "action", action: { type: "message", label: "✅ 確認", text: "確認費用" } },
           { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
@@ -384,12 +387,39 @@ async function handleEvent(event) {
     const d = state.flow_data;
     const cats = await supabase.from("expense_categories").select("id, name").eq("is_active", true);
     const cat = (cats.data || []).find(c => c.name === d.category_suggestion);
+    const baseDate = d.date || new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+
+    if (d.is_prepaid && d.prepaid_months > 1) {
+      // 預付費用：分攤到多個月份
+      const monthlyAmt = Math.round(d.amount / d.prepaid_months);
+      const startMonth = d.prepaid_start || baseDate.slice(0, 7);
+      const [sy, sm] = startMonth.split("-").map(Number);
+      const records = [];
+      for (let i = 0; i < d.prepaid_months; i++) {
+        const m = sm + i;
+        const y = sy + Math.floor((m - 1) / 12);
+        const mm = ((m - 1) % 12) + 1;
+        const mk = y + "-" + String(mm).padStart(2, "0");
+        records.push({
+          store_id: d.store_id, category_id: cat?.id, expense_type: d.expense_type,
+          date: baseDate, amount: monthlyAmt, vendor_name: d.vendor_name,
+          description: (d.description || "") + "（預付" + d.prepaid_months + "個月 " + (i + 1) + "/" + d.prepaid_months + "）",
+          image_url: d.image_url, ai_raw_data: d.ai_raw_data, submitted_by: d.employee_id, submitted_by_name: d.employee_name,
+          month_key: mk, category_suggestion: d.category_suggestion,
+        });
+      }
+      await supabase.from("expenses").insert(records);
+      await clearUserState(userId);
+      const { data: admins } = await supabase.from("employees").select("line_uid").eq("role", "admin").eq("is_active", true);
+      if (admins) for (const a of admins) if (a.line_uid && a.line_uid !== userId) await pushText(a.line_uid, `📦 預付費用\n${d.store_name}｜${d.employee_name}\n${d.vendor_name || ""} ${fmt(d.amount)}（分${d.prepaid_months}個月 每月${fmt(monthlyAmt)}）`).catch(() => {});
+      return replyWithQuickReply(rt, `✅ 預付費用已儲存！\n${d.vendor_name || ""} ${fmt(d.amount)}\n📆 分攤${d.prepaid_months}個月（每月${fmt(monthlyAmt)}）`, getMenu(emp.role));
+    }
+
     await supabase.from("expenses").insert({
       store_id: d.store_id, category_id: cat?.id, expense_type: d.expense_type,
-      date: d.date || new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }),
-      amount: d.amount, vendor_name: d.vendor_name, description: d.description,
+      date: baseDate, amount: d.amount, vendor_name: d.vendor_name, description: d.description,
       image_url: d.image_url, ai_raw_data: d.ai_raw_data, submitted_by: d.employee_id, submitted_by_name: d.employee_name,
-      month_key: (d.date || new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" })).slice(0, 7),
+      month_key: baseDate.slice(0, 7), category_suggestion: d.category_suggestion,
     });
     await clearUserState(userId);
     const { data: admins } = await supabase.from("employees").select("line_uid").eq("role", "admin").eq("is_active", true);
