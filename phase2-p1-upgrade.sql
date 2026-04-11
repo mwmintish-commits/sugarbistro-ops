@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS schedule_templates (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   store_id UUID REFERENCES stores(id),
   name TEXT NOT NULL,
-  data JSONB NOT NULL,
+  template_data JSONB NOT NULL,
   created_by UUID,
   created_at TIMESTAMPTZ DEFAULT now()
 );

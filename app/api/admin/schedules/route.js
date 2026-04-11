@@ -7,6 +7,15 @@ export async function GET(request) {
   const month = searchParams.get("month");
   const week_start = searchParams.get("week_start");
   const week_end = searchParams.get("week_end");
+  const type = searchParams.get("type");
+
+  // ✦16 範本列表
+  if (type === "templates") {
+    let q = supabase.from("schedule_templates").select("*").order("created_at", { ascending: false });
+    if (store_id) q = q.eq("store_id", store_id);
+    const { data } = await q.limit(20);
+    return Response.json({ data });
+  }
 
   let query = supabase.from("schedules").select("*, employees(name, line_uid), shifts(name, start_time, end_time, role), stores(name)").order("date");
   if (store_id) query = query.eq("store_id", store_id);
