@@ -90,6 +90,29 @@ export async function POST(request) {
     }).catch(() => {});
   }
 
+  // 下班打卡：自動偵測加班
+  if (t.type === "clock_out" && schedule?.shifts?.end_time) {
+    const [eh, em2] = schedule.shifts.end_time.split(":").map(Number);
+    const [ch2, cm2] = currentTime.split(":").map(Number);
+    const otMinutes = (ch2 * 60 + cm2) - (eh * 60 + em2);
+    const minOt = settings?.overtime_min_minutes || 30;
+    if (otMinutes >= minOt) {
+      // 查國定假日
+      const { data: hol } = await supabase.from("national_holidays").select("id").eq("date", today).single().catch(() => ({ data: null }));
+      const dayOfWeek = now.getDay();
+      const otType = hol ? "holiday" : dayOfWeek === 0 ? "rest_1" : dayOfWeek === 6 ? "rest_1" : otMinutes <= 120 ? "weekday_1" : "weekday_2";
+      const rates = { weekday_1: 1.34, weekday_2: 1.67, rest_1: 1.34, holiday: 2 };
+      const hourlyRate = emp.hourly_rate || (emp.monthly_salary ? Math.round(emp.monthly_salary / 30 / 8) : 190);
+      const otAmount = Math.round(hourlyRate * (otMinutes / 60) * (rates[otType] || 1.34));
+      await supabase.from("overtime_records").insert({
+        employee_id: t.employee_id, store_id: store?.id, date: today,
+        scheduled_end: schedule.shifts.end_time, actual_end: currentTime,
+        overtime_minutes: otMinutes, overtime_type: otType, rate: rates[otType] || 1.34, amount: otAmount,
+      }).catch(() => {});
+      msg += "\n⏱ 加班 " + otMinutes + " 分鐘（待核准）";
+    }
+  }
+
   if (lateMinutes > 0) {
     const { data: mgrs } = await supabase.from("employees").select("line_uid").in("role", ["admin", "manager"]).eq("is_active", true);
     if (mgrs) for (const m of mgrs) if (m.line_uid) await pushText(m.line_uid, `⏰ 遲到｜${emp?.name}（${store?.name}）${lateMinutes}分鐘`).catch(() => {});

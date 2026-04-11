@@ -109,12 +109,14 @@ function Settings({ stores, as2, upS }) {
   const [hbSaving, setHbSaving] = useState(false);
   const [hbMsg, setHbMsg] = useState("");
   const [editCh, setEditCh] = useState(null);
+  const [hols, setHols] = useState([]);
 
   useEffect(() => {
     ap("/api/admin/system?key=handbook").then(r => {
       setHb(r.data || DEFAULT_HB);
       setHbLoading(false);
     });
+    ap("/api/admin/holidays?year=" + new Date().getFullYear()).then(r => setHols(r.data || [])).catch(() => {});
   }, []);
 
   const saveHb = async () => {
@@ -213,12 +215,21 @@ function Settings({ stores, as2, upS }) {
           <div key={s.id} style={{ padding: "6px 0", borderBottom: "1px solid #f0eeea" }}>
             <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4 }}>{s.name}</div>
             <div style={{ display: "flex", gap: 4 }}>
-              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>緯度</label><input type="number" step="0.0001" defaultValue={s.latitude || ""} onBlur={e => ap("/api/admin/stores", { action: "update_targets", store_id: s.id, daily_target: s.daily_target || 0, monthly_target: s.monthly_target || 0 }).then(() => { /* latitude update needs separate call */ })} placeholder="22.6273" style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }} /></div>
-              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>經度</label><input type="number" step="0.0001" defaultValue={s.longitude || ""} placeholder="120.3014" style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }} /></div>
-              <div style={{ width: 60 }}><label style={{ fontSize: 9, color: "#888" }}>範圍(m)</label><input type="number" defaultValue={s.radius_m || 200} style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10, textAlign: "center" }} /></div>
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>緯度</label><input type="number" step="0.0001" id={"lat-" + s.id} defaultValue={s.latitude || ""} placeholder="22.6273" style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }} /></div>
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>經度</label><input type="number" step="0.0001" id={"lng-" + s.id} defaultValue={s.longitude || ""} placeholder="120.3014" style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }} /></div>
+              <div style={{ width: 60 }}><label style={{ fontSize: 9, color: "#888" }}>範圍m</label><input type="number" id={"rad-" + s.id} defaultValue={s.radius_m || 200} style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10, textAlign: "center" }} /></div>
+              <button onClick={() => { const lat = document.getElementById("lat-" + s.id).value; const lng = document.getElementById("lng-" + s.id).value; const rad = document.getElementById("rad-" + s.id).value; ap("/api/admin/stores", { action: "update_targets", store_id: s.id, latitude: lat ? Number(lat) : null, longitude: lng ? Number(lng) : null, radius_m: rad ? Number(rad) : 200 }).then(() => alert(s.name + " GPS已儲存")); }} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 9, cursor: "pointer", alignSelf: "flex-end" }}>{"💾"}</button>
             </div>
           </div>
         ))}
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"🗓 " + new Date().getFullYear() + " 國定假日（" + hols.length + "天）"}</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {hols.map(h => <span key={h.id} style={{ padding: "3px 8px", borderRadius: 4, background: "#fde8e8", color: "#b91c1c", fontSize: 10 }}>{h.date.slice(5) + " " + h.name}</span>)}
+        </div>
+        <p style={{ fontSize: 10, color: "#888", marginTop: 6 }}>{"* 排班月曆自動標記紅色，出勤給付雙倍薪"}</p>
       </div>
 
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
@@ -654,42 +665,35 @@ function Dashboard({ auth, onLogout }) {
           <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{"💰 " + month + " 薪資核算"}</h3>
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-              <thead><tr style={{ background: "#faf8f5" }}>{["員工", "門市", "類型", "底薪/時薪", "出勤天數", "應發薪資", "勞保扣", "健保扣", "實發薪資"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
+              <thead><tr style={{ background: "#faf8f5" }}>{["員工", "門市", "底薪/時薪", "出勤", "加班費", "應發", "勞保", "健保", "實發"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
               <tbody>{ae.length === 0 ? <tr><td colSpan={9} style={{ padding: 30, textAlign: "center", color: "#ccc" }}>無員工</td></tr> : ae.map(e => {
                 const workDays = att.filter(a => a.employees && a.employees.name === e.name && a.type === "clock_in").length;
                 const basePay = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate) * workDays * 8 : 0);
-                const laborSelf = e.labor_tier ? (TIERS_R.find(t => t[0] === e.labor_tier) ? [690, 723, 761, 799, 836, 874, 912, 959, 1007, 1055, 1103, 1150][e.labor_tier - 1] || 0 : 0) : 0;
+                const otPay = otRecords.filter(r => r.employee_id === e.id && r.status === "approved").reduce((s, r) => s + Number(r.amount || 0), 0);
+                const gross = basePay + otPay;
+                const laborSelf = e.labor_tier ? [690, 723, 761, 799, 836, 874, 912, 959, 1007, 1055, 1103, 1150][e.labor_tier - 1] || 0 : 0;
                 const healthSelf = e.health_tier ? [438, 459, 483, 507, 531, 555, 579, 609, 640, 670, 700, 730][e.health_tier - 1] || 0 : 0;
-                const netPay = basePay - laborSelf - healthSelf;
+                const netPay = gross - laborSelf - healthSelf;
                 return <tr key={e.id} style={{ borderBottom: "1px solid #f0eeea" }}>
                   <td style={{ padding: 6, fontWeight: 500 }}>{e.name}</td>
                   <td style={{ padding: 6 }}>{e.stores ? e.stores.name : "總部"}</td>
-                  <td style={{ padding: 6 }}>{e.employment_type === "parttime" ? "兼職" : "一般"}</td>
-                  <td style={{ padding: 6 }}>{e.monthly_salary ? "月薪 " + fmt(e.monthly_salary) : e.hourly_rate ? "時薪 " + fmt(e.hourly_rate) : "未設定"}</td>
+                  <td style={{ padding: 6, fontSize: 10 }}>{e.monthly_salary ? "月" + fmt(e.monthly_salary) : e.hourly_rate ? "時" + fmt(e.hourly_rate) : "-"}</td>
                   <td style={{ padding: 6 }}>{workDays + "天"}</td>
-                  <td style={{ padding: 6, fontWeight: 600 }}>{fmt(basePay)}</td>
-                  <td style={{ padding: 6, color: "#b45309" }}>{laborSelf > 0 ? "-" + fmt(laborSelf) : "-"}</td>
-                  <td style={{ padding: 6, color: "#0a7c42" }}>{healthSelf > 0 ? "-" + fmt(healthSelf) : "-"}</td>
-                  <td style={{ padding: 6, fontWeight: 700, color: "#1a1a1a", fontSize: 13 }}>{fmt(netPay)}</td>
+                  <td style={{ padding: 6, color: otPay > 0 ? "#b45309" : "#ccc" }}>{otPay > 0 ? "+" + fmt(otPay) : "-"}</td>
+                  <td style={{ padding: 6, fontWeight: 600 }}>{fmt(gross)}</td>
+                  <td style={{ padding: 6, color: "#b45309", fontSize: 10 }}>{laborSelf > 0 ? "-" + fmt(laborSelf) : "-"}</td>
+                  <td style={{ padding: 6, color: "#0a7c42", fontSize: 10 }}>{healthSelf > 0 ? "-" + fmt(healthSelf) : "-"}</td>
+                  <td style={{ padding: 6, fontWeight: 700, fontSize: 13 }}>{fmt(netPay)}</td>
                 </tr>;
               })}</tbody>
             </table>
           </div>
-          <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "10px 14px", flex: 1 }}>
-              <div style={{ fontSize: 10, color: "#888" }}>應發合計</div>
-              <div style={{ fontSize: 18, fontWeight: 600 }}>{fmt(ae.reduce((s, e) => { const wd = att.filter(a => a.employees && a.employees.name === e.name && a.type === "clock_in").length; return s + (e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate) * wd * 8 : 0)); }, 0))}</div>
-            </div>
-            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "10px 14px", flex: 1 }}>
-              <div style={{ fontSize: 10, color: "#888" }}>扣除合計</div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: "#b91c1c" }}>{fmt(ae.reduce((s, e) => { const ls = e.labor_tier ? [690, 723, 761, 799, 836, 874, 912, 959, 1007, 1055, 1103, 1150][e.labor_tier - 1] || 0 : 0; const hs = e.health_tier ? [438, 459, 483, 507, 531, 555, 579, 609, 640, 670, 700, 730][e.health_tier - 1] || 0 : 0; return s + ls + hs; }, 0))}</div>
-            </div>
-            <div style={{ background: "#e6f9f0", borderRadius: 8, padding: "10px 14px", flex: 1 }}>
-              <div style={{ fontSize: 10, color: "#888" }}>實發合計</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#0a7c42" }}>{fmt(ae.reduce((s, e) => { const wd = att.filter(a => a.employees && a.employees.name === e.name && a.type === "clock_in").length; const bp = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate) * wd * 8 : 0); const ls = e.labor_tier ? [690, 723, 761, 799, 836, 874, 912, 959, 1007, 1055, 1103, 1150][e.labor_tier - 1] || 0 : 0; const hs = e.health_tier ? [438, 459, 483, 507, 531, 555, 579, 609, 640, 670, 700, 730][e.health_tier - 1] || 0 : 0; return s + bp - ls - hs; }, 0))}</div>
-            </div>
-          </div>
-          <p style={{ fontSize: 10, color: "#999", marginTop: 8 }}>{"* 出勤天數依本月打卡紀錄計算｜時薪以每天8小時估算｜勞健保自付額依一般人員級距"}</p>
+          {(() => { let totalGross = 0, totalDeduct = 0; ae.forEach(e => { const wd = att.filter(a => a.employees && a.employees.name === e.name && a.type === "clock_in").length; const bp = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate) * wd * 8 : 0); const ot = otRecords.filter(r => r.employee_id === e.id && r.status === "approved").reduce((s, r) => s + Number(r.amount || 0), 0); totalGross += bp + ot; const ls = e.labor_tier ? [690, 723, 761, 799, 836, 874, 912, 959, 1007, 1055, 1103, 1150][e.labor_tier - 1] || 0 : 0; const hs = e.health_tier ? [438, 459, 483, 507, 531, 555, 579, 609, 640, 670, 700, 730][e.health_tier - 1] || 0 : 0; totalDeduct += ls + hs; }); return <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "10px 14px" }}><div style={{ fontSize: 10, color: "#888" }}>應發合計</div><div style={{ fontSize: 18, fontWeight: 600 }}>{fmt(totalGross)}</div></div>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "10px 14px" }}><div style={{ fontSize: 10, color: "#888" }}>扣除合計</div><div style={{ fontSize: 18, fontWeight: 600, color: "#b91c1c" }}>{fmt(totalDeduct)}</div></div>
+            <div style={{ background: "#e6f9f0", borderRadius: 8, padding: "10px 14px" }}><div style={{ fontSize: 10, color: "#888" }}>實發合計</div><div style={{ fontSize: 18, fontWeight: 700, color: "#0a7c42" }}>{fmt(totalGross - totalDeduct)}</div></div>
+          </div>; })()}
+          <p style={{ fontSize: 10, color: "#999", marginTop: 8 }}>{"* 出勤依打卡｜時薪×天數×8hr｜加班費依核准紀錄｜勞健保依一般級距自付額"}</p>
         </div>}
 
         {!ld && tab === "pnl" && pnl && <div style={{ maxWidth: 500 }}>
