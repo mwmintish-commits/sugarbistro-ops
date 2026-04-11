@@ -393,23 +393,37 @@ export default function SettingsMgr({ stores, load }) {
       {/* 資料維護 */}
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🧹 資料維護</h4>
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        <p style={{ fontSize: 10, color: "#b91c1c", marginBottom: 8 }}>⚠️ 刪除後無法復原，請謹慎操作</p>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
           <button onClick={async () => {
             const r = await ap("/api/admin/expenses", { action: "cleanup_rejected", days: 30 });
             alert("已清除 " + (r.deleted || 0) + " 筆駁回超過30天的費用");
             load();
           }} style={{ padding: "5px 10px", borderRadius: 4, border: "1px solid #b45309", background: "transparent", color: "#b45309", fontSize: 11, cursor: "pointer" }}>
-            清除過期駁回單據（30天）
+            清除過期駁回單據
           </button>
-          <button onClick={async () => {
-            if (!confirm("⚠️ 確定清除所有費用和撥款紀錄？")) return;
-            if (!confirm("再次確認：刪除全部費用+撥款，確定？")) return;
-            await ap("/api/admin/expenses", { action: "delete_all" });
-            alert("已清除");
-            load();
-          }} style={{ padding: "5px 10px", borderRadius: 4, border: "1px solid #b91c1c", background: "transparent", color: "#b91c1c", fontSize: 11, cursor: "pointer" }}>
-            ⚠️ 清除全部費用（測試用）
-          </button>
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 500, color: "#666", marginBottom: 4 }}>🗑 一鍵清除（二次確認）</div>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {[
+            ["schedules", "📅 排班"],
+            ["worklogs", "📋 日誌"],
+            ["expenses", "📦 費用+撥款"],
+            ["settlements", "💰 日結"],
+            ["deposits", "🏦 存款"],
+            ["attendance", "📍 出勤"],
+            ["overtime", "⏱ 加班"],
+          ].map(([key, label]) => (
+            <button key={key} onClick={async () => {
+              if (!confirm("確定清除全部「" + label + "」資料？")) return;
+              if (!confirm("再次確認：刪除全部" + label + "，無法復原！")) return;
+              const r = await ap("/api/admin/system", { action: "cleanup", target: key });
+              alert("已清除 " + (r.deleted || 0) + " 筆");
+              load();
+            }} style={{ padding: "5px 10px", borderRadius: 4, border: "1px solid #b91c1c", background: "transparent", color: "#b91c1c", fontSize: 11, cursor: "pointer" }}>
+              {label}
+            </button>
+          ))}
         </div>
       </div>
     </div>
