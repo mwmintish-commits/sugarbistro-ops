@@ -23,6 +23,7 @@ export default function SettingsMgr({ stores, load, month }) {
     frequency: "daily", weekday: "", requires_value: false, value_label: "", value_min: "", value_max: ""
   });
   const [wlCopyTarget, setWlCopyTarget] = useState("");
+  const [invNew, setInvNew] = useState({ category: "庫存盤點", item: "" });
 
   useEffect(() => {
     ap("/api/admin/system?key=company_name").then(r => { if (r.data) setCompanyName(r.data); }).catch(() => {});
@@ -339,10 +340,14 @@ export default function SettingsMgr({ stores, load, month }) {
                     {["日", "一", "二", "三", "四", "五", "六"].map((d, i) => <option key={i} value={i}>{d}</option>)}
                   </select>
                 )}
-                <select value={wlNew.category} onChange={e => setWlNew({ ...wlNew, category: e.target.value })}
+                <select value={wlNew.category} onChange={e => {
+                  const v = e.target.value;
+                  const isInv = v.includes("盤點");
+                  setWlNew({ ...wlNew, category: v, requires_value: isInv || wlNew.requires_value, value_label: isInv ? "數量" : wlNew.value_label });
+                }}
                   style={{ padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }}>
-                  {["開店準備", "營業中", "打烊作業", "清潔消毒", "食材管理", "溫度記錄", "設備維護", "週清潔", "月清潔", "📦 庫存盤點", "🧊 冷藏盤點", "🧊 冷凍盤點"].map(c =>
-                    <option key={c} value={c.replace(/^[📦🧊] /, "")}>{c}</option>
+                  {["開店準備", "營業中", "打烊作業", "清潔消毒", "食材管理", "溫度記錄", "設備維護", "週清潔", "月清潔"].map(c =>
+                    <option key={c} value={c}>{c}</option>
                   )}
                 </select>
                 <select value={wlNew.role} onChange={e => setWlNew({ ...wlNew, role: e.target.value })}
@@ -402,6 +407,77 @@ export default function SettingsMgr({ stores, load, month }) {
                 </button>
               </div>
             )}
+
+            {/* 📦 盤點項目設定 */}
+            <div style={{ background: "#e6f1fb", borderRadius: 8, padding: 10, marginTop: 10 }}>
+              <h4 style={{ fontSize: 12, fontWeight: 600, color: "#185fa5", marginBottom: 6 }}>📦 盤點項目設定</h4>
+              <p style={{ fontSize: 9, color: "#888", marginBottom: 6 }}>設定每日需盤點的品項，員工在日誌中填寫數量，後台即時顯示。</p>
+
+              {/* 現有盤點項目 */}
+              {(() => {
+                const invItems = wlTemplates.filter(t => (t.category || "").includes("盤點"));
+                const invGrouped = {};
+                invItems.forEach(t => { const c = t.category; if (!invGrouped[c]) invGrouped[c] = []; invGrouped[c].push(t); });
+                return Object.entries(invGrouped).length > 0 ? Object.entries(invGrouped).map(([cat, items]) => (
+                  <div key={cat} style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: cat === "庫存盤點" ? "#185fa5" : cat === "冷藏盤點" ? "#0a7c42" : "#8a6d00", marginBottom: 2 }}>
+                      {(cat === "庫存盤點" ? "📦 " : "🧊 ") + cat + "（" + items.length + "項）"}
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {items.map(t => (
+                        <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 2, background: "#fff", borderRadius: 4, padding: "2px 6px", fontSize: 10, border: "1px solid #ddd" }}>
+                          <span>{t.item}</span>
+                          {t.value_label && <span style={{ color: "#888" }}>{"(" + t.value_label + ")"}</span>}
+                          <button onClick={async () => { await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadWlTemplates(); }}
+                            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, color: "#b91c1c", padding: 0 }}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )) : (
+                  <div style={{ fontSize: 10, color: "#aaa", marginBottom: 6 }}>尚無盤點項目</div>
+                );
+              })()}
+
+              {/* 新增盤點項目 */}
+              <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 6 }}>
+                <select value={invNew.category} onChange={e => setInvNew({ ...invNew, category: e.target.value })}
+                  style={{ padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }}>
+                  <option value="庫存盤點">📦 庫存盤點</option>
+                  <option value="冷藏盤點">🧊 冷藏盤點</option>
+                  <option value="冷凍盤點">🧊 冷凍盤點</option>
+                </select>
+                <input value={invNew.item} onChange={e => setInvNew({ ...invNew, item: e.target.value })}
+                  placeholder="品項名稱（如：全脂牛奶）"
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && invNew.item) {
+                      ap("/api/admin/worklogs", {
+                        action: "add_template", store_id: wlStore,
+                        category: invNew.category, item: invNew.item, role: "all",
+                        shift_type: "closing", frequency: "daily",
+                        requires_value: true, value_label: "數量"
+                      });
+                      setInvNew({ ...invNew, item: "" });
+                      setTimeout(loadWlTemplates, 300);
+                    }
+                  }}
+                  style={{ flex: 1, padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} />
+                <button onClick={async () => {
+                  if (!invNew.item) return;
+                  await ap("/api/admin/worklogs", {
+                    action: "add_template", store_id: wlStore,
+                    category: invNew.category, item: invNew.item, role: "all",
+                    shift_type: "closing", frequency: "daily",
+                    requires_value: true, value_label: "數量"
+                  });
+                  setInvNew({ ...invNew, item: "" });
+                  loadWlTemplates();
+                }} disabled={!invNew.item}
+                  style={{ padding: "3px 10px", borderRadius: 4, border: "none", background: invNew.item ? "#185fa5" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>
+                  ＋
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
