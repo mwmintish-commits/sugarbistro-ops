@@ -384,6 +384,42 @@ export default function AdminPage() {
         {/* EMPLOYEES */}
         {!ld && (tab === "employees" || tab === "store_staff") && (
           <div>
+            <button onClick={async()=>{
+              const name = prompt("員工姓名："); if(!name) return;
+              const phone = prompt("手機號碼："); if(!phone) return;
+              const storeId = sf || prompt("門市ID（從門市列表取得）：");
+              const role = prompt("角色（staff/store_manager/manager/admin）：","staff");
+              const r = await ap("/api/admin/employees",{action:"create",name,phone,store_id:storeId,role:role||"staff"});
+              if(r.error) alert(r.error); else { alert("已新增，綁定碼：" + (r.bind_code||"")); load(); }
+            }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
+              ＋新增員工
+            </button>
+
+            {/* 待啟用 */}
+            {emps.filter(e=>!e.is_active).length > 0 && (
+              <div style={{marginBottom:12}}>
+                <h4 style={{fontSize:12,color:"#b45309",marginBottom:4}}>{"⏳ 待啟用（"+emps.filter(e=>!e.is_active).length+"）"}</h4>
+                <div style={{background:"#fff8e6",borderRadius:8,border:"1px solid #f0e6c8",overflow:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                    <tbody>{emps.filter(e=>!e.is_active).map(e=>(
+                      <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                        <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}} onClick={()=>setDetailId(e.id)}>{e.name}</td>
+                        <td style={{padding:6}}>{e.stores?e.stores.name:"總部"}</td>
+                        <td style={{padding:6}}>{e.line_uid?"✅":"❌"}</td>
+                        <td style={{padding:6}}>
+                          <button onClick={async()=>{await ap("/api/admin/employees",{action:"activate",employee_id:e.id});load();}}
+                            style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>啟用</button>
+                          <button onClick={async()=>{if(!confirm("確定刪除"+e.name+"的資料？此操作無法復原"))return;await ap("/api/admin/employees",{action:"deactivate",employee_id:e.id});load();}}
+                            style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>刪除</button>
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* 已啟用 */}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                 <thead>
@@ -394,8 +430,8 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {emps.map(e => (
-                    <tr key={e.id} style={{borderBottom:"1px solid #f0eeea",opacity:e.is_active?1:0.4}}>
+                  {ae.map(e => (
+                    <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
                       <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}}
                         onClick={() => setDetailId(e.id)}>{e.name}</td>
                       <td style={{padding:6}}>{e.stores?e.stores.name:"總部"}</td>
@@ -404,18 +440,10 @@ export default function AdminPage() {
                       <td style={{padding:6}}>{(e.annual_leave_days||0)+"天"}</td>
                       <td style={{padding:6}}>{e.line_uid?"✅":"❌"}</td>
                       <td style={{padding:6}}>
-                        {!e.is_active && (
-                          <button onClick={async()=>{await ap("/api/admin/employees",{action:"activate",employee_id:e.id});load();}}
-                            style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer"}}>
-                            啟用
-                          </button>
-                        )}
-                        {e.is_active && (
-                          <button onClick={()=>deactivate(e.id)}
-                            style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>
-                            停用
-                          </button>
-                        )}
+                        <button onClick={()=>deactivate(e.id)}
+                          style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>
+                          停用
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -425,9 +453,21 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* SCHEDULES - Month view */}
+        {/* SCHEDULES */}
         {!ld && tab === "schedules" && (
           <div>
+            <div style={{display:"flex",gap:4,marginBottom:8}}>
+              <button onClick={()=>setSv("month")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="month"?"#1a1a1a":"#fff",color:sv==="month"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>月檢視</button>
+              <button onClick={()=>setSv("week")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="week"?"#1a1a1a":"#fff",color:sv==="week"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>週檢視</button>
+              <button onClick={async()=>{
+                const we2 = new Date(new Date(ws).getTime()+6*86400000).toLocaleDateString("sv-SE");
+                if(!confirm("發布 "+ws+" ~ "+we2+" 的班表並LINE通知員工？")) return;
+                await ap("/api/admin/schedules",{action:"publish",week_start:ws,week_end:we2,store_id:sf||undefined});
+                alert("已發布"); load();
+              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:11,cursor:"pointer",marginLeft:"auto"}}>
+                📢 發布班表
+              </button>
+            </div>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
                 <thead>
@@ -487,7 +527,7 @@ export default function AdminPage() {
           <div>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["時間","員工","類型","距離","遲到"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["時間","員工","類型","距離","遲到","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{att.map(a=>(
                   <tr key={a.id} style={{borderBottom:"1px solid #f0eeea"}}>
                     <td style={{padding:6,fontSize:10}}>{a.timestamp?new Date(a.timestamp).toLocaleString("zh-TW",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):""}</td>
@@ -495,6 +535,10 @@ export default function AdminPage() {
                     <td style={{padding:6}}>{a.type==="clock_in"?"上班":"下班"}</td>
                     <td style={{padding:6}}>{a.distance_meters?a.distance_meters+"m":"-"}</td>
                     <td style={{padding:6,color:a.late_minutes>0?"#b91c1c":"#0a7c42"}}>{a.late_minutes>0?a.late_minutes+"分":"準時"}</td>
+                    <td style={{padding:6}}>
+                      <button onClick={async()=>{if(!confirm("確定刪除此打卡紀錄？"))return;await ap("/api/admin/attendance",{action:"delete",attendance_id:a.id});load();}}
+                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid #ddd",background:"transparent",fontSize:9,cursor:"pointer",color:"#b91c1c"}}>🗑</button>
+                    </td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -975,9 +1019,26 @@ export default function AdminPage() {
         {!ld && tab === "announcements" && (
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📢 公告</h3>
+            {auth.role !== "store_manager" && (
+              <button onClick={async()=>{
+                const title = prompt("公告標題："); if(!title) return;
+                const content = prompt("公告內容："); if(!content) return;
+                const priority = confirm("是否為急件？") ? "urgent" : "normal";
+                await ap("/api/admin/announcements",{action:"create",title,content,priority});
+                load();
+              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
+                ＋新增公告
+              </button>
+            )}
             {anns.map(a=>(
               <div key={a.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8}}>
-                <div style={{fontWeight:600,fontSize:13}}>{a.priority==="urgent"?"🔴 ":""}{a.title}</div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{fontWeight:600,fontSize:13}}>{a.priority==="urgent"?"🔴 ":""}{a.title}</div>
+                  {auth.role !== "store_manager" && (
+                    <button onClick={async()=>{if(!confirm("確定刪除公告？"))return;await ap("/api/admin/announcements",{action:"delete",announcement_id:a.id});load();}}
+                      style={{fontSize:10,color:"#b91c1c",background:"none",border:"none",cursor:"pointer"}}>🗑</button>
+                  )}
+                </div>
                 <div style={{fontSize:12,color:"#666",marginTop:4}}>{a.content}</div>
                 <div style={{fontSize:10,color:"#aaa",marginTop:4}}>{a.created_at?new Date(a.created_at).toLocaleDateString():""}</div>
               </div>

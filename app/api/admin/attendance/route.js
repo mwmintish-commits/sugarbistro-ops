@@ -50,5 +50,12 @@ export async function POST(request) {
     return Response.json({ data });
   }
 
+  if (body.action === "delete") {
+    const { attendance_id } = body;
+    const { error } = await supabase.from("attendances").delete().eq("id", attendance_id);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ success: true });
+  }
+
   return Response.json({ error: "Unknown action" }, { status: 400 });
 }
