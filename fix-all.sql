@@ -53,7 +53,17 @@ INSERT INTO expense_categories (name, type, sort_order) VALUES
 ('總部代付-其他', 'hq_advance', 24)
 ON CONFLICT (name) DO NOTHING;
 
--- 9. 確保所有表 RLS 關閉
+-- 9. 清除重複班別（保留最早建立的）
+DELETE FROM shifts a USING shifts b
+WHERE a.id > b.id
+AND a.store_id = b.store_id
+AND a.name = b.name
+AND a.role = b.role
+AND a.start_time = b.start_time
+AND a.end_time = b.end_time
+AND a.is_active = true AND b.is_active = true;
+
+-- 10. 確保所有表 RLS 關閉
 ALTER TABLE shifts DISABLE ROW LEVEL SECURITY;
 ALTER TABLE employees DISABLE ROW LEVEL SECURITY;
 ALTER TABLE work_log_templates DISABLE ROW LEVEL SECURITY;
