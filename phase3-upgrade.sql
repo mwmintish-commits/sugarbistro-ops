@@ -138,3 +138,33 @@ BEGIN
 END $$;
 
 SELECT '✅ Phase 3 SQL 完成' AS result;
+
+-- ============================================
+-- SaaS 預備
+-- ============================================
+
+-- M1 門市模組開關
+CREATE TABLE IF NOT EXISTS store_modules (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  store_id UUID REFERENCES stores(id),
+  module_key TEXT NOT NULL,
+  enabled BOOLEAN DEFAULT true,
+  UNIQUE(store_id, module_key)
+);
+
+-- M2 方案限制
+ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS value_type TEXT DEFAULT 'json';
+-- 方案設定存在 system_settings: key="plan", value={"name":"standard","max_stores":3,"max_employees":15}
+
+-- M3 白牌
+-- 品牌設定存在 system_settings: key="branding", value={"company_name":"小食糖","logo_url":"","theme_color":"#0a7c42"}
+
+-- RLS 全關
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', t);
+  END LOOP;
+END $$;

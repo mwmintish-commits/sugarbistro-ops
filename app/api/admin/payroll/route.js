@@ -1,8 +1,8 @@
 import { supabase, eom } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
-const LABOR_SELF = [690,723,761,799,836,874,912,959,1007,1055,1103,1150];
-const HEALTH_SELF = [438,459,483,507,531,555,579,609,640,670,700,730];
+const LABOR_SELF = [659,691,727,763,799,835,871,917,962,1008,1054,1100,1157,1214,1272,1330,1387,1459,1531,1603];
+const HEALTH_SELF = [424,445,468,491,515,538,561,590,620,649,679,708,745,782,819,856,893,940,986,1032];
 const fmt = n => "$" + Number(n||0).toLocaleString();
 
 export async function GET(request) {

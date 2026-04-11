@@ -38,6 +38,15 @@ const TAB_GROUPS = {
   "管理":["shifts","worklogs","announcements","settings"]
 };
 const DAYS = ["日","一","二","三","四","五","六"];
+// ✦34 CSV匯出
+function exportCSV(filename, headers, rows) {
+  const bom = "\uFEFF";
+  const csv = bom + headers.join(",") + "\n" + rows.map(r => r.map(c => '"' + String(c||"").replace(/"/g,'""') + '"').join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function AdminPage() {
   const [auth, setAuth] = useState(null);
@@ -95,6 +104,8 @@ export default function AdminPage() {
   const [amendments, setAmendments] = useState([]);
   const [monthlyReport, setMonthlyReport] = useState([]);
   const [reminders, setReminders] = useState([]);
+  const [rvData, setRvData] = useState([]);
+  const [bnData, setBnData] = useState(null);
   const pl = lr.filter(l => l.status === "pending");
   const ae = emps.filter(e => e.is_active);
 
@@ -406,10 +417,42 @@ export default function AdminPage() {
                 ))
               }
             </div>
+
+            {/* ✦42-44 KPI */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10}}>
+                <h4 style={{fontSize:11,fontWeight:600,marginBottom:6}}>👥 員工KPI</h4>
+                {ae.slice(0,5).map(e => {
+                  const schedCount = scheds.filter(s=>s.employee_id===e.id&&s.type==="shift").length;
+                  const clockCount = att.filter(a=>a.employee_id===e.id&&a.type==="clock_in").length;
+                  const lateCount = att.filter(a=>a.employee_id===e.id&&a.is_late).length;
+                  const attRate = schedCount > 0 ? Math.round(clockCount/schedCount*100) : 100;
+                  const onTimeRate = clockCount > 0 ? Math.round((clockCount-lateCount)/clockCount*100) : 100;
+                  return (
+                    <div key={e.id} style={{display:"flex",justifyContent:"space-between",fontSize:10,padding:"2px 0",borderBottom:"1px solid #f5f5f5"}}>
+                      <span style={{fontWeight:500}}>{e.name}</span>
+                      <span>出勤{attRate}% 準時{onTimeRate}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10}}>
+                <h4 style={{fontSize:11,fontWeight:600,marginBottom:6}}>🏠 門市人效</h4>
+                {stores.map(s => {
+                  const storeEmpCount = ae.filter(e=>e.store_id===s.id).length;
+                  const storeRev = stl.filter(r=>r.store_id===s.id).reduce((a,r)=>a+Number(r.net_sales||0),0);
+                  const perPerson = storeEmpCount > 0 ? Math.round(storeRev/storeEmpCount) : 0;
+                  return (
+                    <div key={s.id} style={{display:"flex",justifyContent:"space-between",fontSize:10,padding:"2px 0",borderBottom:"1px solid #f5f5f5"}}>
+                      <span style={{fontWeight:500}}>{s.name}</span>
+                      <span>{storeEmpCount+"人 人效"+fmt(perPerson)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
-
-        {/* EMPLOYEES */}
         {!ld && (tab === "employees" || tab === "store_staff") && (
           <div>
             <button onClick={async()=>{
@@ -776,7 +819,12 @@ export default function AdminPage() {
         )}
         {!ld && tab === "payroll" && (
           <div>
-            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 薪資"}</h3>
+            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 薪資"}
+              <button onClick={()=>{
+                exportCSV("薪資_"+month+".csv",["員工","出勤天","底薪","加班費","勞保","健保","補充保費","實發"],
+                  ae.map(e=>{const wd=att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;const bp=e.monthly_salary?Number(e.monthly_salary):(e.hourly_rate?Number(e.hourly_rate)*wd*8:0);const ot=otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);const ls=e.labor_tier?LABOR_SELF[e.labor_tier-1]||0:0;const hs=e.health_tier?HEALTH_SELF[e.health_tier-1]||0:0;const suppH=e.employment_type==="parttime"&&bp>27470?Math.round(bp*0.0211):0;return[e.name,wd,bp,ot,ls,hs,suppH,bp+ot-ls-hs-suppH];}));
+              }} style={{marginLeft:8,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
+            </h3>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
               <button onClick={async()=>{
                 const [y,m]=month.split("-").map(Number);
@@ -837,20 +885,27 @@ export default function AdminPage() {
                 {[1,2,3,4].map(q=><option key={q} value={q}>{"Q"+q}</option>)}
               </select>
               <button onClick={async()=>{
-                const y=Number(document.getElementById("rv-year").value);
-                const q=Number(document.getElementById("rv-quarter").value);
-                if(!confirm(y+" Q"+q+" 一鍵產生考核表？系統將掃描打卡/日誌/客訴/違規"))return;
-                const r=await ap("/api/admin/reviews",{action:"generate",year:y,quarter:q});
-                alert("已產生 "+(r.generated||0)+" 人考核表");load();
-              }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>
-                🔄 一鍵產生考核表
+                const y=Number(document.getElementById("rv-year").value),q=Number(document.getElementById("rv-quarter").value);
+                const r=await ap("/api/admin/reviews?year="+y+"&quarter="+q+(sf?"&store_id="+sf:""));
+                setRvData(r.data||[]);
+              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>
+                🔍 查詢
               </button>
               <button onClick={async()=>{
-                const y=Number(document.getElementById("rv-year").value);
-                const q=Number(document.getElementById("rv-quarter").value);
+                const y=Number(document.getElementById("rv-year").value),q=Number(document.getElementById("rv-quarter").value);
+                if(!confirm(y+" Q"+q+" 一鍵產生考核表？"))return;
+                await ap("/api/admin/reviews",{action:"generate",year:y,quarter:q});
+                const r=await ap("/api/admin/reviews?year="+y+"&quarter="+q);
+                setRvData(r.data||[]);alert("已產生");
+              }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>
+                🔄 一鍵產生
+              </button>
+              <button onClick={async()=>{
+                const y=Number(document.getElementById("rv-year").value),q=Number(document.getElementById("rv-quarter").value);
                 if(!confirm("全部核准？"))return;
                 await ap("/api/admin/reviews",{action:"approve_all",year:y,quarter:q});
-                alert("已全部核准");load();
+                const r=await ap("/api/admin/reviews?year="+y+"&quarter="+q);
+                setRvData(r.data||[]);
               }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:11,cursor:"pointer"}}>
                 ✅ 全部核准
               </button>
@@ -861,11 +916,25 @@ export default function AdminPage() {
                   <th key={h} style={{padding:6,textAlign:"center",fontWeight:500,color:"#666",fontSize:10}}>{h}</th>
                 )}</tr></thead>
                 <tbody>
-                  <tr><td colSpan={9} style={{padding:20,textAlign:"center",color:"#ccc",fontSize:11}}>請選擇季度後按「一鍵產生」</td></tr>
+                  {rvData.length===0 ? (
+                    <tr><td colSpan={9} style={{padding:20,textAlign:"center",color:"#ccc",fontSize:11}}>請選擇季度後按「查詢」或「一鍵產生」</td></tr>
+                  ) : rvData.map(r=>(
+                    <tr key={r.id} style={{borderBottom:"1px solid #f0eeea",background:r.bonus_coefficient===0?"#fef9c3":"transparent"}}>
+                      <td style={{padding:6,fontWeight:500}}>{r.employees?.name}</td>
+                      <td style={{padding:6,fontSize:10}}>{r.stores?.name}</td>
+                      <td style={{padding:6,textAlign:"center"}}>{r.attendance_score}</td>
+                      <td style={{padding:6,textAlign:"center"}}>{r.performance_score}{r.performance_adjust!==0&&<span style={{fontSize:8,color:r.performance_adjust>0?"#0a7c42":"#b91c1c"}}>{(r.performance_adjust>0?"+":"")+r.performance_adjust}</span>}</td>
+                      <td style={{padding:6,textAlign:"center"}}>{r.service_score}{r.service_adjust!==0&&<span style={{fontSize:8,color:r.service_adjust>0?"#0a7c42":"#b91c1c"}}>{(r.service_adjust>0?"+":"")+r.service_adjust}</span>}</td>
+                      <td style={{padding:6,textAlign:"center"}}>{r.violation_score}</td>
+                      <td style={{padding:6,textAlign:"center",fontWeight:700,color:r.total_score>=80?"#0a7c42":r.total_score>=70?"#b45309":"#b91c1c"}}>{r.total_score}</td>
+                      <td style={{padding:6,textAlign:"center",fontWeight:600}}>{r.bonus_coefficient===0?"❌":"×"+r.bonus_coefficient}</td>
+                      <td style={{padding:6,textAlign:"center"}}>{r.status==="approved"?"✅":r.status==="submitted"?"📤":"📝"}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
-            <p style={{fontSize:9,color:"#888",marginTop:6}}>出勤/違規=全自動計算　完成度/服務=系統基礎分+主管±5分調整</p>
+            <p style={{fontSize:9,color:"#888",marginTop:6}}>出勤/違規=全自動　完成度/服務=主管可±5分調整（API adjust）</p>
           </div>
         )}
 
@@ -942,7 +1011,12 @@ export default function AdminPage() {
 
         {!ld && tab === "settlements" && (
           <div>
-            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 日結 ("+stl.length+"筆)"}</h3>
+            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 日結 ("+stl.length+"筆)"}
+              <button onClick={()=>{
+                exportCSV("日結_"+month+".csv",["日期","門市","營收","現金","LINE Pay","TWQR","UberEat","悠遊卡","餐券","應存"],
+                  stl.map(s=>[s.date,s.stores?.name,s.net_sales,s.cash_amount,s.line_pay_amount,s.twqr_amount,s.uber_eat_amount,s.easy_card_amount,s.meal_voucher_amount,s.cash_to_deposit]));
+              }} style={{marginLeft:8,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
+            </h3>
             {stl.length > 0 && (
               <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
                 <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"6px 10px",flex:1,minWidth:80}}>
