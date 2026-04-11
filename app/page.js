@@ -21,7 +21,7 @@ const TIERS_R = [[1, "27,470"], [2, "27,471~28,800"], [3, "28,801~30,300"], [4, 
 const TIERS_P = [[1, "~11,100"], [2, "11,101~12,540"], [3, "12,541~13,500"], [4, "13,501~15,840"], [5, "15,841~16,500"], [6, "16,501~17,280"], [7, "17,281~17,880"], [8, "17,881~19,047"], [9, "19,048~20,008"], [10, "20,009~21,009"], [11, "21,010~22,000"], [12, "22,001~23,100"]];
 function tierLabel(i, r) { return "第" + i + "級（$" + r + "）"; }
 
-function EmpDetail({ empId, onClose }) {
+function EmpDetail({ empId, onClose, storesRef }) {
   const [d, setD] = useState(null); const [ld, setLd] = useState(true); const [saving, setSaving] = useState(false); const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ role: "", employment_type: "", labor_tier: "", health_tier: "", labor_start_date: "", health_start_date: "", hourly_rate: "", monthly_salary: "" });
   const reload = () => ap("/api/admin/employees?id=" + empId).then(r => { setD(r); if (r.data) setForm({ role: r.data.role || "staff", employment_type: r.data.employment_type || "regular", labor_tier: r.data.labor_tier || "", health_tier: r.data.health_tier || "", labor_start_date: r.data.labor_start_date || "", health_start_date: r.data.health_start_date || "", hourly_rate: r.data.hourly_rate || "", monthly_salary: r.data.monthly_salary || "" }); setLd(false); });
@@ -89,7 +89,7 @@ function EmpDetail({ empId, onClose }) {
       <div style={{ marginTop: 10, display: "flex", gap: 4, flexWrap: "wrap" }}>
         <select onChange={async (e) => { if (!e.target.value) return; if (!confirm("確定調到此門市？")) { e.target.value = ""; return; } await ap("/api/admin/employees", { action: "update", employee_id: empId, store_id: e.target.value }); alert("已調店"); e.target.value = ""; reload(); }} style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #4361ee", fontSize: 10, color: "#4361ee", cursor: "pointer" }}>
           <option value="">{"🔄 調店..."}</option>
-          {(window.__stores || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          {storesRef.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <button onClick={async () => { if (!confirm("確定解除LINE綁定？員工需重新輸入綁定碼")) return; await ap("/api/admin/employees", { action: "update", employee_id: empId, line_uid: null }); const d2 = await ap("/api/admin/employees", { action: "generate_bind_code", employee_id: empId }); alert("已解除，新綁定碼：" + (d2.bind_code || "")); reload(); }} style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #b45309", background: "transparent", color: "#b45309", fontSize: 10, cursor: "pointer" }}>{"🔓 解除LINE"}</button>
         <button onClick={async () => { const ph = prompt("輸入新手機號碼："); if (ph) { await ap("/api/admin/employees", { action: "update", employee_id: empId, phone: ph }); alert("已更新"); reload(); } }} style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #666", background: "transparent", color: "#666", fontSize: 10, cursor: "pointer" }}>{"📱 換手機"}</button>
@@ -531,7 +531,7 @@ function Dashboard({ auth, onLogout }) {
   const [prodList, setProdList] = useState([]); const [prodSum, setProdSum] = useState({});
   const [si, setSi] = useState(null);
 
-  useEffect(() => { ap("/api/admin/stores").then(d => { setStores(d.data || []); window.__stores = d.data || []; }); }, []);
+  useEffect(() => { ap("/api/admin/stores").then(d => setStores(d.data || [])); }, []);
   const load = useCallback(() => {
     setLd(true); const p = new URLSearchParams(); if (month) p.set("month", month); if (sf) p.set("store_id", sf);
     const we2 = new Date(new Date(ws).getTime() + 6 * 86400000).toLocaleDateString("sv-SE");
@@ -812,7 +812,7 @@ function Dashboard({ auth, onLogout }) {
         </div>}
 
         {/* 圖片預覽 */}
-        {si && <div onClick={() => setSi(null)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, cursor: "pointer" }}><img src={si} style={{ maxWidth: "90%", maxHeight: "90%", borderRadius: 8 }} /></div>}
+        {si && <div onClick={() => setSi(null)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, cursor: "pointer" }}><img src={si} alt="" style={{ maxWidth: "90%", maxHeight: "90%", borderRadius: 8 }} /></div>}
 
         {!ld && tab === "shifts" && <div>
           <button onClick={() => { setSsf(!ssf); setEs(null); setSf2({ ...sf2, store_id: sf || sf2.store_id }); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: ssf ? "#f0f0f0" : "#1a1a1a", color: ssf ? "#666" : "#fff", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>{ssf ? "✕" : "＋新增班別"}</button>
@@ -1001,8 +1001,7 @@ function Dashboard({ auth, onLogout }) {
         </div>}
       </div>
 
-      {detailId && <EmpDetail empId={detailId} onClose={() => { setDetailId(null); load(); }} />}
-      {si && <div onClick={() => setSi(null)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9998, cursor: "pointer", padding: 12 }}><img src={si} alt="" style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: 8 }} /></div>}
+      {detailId && <EmpDetail empId={detailId} storesRef={stores} onClose={() => { setDetailId(null); load(); }} />}
     </div>
   );
 }
