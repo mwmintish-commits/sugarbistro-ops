@@ -65,6 +65,29 @@ export async function POST(request) {
         }, { onConflict: "employee_id,date" }).catch(() => {});
         current.setDate(current.getDate() + 1);
       }
+
+      // 補休核准：扣除最早到期的補休時數
+      if (data.leave_type === "comp_time") {
+        const days = data.half_day ? 0.5
+          : Math.ceil((new Date(data.end_date) - new Date(data.start_date)) / 86400000) + 1;
+        const hoursNeeded = days * 8;
+        let remaining = hoursNeeded;
+        const today = new Date().toLocaleDateString("sv-SE");
+
+        const { data: compRecords } = await supabase.from("overtime_records")
+          .select("id, comp_hours")
+          .eq("employee_id", data.employee_id).eq("status", "approved")
+          .eq("comp_type", "comp").eq("comp_used", false).eq("comp_converted", false)
+          .gte("comp_expiry_date", today)
+          .order("comp_expiry_date"); // 先用最早到期的
+
+        for (const cr of compRecords || []) {
+          if (remaining <= 0) break;
+          await supabase.from("overtime_records")
+            .update({ comp_used: true }).eq("id", cr.id);
+          remaining -= Number(cr.comp_hours || 0);
+        }
+      }
     }
     return Response.json({ data });
   }

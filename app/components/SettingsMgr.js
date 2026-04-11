@@ -21,7 +21,7 @@ export default function SettingsMgr({ stores, load }) {
     ap("/api/admin/system?key=company_name").then(r => { if (r.data) setCompanyName(r.data); }).catch(() => {});
     ap("/api/admin/system?key=handbook").then(r => { setHb(r.data || DEFAULT_HB); setHbLoading(false); }).catch(() => { setHb(DEFAULT_HB); setHbLoading(false); });
     ap("/api/admin/holidays?year=" + new Date().getFullYear()).then(r => setHols(r.data || [])).catch(() => {});
-    ap("/api/admin/attendance?settings=true").then(r => { if (r.data) setClockSettings(r.data); }).catch(() => {});
+    ap("/api/admin/attendance?type=settings").then(r => { if (r.data) setClockSettings(r.data); }).catch(() => {});
   }, []);
 
   const saveHb = async () => {
@@ -90,7 +90,7 @@ export default function SettingsMgr({ stores, load }) {
               style={{ width: "100%", padding: "5px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12 }} />
           </div>
         </div>
-        <button onClick={() => ap("/api/admin/system", { key: "clock_settings", value: clockSettings }).then(() => alert("已儲存"))}
+        <button onClick={() => ap("/api/admin/attendance", { action: "update_settings", late_grace_minutes: clockSettings.late_grace_minutes, overtime_min_minutes: clockSettings.overtime_min_minutes }).then(() => alert("已儲存"))}
           style={{ marginTop: 6, padding: "4px 14px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer" }}>💾 儲存打卡設定</button>
       </div>
 

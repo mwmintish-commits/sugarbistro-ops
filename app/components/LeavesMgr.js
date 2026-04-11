@@ -87,7 +87,7 @@ export default function LeavesMgr({ lr, pl, rvLv, sf }) {
             <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                 <thead><tr style={{ background: "#faf8f5" }}>
-                  {["員工", "門市", "特休(總/用/剩)", "病假(用/30)", "事假(用/14)"].map(h =>
+                  {["員工", "門市", "特休(總/用/剩)", "病假(用/30)", "事假(用/14)", "補休(可用)"].map(h =>
                     <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>
                   )}
                 </tr></thead>
@@ -104,6 +104,14 @@ export default function LeavesMgr({ lr, pl, rvLv, sf }) {
                     </td>
                     <td style={{ padding: 6 }}><span style={{ color: "#b91c1c" }}>{b.sick_used}</span>{" / 30"}</td>
                     <td style={{ padding: 6 }}><span style={{ color: "#b91c1c" }}>{b.personal_used}</span>{" / 14"}</td>
+                    <td style={{ padding: 6 }}>
+                      {b.comp_available > 0 ? (
+                        <b style={{ color: "#4361ee" }}>{b.comp_available + "hr"}</b>
+                      ) : (
+                        <span style={{ color: "#ccc" }}>-</span>
+                      )}
+                      {b.comp_used > 0 && <span style={{ fontSize: 9, color: "#888" }}>{" (已用" + b.comp_used + "hr)"}</span>}
+                    </td>
                   </tr>
                 ))}</tbody>
               </table>

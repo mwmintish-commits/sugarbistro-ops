@@ -33,6 +33,41 @@ export async function POST(request) {
 
   if (action === "create") {
     const { employee_id, store_id, shift_id, date, type, leave_type, half_day, note } = body;
+
+    // ✦03 一例一休檢核：排班前檢查連續工作天數
+    if (type !== "leave") {
+      const d = new Date(date);
+      const checkStart = new Date(d.getTime() - 6 * 86400000).toLocaleDateString("sv-SE");
+      const checkEnd = new Date(d.getTime() + 6 * 86400000).toLocaleDateString("sv-SE");
+      const { data: nearby } = await supabase.from("schedules")
+        .select("date, type")
+        .eq("employee_id", employee_id)
+        .gte("date", checkStart).lte("date", checkEnd)
+        .order("date");
+      // 計算含本次排班後的連續工作天數
+      const workDates = new Set((nearby || []).filter(s => s.type !== "leave").map(s => s.date));
+      workDates.add(date);
+      let maxConsecutive = 0, curr = 0;
+      for (let i = -6; i <= 6; i++) {
+        const dd = new Date(d.getTime() + i * 86400000).toLocaleDateString("sv-SE");
+        if (workDates.has(dd)) { curr++; maxConsecutive = Math.max(maxConsecutive, curr); }
+        else { curr = 0; }
+      }
+      const warning = maxConsecutive >= 7
+        ? "⚠️ 違反一例一休：連續工作" + maxConsecutive + "天（勞基法§36規定每7天至少1天例假+1天休息日）"
+        : maxConsecutive === 6
+        ? "⚠️ 注意：已連續排班6天，再排1天將違反一例一休"
+        : null;
+
+      // 不硬擋，但回傳警示
+      const { data, error } = await supabase.from("schedules").upsert({
+        employee_id, store_id: store_id || null, shift_id: shift_id || null, date,
+        type: type || "shift", leave_type, half_day, note, status: "scheduled",
+      }, { onConflict: "employee_id,date" }).select("*, employees(name), shifts(name, start_time, end_time)").single();
+      if (error) return Response.json({ error: error.message }, { status: 500 });
+      return Response.json({ data, warning });
+    }
+
     const { data, error } = await supabase.from("schedules").upsert({
       employee_id, store_id: store_id || null, shift_id: shift_id || null, date,
       type: type || "shift", leave_type, half_day, note, status: "scheduled",

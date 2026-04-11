@@ -12,7 +12,7 @@ const DAYS = ["日","一","二","三","四","五","六"];
 const MI = (label, text) => ({ type: "action", action: { type: "message", label, text } });
 const MU = (label, url) => ({ type: "action", action: { type: "uri", label, uri: url } });
 const SITE = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
-const MENU_BASE = [MI("📍 上班打卡", "上班打卡"), MI("📍 下班打卡", "下班打卡"), MI("📅 我的班表", "我的班表"), MI("🙋 請假/預休", "請假申請"), MI("🏖 我的假勤", "我的假勤"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報")];
+const MENU_BASE = [MI("📍 上班打卡", "上班打卡"), MI("📍 下班打卡", "下班打卡"), MI("📅 我的班表", "我的班表"), MI("🙋 請假/預休", "請假申請"), MI("🏖 我的假勤", "我的假勤"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報"), MI("🔧 補打卡", "補打卡")];
 const MENU_SM = [...MENU_BASE, MI("📦 月結單據", "月結單據"), MI("💰 零用金", "零用金"), MU("🔗 後台", SITE)];
 const MENU_MGR = [...MENU_SM, MI("🏢 總部代付", "總部代付"), MI("📊 今日營收", "今日營收")];
 const MENU_ADMIN = [MU("🔗 管理後台", SITE), MI("📊 今日營收", "今日營收"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報"), MI("📦 月結單據", "月結單據"), MI("💰 零用金", "零用金"), MI("🏢 總部代付", "總部代付"), MI("📅 我的班表", "我的班表")];
@@ -54,7 +54,7 @@ async function querySchedule(rt, emp) {
   const end = new Date(Date.now() + 7 * 86400000).toLocaleDateString("sv-SE");
   const { data } = await supabase.from("schedules").select("*, shifts(name, start_time, end_time), stores(name)").eq("employee_id", emp.id).gte("date", today).lte("date", end).order("date");
   if (!data?.length) return replyText(rt, "📅 未來 7 天沒有排班。");
-  const leaveMap = { annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假", off:"例假", rest:"休息日" };
+  const leaveMap = { annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假", off:"例假", rest:"休息日", comp_time:"補休" };
   let msg = `📅 ${emp.name} 的班表\n━━━━━━━━━━━━━━\n`;
   for (const s of data) {
     const day = DAYS[new Date(s.date).getDay()];
@@ -70,17 +70,30 @@ async function querySchedule(rt, emp) {
 
 // ===== 請假申請流程 =====
 async function startLeaveRequest(rt, emp) {
-  await setUserState(emp.line_uid, "leave_select_type", { employee_id: emp.id, employee_name: emp.name });
-  return replyWithQuickReply(rt, `🙋 請假/預休申請\n👤 ${emp.name}\n\n請選擇假別：`, [
+  // 查詢補休餘額
+  const today = new Date().toLocaleDateString("sv-SE");
+  const { data: compAvail } = await supabase.from("overtime_records")
+    .select("comp_hours").eq("employee_id", emp.id).eq("status", "approved")
+    .eq("comp_type", "comp").eq("comp_used", false).eq("comp_converted", false)
+    .gte("comp_expiry_date", today);
+  const compH = (compAvail || []).reduce((s, r) => s + Number(r.comp_hours || 0), 0);
+
+  const items = [
     { type: "action", action: { type: "message", label: "🏖 特休", text: "假別:annual" } },
     { type: "action", action: { type: "message", label: "🤒 病假", text: "假別:sick" } },
     { type: "action", action: { type: "message", label: "📋 事假", text: "假別:personal" } },
     { type: "action", action: { type: "message", label: "🌸 生理假", text: "假別:menstrual" } },
-  ]);
+  ];
+  if (compH > 0) {
+    items.push({ type: "action", action: { type: "message", label: "🔄 補休(" + compH + "hr)", text: "假別:comp_time" } });
+  }
+
+  await setUserState(emp.line_uid, "leave_select_type", { employee_id: emp.id, employee_name: emp.name });
+  return replyWithQuickReply(rt, `🙋 請假/預休申請\n👤 ${emp.name}\n\n請選擇假別：`, items);
 }
 
 async function handleLeaveType(rt, uid, typeCode, state) {
-  const typeMap = { annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假" };
+  const typeMap = { annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假", comp_time:"補休" };
   await setUserState(uid, "leave_select_day_type", { ...state.flow_data, leave_type: typeCode, leave_label: typeMap[typeCode] });
   return replyWithQuickReply(rt, `假別：${typeMap[typeCode]}\n\n請選擇：`, [
     { type: "action", action: { type: "message", label: "📅 全日", text: "天數:full" } },
@@ -348,12 +361,63 @@ async function handleEvent(event) {
   // 打卡
   if (text === "上班打卡") return handleClockAction(rt, emp, "clock_in");
   if (text === "下班打卡") return handleClockAction(rt, emp, "clock_out");
+
+  // ✦13 補打卡申請
+  if (text === "補打卡") {
+    await setUserState(userId, "amend_date", { employee_id: emp.id, store_id: emp.store_id });
+    return replyText(rt, "🔧 補打卡申請\n\n請輸入日期（YYYY-MM-DD）：");
+  }
+  if (state?.current_flow === "amend_date") {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return replyText(rt, "格式錯誤，請輸入 YYYY-MM-DD：");
+    await setUserState(userId, "amend_type", { ...state.flow_data, date: text });
+    return replyWithQuickReply(rt, "📅 " + text + "\n請選擇打卡類型：", [
+      { type: "action", action: { type: "message", label: "上班", text: "補登:clock_in" } },
+      { type: "action", action: { type: "message", label: "下班", text: "補登:clock_out" } },
+    ]);
+  }
+  if (text.startsWith("補登:") && state?.current_flow === "amend_type") {
+    const amendType = text.replace("補登:", "");
+    await setUserState(userId, "amend_time", { ...state.flow_data, type: amendType });
+    return replyText(rt, "請輸入實際" + (amendType === "clock_in" ? "上班" : "下班") + "時間（HH:MM）：");
+  }
+  if (state?.current_flow === "amend_time") {
+    if (!/^\d{2}:\d{2}$/.test(text)) return replyText(rt, "格式錯誤，請輸入 HH:MM：");
+    await setUserState(userId, "amend_reason", { ...state.flow_data, amended_time: text });
+    return replyText(rt, "請輸入補打卡原因：");
+  }
+  if (state?.current_flow === "amend_reason") {
+    const d = state.flow_data;
+    await supabase.from("clock_amendments").insert({
+      employee_id: d.employee_id, store_id: d.store_id,
+      date: d.date, type: d.type, amended_time: d.amended_time, reason: text,
+    });
+    await clearUserState(userId);
+    // 通知主管
+    const { data: mgrs } = await supabase.from("employees")
+      .select("line_uid").eq("store_id", d.store_id)
+      .in("role", ["store_manager", "manager", "admin"]).eq("is_active", true);
+    for (const m of mgrs || []) {
+      if (m.line_uid) {
+        await pushText(m.line_uid,
+          "🔧 補打卡申請\n👤 " + emp.name + "\n📅 " + d.date +
+          " " + (d.type === "clock_in" ? "上班" : "下班") + " " + d.amended_time +
+          "\n📝 " + text
+        ).catch(() => {});
+      }
+    }
+    return replyWithQuickReply(rt,
+      "✅ 補打卡申請已送出\n\n📅 " + d.date + " " +
+      (d.type === "clock_in" ? "上班" : "下班") + " " + d.amended_time +
+      "\n📝 " + text + "\n\n⏳ 等待主管核准",
+      getMenu(emp.role)
+    );
+  }
   if (text === "我的班表") return querySchedule(rt, emp);
   if (text === "我的假勤" || text === "假勤") {
     try {
       const r = await fetch(`${SITE}/api/admin/leave-balances?employee_id=${emp.id}&year=${new Date().getFullYear()}`).then(r => r.json());
       const b = r.data || {};
-      return replyText(rt, `🏖 ${emp.name} ${new Date().getFullYear()}年假勤\n━━━━━━━━━━━━━━\n📅 特休：${b.annual_total || 0}天（已用${b.annual_used || 0} / 剩${b.annual_remaining || 0}天）\n🏥 病假：已用${b.sick_used || 0} / 30天\n📋 事假：已用${b.personal_used || 0} / 14天${b.overtime_comp_total > 0 ? "\n⏱ 加班補休：" + b.overtime_comp_total + "hr" : ""}`);
+      return replyText(rt, `🏖 ${emp.name} ${new Date().getFullYear()}年假勤\n━━━━━━━━━━━━━━\n📅 特休：${b.annual_total || 0}天（已用${b.annual_used || 0} / 剩${b.annual_remaining || 0}天）\n🏥 病假：已用${b.sick_used || 0} / 30天\n📋 事假：已用${b.personal_used || 0} / 14天${b.overtime_comp_total > 0 ? "\n🔄 補休：可用" + b.overtime_comp_total + "hr（6個月內到期未休→自動轉加班費）" : ""}`);
     } catch(e) { return replyText(rt, "查詢失敗"); }
   }
 

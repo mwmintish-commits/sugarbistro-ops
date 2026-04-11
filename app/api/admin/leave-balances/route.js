@@ -82,11 +82,24 @@ export async function GET(request) {
       if (used[l.leave_type] !== undefined) used[l.leave_type] += days;
     }
 
+    // 補休餘額
+    const today = new Date().toLocaleDateString("sv-SE");
+    const { data: compAvail } = await supabase.from("overtime_records")
+      .select("comp_hours").eq("employee_id", emp.id).eq("status", "approved")
+      .eq("comp_type", "comp").eq("comp_used", false).eq("comp_converted", false)
+      .gte("comp_expiry_date", today);
+    const compHours = (compAvail || []).reduce((s, r) => s + Number(r.comp_hours || 0), 0);
+    const { data: compUsed } = await supabase.from("overtime_records")
+      .select("comp_hours").eq("employee_id", emp.id)
+      .eq("comp_type", "comp").eq("comp_used", true);
+    const compUsedH = (compUsed || []).reduce((s, r) => s + Number(r.comp_hours || 0), 0);
+
     results.push({
       employee_id: emp.id, name: emp.name, store_name: emp.stores?.name || "總部",
       annual_total: annualDays, annual_used: used.annual, annual_remaining: annualDays - used.annual,
       sick_used: used.sick, sick_remaining: 30 - used.sick,
       personal_used: used.personal, personal_remaining: 14 - used.personal,
+      comp_available: compHours, comp_used: compUsedH,
     });
   }
 

@@ -87,6 +87,9 @@ export default function AdminPage() {
   const [prodList, setProdList] = useState([]);
   const [prodSum, setProdSum] = useState({});
   const [si, setSi] = useState(null);
+  const [attView, setAttView] = useState("records");
+  const [amendments, setAmendments] = useState([]);
+  const [monthlyReport, setMonthlyReport] = useState([]);
   const pl = lr.filter(l => l.status === "pending");
   const ae = emps.filter(e => e.is_active);
 
@@ -146,6 +149,12 @@ export default function AdminPage() {
     }
     ap("/api/admin/holidays?month=" + month)
       .then(r => setHolidays(r.data||[])).catch(() => {});
+    if (myTabs.includes("attendance")) {
+      ap("/api/admin/attendance?type=amendments&month=" + month + (sf ? "&store_id=" + sf : ""))
+        .then(r => setAmendments(r.data||[])).catch(() => {});
+      ap("/api/admin/attendance?type=monthly_report&month=" + month + (sf ? "&store_id=" + sf : ""))
+        .then(r => setMonthlyReport(r.data||[])).catch(() => {});
+    }
     if (myTabs.includes("inventory")) {
       ap("/api/admin/inventory").then(r => { setInvItems(r.data||[]); setInvSum(r.summary||{}); });
     }
@@ -189,6 +198,14 @@ export default function AdminPage() {
   const rvExp = async (id, status) => {
     await ap("/api/admin/expenses", { action: "review", expense_id: id, status });
     load();
+  };
+  const loadAmendments = () => {
+    ap("/api/admin/attendance?type=amendments&month=" + month + (sf ? "&store_id=" + sf : ""))
+      .then(r => setAmendments(r.data||[]));
+  };
+  const loadMonthlyReport = () => {
+    ap("/api/admin/attendance?type=monthly_report&month=" + month + (sf ? "&store_id=" + sf : ""))
+      .then(r => setMonthlyReport(r.data||[]));
   };
   const rvLv = async (id, status) => {
     await ap("/api/admin/leaves", { action: "review", request_id: id, status });
@@ -525,24 +542,97 @@ export default function AdminPage() {
         {/* ATTENDANCE */}
         {!ld && tab === "attendance" && (
           <div>
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["時間","員工","類型","距離","遲到","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
-                <tbody>{att.map(a=>(
-                  <tr key={a.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                    <td style={{padding:6,fontSize:10}}>{a.timestamp?new Date(a.timestamp).toLocaleString("zh-TW",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):""}</td>
-                    <td style={{padding:6,fontWeight:500}}>{a.employees?a.employees.name:""}</td>
-                    <td style={{padding:6}}>{a.type==="clock_in"?"上班":"下班"}</td>
-                    <td style={{padding:6}}>{a.distance_meters?a.distance_meters+"m":"-"}</td>
-                    <td style={{padding:6,color:a.late_minutes>0?"#b91c1c":"#0a7c42"}}>{a.late_minutes>0?a.late_minutes+"分":"準時"}</td>
-                    <td style={{padding:6}}>
-                      <button onClick={async()=>{if(!confirm("確定刪除此打卡紀錄？"))return;await ap("/api/admin/attendance",{action:"delete",attendance_id:a.id});load();}}
-                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid #ddd",background:"transparent",fontSize:9,cursor:"pointer",color:"#b91c1c"}}>🗑</button>
-                    </td>
-                  </tr>
-                ))}</tbody>
-              </table>
+            <div style={{display:"flex",gap:4,marginBottom:8}}>
+              {[["records","📍打卡紀錄"],["amendments","🔧補登申請"],["report","📊月報表"]].map(([k,l])=>(
+                <button key={k} onClick={()=>setAttView(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:attView===k?"#1a1a1a":"#fff",color:attView===k?"#fff":"#666",fontSize:11,cursor:"pointer"}}>{l}</button>
+              ))}
             </div>
+
+            {attView === "records" && (
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                  <thead><tr style={{background:"#faf8f5"}}>{["時間","員工","類型","距離","遲到","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                  <tbody>{att.map(a=>(
+                    <tr key={a.id} style={{borderBottom:"1px solid #f0eeea",background:a.is_amendment?"#f0f8ff":"transparent"}}>
+                      <td style={{padding:6,fontSize:10}}>{a.timestamp?new Date(a.timestamp).toLocaleString("zh-TW",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):""}{a.is_amendment&&<span style={{fontSize:8,color:"#4361ee",marginLeft:2}}>補</span>}</td>
+                      <td style={{padding:6,fontWeight:500}}>{a.employees?a.employees.name:""}</td>
+                      <td style={{padding:6}}>{a.type==="clock_in"?"上班":"下班"}</td>
+                      <td style={{padding:6}}>{a.distance_meters?a.distance_meters+"m":"-"}</td>
+                      <td style={{padding:6,color:a.late_minutes>0?"#b91c1c":"#0a7c42"}}>{a.late_minutes>0?a.late_minutes+"分":"準時"}</td>
+                      <td style={{padding:6}}>
+                        <button onClick={async()=>{if(!confirm("確定刪除？"))return;await ap("/api/admin/attendance",{action:"delete",attendance_id:a.id});load();}}
+                          style={{padding:"1px 6px",borderRadius:3,border:"1px solid #ddd",background:"transparent",fontSize:9,cursor:"pointer",color:"#b91c1c"}}>🗑</button>
+                      </td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
+
+            {attView === "amendments" && (
+              <div>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                    <thead><tr style={{background:"#faf8f5"}}>{["日期","員工","類型","時間","原因","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                    <tbody>{(amendments||[]).length===0?(
+                      <tr><td colSpan={7} style={{padding:20,textAlign:"center",color:"#ccc"}}>無補登申請</td></tr>
+                    ):(amendments||[]).map(a=>(
+                      <tr key={a.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                        <td style={{padding:6}}>{a.date}</td>
+                        <td style={{padding:6,fontWeight:500}}>{a.employees?a.employees.name:""}</td>
+                        <td style={{padding:6}}>{a.type==="clock_in"?"上班":"下班"}</td>
+                        <td style={{padding:6,fontWeight:600}}>{a.amended_time}</td>
+                        <td style={{padding:6,fontSize:10,color:"#666",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.reason}</td>
+                        <td style={{padding:6}}><Badge status={a.status} /></td>
+                        <td style={{padding:6}}>
+                          {a.status==="pending"&&(
+                            <span>
+                              <button onClick={async()=>{await ap("/api/admin/attendance",{action:"review_amendment",amendment_id:a.id,status:"approved"});loadAmendments();load();}}
+                                style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>✅</button>
+                              <button onClick={async()=>{await ap("/api/admin/attendance",{action:"review_amendment",amendment_id:a.id,status:"rejected"});loadAmendments();}}
+                                style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>❌</button>
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {attView === "report" && (
+              <div>
+                <button onClick={async()=>{
+                  const [y,m] = month.split("-").map(Number);
+                  if(!confirm(month+" 月報表產生中，確定？")) return;
+                  await ap("/api/admin/attendance",{action:"generate_monthly_report",year:y,month:m});
+                  loadMonthlyReport(); alert("月報表已產生");
+                }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
+                  {"📊 產生 "+month+" 月報表"}
+                </button>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                    <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","遲到","遲到分鐘","請假","加班hr","補休hr","加班費","補登"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                    <tbody>{(monthlyReport||[]).length===0?(
+                      <tr><td colSpan={9} style={{padding:20,textAlign:"center",color:"#ccc"}}>請先點擊「產生月報表」</td></tr>
+                    ):(monthlyReport||[]).map(r=>(
+                      <tr key={r.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                        <td style={{padding:6,fontWeight:500}}>{r.employees?r.employees.name:""}</td>
+                        <td style={{padding:6,fontWeight:600}}>{r.work_days+"天"}</td>
+                        <td style={{padding:6,color:r.late_count>0?"#b91c1c":"#0a7c42"}}>{r.late_count+"次"}</td>
+                        <td style={{padding:6,color:r.late_total_minutes>0?"#b91c1c":"#ccc"}}>{r.late_total_minutes||0}分</td>
+                        <td style={{padding:6}}>{r.leave_days>0?r.leave_days+"天":"-"}</td>
+                        <td style={{padding:6}}>{r.overtime_hours||0}</td>
+                        <td style={{padding:6,color:"#4361ee"}}>{r.overtime_comp_hours>0?r.overtime_comp_hours+"hr":"-"}</td>
+                        <td style={{padding:6,fontWeight:600}}>{r.overtime_pay_amount>0?fmt(r.overtime_pay_amount):"-"}</td>
+                        <td style={{padding:6}}>{r.amendment_count>0?r.amendment_count+"筆":"-"}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -550,22 +640,63 @@ export default function AdminPage() {
         {!ld && tab === "overtime" && (
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"⏱ "+month+" 加班紀錄"}</h3>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:10}}>
               <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px"}}><div style={{fontSize:10,color:"#888"}}>筆數</div><div style={{fontSize:18,fontWeight:600}}>{otSum.count||0}</div></div>
               <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px"}}><div style={{fontSize:10,color:"#888"}}>總時數</div><div style={{fontSize:18,fontWeight:600}}>{Math.round((otSum.totalMinutes||0)/60*10)/10+"hr"}</div></div>
               <div style={{background:"#fff8e6",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#8a6d00"}}>加班費</div><div style={{fontSize:18,fontWeight:600}}>{fmt(otSum.totalAmount)}</div></div>
+              <div style={{background:"#e6f1fb",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#185fa5"}}>補休餘額</div><div style={{fontSize:18,fontWeight:600,color:"#4361ee"}}>{(otSum.compHours||0)+"hr"}</div></div>
+            </div>
+            <div style={{display:"flex",gap:4,marginBottom:8}}>
+              <button onClick={async()=>{const r=await ap("/api/admin/overtime",{action:"convert_expired"});alert("已轉換 "+r.converted+" 筆過期補休為加班費");load();}}
+                style={{padding:"4px 10px",borderRadius:5,border:"1px solid #b45309",background:"transparent",color:"#b45309",fontSize:11,cursor:"pointer"}}>
+                🔄 過期補休轉加班費
+              </button>
             </div>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","員工","門市","時數","金額","狀態"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["日期","員工","門市","時數","類型","金額/補休","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{otRecords.map(r=>(
                   <tr key={r.id} style={{borderBottom:"1px solid #f0eeea"}}>
                     <td style={{padding:6}}>{r.date}</td>
                     <td style={{padding:6,fontWeight:500}}>{r.employees?r.employees.name:""}</td>
                     <td style={{padding:6}}>{r.stores?r.stores.name:""}</td>
                     <td style={{padding:6}}>{Math.round(r.overtime_minutes/60*10)/10+"hr"}</td>
-                    <td style={{padding:6,fontWeight:600}}>{fmt(r.amount)}</td>
+                    <td style={{padding:6}}>
+                      {r.comp_type==="comp" && !r.comp_used && !r.comp_converted && (
+                        <span style={{background:"#e6f1fb",color:"#185fa5",padding:"1px 5px",borderRadius:4,fontSize:9}}>
+                          {"補休 "+r.comp_hours+"hr"}
+                          <br/><span style={{fontSize:8,color:"#888"}}>{"到期 "+r.comp_expiry_date}</span>
+                        </span>
+                      )}
+                      {r.comp_type==="comp" && r.comp_used && (
+                        <span style={{background:"#e6f9f0",color:"#0a7c42",padding:"1px 5px",borderRadius:4,fontSize:9}}>補休已使用</span>
+                      )}
+                      {r.comp_type==="comp" && r.comp_converted && (
+                        <span style={{background:"#fef9c3",color:"#8a6d00",padding:"1px 5px",borderRadius:4,fontSize:9}}>過期→轉薪資</span>
+                      )}
+                      {r.comp_type==="pay" && (
+                        <span style={{background:"#fff8e6",color:"#8a6d00",padding:"1px 5px",borderRadius:4,fontSize:9}}>{"加班費 "+fmt(r.amount)}</span>
+                      )}
+                      {r.comp_type==="pending" && (
+                        <span style={{background:"#f0f0f0",color:"#888",padding:"1px 5px",borderRadius:4,fontSize:9}}>待選擇</span>
+                      )}
+                    </td>
+                    <td style={{padding:6,fontWeight:600}}>
+                      {r.comp_type==="pay"||r.comp_converted?fmt(r.amount):r.comp_type==="comp"?(r.comp_hours||0)+"hr":fmt(r.amount)}
+                    </td>
                     <td style={{padding:6}}><Badge status={r.status} /></td>
+                    <td style={{padding:6}}>
+                      {r.status==="pending" && (
+                        <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
+                          <button onClick={async()=>{await ap("/api/admin/overtime",{action:"review",record_id:r.id,status:"approved",comp_type:"pay"});load();}}
+                            style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#b45309",color:"#fff",fontSize:9,cursor:"pointer"}}>💰加班費</button>
+                          <button onClick={async()=>{await ap("/api/admin/overtime",{action:"review",record_id:r.id,status:"approved",comp_type:"comp"});load();}}
+                            style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#4361ee",color:"#fff",fontSize:9,cursor:"pointer"}}>🔄補休</button>
+                          <button onClick={async()=>{await ap("/api/admin/overtime",{action:"review",record_id:r.id,status:"rejected"});load();}}
+                            style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>❌</button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}</tbody>
               </table>
