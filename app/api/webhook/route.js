@@ -54,7 +54,7 @@ async function querySchedule(rt, emp) {
   const end = new Date(Date.now() + 7 * 86400000).toLocaleDateString("sv-SE");
   const { data } = await supabase.from("schedules").select("*, shifts(name, start_time, end_time), stores(name)").eq("employee_id", emp.id).gte("date", today).lte("date", end).order("date");
   if (!data?.length) return replyText(rt, "📅 未來 7 天沒有排班。");
-  const leaveMap = { annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假", off:"例假", rest:"休息日", comp_time:"補休" };
+  const leaveMap = { annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假", off:"例假", rest:"休息日", comp_time:"補休", marriage:"婚假", funeral:"喪假", paternity:"陪產假", family_care:"家庭照顧假", maternity:"產假", official:"公假", work_injury:"公傷假" };
   let msg = `📅 ${emp.name} 的班表\n━━━━━━━━━━━━━━\n`;
   for (const s of data) {
     const day = DAYS[new Date(s.date).getDay()];
@@ -83,6 +83,10 @@ async function startLeaveRequest(rt, emp) {
     { type: "action", action: { type: "message", label: "🤒 病假", text: "假別:sick" } },
     { type: "action", action: { type: "message", label: "📋 事假", text: "假別:personal" } },
     { type: "action", action: { type: "message", label: "🌸 生理假", text: "假別:menstrual" } },
+    { type: "action", action: { type: "message", label: "💒 婚假", text: "假別:marriage" } },
+    { type: "action", action: { type: "message", label: "🕯 喪假", text: "假別:funeral" } },
+    { type: "action", action: { type: "message", label: "👶 陪產假", text: "假別:paternity" } },
+    { type: "action", action: { type: "message", label: "🏠 家庭照顧", text: "假別:family_care" } },
   ];
   if (compH > 0) {
     items.push({ type: "action", action: { type: "message", label: "🔄 補休(" + compH + "hr)", text: "假別:comp_time" } });
@@ -93,7 +97,7 @@ async function startLeaveRequest(rt, emp) {
 }
 
 async function handleLeaveType(rt, uid, typeCode, state) {
-  const typeMap = { annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假", comp_time:"補休" };
+  const typeMap = { annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假", comp_time:"補休", marriage:"婚假", funeral:"喪假", paternity:"陪產假", family_care:"家庭照顧假", maternity:"產假", official:"公假", work_injury:"公傷假" };
   await setUserState(uid, "leave_select_day_type", { ...state.flow_data, leave_type: typeCode, leave_label: typeMap[typeCode] });
   return replyWithQuickReply(rt, `假別：${typeMap[typeCode]}\n\n請選擇：`, [
     { type: "action", action: { type: "message", label: "📅 全日", text: "天數:full" } },

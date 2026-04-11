@@ -126,6 +126,8 @@ export async function POST(request) {
       name, store_id: store_id || null, role: role || "staff", phone, email,
       employment_type: employment_type || "regular",
       hire_date: new Date().toLocaleDateString("sv-SE"),
+      probation_end_date: new Date(Date.now() + 90 * 86400000).toLocaleDateString("sv-SE"),
+      probation_status: "in_probation",
       bind_code: bindCode,
       bind_code_expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     }).select("*, stores(name)").single();

@@ -101,3 +101,61 @@ BEGIN
 END $$;
 
 SELECT '✅ P0 打卡系統升級 SQL 完成' AS result;
+
+-- ============================================
+-- P0 其餘項目
+-- ✦01試用期 ✦02假別 ✦06薪資單 ✦09審批 ✦10預算 ✦11差異
+-- ============================================
+
+-- ✦01 試用期
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS probation_end_date DATE;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS probation_status TEXT DEFAULT 'in_probation';
+  -- in_probation / passed / failed
+
+-- ✦02 假別補齊（leave_requests 已有 leave_type TEXT，只需擴充選項，無需改表）
+
+-- ✦06 薪資單歷史
+CREATE TABLE IF NOT EXISTS payroll_records (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  employee_id UUID REFERENCES employees(id),
+  store_id UUID REFERENCES stores(id),
+  year INTEGER NOT NULL,
+  month INTEGER NOT NULL,
+  base_salary NUMERIC DEFAULT 0,
+  work_days INTEGER DEFAULT 0,
+  hourly_rate NUMERIC DEFAULT 0,
+  overtime_pay NUMERIC DEFAULT 0,
+  comp_hours NUMERIC DEFAULT 0,
+  labor_self NUMERIC DEFAULT 0,
+  health_self NUMERIC DEFAULT 0,
+  tax_withhold NUMERIC DEFAULT 0,
+  supplementary_health NUMERIC DEFAULT 0,
+  deductions NUMERIC DEFAULT 0,
+  net_salary NUMERIC DEFAULT 0,
+  notes TEXT,
+  sent_via_line BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(employee_id, year, month)
+);
+ALTER TABLE payroll_records DISABLE ROW LEVEL SECURITY;
+
+-- ✦10 費用預算
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS monthly_expense_budget NUMERIC DEFAULT 0;
+
+-- ✦11 現金差異追蹤
+ALTER TABLE deposits ADD COLUMN IF NOT EXISTS difference_explanation TEXT;
+
+-- 索引
+CREATE INDEX IF NOT EXISTS idx_payroll_emp ON payroll_records(employee_id, year, month);
+
+-- RLS
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', t);
+  END LOOP;
+END $$;
+
+SELECT '✅ P0 全部升級完成' AS result;

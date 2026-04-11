@@ -103,6 +103,13 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
           <Row l="年資" v={(d.service_months || 0) + "個月"} />
           <Row l="特休" v={(d.annual_leave_days || 0) + "天"} />
           <Row l="合約" v={e.onboarding_completed ? "✅已簽" : "❌未簽"} />
+          {e.probation_end_date && (
+            <Row l="試用期" v={
+              e.probation_status === "passed" ? "✅ 已通過" :
+              e.probation_status === "failed" ? "❌ 未通過" :
+              "⏳ 至 " + e.probation_end_date + (new Date(e.probation_end_date) < new Date() ? " (已到期)" : "")
+            } />
+          )}
         </div>
 
         <div style={{ ...sec, border: "2px solid #4361ee" }}>

@@ -45,7 +45,21 @@ export async function POST(request) {
   }
 
   if (body.action === "review") {
-    const { expense_id, status, reviewed_by } = body;
+    const { expense_id, status, reviewed_by, reviewer_role } = body;
+
+    // ✦09 審批層級檢查
+    if (status === "approved" && reviewer_role) {
+      const { data: exp } = await supabase.from("expenses")
+        .select("amount").eq("id", expense_id).single();
+      const amt = Number(exp?.amount || 0);
+      if (reviewer_role === "store_manager" && amt > 500) {
+        return Response.json({ error: "金額超過$500，需管理層或總部核准", needs_escalation: true }, { status: 403 });
+      }
+      if (reviewer_role === "manager" && amt > 5000) {
+        return Response.json({ error: "金額超過$5,000，需總部核准", needs_escalation: true }, { status: 403 });
+      }
+    }
+
     const { data, error: updateErr } = await supabase.from("expenses").update({
       status, reviewed_by, reviewed_at: new Date().toISOString(),
     }).eq("id", expense_id).select("*, employees:submitted_by(name)").single();

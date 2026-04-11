@@ -196,7 +196,8 @@ export default function AdminPage() {
   };
 
   const rvExp = async (id, status) => {
-    await ap("/api/admin/expenses", { action: "review", expense_id: id, status });
+    const r = await ap("/api/admin/expenses", { action: "review", expense_id: id, status, reviewer_role: auth.role });
+    if (r.needs_escalation) { alert(r.error); return; }
     load();
   };
   const loadAmendments = () => {
@@ -473,9 +474,14 @@ export default function AdminPage() {
         {/* SCHEDULES */}
         {!ld && tab === "schedules" && (
           <div>
-            <div style={{display:"flex",gap:4,marginBottom:8}}>
-              <button onClick={()=>setSv("month")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="month"?"#1a1a1a":"#fff",color:sv==="month"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>月檢視</button>
+            <div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
               <button onClick={()=>setSv("week")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="week"?"#1a1a1a":"#fff",color:sv==="week"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>週檢視</button>
+              <button onClick={()=>setSv("month")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="month"?"#1a1a1a":"#fff",color:sv==="month"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>月檢視</button>
+              {sv==="week" && <>
+                <button onClick={()=>setWs(new Date(new Date(ws).getTime()-7*86400000).toLocaleDateString("sv-SE"))} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>◀</button>
+                <span style={{fontSize:12,fontWeight:500}}>{ws+" ~ "+new Date(new Date(ws).getTime()+6*86400000).toLocaleDateString("sv-SE")}</span>
+                <button onClick={()=>setWs(new Date(new Date(ws).getTime()+7*86400000).toLocaleDateString("sv-SE"))} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>▶</button>
+              </>}
               <button onClick={async()=>{
                 const we2 = new Date(new Date(ws).getTime()+6*86400000).toLocaleDateString("sv-SE");
                 if(!confirm("發布 "+ws+" ~ "+we2+" 的班表並LINE通知員工？")) return;
@@ -485,52 +491,129 @@ export default function AdminPage() {
                 📢 發布班表
               </button>
             </div>
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
-                <thead>
-                  <tr>{DAYS.map(d=><th key={d} style={{padding:4,textAlign:"center",fontWeight:500,color:"#888",width:"14.2%"}}>{d}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const [y,m] = month.split("-").map(Number);
-                    const f = new Date(y, m-1, 1);
-                    const sd = f.getDay();
-                    const dim = new Date(y, m, 0).getDate();
-                    const rows = [];
-                    let cells = [];
-                    for (let i=0; i<sd; i++) cells.push(<td key={"e"+i} style={{padding:3,border:"1px solid #f0eeea"}} />);
-                    for (let d=1; d<=dim; d++) {
-                      const date = y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0");
-                      const ds = scheds.filter(s => s.date === date);
-                      const hol = holidays.find(h => h.date === date);
-                      const isWe = new Date(date).getDay()===0 || new Date(date).getDay()===6;
-                      cells.push(
-                        <td key={date} style={{padding:3,verticalAlign:"top",border:"1px solid #f0eeea",minHeight:40,
-                          background:hol?"#fde8e8":isWe?"#faf8f5":"transparent"}}>
-                          <div style={{fontSize:10,fontWeight:500,color:hol?"#b91c1c":"#666"}}>
-                            {d}{hol && <span style={{fontSize:7,color:"#b91c1c",marginLeft:2}}>{hol.name}</span>}
-                          </div>
-                          {ds.slice(0,3).map(s => (
-                            <div key={s.id} style={{
-                              background:s.type==="leave"?(LT[s.leave_type]||LT.off).bg:s.published?"#e6f9f0":"#fff8e6",
-                              borderRadius:2,padding:"0 2px",fontSize:8,marginBottom:1,
-                              overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",
-                              color:s.type==="leave"?(LT[s.leave_type]||LT.off).c:"inherit"
-                            }}>
-                              {(s.employees?s.employees.name:"")+" "+(s.type==="leave"?(LT[s.leave_type]||LT.off).l:s.shifts?s.shifts.name:"")}
+
+            {/* 週檢視 */}
+            {sv==="week" && (() => {
+              const wd = Array.from({length:7},(_,i)=>new Date(new Date(ws).getTime()+i*86400000).toLocaleDateString("sv-SE"));
+              const fe = sf ? ae.filter(e=>e.store_id===sf) : ae;
+              const addSch = async (eid, sid, date) => {
+                const s = shifts.find(x=>x.id===sid);
+                const r = await ap("/api/admin/schedules",{action:"create",employee_id:eid,store_id:s?s.store_id:sf,shift_id:sid,date});
+                if (r.warning) alert(r.warning);
+                load();
+              };
+              const addLv = async (eid, date, lt) => { await ap("/api/admin/schedules",{action:"add_leave",employee_id:eid,date,leave_type:lt}); load(); };
+              const delSch = async (id) => { await ap("/api/admin/schedules",{action:"delete",schedule_id:id}); load(); };
+
+              return (
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:700}}>
+                    <thead>
+                      <tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>
+                        <th style={{padding:"7px 5px",textAlign:"left",fontWeight:500,color:"#666",minWidth:70,position:"sticky",left:0,background:"#faf8f5",zIndex:1}}>員工</th>
+                        {wd.map((d,i)=>{
+                          const day = DAYS[new Date(d).getDay()];
+                          const hol = holidays.find(h=>h.date===d);
+                          const isWe = new Date(d).getDay()===0||new Date(d).getDay()===6;
+                          return <th key={d} style={{padding:"7px 3px",textAlign:"center",fontWeight:500,color:hol?"#b91c1c":isWe?"#b45309":"#666",minWidth:90,background:hol?"#fef2f2":"transparent"}}>
+                            {d.slice(5)+"("+day+")"}{hol&&<div style={{fontSize:7,color:"#b91c1c"}}>{hol.name}</div>}
+                          </th>;
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fe.map(emp=>(
+                        <tr key={emp.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                          <td style={{padding:5,fontWeight:500,fontSize:11,position:"sticky",left:0,background:"#fff",zIndex:1}}>
+                            {emp.name}<br/><RB role={emp.role} />
+                          </td>
+                          {wd.map(date=>{
+                            const sc = scheds.find(s=>s.employee_id===emp.id&&s.date===date);
+                            return (
+                              <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top"}}>
+                                {sc ? (
+                                  <div style={{
+                                    background:sc.type==="leave"?(LT[sc.leave_type]||LT.off).bg:sc.published?"#e6f9f0":"#fff8e6",
+                                    borderRadius:4,padding:"2px 3px",fontSize:9,position:"relative"
+                                  }}>
+                                    {sc.type==="leave" ? (
+                                      <div style={{color:(LT[sc.leave_type]||LT.off).c,fontWeight:500}}>{(LT[sc.leave_type]||LT.off).l}</div>
+                                    ) : (
+                                      <div>
+                                        <div style={{fontWeight:500}}>{sc.shifts?sc.shifts.name:""}</div>
+                                        <div style={{color:"#888"}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div>
+                                      </div>
+                                    )}
+                                    <button onClick={()=>delSch(sc.id)} style={{position:"absolute",top:0,right:1,background:"none",border:"none",cursor:"pointer",fontSize:8,color:"#ccc"}}>✕</button>
+                                  </div>
+                                ) : (
+                                  <select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else addSch(emp.id,v,date);}}
+                                    style={{width:"100%",padding:1,borderRadius:3,border:"1px dashed #ddd",fontSize:9,color:"#ccc",background:"transparent",cursor:"pointer"}}>
+                                    <option value="">+</option>
+                                    <optgroup label="班別">{shifts.filter(s=>!sf||s.store_id===sf).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</optgroup>
+                                    <optgroup label="休假">{Object.entries(LT).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup>
+                                  </select>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+
+            {/* 月檢視 */}
+            {sv==="month" && (
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
+                  <thead>
+                    <tr>{DAYS.map(d=><th key={d} style={{padding:4,textAlign:"center",fontWeight:500,color:"#888",width:"14.2%"}}>{d}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const [y,m] = month.split("-").map(Number);
+                      const f = new Date(y, m-1, 1);
+                      const sd = f.getDay();
+                      const dim = new Date(y, m, 0).getDate();
+                      const rows = [];
+                      let cells = [];
+                      for (let i=0; i<sd; i++) cells.push(<td key={"e"+i} style={{padding:3,border:"1px solid #f0eeea"}} />);
+                      for (let d=1; d<=dim; d++) {
+                        const date = y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+                        const ds = scheds.filter(s => s.date === date);
+                        const hol = holidays.find(h => h.date === date);
+                        const isWe = new Date(date).getDay()===0 || new Date(date).getDay()===6;
+                        cells.push(
+                          <td key={date} style={{padding:3,verticalAlign:"top",border:"1px solid #f0eeea",minHeight:40,
+                            background:hol?"#fde8e8":isWe?"#faf8f5":"transparent"}}>
+                            <div style={{fontSize:10,fontWeight:500,color:hol?"#b91c1c":"#666"}}>
+                              {d}{hol && <span style={{fontSize:7,color:"#b91c1c",marginLeft:2}}>{hol.name}</span>}
                             </div>
-                          ))}
-                        </td>
-                      );
-                      if (cells.length === 7) { rows.push(<tr key={"r"+rows.length}>{cells}</tr>); cells=[]; }
-                    }
-                    while (cells.length < 7) cells.push(<td key={"f"+cells.length} style={{padding:3,border:"1px solid #f0eeea"}} />);
-                    if (cells.length) rows.push(<tr key={"r"+rows.length}>{cells}</tr>);
-                    return rows;
-                  })()}
-                </tbody>
-              </table>
-            </div>
+                            {ds.slice(0,3).map(s => (
+                              <div key={s.id} style={{
+                                background:s.type==="leave"?(LT[s.leave_type]||LT.off).bg:s.published?"#e6f9f0":"#fff8e6",
+                                borderRadius:2,padding:"0 2px",fontSize:8,marginBottom:1,
+                                overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",
+                                color:s.type==="leave"?(LT[s.leave_type]||LT.off).c:"inherit"
+                              }}>
+                                {(s.employees?s.employees.name:"")+" "+(s.type==="leave"?(LT[s.leave_type]||LT.off).l:s.shifts?s.shifts.name:"")}
+                              </div>
+                            ))}
+                          </td>
+                        );
+                        if (cells.length === 7) { rows.push(<tr key={"r"+rows.length}>{cells}</tr>); cells=[]; }
+                      }
+                      while (cells.length < 7) cells.push(<td key={"f"+cells.length} style={{padding:3,border:"1px solid #f0eeea"}} />);
+                      if (cells.length) rows.push(<tr key={"r"+rows.length}>{cells}</tr>);
+                      return rows;
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
@@ -716,51 +799,51 @@ export default function AdminPage() {
         {!ld && tab === "payroll" && (
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 薪資"}</h3>
+            <div style={{display:"flex",gap:4,marginBottom:8}}>
+              <button onClick={async()=>{
+                const [y,m]=month.split("-").map(Number);
+                if(!confirm(month+" 薪資結算？"))return;
+                await ap("/api/admin/payroll",{action:"generate",year:y,month:m,store_id:sf||undefined});
+                load(); alert("薪資已結算並存檔");
+              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>
+                📊 結算薪資
+              </button>
+              <button onClick={async()=>{
+                const [y,m]=month.split("-").map(Number);
+                if(!confirm("確定LINE發送薪資條？"))return;
+                const r = await ap("/api/admin/payroll",{action:"send_line",year:y,month:m});
+                alert("已發送 "+(r.sent||0)+" 位");
+              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #4361ee",background:"transparent",color:"#4361ee",fontSize:11,cursor:"pointer"}}>
+                📱 LINE發送薪資條
+              </button>
+            </div>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["員工","底薪","出勤","加班費","勞保","健保","實發"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","勞保","健保","補充保費","實發"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{ae.map(e=>{
                   const wd = att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;
                   const bp = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate)*wd*8 : 0);
-                  const ot = otRecords.filter(r=>r.employee_id===e.id).reduce((s,r)=>s+Number(r.amount||0),0);
+                  const ot = otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);
+                  const compH = otRecords.filter(r=>r.employee_id===e.id&&r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted).reduce((s,r)=>s+Number(r.comp_hours||0),0);
                   const ls = e.labor_tier ? LABOR_SELF[e.labor_tier-1]||0 : 0;
                   const hs = e.health_tier ? HEALTH_SELF[e.health_tier-1]||0 : 0;
+                  const suppH = e.employment_type==="parttime"&&bp>27470?Math.round(bp*0.0211):0;
                   return (
                     <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
                       <td style={{padding:6,fontWeight:500}}>{e.name}</td>
-                      <td style={{padding:6}}>{fmt(bp)}</td>
                       <td style={{padding:6}}>{wd+"天"}</td>
+                      <td style={{padding:6}}>{fmt(bp)}</td>
                       <td style={{padding:6,color:ot>0?"#b45309":"#ccc"}}>{ot>0?"+"+fmt(ot):"-"}</td>
+                      <td style={{padding:6,color:compH>0?"#4361ee":"#ccc"}}>{compH>0?compH+"hr":"-"}</td>
                       <td style={{padding:6,color:"#888",fontSize:10}}>{ls>0?"-"+fmt(ls):"-"}</td>
                       <td style={{padding:6,color:"#888",fontSize:10}}>{hs>0?"-"+fmt(hs):"-"}</td>
-                      <td style={{padding:6,fontWeight:700,fontSize:13}}>{fmt(bp+ot-ls-hs)}</td>
+                      <td style={{padding:6,color:suppH>0?"#b91c1c":"#ccc",fontSize:10}}>{suppH>0?"-"+fmt(suppH):"-"}</td>
+                      <td style={{padding:6,fontWeight:700,fontSize:13}}>{fmt(bp+ot-ls-hs-suppH)}</td>
                     </tr>
                   );
                 })}</tbody>
               </table>
             </div>
-            <button onClick={async()=>{
-              if(!confirm("確定發送薪資條到所有員工LINE？")) return;
-              let sent = 0;
-              for (const e of ae) {
-                if (!e.line_uid) continue;
-                const wd = att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;
-                const bp = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate)*wd*8 : 0);
-                const ot = otRecords.filter(r=>r.employee_id===e.id).reduce((s,r)=>s+Number(r.amount||0),0);
-                const ls = e.labor_tier ? LABOR_SELF[e.labor_tier-1]||0 : 0;
-                const hs = e.health_tier ? HEALTH_SELF[e.health_tier-1]||0 : 0;
-                const net = bp + ot - ls - hs;
-                try {
-                  await ap("/api/webhook", { action:"push_text", line_uid:e.line_uid,
-                    text: "💰 "+month+" 薪資條\n━━━━━━━━━━━━\n👤 "+e.name+"\n📅 出勤 "+wd+" 天\n💵 底薪 $"+bp.toLocaleString()+(ot>0?"\n⏱ 加班費 +$"+ot.toLocaleString():"")+(ls>0?"\n🛡 勞保 -$"+ls.toLocaleString():"")+(hs>0?"\n🏥 健保 -$"+hs.toLocaleString():"")+"\n━━━━━━━━━━━━\n💰 實發 $"+net.toLocaleString()
-                  });
-                  sent++;
-                } catch(ex) {}
-              }
-              alert("已發送 "+sent+" 位員工");
-            }} style={{marginTop:8,padding:"6px 14px",borderRadius:6,border:"none",background:"#4361ee",color:"#fff",fontSize:11,cursor:"pointer"}}>
-              {"📱 LINE發送薪資條"}
-            </button>
           </div>
         )}
         {!ld && tab === "settlements" && (
@@ -789,14 +872,21 @@ export default function AdminPage() {
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"🏦 "+month+" 存款"}</h3>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","金額","應存","差異","狀態"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","金額","應存","差異","說明","狀態"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{dep.map(d=>(
-                  <tr key={d.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                  <tr key={d.id} style={{borderBottom:"1px solid #f0eeea",background:Math.abs(d.difference||0)>500?"#fef9f9":"transparent"}}>
                     <td style={{padding:6}}>{d.deposit_date}</td>
                     <td style={{padding:6}}>{d.stores?d.stores.name:""}</td>
                     <td style={{padding:6,fontWeight:600}}>{fmt(d.amount)}</td>
                     <td style={{padding:6}}>{fmt(d.expected_cash)}</td>
-                    <td style={{padding:6,color:Math.abs(d.difference||0)>500?"#b91c1c":"#0a7c42"}}>{fmt(d.difference)}</td>
+                    <td style={{padding:6,color:Math.abs(d.difference||0)>500?"#b91c1c":"#0a7c42",fontWeight:600}}>{fmt(d.difference)}</td>
+                    <td style={{padding:6}}>
+                      {Math.abs(d.difference||0)>500 ? (
+                        <input defaultValue={d.difference_explanation||""} placeholder="請說明差異原因"
+                          onBlur={e=>{if(e.target.value)ap("/api/admin/deposits",{action:"update",deposit_id:d.id,difference_explanation:e.target.value});}}
+                          style={{padding:2,borderRadius:3,border:"1px solid #fbbf24",fontSize:10,width:100,background:"#fffbeb"}} />
+                      ) : <span style={{fontSize:10,color:"#ccc"}}>-</span>}
+                    </td>
                     <td style={{padding:6}}><Badge status={d.status} /></td>
                   </tr>
                 ))}</tbody>
@@ -835,6 +925,31 @@ export default function AdminPage() {
                 <div style={{fontSize:15,fontWeight:600}}>{fmt(exps.filter(e=>e.expense_type==="hq_advance").reduce((s,e)=>s+Number(e.amount||0),0))}</div>
               </div>
             </div>
+            {/* ✦10 費用預算進度 */}
+            {(() => {
+              const totalExp = exps.reduce((s,e)=>s+Number(e.amount||0),0);
+              const budgetStores = sf ? stores.filter(s=>s.id===sf) : stores;
+              const hasBudget = budgetStores.some(s=>s.monthly_expense_budget>0);
+              if (!hasBudget) return null;
+              return (
+                <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+                  {budgetStores.filter(s=>s.monthly_expense_budget>0).map(s=>{
+                    const storeExp = exps.filter(e=>e.store_id===s.id).reduce((sum,e)=>sum+Number(e.amount||0),0);
+                    const pct = Math.round(storeExp/s.monthly_expense_budget*100);
+                    return (
+                      <div key={s.id} style={{flex:1,minWidth:140,background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px"}}>
+                        <div style={{fontSize:10,color:"#888"}}>{s.name+" 預算"}</div>
+                        <div style={{fontSize:12,fontWeight:600}}>{fmt(storeExp)+" / "+fmt(s.monthly_expense_budget)}</div>
+                        <div style={{height:6,background:"#f0f0f0",borderRadius:3,marginTop:4}}>
+                          <div style={{height:"100%",width:Math.min(100,pct)+"%",background:pct>100?"#b91c1c":pct>80?"#fbbf24":"#0a7c42",borderRadius:3}} />
+                        </div>
+                        <div style={{fontSize:9,color:pct>100?"#b91c1c":pct>80?"#b45309":"#888",marginTop:2}}>{pct+"%"}{pct>100?" ⚠️超標":pct>80?" ⚠️注意":""}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             {/* 分類圖表 */}
             {(() => {
               const catTotals = {};

@@ -21,3 +21,19 @@ export async function GET(request) {
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ data });
 }
+
+export async function POST(request) {
+  const body = await request.json();
+
+  if (body.action === "update") {
+    const { deposit_id, difference_explanation } = body;
+    const updates = {};
+    if (difference_explanation !== undefined) updates.difference_explanation = difference_explanation;
+    const { data, error } = await supabase.from("deposits")
+      .update(updates).eq("id", deposit_id).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ data });
+  }
+
+  return Response.json({ error: "Unknown action" }, { status: 400 });
+}

@@ -14,7 +14,7 @@ export async function GET() {
 export async function POST(request) {
   const body = await request.json();
   if (body.action === "update_targets") {
-    const { store_id, daily_target, monthly_target, latitude, longitude, radius_m, name, address } = body;
+    const { store_id, daily_target, monthly_target, latitude, longitude, radius_m, name, address, monthly_expense_budget } = body;
     const updates = {};
     if (daily_target !== undefined) updates.daily_target = daily_target;
     if (monthly_target !== undefined) updates.monthly_target = monthly_target;
@@ -23,6 +23,7 @@ export async function POST(request) {
     if (radius_m !== undefined) updates.radius_m = radius_m;
     if (name !== undefined) updates.name = name;
     if (address !== undefined) updates.address = address;
+    if (monthly_expense_budget !== undefined) updates.monthly_expense_budget = monthly_expense_budget;
     const { data, error } = await supabase.from("stores").update(updates).eq("id", store_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });

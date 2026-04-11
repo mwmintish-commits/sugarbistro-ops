@@ -20,7 +20,14 @@ export const LT = {
   menstrual: { l: "生理假", c: "#993556", bg: "#fbeaf0" },
   off: { l: "例假", c: "#666", bg: "#f0f0f0" },
   rest: { l: "休息日", c: "#888", bg: "#f5f5f5" },
-  comp_time: { l: "補休", c: "#185fa5", bg: "#e6f1fb" }
+  comp_time: { l: "補休", c: "#185fa5", bg: "#e6f1fb" },
+  marriage: { l: "婚假", c: "#b45309", bg: "#fff8e6" },
+  funeral: { l: "喪假", c: "#555", bg: "#e8e8e8" },
+  paternity: { l: "陪產假", c: "#185fa5", bg: "#e6f1fb" },
+  maternity: { l: "產假", c: "#993556", bg: "#fbeaf0" },
+  family_care: { l: "家庭照顧", c: "#8a6d00", bg: "#fef9c3" },
+  official: { l: "公假", c: "#666", bg: "#f0f0f0" },
+  work_injury: { l: "公傷假", c: "#b91c1c", bg: "#fde8e8" }
 };
 
 export function Badge({ status }) {

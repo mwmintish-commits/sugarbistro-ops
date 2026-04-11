@@ -96,7 +96,7 @@ export default function SettingsMgr({ stores, load }) {
 
       {/* 營業目標 */}
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
-        <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🏢 營業目標</h4>
+        <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🏢 營業目標 & 費用預算</h4>
         {stores.map(s => {
           const dim = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
           return (
@@ -111,6 +111,12 @@ export default function SettingsMgr({ stores, load }) {
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 9, color: "#888" }}>{"月目標（×" + dim + "天）"}</label>
                 <div style={{ padding: "4px 0", fontSize: 12, fontWeight: 600, textAlign: "center" }}>{"$" + ((s.daily_target || 0) * dim).toLocaleString()}</div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 9, color: "#888" }}>月費用預算</label>
+                <input type="number" defaultValue={s.monthly_expense_budget || ""} onBlur={e => {
+                  ap("/api/admin/stores", { action: "update_targets", store_id: s.id, monthly_expense_budget: Number(e.target.value || 0) });
+                }} style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "center" }} />
               </div>
             </div>
           );
