@@ -448,10 +448,10 @@ function WorklogMgr({ stores, sf, month, load, role, lockedStore }) {
             </div>
           </div>}
 
-          <h4 style={{ fontSize: 13, fontWeight: 600, marginTop: 16, marginBottom: 6 }}>{"📝 員工提交紀錄"}</h4>
+          <h4 style={{ fontSize: 13, fontWeight: 600, marginTop: 16, marginBottom: 6 }}>{"📝 每日完成度"}</h4>
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["日期", "員工", "完成", "備註"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
-              <tbody>{logs.length === 0 ? <tr><td colSpan={4} style={{ padding: 16, textAlign: "center", color: "#ccc" }}>本月無紀錄</td></tr> : logs.map(l => <tr key={l.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{l.date}</td><td style={{ padding: 6, fontWeight: 500 }}>{l.employees ? l.employees.name : ""}</td><td style={{ padding: 6 }}>{(l.items || []).length + "項"}</td><td style={{ padding: 6, fontSize: 10, color: "#888" }}>{l.notes || "-"}</td></tr>)}</tbody></table>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["日期", "完成度", "協作者"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
+              <tbody>{logs.length === 0 ? <tr><td colSpan={3} style={{ padding: 16, textAlign: "center", color: "#ccc" }}>本月無紀錄</td></tr> : logs.map(l => <tr key={l.date + l.store_id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{l.date}</td><td style={{ padding: 6 }}><div style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 60, height: 6, background: "#f0f0f0", borderRadius: 3 }}><div style={{ height: "100%", width: (l.percent || 0) + "%", background: l.percent === 100 ? "#0a7c42" : "#fbbf24", borderRadius: 3 }} /></div><span style={{ fontWeight: 600, color: l.percent === 100 ? "#0a7c42" : "#b45309" }}>{l.percent + "%"}</span><span style={{ color: "#888" }}>{"(" + l.done + "/" + l.total + ")"}</span></div></td><td style={{ padding: 6, fontSize: 10 }}>{(l.people || []).join("、") || "-"}</td></tr>)}</tbody></table>
           </div>
         </div>}
       </div>}
