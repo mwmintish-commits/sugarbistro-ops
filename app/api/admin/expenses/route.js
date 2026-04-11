@@ -46,24 +46,37 @@ export async function POST(request) {
 
   if (body.action === "review") {
     const { expense_id, status, reviewed_by } = body;
-    const { data } = await supabase.from("expenses").update({
+    const { data, error: updateErr } = await supabase.from("expenses").update({
       status, reviewed_by, reviewed_at: new Date().toISOString(),
     }).eq("id", expense_id).select("*, employees:submitted_by(name)").single();
 
+    if (updateErr) return Response.json({ error: updateErr.message }, { status: 500 });
+
     // 核准時自動建立撥款紀錄
     if (status === "approved" && data) {
-      const pmtType = data.expense_type === "vendor" ? "vendor" : data.expense_type === "hq_advance" ? "hq_advance" : "petty_cash";
-      // 月結→撥給廠商，零用金/代付→撥給提交人
+      const pmtType = data.expense_type === "vendor" ? "vendor"
+        : data.expense_type === "hq_advance" ? "hq_advance" : "petty_cash";
       const recipient = data.expense_type === "vendor"
-        ? (data.vendor_name || "")
-        : (data.employees?.name || data.submitted_by_name || "");
-      await supabase.from("payments").insert({
-        type: pmtType, reference_id: data.id, store_id: data.store_id,
+        ? (data.vendor_name || "未知廠商")
+        : (data.employees?.name || data.submitted_by_name || "未知");
+      const mk = data.month_key || data.date?.slice(0, 7) || new Date().toISOString().slice(0, 7);
+
+      const { error: pmtErr } = await supabase.from("payments").insert({
+        type: pmtType,
+        reference_id: data.id,
+        store_id: data.store_id,
         employee_id: data.expense_type !== "vendor" ? data.submitted_by : null,
-        amount: data.amount, recipient: recipient,
-        month_key: data.month_key,
+        amount: data.amount,
+        recipient: recipient,
+        month_key: mk,
         notes: (data.vendor_name || "") + (data.invoice_number ? " #" + data.invoice_number : ""),
-      }).catch(() => {});
+      });
+
+      if (pmtErr) {
+        console.error("撥款建立失敗:", pmtErr.message);
+        // 仍然回傳成功（費用已核准），但帶撥款錯誤訊息
+        return Response.json({ data, payment_error: pmtErr.message });
+      }
     }
     return Response.json({ data });
   }
@@ -81,6 +94,23 @@ export async function POST(request) {
       .update(updates).eq("id", expense_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
+  }
+
+  // 刪除全部費用（測試用）
+  if (body.action === "delete_all") {
+    await supabase.from("payments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabase.from("expenses").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    return Response.json({ success: true, message: "已清除所有費用和撥款紀錄" });
+  }
+
+  // 清除過期駁回單據
+  if (body.action === "cleanup_rejected") {
+    const days = body.days || 30;
+    const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+    const { data: deleted } = await supabase.from("expenses")
+      .delete().eq("status", "rejected").lt("reviewed_at", cutoff)
+      .select("id");
+    return Response.json({ success: true, deleted: (deleted || []).length });
   }
 
   return Response.json({ error: "Unknown" }, { status: 400 });

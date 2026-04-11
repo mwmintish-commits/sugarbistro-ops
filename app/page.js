@@ -138,7 +138,7 @@ export default function AdminPage() {
         .then(r => { setOtRecords(r.data||[]); setOtSum(r.summary||{}); });
     }
     if (myTabs.includes("payments")) {
-      ap("/api/admin/payments?month=" + month)
+      ap("/api/admin/payments")
         .then(r => { setPmtRecords(r.data||[]); setPmtSum(r.summary||{}); });
     }
     ap("/api/admin/holidays?month=" + month)
@@ -983,6 +983,28 @@ export default function AdminPage() {
                     {h.date.slice(5)+" "+h.name}
                   </span>
                 ))}
+              </div>
+            </div>
+
+            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:12}}>
+              <h4 style={{fontSize:13,fontWeight:500,marginBottom:8}}>🧹 資料維護</h4>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                <button onClick={async()=>{
+                  const r = await ap("/api/admin/expenses",{action:"cleanup_rejected",days:30});
+                  alert("已清除 " + (r.deleted||0) + " 筆駁回超過30天的費用");
+                  load();
+                }} style={{padding:"5px 10px",borderRadius:4,border:"1px solid #b45309",background:"transparent",color:"#b45309",fontSize:11,cursor:"pointer"}}>
+                  清除過期駁回單據（30天）
+                </button>
+                <button onClick={async()=>{
+                  if(!confirm("⚠️ 確定清除所有費用和撥款紀錄？此操作無法復原！")) return;
+                  if(!confirm("再次確認：這會刪除全部費用+撥款資料，確定？")) return;
+                  await ap("/api/admin/expenses",{action:"delete_all"});
+                  alert("已清除所有費用和撥款紀錄");
+                  load();
+                }} style={{padding:"5px 10px",borderRadius:4,border:"1px solid #b91c1c",background:"transparent",color:"#b91c1c",fontSize:11,cursor:"pointer"}}>
+                  ⚠️ 清除全部費用（測試用）
+                </button>
               </div>
             </div>
           </div>
