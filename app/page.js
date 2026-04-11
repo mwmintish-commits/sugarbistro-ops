@@ -8,10 +8,12 @@ import LeavesMgr from "./components/LeavesMgr";
 
 const ROLE_TABS = {
   admin: ["dashboard","employees","schedules","leaves","attendance","overtime","payroll",
+    "reviews","bonus",
     "settlements","deposits","expenses","payments","pnl",
     "recipes","production","inventory","clients","orders",
     "shifts","worklogs","announcements","settings"],
   manager: ["employees","schedules","leaves","attendance","overtime","payroll",
+    "reviews",
     "settlements","deposits","expenses","payments","pnl",
     "recipes","production","inventory","clients","orders","shifts","worklogs"],
   store_manager: ["schedules","leaves","store_staff","shifts","worklogs",
@@ -19,7 +21,9 @@ const ROLE_TABS = {
 };
 const TAB_L = {
   dashboard:"🏠總覽",employees:"👥員工",schedules:"📅排班",leaves:"🙋請假",
-  attendance:"📍出勤",overtime:"⏱加班",payroll:"💰薪資",settlements:"💰日結",
+  attendance:"📍出勤",overtime:"⏱加班",payroll:"💰薪資",
+  reviews:"📝考核",bonus:"🏆獎金",
+  settlements:"💰日結",
   deposits:"🏦存款",expenses:"📦費用",payments:"💳撥款",pnl:"📊損益",
   recipes:"📋配方",production:"🏭生產",inventory:"📊庫存",
   clients:"👥客戶",orders:"📝訂單",shifts:"⏰班別",worklogs:"📋日誌",
@@ -27,7 +31,7 @@ const TAB_L = {
 };
 const TAB_GROUPS = {
   "總覽":["dashboard"],
-  "人資":["employees","store_staff","schedules","leaves","attendance","overtime","payroll"],
+  "人資":["employees","store_staff","schedules","leaves","attendance","overtime","payroll","reviews","bonus"],
   "財務":["settlements","deposits","expenses","payments","pnl"],
   "生產":["recipes","production","inventory"],
   "業務":["clients","orders"],
@@ -820,6 +824,122 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* REVIEWS 考核 */}
+        {!ld && tab === "reviews" && (
+          <div>
+            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📝 季考核</h3>
+            <div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
+              <select id="rv-year" defaultValue={new Date().getFullYear()} style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}>
+                {[2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}
+              </select>
+              <select id="rv-quarter" defaultValue={Math.ceil((new Date().getMonth()+1)/3)} style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}>
+                {[1,2,3,4].map(q=><option key={q} value={q}>{"Q"+q}</option>)}
+              </select>
+              <button onClick={async()=>{
+                const y=Number(document.getElementById("rv-year").value);
+                const q=Number(document.getElementById("rv-quarter").value);
+                if(!confirm(y+" Q"+q+" 一鍵產生考核表？系統將掃描打卡/日誌/客訴/違規"))return;
+                const r=await ap("/api/admin/reviews",{action:"generate",year:y,quarter:q});
+                alert("已產生 "+(r.generated||0)+" 人考核表");load();
+              }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>
+                🔄 一鍵產生考核表
+              </button>
+              <button onClick={async()=>{
+                const y=Number(document.getElementById("rv-year").value);
+                const q=Number(document.getElementById("rv-quarter").value);
+                if(!confirm("全部核准？"))return;
+                await ap("/api/admin/reviews",{action:"approve_all",year:y,quarter:q});
+                alert("已全部核准");load();
+              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:11,cursor:"pointer"}}>
+                ✅ 全部核准
+              </button>
+            </div>
+            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                <thead><tr style={{background:"#faf8f5"}}>{["員工","門市","出勤/30","完成度/30","服務/20","違規/20","總分","係數","狀態"].map(h=>
+                  <th key={h} style={{padding:6,textAlign:"center",fontWeight:500,color:"#666",fontSize:10}}>{h}</th>
+                )}</tr></thead>
+                <tbody>
+                  <tr><td colSpan={9} style={{padding:20,textAlign:"center",color:"#ccc",fontSize:11}}>請選擇季度後按「一鍵產生」</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p style={{fontSize:9,color:"#888",marginTop:6}}>出勤/違規=全自動計算　完成度/服務=系統基礎分+主管±5分調整</p>
+          </div>
+        )}
+
+        {/* BONUS 獎金 */}
+        {!ld && tab === "bonus" && (
+          <div>
+            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>🏆 季獎金發放</h3>
+            <div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
+              <select id="bn-year" defaultValue={new Date().getFullYear()} style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}>
+                {[2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}
+              </select>
+              <select id="bn-quarter" defaultValue={Math.ceil((new Date().getMonth()+1)/3)} style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}>
+                {[1,2,3,4].map(q=><option key={q} value={q}>{"Q"+q}</option>)}
+              </select>
+              <button onClick={async()=>{
+                const y=Number(document.getElementById("bn-year").value);
+                const q=Number(document.getElementById("bn-quarter").value);
+                const r=await ap("/api/admin/bonus?year="+y+"&quarter="+q);
+                if(!r.stores){alert("無資料");return;}
+                let msg="📊 業績達標率\n";
+                r.stores.forEach(s=>{
+                  msg+="\n🏠 "+s.name+(s.is_loss?" ❌虧損":" ✅")+"\n";
+                  s.months.forEach(m=>{msg+="  "+m.month.slice(5)+"月 "+fmt(m.revenue)+" / "+fmt(m.target)+" = "+m.rate+"%\n";});
+                  msg+="  Q淨利: "+fmt(s.q_net)+"\n";
+                });
+                alert(msg);
+              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>
+                📊 查看達標率
+              </button>
+            </div>
+
+            {auth.role==="admin" && (
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:10}}>
+                <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>💰 總部填入各門市獎金總額</h4>
+                <p style={{fontSize:9,color:"#888",marginBottom:6}}>參照損益表決定金額，虧損門市自動鎖定</p>
+                {stores.map(s=>(
+                  <div key={s.id} style={{display:"flex",gap:6,alignItems:"center",padding:"4px 0",borderBottom:"1px solid #f0eeea"}}>
+                    <span style={{fontSize:11,fontWeight:500,width:80}}>{s.name}</span>
+                    <input type="number" id={"bp-"+s.id} placeholder="Q總獎金"
+                      style={{flex:1,padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} />
+                    <button onClick={async()=>{
+                      const y=Number(document.getElementById("bn-year").value);
+                      const q=Number(document.getElementById("bn-quarter").value);
+                      const amt=Number(document.getElementById("bp-"+s.id).value||0);
+                      await ap("/api/admin/bonus",{action:"set_pool",store_id:s.id,year:y,quarter:q,total_amount:amt});
+                      alert(s.name+" 獎金池已設定 "+fmt(amt));
+                    }} style={{padding:"3px 8px",borderRadius:4,border:"none",background:"#0a7c42",color:"#fff",fontSize:10,cursor:"pointer"}}>💾</button>
+                  </div>
+                ))}
+                <div style={{display:"flex",gap:4,marginTop:8}}>
+                  <button onClick={async()=>{
+                    const y=Number(document.getElementById("bn-year").value);
+                    const q=Number(document.getElementById("bn-quarter").value);
+                    if(!confirm("計算Q"+q+"個人獎金？"))return;
+                    const r=await ap("/api/admin/bonus",{action:"calculate",year:y,quarter:q});
+                    alert("已計算 "+(r.calculated||0)+" 人");load();
+                  }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>
+                    📊 計算個人獎金
+                  </button>
+                  <button onClick={async()=>{
+                    const y=Number(document.getElementById("bn-year").value);
+                    const q=Number(document.getElementById("bn-quarter").value);
+                    if(!confirm("LINE發送獎金條？"))return;
+                    const r=await ap("/api/admin/bonus",{action:"send_line",year:y,quarter:q});
+                    alert("已發送 "+(r.sent||0)+" 位");
+                  }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #4361ee",background:"transparent",color:"#4361ee",fontSize:11,cursor:"pointer"}}>
+                    📱 LINE發送獎金條
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {!ld && tab === "settlements" && (
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 日結 ("+stl.length+"筆)"}</h3>

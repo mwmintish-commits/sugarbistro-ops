@@ -12,7 +12,7 @@ const DAYS = ["日","一","二","三","四","五","六"];
 const MI = (label, text) => ({ type: "action", action: { type: "message", label, text } });
 const MU = (label, url) => ({ type: "action", action: { type: "uri", label, uri: url } });
 const SITE = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
-const MENU_BASE = [MI("📍 上班打卡", "上班打卡"), MI("📍 下班打卡", "下班打卡"), MI("📅 我的班表", "我的班表"), MI("🙋 請假/預休", "請假申請"), MI("🏖 我的假勤", "我的假勤"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報"), MI("🔧 補打卡", "補打卡")];
+const MENU_BASE = [MI("📍 上班打卡", "上班打卡"), MI("📍 下班打卡", "下班打卡"), MI("📅 我的班表", "我的班表"), MI("🙋 請假/預休", "請假申請"), MI("🏖 我的假勤", "我的假勤"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報"), MI("🔧 補打卡", "補打卡"), MI("🔄 調班申請", "調班申請")];
 const MENU_SM = [...MENU_BASE, MI("📦 月結單據", "月結單據"), MI("💰 零用金", "零用金"), MU("🔗 後台", SITE)];
 const MENU_MGR = [...MENU_SM, MI("🏢 總部代付", "總部代付"), MI("📊 今日營收", "今日營收")];
 const MENU_ADMIN = [MU("🔗 管理後台", SITE), MI("📊 今日營收", "今日營收"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報"), MI("📦 月結單據", "月結單據"), MI("💰 零用金", "零用金"), MI("🏢 總部代付", "總部代付"), MI("📅 我的班表", "我的班表")];
@@ -41,6 +41,11 @@ async function handleBinding(rt, userId, code) {
 
 // ===== 打卡 =====
 async function handleClockAction(rt, emp, type) {
+  // 未完成報到流程 → 擋住打卡
+  if (!emp.contract_signed || !emp.onboarding_completed) {
+    const url = `${process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app"}/onboarding?bind_code=${emp.bind_code}`;
+    return replyText(rt, "❌ 請先完成報到流程（簽署合約+繳交資料）後才能打卡\n\n👉 " + url);
+  }
   const token = crypto.randomBytes(24).toString("hex");
   await supabase.from("clockin_tokens").insert({ token, employee_id: emp.id, type, store_id: emp.store_id, expires_at: new Date(Date.now() + 600000).toISOString() });
   const url = `${process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app"}/clockin?token=${token}`;
