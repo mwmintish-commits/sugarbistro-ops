@@ -201,9 +201,24 @@ function Settings({ stores, as2, upS }) {
           <div key={s.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0eeea" }}>
             <span style={{ fontSize: 12, fontWeight: 500, width: 80 }}>{s.name}</span>
             <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>日營業目標</label><input type="number" defaultValue={s.daily_target || ""} onBlur={e => { ap("/api/admin/stores", { action: "update_targets", store_id: s.id, daily_target: Number(e.target.value || 0), monthly_target: Number(e.target.value || 0) * daysInMonth }); }} style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "center" }} /></div>
-            <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>{"月目標（自動 ×" + daysInMonth + "天）"}</label><div style={{ padding: "4px 0", fontSize: 12, fontWeight: 600, textAlign: "center" }}>{"$" + autoMonthly.toLocaleString()}</div></div>
+            <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>{"月目標（×" + daysInMonth + "天）"}</label><div style={{ padding: "4px 0", fontSize: 12, fontWeight: 600, textAlign: "center" }}>{"$" + autoMonthly.toLocaleString()}</div></div>
           </div>);
         })}
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{"📍 門市GPS打卡範圍"}</h3>
+        <p style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>設定門市座標和打卡範圍，員工超出範圍將無法打卡。</p>
+        {stores.map(s => (
+          <div key={s.id} style={{ padding: "6px 0", borderBottom: "1px solid #f0eeea" }}>
+            <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4 }}>{s.name}</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>緯度</label><input type="number" step="0.0001" defaultValue={s.latitude || ""} onBlur={e => ap("/api/admin/stores", { action: "update_targets", store_id: s.id, daily_target: s.daily_target || 0, monthly_target: s.monthly_target || 0 }).then(() => { /* latitude update needs separate call */ })} placeholder="22.6273" style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }} /></div>
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>經度</label><input type="number" step="0.0001" defaultValue={s.longitude || ""} placeholder="120.3014" style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }} /></div>
+              <div style={{ width: 60 }}><label style={{ fontSize: 9, color: "#888" }}>範圍(m)</label><input type="number" defaultValue={s.radius_m || 200} style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10, textAlign: "center" }} /></div>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
@@ -219,6 +234,64 @@ function Settings({ stores, as2, upS }) {
           <a href="/setup" target="_blank" style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #4361ee", color: "#4361ee", fontSize: 11, textDecoration: "none" }}>{"🚀 設定 LINE 常駐選單（Rich Menu）"}</a>
         </div>
       </div>
+    </div>
+  );
+}
+
+function LeavesMgr({ lr, pl, rvLv, sf, month, stores, LT }) {
+  const [lbView, setLbView] = useState("pending");
+  const [balances, setBalances] = useState([]);
+  const [lbLd, setLbLd] = useState(false);
+
+  useEffect(() => {
+    if (lbView === "balances") {
+      setLbLd(true);
+      ap("/api/admin/leave-balances?year=" + new Date().getFullYear() + (sf ? "&store_id=" + sf : "")).then(r => { setBalances(r.data || []); setLbLd(false); });
+    }
+  }, [lbView, sf]);
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
+        <button onClick={() => setLbView("pending")} style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid #ddd", background: lbView === "pending" ? "#1a1a1a" : "#fff", color: lbView === "pending" ? "#fff" : "#666", fontSize: 11, cursor: "pointer" }}>{"⏳ 待審核/紀錄"}</button>
+        <button onClick={() => setLbView("balances")} style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid #ddd", background: lbView === "balances" ? "#1a1a1a" : "#fff", color: lbView === "balances" ? "#fff" : "#666", fontSize: 11, cursor: "pointer" }}>{"📊 假勤總覽"}</button>
+      </div>
+
+      {lbView === "pending" && <div>
+        <div style={{ background: "#e6f1fb", borderRadius: 6, padding: 8, marginBottom: 10, fontSize: 11, color: "#185fa5" }}>{"💡 預休/請假申請會自動顯示在排班表上，核准後排入班表。"}</div>
+        {pl.length > 0 && <div style={{ background: "#fff8e6", borderRadius: 8, padding: 10, marginBottom: 10 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>{"⏳ 待審核（" + pl.length + "）"}</h3>
+          {pl.map(l => <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 0", borderBottom: "1px solid #f0eeea", flexWrap: "wrap", fontSize: 12 }}>
+            <b>{l.employees ? l.employees.name : ""}</b>
+            <span style={{ color: LT[l.leave_type] ? LT[l.leave_type].c : "#666", background: LT[l.leave_type] ? LT[l.leave_type].bg : "#f0f0f0", padding: "1px 6px", borderRadius: 4, fontSize: 10 }}>{LT[l.leave_type] ? LT[l.leave_type].l : l.leave_type}</span>
+            <span>{l.start_date}{l.end_date !== l.start_date ? " ~ " + l.end_date : ""}{l.half_day ? (l.half_day === "am" ? "（上午）" : "（下午）") : ""}</span>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 3 }}>
+              <button onClick={() => rvLv(l.id, "approved")} style={{ padding: "3px 10px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 10, cursor: "pointer" }}>{"✅ 核准"}</button>
+              <button onClick={() => rvLv(l.id, "rejected")} style={{ padding: "3px 10px", borderRadius: 4, border: "none", background: "#b91c1c", color: "#fff", fontSize: 10, cursor: "pointer" }}>{"❌ 駁回"}</button>
+            </div>
+          </div>)}
+        </div>}
+        {lr.filter(l => l.status !== "pending").length > 0 && <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["員工", "假別", "日期", "狀態"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
+          <tbody>{lr.filter(l => l.status !== "pending").map(l => <tr key={l.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6, fontWeight: 500 }}>{l.employees ? l.employees.name : ""}</td><td style={{ padding: 6 }}>{LT[l.leave_type] ? LT[l.leave_type].l : l.leave_type}</td><td style={{ padding: 6 }}>{l.start_date}{l.end_date !== l.start_date ? " ~ " + l.end_date : ""}</td><td style={{ padding: 6 }}><Badge status={l.status} /></td></tr>)}</tbody></table>
+        </div>}
+        {lr.length === 0 && pl.length === 0 && <div style={{ background: "#fff", borderRadius: 8, padding: 30, textAlign: "center", color: "#ccc" }}>本月無請假紀錄</div>}
+      </div>}
+
+      {lbView === "balances" && <div>
+        <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{new Date().getFullYear() + " 年度假勤總覽"}</h3>
+        {lbLd ? <p style={{ color: "#ccc", textAlign: "center", padding: 20 }}>計算中...</p> : <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["員工", "門市", "特休(總/已用/剩餘)", "病假(已用/30)", "事假(已用/14)"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
+          <tbody>{balances.map(b => <tr key={b.employee_id} style={{ borderBottom: "1px solid #f0eeea" }}>
+            <td style={{ padding: 6, fontWeight: 500 }}>{b.name}</td>
+            <td style={{ padding: 6 }}>{b.store_name}</td>
+            <td style={{ padding: 6 }}><span style={{ color: "#4361ee" }}>{b.annual_total}</span>{" / "}<span style={{ color: "#b91c1c" }}>{b.annual_used}</span>{" / "}<b style={{ color: b.annual_remaining > 0 ? "#0a7c42" : "#b91c1c" }}>{b.annual_remaining}</b></td>
+            <td style={{ padding: 6 }}><span style={{ color: "#b91c1c" }}>{b.sick_used}</span>{" / 30"}</td>
+            <td style={{ padding: 6 }}><span style={{ color: "#b91c1c" }}>{b.personal_used}</span>{" / 14"}</td>
+          </tr>)}</tbody></table>
+        </div>}
+        <p style={{ fontSize: 10, color: "#999", marginTop: 6 }}>{"* 特休天數依勞基法§38自動計算（週年制）：滿6月3天、滿1年7天、滿2年10天、滿3年14天、滿5年15天"}</p>
+      </div>}
     </div>
   );
 }
@@ -512,26 +585,7 @@ function Dashboard({ auth, onLogout }) {
           </div>
         </div>}
 
-        {!ld && tab === "leaves" && <div>
-          <div style={{ background: "#e6f1fb", borderRadius: 6, padding: 8, marginBottom: 10, fontSize: 11, color: "#185fa5" }}>{"💡 員工提交的預休/請假申請會自動顯示在排班表上（黃色虛線標記），方便排班時參考。核准後自動排入班表。"}</div>
-          {pl.length > 0 && <div style={{ background: "#fff8e6", borderRadius: 8, padding: 10, marginBottom: 10 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>{"⏳ 待審核（" + pl.length + "）"}</h3>
-            {pl.map(l => <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 0", borderBottom: "1px solid #f0eeea", flexWrap: "wrap", fontSize: 12 }}>
-              <b>{l.employees ? l.employees.name : ""}</b>
-              <span style={{ color: LT[l.leave_type] ? LT[l.leave_type].c : "#666", background: LT[l.leave_type] ? LT[l.leave_type].bg : "#f0f0f0", padding: "1px 6px", borderRadius: 4, fontSize: 10 }}>{LT[l.leave_type] ? LT[l.leave_type].l : l.leave_type}</span>
-              <span>{l.start_date}{l.end_date !== l.start_date ? " ~ " + l.end_date : ""}{l.half_day ? (l.half_day === "am" ? "（上午）" : "（下午）") : ""}</span>
-              <div style={{ marginLeft: "auto", display: "flex", gap: 3 }}>
-                <button onClick={() => rvLv(l.id, "approved")} style={{ padding: "3px 10px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 10, cursor: "pointer" }}>{"✅ 核准"}</button>
-                <button onClick={() => rvLv(l.id, "rejected")} style={{ padding: "3px 10px", borderRadius: 4, border: "none", background: "#b91c1c", color: "#fff", fontSize: 10, cursor: "pointer" }}>{"❌ 駁回"}</button>
-              </div>
-            </div>)}
-          </div>}
-          {lr.filter(l => l.status !== "pending").length > 0 && <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["員工", "假別", "日期", "狀態"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
-            <tbody>{lr.filter(l => l.status !== "pending").map(l => <tr key={l.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6, fontWeight: 500 }}>{l.employees ? l.employees.name : ""}</td><td style={{ padding: 6 }}>{LT[l.leave_type] ? LT[l.leave_type].l : l.leave_type}</td><td style={{ padding: 6 }}>{l.start_date}{l.end_date !== l.start_date ? " ~ " + l.end_date : ""}</td><td style={{ padding: 6 }}><Badge status={l.status} /></td></tr>)}</tbody></table>
-          </div>}
-          {lr.length === 0 && <div style={{ background: "#fff", borderRadius: 8, padding: 30, textAlign: "center", color: "#ccc" }}>本月無請假紀錄</div>}
-        </div>}
+        {!ld && tab === "leaves" && <LeavesMgr lr={lr} pl={pl} rvLv={rvLv} sf={sf} month={month} stores={stores} LT={LT} />}
 
         {!ld && tab === "shifts" && <div>
           <button onClick={() => { setSsf(!ssf); setEs(null); setSf2({ ...sf2, store_id: sf || sf2.store_id }); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: ssf ? "#f0f0f0" : "#1a1a1a", color: ssf ? "#666" : "#fff", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>{ssf ? "✕" : "＋新增班別"}</button>
@@ -646,7 +700,11 @@ function Dashboard({ auth, onLogout }) {
           </div>
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 14, marginBottom: 10 }}>
             <h4 style={{ fontSize: 13, color: "#b91c1c", marginBottom: 8 }}>支出</h4>
-            <Row l="月結廠商" v={fmt(pnl.expenses ? pnl.expenses.vendor : 0)} /><Row l="零用金" v={fmt(pnl.expenses ? pnl.expenses.petty_cash : 0)} /><Row l="總部代付" v={fmt(pnl.expenses ? pnl.expenses.hq_advance : 0)} /><Row l="人事成本" v={fmt(pnl.expenses ? pnl.expenses.labor : 0)} />
+            <Row l="月結廠商" v={fmt(pnl.expenses ? pnl.expenses.vendor : 0)} />
+            <Row l="零用金" v={fmt(pnl.expenses ? pnl.expenses.petty_cash : 0)} />
+            <Row l="總部代付" v={fmt(pnl.expenses ? pnl.expenses.hq_advance : 0)} />
+            <Row l="人事成本" v={fmt(pnl.expenses ? pnl.expenses.labor : 0)} />
+            <Row l="加班費" v={fmt(otSum.totalAmount || 0)} />
             <Row l="支出合計" v={<b style={{ color: "#b91c1c" }}>{fmt(pnl.expenses ? pnl.expenses.total : 0)}</b>} />
           </div>
           <div style={{ background: (pnl.profit ? pnl.profit.net : 0) >= 0 ? "#e6f9f0" : "#fde8e8", borderRadius: 8, padding: 14 }}>
