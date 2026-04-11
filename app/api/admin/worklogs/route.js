@@ -61,6 +61,23 @@ export async function GET(request) {
     return Response.json({ data });
   }
 
+  // 盤點回報查詢
+  if (type === "inventory") {
+    let q = supabase.from("work_log_items")
+      .select("date, store_id, item_name, category, value, completed_by_name, stores(name)")
+      .in("category", ["庫存盤點", "冷藏盤點", "冷凍盤點", "盤點"])
+      .not("value", "is", null)
+      .order("date", { ascending: false });
+    if (date) q = q.eq("date", date);
+    if (store_id) q = q.eq("store_id", store_id);
+    const { data } = await q.limit(200);
+    const formatted = (data || []).map(d => ({
+      date: d.date, store_name: d.stores ? d.stores.name : "", category: d.category,
+      item: d.item_name, value: d.value, employee_name: d.completed_by_name || "",
+    }));
+    return Response.json({ data: formatted });
+  }
+
   // 後台：每日完成度總覽
   let q = supabase.from("work_log_items").select("store_id, date, completed, completed_by_name").order("date", { ascending: false });
   if (store_id) q = q.eq("store_id", store_id);

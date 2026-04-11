@@ -16,6 +16,13 @@ export default function SettingsMgr({ stores, load }) {
   const [editCh, setEditCh] = useState(null);
   const [newStore, setNewStore] = useState({ name: "", address: "" });
   const [clockSettings, setClockSettings] = useState({ late_grace_minutes: 5, overtime_min_minutes: 30 });
+  const [wlStore, setWlStore] = useState("");
+  const [wlTemplates, setWlTemplates] = useState([]);
+  const [wlNew, setWlNew] = useState({
+    category: "開店準備", item: "", role: "all", shift_type: "opening",
+    frequency: "daily", weekday: "", requires_value: false, value_label: "", value_min: "", value_max: ""
+  });
+  const [wlCopyTarget, setWlCopyTarget] = useState("");
 
   useEffect(() => {
     ap("/api/admin/system?key=company_name").then(r => { if (r.data) setCompanyName(r.data); }).catch(() => {});
@@ -23,6 +30,12 @@ export default function SettingsMgr({ stores, load }) {
     ap("/api/admin/holidays?year=" + new Date().getFullYear()).then(r => setHols(r.data || [])).catch(() => {});
     ap("/api/admin/attendance?type=settings").then(r => { if (r.data) setClockSettings(r.data); }).catch(() => {});
   }, []);
+
+  const loadWlTemplates = () => {
+    if (!wlStore) return;
+    ap("/api/admin/worklogs?type=templates&store_id=" + wlStore).then(r => setWlTemplates(r.data || []));
+  };
+  useEffect(() => { loadWlTemplates(); }, [wlStore]);
 
   const saveHb = async () => {
     setHbSaving(true);
@@ -256,6 +269,125 @@ export default function SettingsMgr({ stores, load }) {
           <div><b>🏠 管理：</b>以上 + 總部代付、營收、🔗後台</div>
           <div><b>👑 總部：</b>🔗管理後台、營收、費用（不顯示打卡）</div>
         </div>
+      </div>
+
+      {/* 工作日誌模板管理 */}
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+        <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📋 工作日誌模板管理</h4>
+        <select value={wlStore} onChange={e => setWlStore(e.target.value)}
+          style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11, marginBottom: 8, width: "100%" }}>
+          <option value="">選擇門市</option>
+          {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+
+        {wlStore && (
+          <div>
+            {/* 現有模板列表 */}
+            {(() => {
+              const grouped = {};
+              wlTemplates.forEach(t => { const c = t.category || "其他"; if (!grouped[c]) grouped[c] = []; grouped[c].push(t); });
+              return Object.entries(grouped).length > 0 ? Object.entries(grouped).map(([cat, items]) => (
+                <div key={cat} style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 2 }}>{cat + "（" + items.length + "）"}</div>
+                  {items.map(t => (
+                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderBottom: "1px solid #f0eeea", fontSize: 11 }}>
+                      <span style={{ flex: 1 }}>
+                        {t.item}
+                        {t.role !== "all" && <span style={{ fontSize: 8, background: "#fef9c3", color: "#8a6d00", padding: "0 3px", borderRadius: 2, marginLeft: 3 }}>{t.role}</span>}
+                        {t.frequency === "weekly" && <span style={{ fontSize: 8, background: "#e6f1fb", color: "#185fa5", padding: "0 3px", borderRadius: 2, marginLeft: 3 }}>{"週"}</span>}
+                        {t.frequency === "monthly" && <span style={{ fontSize: 8, background: "#fde8e8", color: "#b91c1c", padding: "0 3px", borderRadius: 2, marginLeft: 3 }}>月</span>}
+                        {t.requires_value && <span style={{ fontSize: 8, background: "#e6f9f0", color: "#0a7c42", padding: "0 3px", borderRadius: 2, marginLeft: 3 }}>{"📊" + (t.value_label || "數值")}</span>}
+                      </span>
+                      <button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadWlTemplates(); }}
+                        style={{ fontSize: 10, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )) : (
+                <div style={{ padding: 16, textAlign: "center", color: "#ccc", fontSize: 11 }}>此門市尚無模板</div>
+              );
+            })()}
+
+            {/* 新增模板表單 */}
+            <div style={{ background: "#faf8f5", borderRadius: 6, padding: 8, marginTop: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 4 }}>＋ 新增工作項目</div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 4 }}>
+                <select value={wlNew.frequency} onChange={e => setWlNew({ ...wlNew, frequency: e.target.value })}
+                  style={{ padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }}>
+                  <option value="daily">每日</option><option value="weekly">週清</option><option value="monthly">月清</option>
+                </select>
+                {wlNew.frequency === "weekly" && (
+                  <select value={wlNew.weekday} onChange={e => setWlNew({ ...wlNew, weekday: e.target.value })}
+                    style={{ padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }}>
+                    <option value="">星期</option>
+                    {["日", "一", "二", "三", "四", "五", "六"].map((d, i) => <option key={i} value={i}>{d}</option>)}
+                  </select>
+                )}
+                <select value={wlNew.category} onChange={e => setWlNew({ ...wlNew, category: e.target.value })}
+                  style={{ padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }}>
+                  {["開店準備", "營業中", "打烊作業", "清潔消毒", "食材管理", "溫度記錄", "設備維護", "週清潔", "月清潔", "📦 庫存盤點", "🧊 冷藏盤點", "🧊 冷凍盤點"].map(c =>
+                    <option key={c} value={c.replace(/^[📦🧊] /, "")}>{c}</option>
+                  )}
+                </select>
+                <select value={wlNew.role} onChange={e => setWlNew({ ...wlNew, role: e.target.value })}
+                  style={{ padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }}>
+                  <option value="all">全員</option><option value="外場">外場</option><option value="內場">內場</option><option value="吧台">吧台</option><option value="烘焙">烘焙</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+                <input value={wlNew.item} onChange={e => setWlNew({ ...wlNew, item: e.target.value })}
+                  placeholder="工作項目名稱" onKeyDown={e => { if (e.key === "Enter" && wlNew.item) { ap("/api/admin/worklogs", { action: "add_template", store_id: wlStore, ...wlNew }); setWlNew({ ...wlNew, item: "" }); setTimeout(loadWlTemplates, 300); } }}
+                  style={{ flex: 1, padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} />
+                <button onClick={async () => {
+                  if (!wlNew.item) return;
+                  await ap("/api/admin/worklogs", { action: "add_template", store_id: wlStore, ...wlNew });
+                  setWlNew({ ...wlNew, item: "" });
+                  loadWlTemplates();
+                }} disabled={!wlNew.item}
+                  style={{ padding: "4px 10px", borderRadius: 4, border: "none", background: wlNew.item ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>
+                  新增
+                </button>
+              </div>
+              <div style={{ display: "flex", gap: 3, alignItems: "center", fontSize: 10 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 2, cursor: "pointer" }}>
+                  <input type="checkbox" checked={wlNew.requires_value}
+                    onChange={e => setWlNew({ ...wlNew, requires_value: e.target.checked })} />
+                  需輸入數值
+                </label>
+                {wlNew.requires_value && (
+                  <>
+                    <input value={wlNew.value_label} onChange={e => setWlNew({ ...wlNew, value_label: e.target.value })}
+                      placeholder="單位" style={{ width: 40, padding: 2, borderRadius: 3, border: "1px solid #ddd", fontSize: 10 }} />
+                    <input type="number" value={wlNew.value_min} onChange={e => setWlNew({ ...wlNew, value_min: e.target.value })}
+                      placeholder="最小" style={{ width: 35, padding: 2, borderRadius: 3, border: "1px solid #ddd", fontSize: 10 }} />
+                    <span>~</span>
+                    <input type="number" value={wlNew.value_max} onChange={e => setWlNew({ ...wlNew, value_max: e.target.value })}
+                      placeholder="最大" style={{ width: 35, padding: 2, borderRadius: 3, border: "1px solid #ddd", fontSize: 10 }} />
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* 複製到其他門市 */}
+            {wlTemplates.length > 0 && (
+              <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+                <select value={wlCopyTarget} onChange={e => setWlCopyTarget(e.target.value)}
+                  style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}>
+                  <option value="">複製到門市...</option>
+                  {stores.filter(s => s.id !== wlStore).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <button onClick={async () => {
+                  if (!wlCopyTarget) return;
+                  await ap("/api/admin/worklogs", { action: "copy_to_store", from_store_id: wlStore, to_store_id: wlCopyTarget });
+                  alert("已複製");
+                }} disabled={!wlCopyTarget}
+                  style={{ padding: "4px 10px", borderRadius: 4, border: "none", background: wlCopyTarget ? "#4361ee" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>
+                  📋 複製
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 資料維護 */}
