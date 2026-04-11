@@ -53,13 +53,33 @@ export async function POST(request) {
     // 核准時自動建立撥款紀錄
     if (status === "approved" && data) {
       const pmtType = data.expense_type === "vendor" ? "vendor" : data.expense_type === "hq_advance" ? "hq_advance" : "petty_cash";
+      // 月結→撥給廠商，零用金/代付→撥給提交人
+      const recipient = data.expense_type === "vendor"
+        ? (data.vendor_name || "")
+        : (data.employees?.name || data.submitted_by_name || "");
       await supabase.from("payments").insert({
         type: pmtType, reference_id: data.id, store_id: data.store_id,
-        employee_id: data.submitted_by, amount: data.amount,
-        recipient: data.employees?.name || data.vendor_name || data.submitted_by_name || "",
-        month_key: data.month_key, notes: (data.expense_type === "vendor" ? "月結-" : data.expense_type === "hq_advance" ? "代付-" : "零用金-") + (data.vendor_name || ""),
+        employee_id: data.expense_type !== "vendor" ? data.submitted_by : null,
+        amount: data.amount, recipient: recipient,
+        month_key: data.month_key,
+        notes: (data.vendor_name || "") + (data.invoice_number ? " #" + data.invoice_number : ""),
       }).catch(() => {});
     }
+    return Response.json({ data });
+  }
+
+  if (body.action === "update") {
+    const { expense_id, amount, vendor_name, category_suggestion, description, date, invoice_number } = body;
+    const updates = {};
+    if (amount !== undefined) updates.amount = amount;
+    if (vendor_name !== undefined) updates.vendor_name = vendor_name;
+    if (category_suggestion !== undefined) updates.category_suggestion = category_suggestion;
+    if (description !== undefined) updates.description = description;
+    if (date !== undefined) updates.date = date;
+    if (invoice_number !== undefined) updates.invoice_number = invoice_number;
+    const { data, error } = await supabase.from("expenses")
+      .update(updates).eq("id", expense_id).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
   }
 
