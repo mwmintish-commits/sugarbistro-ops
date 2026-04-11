@@ -21,7 +21,8 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({
-    role: "", employment_type: "", labor_tier: "", health_tier: "",
+    role: "", employment_type: "", store_id: "",
+    labor_tier: "", health_tier: "",
     labor_start_date: "", health_start_date: "", hourly_rate: "", monthly_salary: ""
   });
 
@@ -32,6 +33,7 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
         setForm({
           role: r.data.role || "staff",
           employment_type: r.data.employment_type || "regular",
+          store_id: r.data.store_id || "",
           labor_tier: r.data.labor_tier || "",
           health_tier: r.data.health_tier || "",
           labor_start_date: r.data.labor_start_date || "",
@@ -52,6 +54,7 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
     await ap("/api/admin/employees", {
       action: "update", employee_id: empId,
       role: form.role, employment_type: form.employment_type,
+      store_id: form.store_id || null,
       labor_tier: form.labor_tier ? Number(form.labor_tier) : null,
       health_tier: form.health_tier ? Number(form.health_tier) : null,
       labor_start_date: form.labor_start_date || null,
@@ -113,21 +116,34 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
         </div>
 
         <div style={{ ...sec, border: "2px solid #4361ee" }}>
-          <h3 style={sh}>角色與薪資設定</h3>
+          <h3 style={{ ...sh, color: "#4361ee" }}>🔑 權限與所屬門市</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             <div>
-              <label style={{ fontSize: 10, color: "#888" }}>角色</label>
+              <label style={{ fontSize: 10, color: "#888" }}>角色權限</label>
               <select value={form.role} onChange={ev => setForm({...form, role: ev.target.value})} style={inp}>
                 {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 10, color: "#888" }}>類型</label>
+              <label style={{ fontSize: 10, color: "#888" }}>僱用類型</label>
               <select value={form.employment_type} onChange={ev => setForm({...form, employment_type: ev.target.value})} style={inp}>
                 <option value="regular">一般</option>
                 <option value="parttime">兼職</option>
               </select>
             </div>
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <label style={{ fontSize: 10, color: "#888" }}>所屬門市</label>
+            <select value={form.store_id || ""} onChange={ev => setForm({...form, store_id: ev.target.value})} style={inp}>
+              <option value="">🏢 總部（無門市）</option>
+              {(storesRef || []).map(s => <option key={s.id} value={s.id}>{"🏠 " + s.name}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ ...sec, border: "2px solid #666" }}>
+          <h3 style={{ ...sh, color: "#666" }}>💰 薪資設定</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             <div>
               <label style={{ fontSize: 10, color: "#888" }}>月薪</label>
               <input type="number" value={form.monthly_salary} onChange={ev => setForm({...form, monthly_salary: ev.target.value})} style={inp} />
@@ -136,6 +152,12 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
               <label style={{ fontSize: 10, color: "#888" }}>時薪</label>
               <input type="number" value={form.hourly_rate} onChange={ev => setForm({...form, hourly_rate: ev.target.value})} style={inp} />
             </div>
+          </div>
+        </div>
+
+        <div style={{ ...sec, border: "2px solid #b45309" }}>
+          <h3 style={{ ...sh, color: "#b45309" }}>🛡️ 勞健保設定</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             <div>
               <label style={{ fontSize: 10, color: "#888" }}>勞保級距</label>
               <select value={form.labor_tier} onChange={ev => setForm({...form, labor_tier: ev.target.value})} style={inp}>
@@ -168,18 +190,6 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
         {msg && <p style={{ textAlign: "center", fontSize: 12, color: "#0a7c42", marginTop: 4 }}>{msg}</p>}
 
         <div style={{ marginTop: 10, display: "flex", gap: 4, flexWrap: "wrap" }}>
-          <select onChange={async (ev) => {
-            if (!ev.target.value) return;
-            if (!confirm("確定調到此門市？")) { ev.target.value = ""; return; }
-            await ap("/api/admin/employees", { action: "update", employee_id: empId, store_id: ev.target.value });
-            alert("已調店");
-            ev.target.value = "";
-            reload();
-          }} style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #4361ee", fontSize: 10, color: "#4361ee" }}>
-            <option value="">{"🔄 調店..."}</option>
-            {(storesRef || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-
           <button onClick={async () => {
             if (!confirm("確定解除LINE綁定？")) return;
             await ap("/api/admin/employees", { action: "update", employee_id: empId, line_uid: null });
