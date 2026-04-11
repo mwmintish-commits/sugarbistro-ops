@@ -4,9 +4,9 @@ const fmt = (n) => "$" + Number(n || 0).toLocaleString();
 const ROLES = { admin: "👑總部", manager: "🏠管理", store_manager: "🏪門店主管", staff: "👤員工" };
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
 const LT = { annual: { l: "特休", c: "#4361ee", bg: "#e6f1fb" }, sick: { l: "病假", c: "#b45309", bg: "#fff8e6" }, personal: { l: "事假", c: "#8a6d00", bg: "#fef9c3" }, menstrual: { l: "生理假", c: "#993556", bg: "#fbeaf0" }, off: { l: "例假", c: "#666", bg: "#f0f0f0" }, rest: { l: "休息日", c: "#888", bg: "#f5f5f5" } };
-const ROLE_TABS = { admin: ["employees", "schedules", "leaves", "attendance", "overtime", "payroll", "settlements", "deposits", "expenses", "payments", "pnl", "shifts", "worklogs", "announcements", "settings"], manager: ["employees", "schedules", "leaves", "attendance", "overtime", "payroll", "settlements", "deposits", "expenses", "payments", "pnl", "shifts", "worklogs"], store_manager: ["schedules", "leaves", "store_staff", "shifts", "worklogs", "announcements", "settlements", "deposits", "expenses"] };
-const TAB_L = { employees: "👥員工", schedules: "📅排班", leaves: "🙋請假", attendance: "📍出勤", overtime: "⏱加班", payroll: "💰薪資", settlements: "💰日結", deposits: "🏦存款", expenses: "📦費用", payments: "💳撥款", pnl: "📊損益", shifts: "⏰班別", worklogs: "📋日誌", announcements: "📢公告", settings: "⚙️設定", store_staff: "👥本店員工" };
-const TAB_GROUPS = { "人資": ["employees", "store_staff", "schedules", "leaves", "attendance", "overtime", "payroll"], "財務": ["settlements", "deposits", "expenses", "payments", "pnl"], "管理": ["shifts", "worklogs", "announcements", "settings"] };
+const ROLE_TABS = { admin: ["dashboard", "employees", "schedules", "leaves", "attendance", "overtime", "payroll", "settlements", "deposits", "expenses", "payments", "pnl", "shifts", "worklogs", "announcements", "settings"], manager: ["employees", "schedules", "leaves", "attendance", "overtime", "payroll", "settlements", "deposits", "expenses", "payments", "pnl", "shifts", "worklogs"], store_manager: ["schedules", "leaves", "store_staff", "shifts", "worklogs", "announcements", "settlements", "deposits", "expenses"] };
+const TAB_L = { dashboard: "🏠總覽", employees: "👥員工", schedules: "📅排班", leaves: "🙋請假", attendance: "📍出勤", overtime: "⏱加班", payroll: "💰薪資", settlements: "💰日結", deposits: "🏦存款", expenses: "📦費用", payments: "💳撥款", pnl: "📊損益", shifts: "⏰班別", worklogs: "📋日誌", announcements: "📢公告", settings: "⚙️設定", store_staff: "👥本店員工" };
+const TAB_GROUPS = { "總覽": ["dashboard"], "人資": ["employees", "store_staff", "schedules", "leaves", "attendance", "overtime", "payroll"], "財務": ["settlements", "deposits", "expenses", "payments", "pnl"], "管理": ["shifts", "worklogs", "announcements", "settings"] };
 function ap(u, b) { return b ? fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).then(r => r.json()) : fetch(u).then(r => r.json()); }
 function Badge({ status }) { const m = { matched: { bg: "#e6f9f0", c: "#0a7c42" }, pending: { bg: "#fff8e6", c: "#8a6d00" }, approved: { bg: "#e6f9f0", c: "#0a7c42" }, rejected: { bg: "#fde8e8", c: "#b91c1c" }, anomaly: { bg: "#fde8e8", c: "#b91c1c" } }; const s = m[status] || { bg: "#f0f0f0", c: "#666" }; return <span style={{ padding: "2px 6px", borderRadius: 8, fontSize: 10, background: s.bg, color: s.c }}>{status}</span>; }
 function RB({ role }) { const c = { admin: { bg: "#fde8e8", c: "#b91c1c" }, manager: { bg: "#e6f1fb", c: "#185fa5" }, store_manager: { bg: "#fef9c3", c: "#8a6d00" }, staff: { bg: "#e6f9f0", c: "#0a7c42" } }; const s = c[role] || c.staff; return <span style={{ padding: "1px 5px", borderRadius: 5, fontSize: 9, background: s.bg, color: s.c }}>{ROLES[role] || role}</span>; }
@@ -26,7 +26,15 @@ function EmpDetail({ empId, onClose }) {
   const [form, setForm] = useState({ role: "", employment_type: "", labor_tier: "", health_tier: "", labor_start_date: "", health_start_date: "", hourly_rate: "", monthly_salary: "" });
   const reload = () => ap("/api/admin/employees?id=" + empId).then(r => { setD(r); if (r.data) setForm({ role: r.data.role || "staff", employment_type: r.data.employment_type || "regular", labor_tier: r.data.labor_tier || "", health_tier: r.data.health_tier || "", labor_start_date: r.data.labor_start_date || "", health_start_date: r.data.health_start_date || "", hourly_rate: r.data.hourly_rate || "", monthly_salary: r.data.monthly_salary || "" }); setLd(false); });
   useEffect(() => { reload(); }, [empId]);
-  const save = async () => { setSaving(true); setMsg(""); await ap("/api/admin/employees", { action: "update", employee_id: empId, role: form.role, employment_type: form.employment_type, labor_tier: form.labor_tier ? Number(form.labor_tier) : null, health_tier: form.health_tier ? Number(form.health_tier) : null, labor_start_date: form.labor_start_date || null, health_start_date: form.health_start_date || null, hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : null, monthly_salary: form.monthly_salary ? Number(form.monthly_salary) : null }); setMsg("已儲存"); setSaving(false); reload(); };
+  const save = async () => { setSaving(true); setMsg(""); 
+    const changes = []; const old = d.data;
+    if (form.role !== old.role) changes.push({ change_type: "role", old_value: old.role, new_value: form.role });
+    if (form.monthly_salary !== String(old.monthly_salary || "")) changes.push({ change_type: "salary", old_value: String(old.monthly_salary || 0), new_value: form.monthly_salary });
+    if (form.labor_tier !== String(old.labor_tier || "")) changes.push({ change_type: "labor_tier", old_value: String(old.labor_tier || ""), new_value: form.labor_tier });
+    if (form.health_tier !== String(old.health_tier || "")) changes.push({ change_type: "health_tier", old_value: String(old.health_tier || ""), new_value: form.health_tier });
+    await ap("/api/admin/employees", { action: "update", employee_id: empId, role: form.role, employment_type: form.employment_type, labor_tier: form.labor_tier ? Number(form.labor_tier) : null, health_tier: form.health_tier ? Number(form.health_tier) : null, labor_start_date: form.labor_start_date || null, health_start_date: form.health_start_date || null, hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : null, monthly_salary: form.monthly_salary ? Number(form.monthly_salary) : null }); 
+    for (const c of changes) { ap("/api/admin/system", { key: "emp_change_" + empId + "_" + Date.now(), value: { ...c, employee_id: empId, employee_name: old.name, timestamp: new Date().toISOString() } }).catch(() => {}); }
+    setMsg("✅ 已儲存"); setSaving(false); reload(); };
   const tiers = form.employment_type === "parttime" ? TIERS_P : TIERS_R;
   if (ld) return <div style={modal}><div style={mbox}><p>載入中...</p></div></div>;
   const e = d.data, li = d.labor_insurance, hi = d.health_insurance;
@@ -480,7 +488,23 @@ function Dashboard({ auth, onLogout }) {
 
   const addEmp = async () => { const d = await ap("/api/admin/employees", { action: "create", ...ne }); if (d.bind_code) { setNbc(d.bind_code); load(); } };
   const activate = async (id) => { const d = await ap("/api/admin/employees", { action: "activate", employee_id: id }); if (d.bind_code) alert("已啟用！綁定碼：" + d.bind_code); load(); };
-  const deactivate = async (id) => { if (confirm("確定停用？")) { await ap("/api/admin/employees", { action: "deactivate", employee_id: id }); load(); } };
+  const deactivate = async (id) => { 
+    const emp = emps.find(e => e.id === id);
+    const action = confirm("選擇操作：\n確定 = 離職結算（計算未休特休換薪）\n取消 = 僅停用帳號");
+    if (action) {
+      const r = await ap("/api/admin/leave-balances?employee_id=" + id + "&year=" + new Date().getFullYear());
+      const remaining = r.data ? r.data.annual_remaining || 0 : 0;
+      const dailyPay = emp.monthly_salary ? Math.round(emp.monthly_salary / 30) : (emp.hourly_rate ? emp.hourly_rate * 8 : 0);
+      const settlement = remaining * dailyPay;
+      if (confirm((emp.name || "") + " 離職結算：\n\n未休特休：" + remaining + " 天\n日薪：$" + dailyPay + "\n應付特休換薪：$" + settlement.toLocaleString() + "\n\n確定執行離職？")) {
+        await ap("/api/admin/employees", { action: "deactivate", employee_id: id });
+        if (settlement > 0) await ap("/api/admin/payments", { action: "create", type: "leave_settlement", employee_id: id, amount: settlement, recipient: emp.name, notes: "離職特休結算 " + remaining + "天", month_key: new Date().toISOString().slice(0, 7) });
+        alert("已離職，特休換薪 $" + settlement.toLocaleString() + " 已加入撥款追蹤"); load();
+      }
+    } else {
+      if (confirm("確定停用 " + (emp.name || "") + " 的帳號？")) { await ap("/api/admin/employees", { action: "deactivate", employee_id: id }); load(); }
+    }
+  };
   const regen = async (id) => { const d = await ap("/api/admin/employees", { action: "generate_bind_code", employee_id: id }); if (d.bind_code) alert("綁定碼：" + d.bind_code); load(); };
   const saveShift = async () => { if (es) await ap("/api/admin/shifts", { action: "update", shift_id: es, ...sf2 }); else await ap("/api/admin/shifts", { action: "create", ...sf2 }); setSsf(false); setEs(null); load(); };
   const delShift = async (id) => { if (confirm("刪除？")) { await ap("/api/admin/shifts", { action: "delete", shift_id: id }); load(); } };
@@ -542,6 +566,45 @@ function Dashboard({ auth, onLogout }) {
           })}
         </div>
         {ld && <div style={{ textAlign: "center", padding: 30, color: "#aaa" }}>載入中...</div>}
+
+        {!ld && tab === "dashboard" && <div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 12 }}>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "10px 12px" }}><div style={{ fontSize: 10, color: "#888" }}>{"本月營收"}</div><div style={{ fontSize: 20, fontWeight: 700, color: "#0a7c42" }}>{fmt(sum.total_net_sales)}</div></div>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "10px 12px" }}><div style={{ fontSize: 10, color: "#888" }}>{"待審核"}</div><div style={{ fontSize: 20, fontWeight: 700, color: "#b45309" }}>{pl.length + lr.filter(l => l.status === "pending").length}</div><div style={{ fontSize: 9, color: "#888" }}>{pl.length + "假 " + exps.filter(e => e.status === "pending").length + "費用"}</div></div>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "10px 12px" }}><div style={{ fontSize: 10, color: "#888" }}>{"在職員工"}</div><div style={{ fontSize: 20, fontWeight: 700 }}>{ae.length}</div></div>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "10px 12px" }}><div style={{ fontSize: 10, color: "#888" }}>{"待撥款"}</div><div style={{ fontSize: 20, fontWeight: 700, color: "#b91c1c" }}>{fmt(pmtSum.pending)}</div></div>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "10px 12px" }}><div style={{ fontSize: 10, color: "#888" }}>{"加班時數"}</div><div style={{ fontSize: 20, fontWeight: 700, color: "#b45309" }}>{Math.round((otSum.totalMinutes || 0) / 60 * 10) / 10 + "hr"}</div>{(otSum.totalMinutes || 0) > 46 * 60 && <div style={{ fontSize: 9, color: "#b91c1c" }}>{"⚠️ 超過46hr上限"}</div>}</div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12 }}>
+              <h4 style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{"📊 門市營收比較"}</h4>
+              {stores.map(s => { const rev = stl.filter(r => r.store_id === s.id).reduce((a, r) => a + Number(r.net_sales || 0), 0); const target = (s.daily_target || 0) * new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate(); const pct = target > 0 ? Math.round(rev / target * 100) : 0; return <div key={s.id} style={{ marginBottom: 6 }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}><span>{s.name}</span><span style={{ fontWeight: 600 }}>{fmt(rev)}{target > 0 ? " / " + fmt(target) : ""}</span></div>{target > 0 && <div style={{ height: 5, background: "#f0f0f0", borderRadius: 3, marginTop: 2 }}><div style={{ height: "100%", width: Math.min(100, pct) + "%", background: pct >= 100 ? "#0a7c42" : pct >= 70 ? "#fbbf24" : "#b91c1c", borderRadius: 3 }} /></div>}{target > 0 && <div style={{ fontSize: 9, color: pct >= 100 ? "#0a7c42" : "#888", textAlign: "right" }}>{pct + "%"}</div>}</div>; })}
+            </div>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12 }}>
+              <h4 style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{"⚠️ 異常通報"}</h4>
+              {dep.filter(d => d.status === "anomaly").map(d => <div key={d.id} style={{ fontSize: 11, padding: "3px 0", borderBottom: "1px solid #f0eeea", color: "#b91c1c" }}>{"🚨 存款異常 " + (d.stores ? d.stores.name : "") + " " + d.deposit_date + " 差" + fmt(d.difference)}</div>)}
+              {att.filter(a => a.late_minutes > 30).slice(0, 5).map(a => <div key={a.id} style={{ fontSize: 11, padding: "3px 0", borderBottom: "1px solid #f0eeea", color: "#b45309" }}>{"⏰ 嚴重遲到 " + (a.employees ? a.employees.name : "") + " " + a.late_minutes + "分"}</div>)}
+              {otRecords.filter(r => r.overtime_minutes > 180).slice(0, 3).map(r => <div key={r.id} style={{ fontSize: 11, padding: "3px 0", borderBottom: "1px solid #f0eeea", color: "#b45309" }}>{"⏱ 大量加班 " + (r.employees ? r.employees.name : "") + " " + r.date + " " + Math.round(r.overtime_minutes / 60) + "hr"}</div>)}
+              {dep.filter(d => d.status === "anomaly").length === 0 && att.filter(a => a.late_minutes > 30).length === 0 && <div style={{ fontSize: 11, color: "#ccc", textAlign: "center", padding: 10 }}>{"✅ 本月無異常"}</div>}
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12 }}>
+              <h4 style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{"🏖 特休即將到期"}</h4>
+              {ae.filter(e => { const m = e.service_months || 0; const monthInYear = new Date(e.hire_date || "").getMonth(); const expMonth = new Date().getMonth(); return m >= 6 && Math.abs(monthInYear - expMonth) <= 2; }).slice(0, 5).map(e => <div key={e.id} style={{ fontSize: 11, padding: "3px 0", borderBottom: "1px solid #f0eeea" }}>{e.name + " — " + (e.annual_leave_days || 0) + "天特休，到職月：" + (e.hire_date || "").slice(5, 7) + "月"}</div>)}
+              {ae.filter(e => (e.service_months || 0) >= 6).length === 0 && <div style={{ fontSize: 11, color: "#ccc", textAlign: "center", padding: 10 }}>無</div>}
+            </div>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12 }}>
+              <h4 style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{"📋 快捷操作"}</h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <button onClick={() => setTab("schedules")} style={{ padding: "6px", borderRadius: 4, border: "1px solid #ddd", background: "transparent", fontSize: 11, cursor: "pointer", textAlign: "left" }}>{"📅 排班管理"}</button>
+                <button onClick={() => setTab("payroll")} style={{ padding: "6px", borderRadius: 4, border: "1px solid #ddd", background: "transparent", fontSize: 11, cursor: "pointer", textAlign: "left" }}>{"💰 薪資核算"}</button>
+                <button onClick={() => setTab("expenses")} style={{ padding: "6px", borderRadius: 4, border: "1px solid #ddd", background: "transparent", fontSize: 11, cursor: "pointer", textAlign: "left" }}>{"📦 費用審核（" + exps.filter(e => e.status === "pending").length + "待核）"}</button>
+                <button onClick={() => setTab("payments")} style={{ padding: "6px", borderRadius: 4, border: "1px solid #ddd", background: "transparent", fontSize: 11, cursor: "pointer", textAlign: "left" }}>{"💳 撥款追蹤（" + fmt(pmtSum.pending) + "待撥）"}</button>
+              </div>
+            </div>
+          </div>
+        </div>}
 
         {!ld && tab === "schedules" && <div>
           <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 8, flexWrap: "wrap" }}>
@@ -629,6 +692,7 @@ function Dashboard({ auth, onLogout }) {
           <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
             {[["all", "全部"], ["petty_cash", "💰零用金"], ["vendor", "📦月結單據"], ["hq_advance", "🏢總部代付"]].map(([k, l]) => <button key={k} onClick={() => setExpType(k)} style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid #ddd", background: expType === k ? "#1a1a1a" : "#fff", color: expType === k ? "#fff" : "#666", fontSize: 11, cursor: "pointer" }}>{l}</button>)}
             <input value={expSearch} onChange={e => setExpSearch(e.target.value)} placeholder="搜尋廠商..." style={{ padding: "4px 8px", borderRadius: 5, border: "1px solid #ddd", fontSize: 11, width: 120 }} />
+            <button onClick={() => { const filtered = exps.filter(e => (expType === "all" || e.expense_type === expType) && (!expSearch || (e.vendor_name || "").includes(expSearch))); const csv = "\uFEFF日期,門市,類型,廠商,說明,金額,狀態\n" + filtered.map(e => [e.date, e.stores ? e.stores.name : "", e.expense_type === "vendor" ? "月結" : e.expense_type === "hq_advance" ? "總部代付" : "零用金", e.vendor_name || "", (e.description || "").replace(/,/g, " "), e.amount, e.status].join(",")).join("\n"); const blob = new Blob([csv], { type: "text/csv" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = month + "_費用明細.csv"; a.click(); }} style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid #0a7c42", background: "transparent", color: "#0a7c42", fontSize: 11, cursor: "pointer" }}>{"📥 匯出CSV"}</button>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
             <div style={{ background: "#fff8e6", borderRadius: 8, padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#8a6d00" }}>💰 零用金</div><div style={{ fontSize: 15, fontWeight: 600 }}>{fmt(exps.filter(e => e.expense_type === "petty_cash").reduce((s, e) => s + Number(e.amount || 0), 0))}</div></div>
@@ -648,6 +712,7 @@ function Dashboard({ auth, onLogout }) {
           <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["日期", "員工", "門市", "加班時數", "類型", "費率", "金額", "狀態"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
           <tbody>{otRecords.length === 0 ? <tr><td colSpan={8} style={{ padding: 30, textAlign: "center", color: "#ccc" }}>本月無加班紀錄</td></tr> : otRecords.map(r => <tr key={r.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6 }}>{r.date}</td><td style={{ padding: 6, fontWeight: 500 }}>{r.employees ? r.employees.name : ""}</td><td style={{ padding: 6 }}>{r.stores ? r.stores.name : ""}</td><td style={{ padding: 6 }}>{Math.round(r.overtime_minutes / 60 * 10) / 10 + "hr"}</td><td style={{ padding: 6 }}>{r.overtime_type === "weekday_1" ? "平日" : r.overtime_type === "rest_1" ? "休息日" : r.overtime_type === "holiday" ? "國定假日" : r.overtime_type}</td><td style={{ padding: 6 }}>{r.rate + "倍"}</td><td style={{ padding: 6, fontWeight: 600 }}>{fmt(r.amount)}</td><td style={{ padding: 6 }}><Badge status={r.status} /></td></tr>)}</tbody></table></div>
           <p style={{ fontSize: 10, color: "#999", marginTop: 6 }}>{"* 加班費率：平日前2hr 1.34倍/後2hr 1.67倍、休息日前2hr 1.34倍/後6hr 1.67倍、國定假日 2倍"}</p>
+          {(() => { const byEmp = {}; otRecords.forEach(r => { const n = r.employees ? r.employees.name : "?"; byEmp[n] = (byEmp[n] || 0) + (r.overtime_minutes || 0); }); const over = Object.entries(byEmp).filter(([, m]) => m > 46 * 60); return over.length > 0 ? <div style={{ background: "#fde8e8", borderRadius: 6, padding: 8, marginTop: 8, fontSize: 11, color: "#b91c1c" }}>{"⚠️ 月加班超過46小時上限：" + over.map(([n, m]) => n + "（" + Math.round(m / 60) + "hr）").join("、")}</div> : null; })()}
         </div>}
 
         {!ld && tab === "payments" && <div>
@@ -694,6 +759,9 @@ function Dashboard({ auth, onLogout }) {
             <div style={{ background: "#e6f9f0", borderRadius: 8, padding: "10px 14px" }}><div style={{ fontSize: 10, color: "#888" }}>實發合計</div><div style={{ fontSize: 18, fontWeight: 700, color: "#0a7c42" }}>{fmt(totalGross - totalDeduct)}</div></div>
           </div>; })()}
           <p style={{ fontSize: 10, color: "#999", marginTop: 8 }}>{"* 出勤依打卡｜時薪×天數×8hr｜加班費依核准紀錄｜勞健保依一般級距自付額"}</p>
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <button onClick={async () => { if (!confirm("確定發送薪資條到所有員工LINE？")) return; for (const e of ae) { if (!e.line_uid) continue; const wd = att.filter(a => a.employees && a.employees.name === e.name && a.type === "clock_in").length; const bp = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate) * wd * 8 : 0); const ot = otRecords.filter(r => r.employee_id === e.id && r.status === "approved").reduce((s, r) => s + Number(r.amount || 0), 0); const ls = e.labor_tier ? [690,723,761,799,836,874,912,959,1007,1055,1103,1150][e.labor_tier-1]||0:0; const hs = e.health_tier ? [438,459,483,507,531,555,579,609,640,670,700,730][e.health_tier-1]||0:0; const net = bp + ot - ls - hs; try { await fetch("/api/webhook", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "push_text", line_uid: e.line_uid, text: "💰 " + month + " 薪資條\n━━━━━━━━━━━━\n👤 " + e.name + "\n📅 出勤 " + wd + " 天\n💵 底薪 $" + bp.toLocaleString() + (ot > 0 ? "\n⏱ 加班費 +$" + ot.toLocaleString() : "") + (ls > 0 ? "\n🛡 勞保 -$" + ls.toLocaleString() : "") + (hs > 0 ? "\n🏥 健保 -$" + hs.toLocaleString() : "") + "\n━━━━━━━━━━━━\n💰 實發 $" + net.toLocaleString() }) }); } catch(ex) {} } alert("已發送 " + ae.filter(e => e.line_uid).length + " 位員工的薪資條"); }} style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: "#4361ee", color: "#fff", fontSize: 11, cursor: "pointer" }}>{"📱 LINE發送薪資條"}</button>
+          </div>
         </div>}
 
         {!ld && tab === "pnl" && pnl && <div style={{ maxWidth: 500 }}>

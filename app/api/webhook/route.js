@@ -12,7 +12,7 @@ const DAYS = ["日","一","二","三","四","五","六"];
 const MI = (label, text) => ({ type: "action", action: { type: "message", label, text } });
 const MU = (label, url) => ({ type: "action", action: { type: "uri", label, uri: url } });
 const SITE = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
-const MENU_BASE = [MI("📍 上班打卡", "上班打卡"), MI("📍 下班打卡", "下班打卡"), MI("📅 我的班表", "我的班表"), MI("🙋 請假/預休", "請假申請"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報")];
+const MENU_BASE = [MI("📍 上班打卡", "上班打卡"), MI("📍 下班打卡", "下班打卡"), MI("📅 我的班表", "我的班表"), MI("🙋 請假/預休", "請假申請"), MI("🏖 我的假勤", "我的假勤"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報")];
 const MENU_SM = [...MENU_BASE, MI("📦 月結單據", "月結單據"), MI("💰 零用金", "零用金"), MU("🔗 後台", SITE)];
 const MENU_MGR = [...MENU_SM, MI("🏢 總部代付", "總部代付"), MI("📊 今日營收", "今日營收")];
 const MENU_ADMIN = [MU("🔗 管理後台", SITE), MI("📊 今日營收", "今日營收"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報"), MI("📦 月結單據", "月結單據"), MI("💰 零用金", "零用金"), MI("🏢 總部代付", "總部代付"), MI("📅 我的班表", "我的班表")];
@@ -308,6 +308,13 @@ async function handleEvent(event) {
   if (text === "上班打卡") return handleClockAction(rt, emp, "clock_in");
   if (text === "下班打卡") return handleClockAction(rt, emp, "clock_out");
   if (text === "我的班表") return querySchedule(rt, emp);
+  if (text === "我的假勤" || text === "假勤") {
+    try {
+      const r = await fetch(`${SITE}/api/admin/leave-balances?employee_id=${emp.id}&year=${new Date().getFullYear()}`).then(r => r.json());
+      const b = r.data || {};
+      return replyText(rt, `🏖 ${emp.name} ${new Date().getFullYear()}年假勤\n━━━━━━━━━━━━━━\n📅 特休：${b.annual_total || 0}天（已用${b.annual_used || 0} / 剩${b.annual_remaining || 0}天）\n🏥 病假：已用${b.sick_used || 0} / 30天\n📋 事假：已用${b.personal_used || 0} / 14天${b.overtime_comp_total > 0 ? "\n⏱ 加班補休：" + b.overtime_comp_total + "hr" : ""}`);
+    } catch(e) { return replyText(rt, "查詢失敗"); }
+  }
 
   // 請假流程
   if (text === "請假申請" || text === "預休假") return startLeaveRequest(rt, emp);
@@ -392,6 +399,16 @@ async function handleEvent(event) {
 }
 
 export async function POST(request) {
-  try { const body = await request.text(); const sig = request.headers.get("x-line-signature"); if (!verifySignature(body, sig)) return new Response("Invalid", { status: 401 }); const { events } = JSON.parse(body); await Promise.all(events.map(handleEvent)); return new Response("OK"); } catch (e) { console.error(e); return new Response("Error", { status: 500 }); }
+  try {
+    const ct = request.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      const body = await request.clone().json();
+      if (body.action === "push_text" && body.line_uid && body.text) {
+        await pushText(body.line_uid, body.text);
+        return Response.json({ success: true });
+      }
+    }
+    const body = await request.text(); const sig = request.headers.get("x-line-signature"); if (!verifySignature(body, sig)) return new Response("Invalid", { status: 401 }); const { events } = JSON.parse(body); await Promise.all(events.map(handleEvent)); return new Response("OK");
+  } catch (e) { console.error(e); return new Response("Error", { status: 500 }); }
 }
 export async function GET() { return new Response("🍯 Running!"); }
