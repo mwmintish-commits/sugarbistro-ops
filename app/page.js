@@ -166,14 +166,14 @@ export default function AdminPage() {
   const login = async () => {
     setErr("");
     if (step === 1) {
-      const r = await ap("/api/auth", { phone });
+      const r = await ap("/api/auth", { action: "send_code", phone });
       if (r.error) { setErr(r.error); return; }
       setStep(2);
     } else {
-      const r = await ap("/api/auth", { phone, code });
+      const r = await ap("/api/auth", { action: "verify", phone, code });
       if (r.error) { setErr(r.error); return; }
-      setAuth(r.data);
-      localStorage.setItem("sb_auth", JSON.stringify(r.data));
+      setAuth(r);
+      localStorage.setItem("sb_auth", JSON.stringify(r));
     }
   };
 
