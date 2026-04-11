@@ -4,9 +4,9 @@ const fmt = (n) => "$" + Number(n || 0).toLocaleString();
 const ROLES = { admin: "👑總部", manager: "🏠管理", store_manager: "🏪門店主管", staff: "👤員工" };
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
 const LT = { annual: { l: "特休", c: "#4361ee", bg: "#e6f1fb" }, sick: { l: "病假", c: "#b45309", bg: "#fff8e6" }, personal: { l: "事假", c: "#8a6d00", bg: "#fef9c3" }, menstrual: { l: "生理假", c: "#993556", bg: "#fbeaf0" }, off: { l: "例假", c: "#666", bg: "#f0f0f0" }, rest: { l: "休息日", c: "#888", bg: "#f5f5f5" } };
-const ROLE_TABS = { admin: ["dashboard", "employees", "schedules", "leaves", "attendance", "overtime", "payroll", "settlements", "deposits", "expenses", "payments", "pnl", "shifts", "worklogs", "announcements", "settings"], manager: ["employees", "schedules", "leaves", "attendance", "overtime", "payroll", "settlements", "deposits", "expenses", "payments", "pnl", "shifts", "worklogs"], store_manager: ["schedules", "leaves", "store_staff", "shifts", "worklogs", "announcements", "settlements", "deposits", "expenses"] };
-const TAB_L = { dashboard: "🏠總覽", employees: "👥員工", schedules: "📅排班", leaves: "🙋請假", attendance: "📍出勤", overtime: "⏱加班", payroll: "💰薪資", settlements: "💰日結", deposits: "🏦存款", expenses: "📦費用", payments: "💳撥款", pnl: "📊損益", shifts: "⏰班別", worklogs: "📋日誌", announcements: "📢公告", settings: "⚙️設定", store_staff: "👥本店員工" };
-const TAB_GROUPS = { "總覽": ["dashboard"], "人資": ["employees", "store_staff", "schedules", "leaves", "attendance", "overtime", "payroll"], "財務": ["settlements", "deposits", "expenses", "payments", "pnl"], "管理": ["shifts", "worklogs", "announcements", "settings"] };
+const ROLE_TABS = { admin: ["dashboard", "employees", "schedules", "leaves", "attendance", "overtime", "payroll", "settlements", "deposits", "expenses", "payments", "pnl", "recipes", "production", "inventory", "clients", "orders", "shifts", "worklogs", "announcements", "settings"], manager: ["employees", "schedules", "leaves", "attendance", "overtime", "payroll", "settlements", "deposits", "expenses", "payments", "pnl", "recipes", "production", "inventory", "clients", "orders", "shifts", "worklogs"], store_manager: ["schedules", "leaves", "store_staff", "shifts", "worklogs", "announcements", "settlements", "deposits", "expenses"] };
+const TAB_L = { dashboard: "🏠總覽", employees: "👥員工", schedules: "📅排班", leaves: "🙋請假", attendance: "📍出勤", overtime: "⏱加班", payroll: "💰薪資", settlements: "💰日結", deposits: "🏦存款", expenses: "📦費用", payments: "💳撥款", pnl: "📊損益", recipes: "📋配方", production: "🏭生產", inventory: "📊庫存", clients: "👥客戶", orders: "📝訂單", shifts: "⏰班別", worklogs: "📋日誌", announcements: "📢公告", settings: "⚙️設定", store_staff: "👥本店員工" };
+const TAB_GROUPS = { "總覽": ["dashboard"], "人資": ["employees", "store_staff", "schedules", "leaves", "attendance", "overtime", "payroll"], "財務": ["settlements", "deposits", "expenses", "payments", "pnl"], "生產": ["recipes", "production", "inventory"], "業務": ["clients", "orders"], "管理": ["shifts", "worklogs", "announcements", "settings"] };
 function ap(u, b) { return b ? fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).then(r => r.json()) : fetch(u).then(r => r.json()); }
 function Badge({ status }) { const m = { matched: { bg: "#e6f9f0", c: "#0a7c42" }, pending: { bg: "#fff8e6", c: "#8a6d00" }, approved: { bg: "#e6f9f0", c: "#0a7c42" }, rejected: { bg: "#fde8e8", c: "#b91c1c" }, anomaly: { bg: "#fde8e8", c: "#b91c1c" } }; const s = m[status] || { bg: "#f0f0f0", c: "#666" }; return <span style={{ padding: "2px 6px", borderRadius: 8, fontSize: 10, background: s.bg, color: s.c }}>{status}</span>; }
 function RB({ role }) { const c = { admin: { bg: "#fde8e8", c: "#b91c1c" }, manager: { bg: "#e6f1fb", c: "#185fa5" }, store_manager: { bg: "#fef9c3", c: "#8a6d00" }, staff: { bg: "#e6f9f0", c: "#0a7c42" } }; const s = c[role] || c.staff; return <span style={{ padding: "1px 5px", borderRadius: 5, fontSize: 9, background: s.bg, color: s.c }}>{ROLES[role] || role}</span>; }
@@ -524,6 +524,12 @@ function Dashboard({ auth, onLogout }) {
   const [pmtRecords, setPmtRecords] = useState([]); const [pmtSum, setPmtSum] = useState({});
   const [holidays, setHolidays] = useState([]);
   const [expSearch, setExpSearch] = useState("");
+  const [invItems, setInvItems] = useState([]); const [invSum, setInvSum] = useState({});
+  const [recipeList, setRecipeList] = useState([]);
+  const [clientList, setClientList] = useState([]);
+  const [orderList, setOrderList] = useState([]); const [orderSum, setOrderSum] = useState({});
+  const [prodList, setProdList] = useState([]); const [prodSum, setProdSum] = useState({});
+  const [si, setSi] = useState(null);
 
   useEffect(() => { ap("/api/admin/stores").then(d => { setStores(d.data || []); window.__stores = d.data || []; }); }, []);
   const load = useCallback(() => {
@@ -546,6 +552,11 @@ function Dashboard({ auth, onLogout }) {
     if (myTabs.includes("overtime")) ap("/api/admin/overtime?month=" + month + (sf ? "&store_id=" + sf : "")).then(r => { setOtRecords(r.data || []); setOtSum(r.summary || {}); });
     if (myTabs.includes("payments")) ap("/api/admin/payments?month=" + month).then(r => { setPmtRecords(r.data || []); setPmtSum(r.summary || {}); });
     ap("/api/admin/holidays?month=" + month).then(r => setHolidays(r.data || [])).catch(() => {});
+    if (myTabs.includes("inventory")) ap("/api/admin/inventory").then(r => { setInvItems(r.data || []); setInvSum(r.summary || {}); });
+    if (myTabs.includes("recipes")) ap("/api/admin/recipes").then(r => setRecipeList(r.data || []));
+    if (myTabs.includes("clients")) ap("/api/admin/clients").then(r => setClientList(r.data || []));
+    if (myTabs.includes("orders")) ap("/api/admin/orders").then(r => { setOrderList(r.data || []); setOrderSum(r.summary || {}); });
+    if (myTabs.includes("production")) ap("/api/admin/production?month=" + month).then(r => { setProdList(r.data || []); setProdSum(r.summary || {}); });
   }, [month, sf, ws, sv, myTabs]);
   useEffect(() => { load(); }, [load]);
 
@@ -723,6 +734,85 @@ function Dashboard({ auth, onLogout }) {
         </div>}
 
         {!ld && tab === "leaves" && <LeavesMgr lr={lr} pl={pl} rvLv={rvLv} sf={sf} month={month} stores={stores} LT={LT} />}
+
+        {/* ===== 生產/業務模組 ===== */}
+        {!ld && tab === "inventory" && <div>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{"📊 庫存管理"}</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#888" }}>品項數</div><div style={{ fontSize: 18, fontWeight: 600 }}>{invSum.count || 0}</div></div>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#888" }}>庫存總值</div><div style={{ fontSize: 18, fontWeight: 600 }}>{fmt(invSum.totalValue)}</div></div>
+          </div>
+          <button onClick={async () => { const name = prompt("品項名稱："); if (!name) return; const unit = prompt("單位（kg/g/個/包）：", "個"); const type = prompt("類型（raw_material/finished/packaging）：", "raw_material"); const cost = prompt("單位成本：", "0"); await ap("/api/admin/inventory", { action: "create", name, unit, type, cost_per_unit: Number(cost) }); load(); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: "#1a1a1a", color: "#fff", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>{"＋新增品項"}</button>
+          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["品項", "類型", "庫存", "安全量", "單價", "總值"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
+          <tbody>{invItems.map(i => <tr key={i.id} style={{ borderBottom: "1px solid #f0eeea", background: i.safe_stock > 0 && i.current_stock <= i.safe_stock ? "#fef9c3" : "transparent" }}><td style={{ padding: 6, fontWeight: 500 }}>{i.name}</td><td style={{ padding: 6, fontSize: 10 }}>{i.type === "raw_material" ? "原料" : i.type === "finished" ? "成品" : i.type === "packaging" ? "包材" : i.type}</td><td style={{ padding: 6, fontWeight: 600 }}>{i.current_stock + " " + (i.unit || "")}{i.safe_stock > 0 && i.current_stock <= i.safe_stock && <span style={{ color: "#b91c1c", fontSize: 9 }}>{" ⚠️低"}</span>}</td><td style={{ padding: 6, color: "#888" }}>{i.safe_stock || "-"}</td><td style={{ padding: 6 }}>{fmt(i.cost_per_unit)}</td><td style={{ padding: 6 }}>{fmt(i.current_stock * i.cost_per_unit)}</td></tr>)}</tbody></table></div>
+        </div>}
+
+        {!ld && tab === "recipes" && <div>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{"📋 配方管理"}</h3>
+          <button onClick={async () => { const name = prompt("產品名稱："); if (!name) return; const cat = prompt("分類（泡芙/餅乾/蛋糕/冰淇淋/吐司/其他）：", "泡芙"); const yld = prompt("每批產出數量：", "50"); const price = prompt("門市售價：", "0"); const wp = prompt("批發價：", "0"); await ap("/api/admin/recipes", { action: "create", name, category: cat, yield_qty: Number(yld), selling_price: Number(price), wholesale_price: Number(wp) }); load(); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: "#1a1a1a", color: "#fff", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>{"＋新增配方"}</button>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 8 }}>
+            {recipeList.map(r => <div key={r.id} style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <div><div style={{ fontSize: 13, fontWeight: 600 }}>{r.name}</div><div style={{ fontSize: 10, color: "#888" }}>{r.category} · 每批{r.yield_qty}{r.yield_unit || "個"}</div></div>
+                <span style={{ fontSize: 10, background: "#e6f9f0", color: "#0a7c42", padding: "2px 6px", borderRadius: 4, fontWeight: 600 }}>{r.margin_percent ? r.margin_percent + "%" : "-"}</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4, fontSize: 10 }}>
+                <div><span style={{ color: "#888" }}>成本</span><div style={{ fontWeight: 600 }}>{fmt(r.cost_per_unit)}</div></div>
+                <div><span style={{ color: "#888" }}>門市價</span><div style={{ fontWeight: 600 }}>{fmt(r.selling_price)}</div></div>
+                <div><span style={{ color: "#888" }}>批發價</span><div style={{ fontWeight: 600 }}>{fmt(r.wholesale_price)}</div></div>
+              </div>
+            </div>)}
+          </div>
+        </div>}
+
+        {!ld && tab === "production" && <div>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{"🏭 " + month + " 生產管理"}</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#888" }}>工單數</div><div style={{ fontSize: 18, fontWeight: 600 }}>{prodSum.count || 0}</div></div>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#888" }}>計劃/實際</div><div style={{ fontSize: 18, fontWeight: 600 }}>{(prodSum.totalPlanned || 0) + "/" + (prodSum.totalActual || 0)}</div></div>
+            <div style={{ background: "#e6f9f0", borderRadius: 8, padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#888" }}>平均良率</div><div style={{ fontSize: 18, fontWeight: 700, color: "#0a7c42" }}>{(prodSum.avgYield || 0) + "%"}</div></div>
+          </div>
+          <button onClick={async () => { const rn = prompt("選擇配方（輸入名稱）："); if (!rn) return; const recipe = recipeList.find(r => r.name.includes(rn)); const qty = prompt("計劃生產數量：", recipe?.yield_qty || "50"); const date = prompt("生產日期：", new Date().toLocaleDateString("sv-SE")); await ap("/api/admin/production", { action: "create", recipe_id: recipe?.id, recipe_name: rn, planned_qty: Number(qty), production_date: date }); load(); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: "#1a1a1a", color: "#fff", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>{"＋新增工單"}</button>
+          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["單號", "產品", "門市", "計劃", "實際", "良率", "狀態", "操作"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
+          <tbody>{prodList.map(p => <tr key={p.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6, fontSize: 10 }}>{p.order_number}</td><td style={{ padding: 6, fontWeight: 500 }}>{p.recipe_name}</td><td style={{ padding: 6 }}>{p.stores ? p.stores.name : ""}</td><td style={{ padding: 6 }}>{p.planned_qty}</td><td style={{ padding: 6, fontWeight: 600 }}>{p.actual_qty || "-"}</td><td style={{ padding: 6 }}>{p.yield_rate ? p.yield_rate + "%" : "-"}</td><td style={{ padding: 6 }}><Badge status={p.status} /></td>
+          <td style={{ padding: 6, display: "flex", gap: 2 }}>
+            {p.status === "planned" && <button onClick={async () => { await ap("/api/admin/production", { action: "start", order_id: p.id }); load(); }} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#4361ee", color: "#fff", fontSize: 9, cursor: "pointer" }}>開工</button>}
+            {p.status === "in_progress" && <button onClick={async () => { const qty = prompt("實際產出數量："); if (!qty) return; const waste = prompt("報廢數量：", "0"); await ap("/api/admin/production", { action: "complete", order_id: p.id, actual_qty: Number(qty), waste_qty: Number(waste || 0) }); load(); }} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#0a7c42", color: "#fff", fontSize: 9, cursor: "pointer" }}>完工</button>}
+          </td></tr>)}</tbody></table></div>
+        </div>}
+
+        {!ld && tab === "clients" && <div>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{"👥 客戶管理"}</h3>
+          <button onClick={async () => { const name = prompt("客戶/廠商名稱："); if (!name) return; const type = prompt("類型（oem/b2b/both）：", "b2b"); const contact = prompt("聯絡人：", ""); const phone = prompt("電話：", ""); const taxId = prompt("統編：", ""); await ap("/api/admin/clients", { action: "create", name, type, contact_person: contact, phone, tax_id: taxId }); load(); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: "#1a1a1a", color: "#fff", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>{"＋新增客戶"}</button>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
+            {clientList.map(c => <div key={c.id} style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</div>
+                <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, background: c.type === "oem" ? "#e6f1fb" : c.type === "b2b" ? "#e6f9f0" : "#fff8e6", color: c.type === "oem" ? "#185fa5" : c.type === "b2b" ? "#0a7c42" : "#8a6d00" }}>{c.type === "oem" ? "代工" : c.type === "b2b" ? "批發" : "代工+批發"}</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#888" }}>{c.contact_person && c.contact_person + " · "}{c.phone}{c.tax_id && " · 統編" + c.tax_id}</div>
+              <div style={{ fontSize: 10, color: "#888", marginTop: 2 }}>{c.payment_terms}</div>
+            </div>)}
+          </div>
+        </div>}
+
+        {!ld && tab === "orders" && <div>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{"📝 訂單管理"}</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#888" }}>訂單數</div><div style={{ fontSize: 18, fontWeight: 600 }}>{orderSum.count || 0}</div></div>
+            <div style={{ background: "#fde8e8", borderRadius: 8, padding: "8px 12px" }}><div style={{ fontSize: 10, color: "#b91c1c" }}>應收帳款</div><div style={{ fontSize: 18, fontWeight: 700, color: "#b91c1c" }}>{fmt(orderSum.unpaid)}</div></div>
+          </div>
+          <button onClick={async () => { if (clientList.length === 0) { alert("請先新增客戶"); return; } const cn = prompt("客戶名稱（" + clientList.map(c => c.name).join("/") + "）："); const client = clientList.find(c => c.name.includes(cn)); if (!client) { alert("找不到客戶"); return; } const type = prompt("類型（oem/b2b）：", client.type === "oem" ? "oem" : "b2b"); const pn = prompt("產品名稱："); const qty = prompt("數量："); const price = prompt("單價："); const dd = prompt("交期（YYYY-MM-DD）："); await ap("/api/admin/orders", { action: "create", client_id: client.id, type, delivery_date: dd, items: [{ product_name: pn, quantity: Number(qty), unit_price: Number(price) }] }); load(); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: "#1a1a1a", color: "#fff", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>{"＋新增訂單"}</button>
+          <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}><thead><tr style={{ background: "#faf8f5" }}>{["單號", "客戶", "類型", "金額", "交期", "狀態", "付款", "操作"].map(h => <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>)}</tr></thead>
+          <tbody>{orderList.map(o => <tr key={o.id} style={{ borderBottom: "1px solid #f0eeea" }}><td style={{ padding: 6, fontSize: 10 }}>{o.order_number}</td><td style={{ padding: 6, fontWeight: 500 }}>{o.clients ? o.clients.name : ""}</td><td style={{ padding: 6 }}>{o.type === "oem" ? "🏭代工" : "📦批發"}</td><td style={{ padding: 6, fontWeight: 600 }}>{fmt(o.total_amount)}</td><td style={{ padding: 6 }}>{o.delivery_date || "-"}</td><td style={{ padding: 6 }}><Badge status={o.status} /></td><td style={{ padding: 6 }}><Badge status={o.payment_status} /></td>
+          <td style={{ padding: 6 }}>{o.status === "confirmed" && <button onClick={async () => { await ap("/api/admin/orders", { action: "update_status", order_id: o.id, status: "shipped", shipped_date: new Date().toLocaleDateString("sv-SE") }); load(); }} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#4361ee", color: "#fff", fontSize: 9, cursor: "pointer" }}>出貨</button>}
+          {o.status === "shipped" && <button onClick={async () => { await ap("/api/admin/orders", { action: "update_status", order_id: o.id, status: "delivered", delivered_date: new Date().toLocaleDateString("sv-SE") }); load(); }} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#0a7c42", color: "#fff", fontSize: 9, cursor: "pointer" }}>已送達</button>}
+          {o.payment_status !== "paid" && <button onClick={async () => { await ap("/api/admin/orders", { action: "update_status", order_id: o.id, status: "paid", paid_amount: o.total_amount, paid_date: new Date().toLocaleDateString("sv-SE") }); load(); }} style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: "#b45309", color: "#fff", fontSize: 9, cursor: "pointer", marginLeft: 2 }}>收款</button>}
+          </td></tr>)}</tbody></table></div>
+        </div>}
+
+        {/* 圖片預覽 */}
+        {si && <div onClick={() => setSi(null)} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, cursor: "pointer" }}><img src={si} style={{ maxWidth: "90%", maxHeight: "90%", borderRadius: 8 }} /></div>}
 
         {!ld && tab === "shifts" && <div>
           <button onClick={() => { setSsf(!ssf); setEs(null); setSf2({ ...sf2, store_id: sf || sf2.store_id }); }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: ssf ? "#f0f0f0" : "#1a1a1a", color: ssf ? "#666" : "#fff", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>{ssf ? "✕" : "＋新增班別"}</button>
