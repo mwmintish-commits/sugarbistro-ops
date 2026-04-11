@@ -7,7 +7,7 @@ const DEFAULT_HB = [
   { title: "第二章 服務守則", items: ["親切招呼客人", "正確操作收銀機", "確實執行食安流程"] },
 ];
 
-export default function SettingsMgr({ stores, load }) {
+export default function SettingsMgr({ stores, load, month }) {
   const [companyName, setCompanyName] = useState("小食糖 Sugar Bistro");
   const [hols, setHols] = useState([]);
   const [hb, setHb] = useState(null);
@@ -111,25 +111,41 @@ export default function SettingsMgr({ stores, load }) {
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🏢 營業目標 & 費用預算</h4>
         {stores.map(s => {
-          const dim = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+          const [y, m] = (month || new Date().toISOString().slice(0, 7)).split("-").map(Number);
+          const dim = new Date(y, m, 0).getDate();
           return (
-            <div key={s.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0eeea" }}>
-              <span style={{ fontSize: 12, fontWeight: 500, width: 80 }}>{s.name}</span>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 9, color: "#888" }}>日營業目標</label>
-                <input type="number" defaultValue={s.daily_target || ""} onBlur={e => {
-                  ap("/api/admin/stores", { action: "update_targets", store_id: s.id, daily_target: Number(e.target.value || 0), monthly_target: Number(e.target.value || 0) * dim });
-                }} style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "center" }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 9, color: "#888" }}>{"月目標（×" + dim + "天）"}</label>
-                <div style={{ padding: "4px 0", fontSize: 12, fontWeight: 600, textAlign: "center" }}>{"$" + ((s.daily_target || 0) * dim).toLocaleString()}</div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 9, color: "#888" }}>月費用預算</label>
-                <input type="number" defaultValue={s.monthly_expense_budget || ""} onBlur={e => {
-                  ap("/api/admin/stores", { action: "update_targets", store_id: s.id, monthly_expense_budget: Number(e.target.value || 0) });
-                }} style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "center" }} />
+            <div key={s.id} style={{ padding: "8px 0", borderBottom: "1px solid #f0eeea" }}>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>{s.name}</span>
+              <div style={{ display: "flex", gap: 6, alignItems: "flex-end", marginTop: 4 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 9, color: "#888" }}>日營業目標</label>
+                  <input type="number" id={"dt-" + s.id} defaultValue={s.daily_target || ""}
+                    style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "center" }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 9, color: "#888" }}>{"月目標（" + month + "，" + dim + "天）"}</label>
+                  <div style={{ padding: "4px 0", fontSize: 12, fontWeight: 600, textAlign: "center" }}>
+                    {"$" + ((s.daily_target || 0) * dim).toLocaleString()}
+                  </div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 9, color: "#888" }}>月費用預算</label>
+                  <input type="number" id={"eb-" + s.id} defaultValue={s.monthly_expense_budget || ""}
+                    style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "center" }} />
+                </div>
+                <button onClick={async () => {
+                  const dt = Number(document.getElementById("dt-" + s.id)?.value || 0);
+                  const eb = Number(document.getElementById("eb-" + s.id)?.value || 0);
+                  await ap("/api/admin/stores", {
+                    action: "update_targets", store_id: s.id,
+                    daily_target: dt, monthly_target: dt * dim,
+                    monthly_expense_budget: eb
+                  });
+                  alert("✅ " + s.name + " 已儲存");
+                  load();
+                }} style={{ padding: "4px 10px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  💾
+                </button>
               </div>
             </div>
           );

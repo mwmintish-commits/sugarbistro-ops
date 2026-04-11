@@ -116,7 +116,10 @@ export async function POST(request) {
   }
 
   if (action === "delete") {
-    await supabase.from("schedules").delete().eq("id", body.schedule_id);
+    // 先清除出勤紀錄的排班關聯，避免外鍵約束擋住
+    await supabase.from("attendances").update({ schedule_id: null }).eq("schedule_id", body.schedule_id);
+    const { error } = await supabase.from("schedules").delete().eq("id", body.schedule_id);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ success: true });
   }
 

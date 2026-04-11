@@ -520,9 +520,9 @@ export default function AdminPage() {
                             <td style={{padding:5,fontWeight:500,fontSize:11,position:"sticky",left:0,background:"#fff",zIndex:1}}>{emp.name}<br/><RB role={emp.role}/></td>
                             {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);return(
                               <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top"}}>
-                                {sc?(<div style={{background:sc.type==="leave"?(LT[sc.leave_type]||LT.off).bg:sc.published?"#e6f9f0":"#fff8e6",borderRadius:4,padding:"2px 3px",fontSize:9,position:"relative"}}>
+                                {sc?(<div style={{background:sc.type==="leave"?(LT[sc.leave_type]||LT.off).bg:sc.published?"#e6f9f0":"#fff8e6",borderRadius:4,padding:"2px 3px",fontSize:9}}>
                                   {sc.type==="leave"?<div style={{color:(LT[sc.leave_type]||LT.off).c,fontWeight:500}}>{(LT[sc.leave_type]||LT.off).l}</div>:<div><div style={{fontWeight:500}}>{sc.shifts?sc.shifts.name:""}</div><div style={{color:"#888"}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></div>}
-                                  <button onClick={()=>delSch(sc.id)} style={{position:"absolute",top:-2,right:-2,background:"#fff",border:"1px solid #ddd",borderRadius:"50%",cursor:"pointer",fontSize:12,color:"#b91c1c",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",padding:0,zIndex:2}}>✕</button>
+                                  <div style={{textAlign:"right",marginTop:1}}><button onClick={(ev)=>{ev.stopPropagation();delSch(sc.id);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c",padding:"2px 4px"}}>✕刪</button></div>
                                 </div>):(<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else addSch(emp.id,v,date);}} style={{width:"100%",padding:1,borderRadius:3,border:"1px dashed #ddd",fontSize:9,color:"#ccc",background:"transparent",cursor:"pointer"}}><option value="">+</option><optgroup label="班別">{storeShifts.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</optgroup><optgroup label="休假">{Object.entries(LT).filter(([k])=>!["off","rest"].includes(k)).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select>)}
                               </td>);})}
                           </tr>))}</tbody>
@@ -793,16 +793,37 @@ export default function AdminPage() {
         {!ld && tab === "settlements" && (
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 日結 ("+stl.length+"筆)"}</h3>
+            {stl.length > 0 && (
+              <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"6px 10px",flex:1,minWidth:80}}>
+                  <div style={{fontSize:9,color:"#888"}}>營收合計</div>
+                  <div style={{fontSize:16,fontWeight:700,color:"#0a7c42"}}>{fmt(sum.total_net_sales)}</div>
+                </div>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"6px 10px",flex:1,minWidth:80}}>
+                  <div style={{fontSize:9,color:"#888"}}>現金合計</div>
+                  <div style={{fontSize:14,fontWeight:600}}>{fmt(sum.total_cash)}</div>
+                </div>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"6px 10px",flex:1,minWidth:80}}>
+                  <div style={{fontSize:9,color:"#888"}}>應存合計</div>
+                  <div style={{fontSize:14,fontWeight:600,color:"#b45309"}}>{fmt(sum.total_cash_to_deposit)}</div>
+                </div>
+              </div>
+            )}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","營收","現金","應存"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:700}}>
+                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","營收","現金","LINE Pay","TWQR","UberEat","悠遊卡","餐券","應存"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{stl.map(s=>(
                   <tr key={s.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                    <td style={{padding:6}}>{s.date}</td>
-                    <td style={{padding:6}}>{s.stores?s.stores.name:""}</td>
-                    <td style={{padding:6,fontWeight:600}}>{fmt(s.net_sales)}</td>
-                    <td style={{padding:6}}>{fmt(s.cash_amount)}</td>
-                    <td style={{padding:6}}>{fmt(s.cash_to_deposit)}</td>
+                    <td style={{padding:"5px 4px",textAlign:"right"}}>{s.date?.slice(5)}</td>
+                    <td style={{padding:"5px 4px",textAlign:"right",fontWeight:500}}>{s.stores?s.stores.name:""}</td>
+                    <td style={{padding:"5px 4px",textAlign:"right",fontWeight:700,color:"#0a7c42"}}>{fmt(s.net_sales)}</td>
+                    <td style={{padding:"5px 4px",textAlign:"right"}}>{fmt(s.cash_amount)}</td>
+                    <td style={{padding:"5px 4px",textAlign:"right",color:s.line_pay_amount>0?"#185fa5":"#ccc"}}>{s.line_pay_amount>0?fmt(s.line_pay_amount):"-"}</td>
+                    <td style={{padding:"5px 4px",textAlign:"right",color:s.twqr_amount>0?"#0a7c42":"#ccc"}}>{s.twqr_amount>0?fmt(s.twqr_amount):"-"}</td>
+                    <td style={{padding:"5px 4px",textAlign:"right",color:s.uber_eat_amount>0?"#0a7c42":"#ccc"}}>{s.uber_eat_amount>0?fmt(s.uber_eat_amount):"-"}</td>
+                    <td style={{padding:"5px 4px",textAlign:"right",color:s.easy_card_amount>0?"#0a7c42":"#ccc"}}>{s.easy_card_amount>0?fmt(s.easy_card_amount):"-"}</td>
+                    <td style={{padding:"5px 4px",textAlign:"right",color:s.meal_voucher_amount>0?"#0a7c42":"#ccc"}}>{s.meal_voucher_amount>0?fmt(s.meal_voucher_amount):"-"}</td>
+                    <td style={{padding:"5px 4px",textAlign:"right",fontWeight:600,color:"#b45309"}}>{fmt(s.cash_to_deposit)}</td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -1240,7 +1261,7 @@ export default function AdminPage() {
 
         {/* SETTINGS */}
         {!ld && tab === "settings" && (
-          <SettingsMgr stores={stores} load={load} />
+          <SettingsMgr stores={stores} load={load} month={month} />
         )}
 
         {/* IMAGE PREVIEW */}
