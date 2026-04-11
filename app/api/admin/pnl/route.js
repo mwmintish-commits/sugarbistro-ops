@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, eom } from "@/lib/supabase";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -8,7 +8,7 @@ export async function GET(request) {
   if (!month) return Response.json({ error: "需要指定月份" }, { status: 400 });
 
   // 收入：日結營業額
-  let revQ = supabase.from("daily_settlements").select("net_sales, cash_amount, line_pay_amount, twqr_amount, uber_eat_amount, easy_card_amount, meal_voucher_amount, line_credit_amount, drink_voucher_amount, stores(name)").gte("date", `${month}-01`).lte("date", `${month}-31`);
+  let revQ = supabase.from("daily_settlements").select("net_sales, cash_amount, line_pay_amount, twqr_amount, uber_eat_amount, easy_card_amount, meal_voucher_amount, line_credit_amount, drink_voucher_amount, stores(name)").gte("date", `${month}-01`).lte("date", `${eom(month)}`);
   if (store_id) revQ = revQ.eq("store_id", store_id);
   const { data: revenues } = await revQ;
 

@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, eom } from "@/lib/supabase";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -6,7 +6,7 @@ export async function GET(request) {
   const month = searchParams.get("month");
 
   let query = supabase.from("national_holidays").select("*").eq("year", year).order("date");
-  if (month) query = query.gte("date", month + "-01").lte("date", month + "-31");
+  if (month) query = query.gte("date", month + "-01").lte("date", eom(month));
 
   const { data, error } = await query;
   if (error) return Response.json({ error: error.message }, { status: 500 });

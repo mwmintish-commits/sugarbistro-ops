@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, eom } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
 const LABOR_SELF = [690,723,761,799,836,874,912,959,1007,1055,1103,1150];
@@ -39,7 +39,7 @@ export async function POST(request) {
       // 出勤天數
       const { data: records } = await supabase.from("attendances")
         .select("type").eq("employee_id", emp.id).eq("type", "clock_in")
-        .gte("timestamp", mk + "-01T00:00:00").lte("timestamp", mk + "-31T23:59:59");
+        .gte("timestamp", mk + "-01T00:00:00").lte("timestamp", eom(mk) + "T23:59:59");
       const workDays = (records || []).length;
 
       // 底薪
@@ -50,7 +50,7 @@ export async function POST(request) {
       const { data: ot } = await supabase.from("overtime_records")
         .select("amount, comp_type, comp_hours, comp_converted")
         .eq("employee_id", emp.id).eq("status", "approved")
-        .gte("date", mk + "-01").lte("date", mk + "-31");
+        .gte("date", mk + "-01").lte("date", eom(mk));
       const otPay = (ot || []).filter(r => r.comp_type === "pay" || r.comp_converted)
         .reduce((s, r) => s + Number(r.amount || 0), 0);
       const compH = (ot || []).filter(r => r.comp_type === "comp" && !r.comp_used && !r.comp_converted)

@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, eom } from "@/lib/supabase";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -9,7 +9,7 @@ export async function GET(request) {
   let query = supabase.from("overtime_records")
     .select("*, employees(name, store_id), stores(name)")
     .order("date", { ascending: false });
-  if (month) query = query.gte("date", month + "-01").lte("date", month + "-31");
+  if (month) query = query.gte("date", month + "-01").lte("date", eom(month));
   if (store_id) query = query.eq("store_id", store_id);
   if (employee_id) query = query.eq("employee_id", employee_id);
 

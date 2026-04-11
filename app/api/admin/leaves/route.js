@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, eom } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
 export async function GET(request) {
@@ -10,7 +10,7 @@ export async function GET(request) {
   let query = supabase.from("leave_requests").select("*, employees(name, store_id, line_uid, stores(name))").order("created_at", { ascending: false });
   if (status) query = query.eq("status", status);
   if (employee_id) query = query.eq("employee_id", employee_id);
-  if (month) query = query.gte("start_date", `${month}-01`).lte("start_date", `${month}-31`);
+  if (month) query = query.gte("start_date", `${month}-01`).lte("start_date", `${eom(month)}`);
 
   const { data, error } = await query.limit(100);
   if (error) return Response.json({ error: error.message }, { status: 500 });

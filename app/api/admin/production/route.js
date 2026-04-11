@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, eom } from "@/lib/supabase";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -9,7 +9,7 @@ export async function GET(request) {
   let q = supabase.from("production_orders").select("*, stores(name)").order("production_date", { ascending: false });
   if (status) q = q.eq("status", status);
   if (store_id) q = q.eq("store_id", store_id);
-  if (month) q = q.gte("production_date", month + "-01").lte("production_date", month + "-31");
+  if (month) q = q.gte("production_date", month + "-01").lte("production_date", eom(month));
   const { data } = await q.limit(200);
 
   const totalPlanned = (data || []).reduce((s, o) => s + Number(o.planned_qty || 0), 0);

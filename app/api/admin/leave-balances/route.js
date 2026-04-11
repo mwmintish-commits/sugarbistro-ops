@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, eom } from "@/lib/supabase";
 
 function calcAnnualLeave(hireDate) {
   if (!hireDate) return 0;
@@ -71,7 +71,11 @@ export async function GET(request) {
 
   const results = [];
   for (const emp of filtered || []) {
-    const annualDays = calcAnnualLeave(emp.hire_date);
+    // 優先使用手動設定的特休天數，否則依到職日計算
+    const { data: balRec } = await supabase.from("leave_balances")
+      .select("annual_total").eq("employee_id", emp.id).eq("year", year).single()
+      .catch(() => ({ data: null }));
+    const annualDays = balRec?.annual_total ?? calcAnnualLeave(emp.hire_date);
     const { data: leaves } = await supabase.from("leave_requests").select("leave_type, start_date, end_date, half_day")
       .eq("employee_id", emp.id).eq("status", "approved")
       .gte("start_date", year + "-01-01").lte("start_date", year + "-12-31");
@@ -104,4 +108,20 @@ export async function GET(request) {
   }
 
   return Response.json({ data: results });
+}
+
+export async function POST(request) {
+  const body = await request.json();
+
+  if (body.action === "set_annual") {
+    const { employee_id, annual_total } = body;
+    const year = new Date().getFullYear();
+    const { data, error } = await supabase.from("leave_balances").upsert({
+      employee_id, year, annual_total,
+    }, { onConflict: "employee_id,year" }).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ data });
+  }
+
+  return Response.json({ error: "Unknown action" }, { status: 400 });
 }

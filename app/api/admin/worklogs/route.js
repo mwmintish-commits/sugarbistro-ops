@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, eom } from "@/lib/supabase";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -83,7 +83,7 @@ export async function GET(request) {
   if (store_id) q = q.eq("store_id", store_id);
   if (searchParams.get("month")) {
     const m = searchParams.get("month");
-    q = q.gte("date", m + "-01").lte("date", m + "-31");
+    q = q.gte("date", m + "-01").lte("date", eom(m));
   }
   const { data: allItems } = await q.limit(2000);
 

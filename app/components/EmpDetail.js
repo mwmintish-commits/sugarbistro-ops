@@ -23,7 +23,8 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
   const [form, setForm] = useState({
     role: "", employment_type: "", store_id: "",
     labor_tier: "", health_tier: "",
-    labor_start_date: "", health_start_date: "", hourly_rate: "", monthly_salary: ""
+    labor_start_date: "", health_start_date: "", hourly_rate: "", monthly_salary: "",
+    hire_date: "", annual_leave_override: ""
   });
 
   const reload = () => {
@@ -39,7 +40,9 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
           labor_start_date: r.data.labor_start_date || "",
           health_start_date: r.data.health_start_date || "",
           hourly_rate: r.data.hourly_rate || "",
-          monthly_salary: r.data.monthly_salary || ""
+          monthly_salary: r.data.monthly_salary || "",
+          hire_date: r.data.hire_date || "",
+          annual_leave_override: ""
         });
       }
       setLd(false);
@@ -55,6 +58,7 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
       action: "update", employee_id: empId,
       role: form.role, employment_type: form.employment_type,
       store_id: form.store_id || null,
+      hire_date: form.hire_date || null,
       labor_tier: form.labor_tier ? Number(form.labor_tier) : null,
       health_tier: form.health_tier ? Number(form.health_tier) : null,
       labor_start_date: form.labor_start_date || null,
@@ -62,6 +66,13 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
       hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : null,
       monthly_salary: form.monthly_salary ? Number(form.monthly_salary) : null
     });
+    // 手動調整特休天數
+    if (form.annual_leave_override !== "" && form.annual_leave_override !== null) {
+      await ap("/api/admin/leave-balances", {
+        action: "set_annual", employee_id: empId,
+        annual_total: Number(form.annual_leave_override)
+      });
+    }
     setMsg("✅ 已儲存");
     setSaving(false);
     reload();
@@ -102,9 +113,19 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
 
         <div style={sec}>
           <h3 style={sh}>在職資訊</h3>
-          <Row l="到職日" v={e.hire_date} />
+          <div style={{ marginBottom: 4 }}>
+            <label style={{ fontSize: 10, color: "#888" }}>到職日</label>
+            <input type="date" value={form.hire_date} onChange={ev => setForm({...form, hire_date: ev.target.value})} style={inp} />
+          </div>
           <Row l="年資" v={(d.service_months || 0) + "個月"} />
-          <Row l="特休" v={(d.annual_leave_days || 0) + "天"} />
+          <div style={{ marginBottom: 4 }}>
+            <label style={{ fontSize: 10, color: "#888" }}>{"特休天數（系統計算：" + (d.annual_leave_days || 0) + "天）"}</label>
+            <input type="number" value={form.annual_leave_override}
+              onChange={ev => setForm({...form, annual_leave_override: ev.target.value})}
+              placeholder={"自動" + (d.annual_leave_days || 0) + "天，填數字可覆蓋"}
+              style={inp} />
+            <div style={{ fontSize: 9, color: "#888", marginTop: 1 }}>留空=依到職日自動計算，填數字=手動設定（舊員工導入用）</div>
+          </div>
           <Row l="合約" v={e.onboarding_completed ? "✅已簽" : "❌未簽"} />
           {e.probation_end_date && (
             <Row l="試用期" v={

@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, eom } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
 export async function GET(request) {
@@ -31,7 +31,7 @@ export async function GET(request) {
     let q = supabase.from("clock_amendments")
       .select("*, employees(name), stores(name)")
       .order("created_at", { ascending: false });
-    if (month) q = q.gte("date", month + "-01").lte("date", month + "-31");
+    if (month) q = q.gte("date", month + "-01").lte("date", eom(month));
     if (store_id) q = q.eq("store_id", store_id);
     const { data } = await q.limit(100);
     return Response.json({ data });
@@ -42,7 +42,7 @@ export async function GET(request) {
     let q = supabase.from("attendance_alerts")
       .select("*, employees(name), stores(name)")
       .order("created_at", { ascending: false });
-    if (month) q = q.gte("date", month + "-01").lte("date", month + "-31");
+    if (month) q = q.gte("date", month + "-01").lte("date", eom(month));
     const { data } = await q.limit(100);
     return Response.json({ data });
   }
@@ -54,7 +54,7 @@ export async function GET(request) {
   if (store_id) query = query.eq("store_id", store_id);
   if (month) {
     query = query.gte("timestamp", month + "-01T00:00:00")
-      .lte("timestamp", month + "-31T23:59:59");
+      .lte("timestamp", eom(month) + "T23:59:59");
   }
   if (date) {
     query = query.gte("timestamp", date + "T00:00:00")
@@ -143,7 +143,7 @@ export async function POST(request) {
         .select("type, timestamp, late_minutes")
         .eq("employee_id", emp.id)
         .gte("timestamp", mk + "-01T00:00:00")
-        .lte("timestamp", mk + "-31T23:59:59");
+        .lte("timestamp", eom(mk) + "T23:59:59");
 
       const clockIns = (records || []).filter(r => r.type === "clock_in");
       const workDays = clockIns.length;
@@ -154,7 +154,7 @@ export async function POST(request) {
       const { data: leaves } = await supabase.from("leave_requests")
         .select("start_date, end_date, half_day")
         .eq("employee_id", emp.id).eq("status", "approved")
-        .gte("start_date", mk + "-01").lte("start_date", mk + "-31");
+        .gte("start_date", mk + "-01").lte("start_date", eom(mk));
       let leaveDays = 0;
       for (const l of leaves || []) {
         leaveDays += l.half_day ? 0.5 :
@@ -165,7 +165,7 @@ export async function POST(request) {
       const { data: ot } = await supabase.from("overtime_records")
         .select("overtime_minutes, amount, comp_type, comp_hours")
         .eq("employee_id", emp.id).eq("status", "approved")
-        .gte("date", mk + "-01").lte("date", mk + "-31");
+        .gte("date", mk + "-01").lte("date", eom(mk));
       const otHours = (ot || []).reduce((s, r) => s + (r.overtime_minutes || 0), 0) / 60;
       const otCompH = (ot || []).filter(r => r.comp_type === "comp")
         .reduce((s, r) => s + Number(r.comp_hours || 0), 0);
@@ -175,7 +175,7 @@ export async function POST(request) {
       // 補登
       const { data: amends } = await supabase.from("clock_amendments")
         .select("id").eq("employee_id", emp.id).eq("status", "approved")
-        .gte("date", mk + "-01").lte("date", mk + "-31");
+        .gte("date", mk + "-01").lte("date", eom(mk));
 
       await supabase.from("attendance_monthly_reports").upsert({
         employee_id: emp.id, store_id: emp.store_id,
