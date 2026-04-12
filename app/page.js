@@ -21,7 +21,7 @@ const ROLE_TABS = {
 };
 const TAB_L = {
   dashboard:"🏠總覽",employees:"👥員工",schedules:"📅排班",leaves:"🙋請假",
-  attendance:"📍出勤",overtime:"⏱加班",payroll:"💰薪資",
+  attendance:"📍出勤",overtime:"🏖休假表",payroll:"💰薪資",
   reviews:"📝考核",bonus:"🏆獎金",
   settlements:"💰日結",
   deposits:"🏦存款",expenses:"📦費用",payments:"💳撥款",pnl:"📊損益",
@@ -522,6 +522,10 @@ export default function AdminPage() {
                           style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>
                           停用
                         </button>
+                        <button onClick={async()=>{if(!confirm("⚠️ 永久刪除「"+e.name+"」？\n\n此操作會刪除所有排班/出勤/薪資/請假/考核紀錄，無法復原！"))return;if(!confirm("再次確認：真的要永久刪除嗎？"))return;await ap("/api/admin/employees",{action:"delete",employee_id:e.id});load();}}
+                          style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b91c1c",background:"transparent",color:"#b91c1c",fontSize:9,cursor:"pointer",marginLeft:2}}>
+                          🗑
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -750,68 +754,137 @@ export default function AdminPage() {
         {/* OVERTIME */}
         {!ld && tab === "overtime" && (
           <div>
-            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"⏱ "+month+" 加班紀錄"}</h3>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:10}}>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px"}}><div style={{fontSize:10,color:"#888"}}>筆數</div><div style={{fontSize:18,fontWeight:600}}>{otSum.count||0}</div></div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px"}}><div style={{fontSize:10,color:"#888"}}>總時數</div><div style={{fontSize:18,fontWeight:600}}>{Math.round((otSum.totalMinutes||0)/60*10)/10+"hr"}</div></div>
-              <div style={{background:"#fff8e6",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#8a6d00"}}>加班費</div><div style={{fontSize:18,fontWeight:600}}>{fmt(otSum.totalAmount)}</div></div>
-              <div style={{background:"#e6f1fb",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#185fa5"}}>補休餘額</div><div style={{fontSize:18,fontWeight:600,color:"#4361ee"}}>{(otSum.compHours||0)+"hr"}</div></div>
-            </div>
+            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"🏖 "+new Date().getFullYear()+" 年度休假表"}</h3>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
-              <button onClick={async()=>{const r=await ap("/api/admin/overtime",{action:"convert_expired"});alert("已轉換 "+r.converted+" 筆過期補休為加班費");load();}}
+              <button onClick={async()=>{const r=await ap("/api/admin/overtime",{action:"convert_expired"});alert("已轉換 "+(r.converted||0)+" 筆過期補休為加班費");load();}}
                 style={{padding:"4px 10px",borderRadius:5,border:"1px solid #b45309",background:"transparent",color:"#b45309",fontSize:11,cursor:"pointer"}}>
                 🔄 過期補休轉加班費
               </button>
+              <button onClick={load} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>🔄 重新整理</button>
             </div>
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","員工","門市","時數","類型","金額/補休","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
-                <tbody>{otRecords.map(r=>(
-                  <tr key={r.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                    <td style={{padding:6}}>{r.date}</td>
-                    <td style={{padding:6,fontWeight:500}}>{r.employees?r.employees.name:""}</td>
-                    <td style={{padding:6}}>{r.stores?r.stores.name:""}</td>
-                    <td style={{padding:6}}>{Math.round(r.overtime_minutes/60*10)/10+"hr"}</td>
-                    <td style={{padding:6}}>
-                      {r.comp_type==="comp" && !r.comp_used && !r.comp_converted && (
-                        <span style={{background:"#e6f1fb",color:"#185fa5",padding:"1px 5px",borderRadius:4,fontSize:9}}>
-                          {"補休 "+r.comp_hours+"hr"}
-                          <br/><span style={{fontSize:8,color:"#888"}}>{"到期 "+r.comp_expiry_date}</span>
-                        </span>
-                      )}
-                      {r.comp_type==="comp" && r.comp_used && (
-                        <span style={{background:"#e6f9f0",color:"#0a7c42",padding:"1px 5px",borderRadius:4,fontSize:9}}>補休已使用</span>
-                      )}
-                      {r.comp_type==="comp" && r.comp_converted && (
-                        <span style={{background:"#fef9c3",color:"#8a6d00",padding:"1px 5px",borderRadius:4,fontSize:9}}>過期→轉薪資</span>
-                      )}
-                      {r.comp_type==="pay" && (
-                        <span style={{background:"#fff8e6",color:"#8a6d00",padding:"1px 5px",borderRadius:4,fontSize:9}}>{"加班費 "+fmt(r.amount)}</span>
-                      )}
-                      {r.comp_type==="pending" && (
-                        <span style={{background:"#f0f0f0",color:"#888",padding:"1px 5px",borderRadius:4,fontSize:9}}>待選擇</span>
-                      )}
-                    </td>
-                    <td style={{padding:6,fontWeight:600}}>
-                      {r.comp_type==="pay"||r.comp_converted?fmt(r.amount):r.comp_type==="comp"?(r.comp_hours||0)+"hr":fmt(r.amount)}
-                    </td>
-                    <td style={{padding:6}}><Badge status={r.status} /></td>
-                    <td style={{padding:6}}>
-                      {r.status==="pending" && (
-                        <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
-                          <button onClick={async()=>{await ap("/api/admin/overtime",{action:"review",record_id:r.id,status:"approved",comp_type:"pay"});load();}}
-                            style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#b45309",color:"#fff",fontSize:9,cursor:"pointer"}}>💰加班費</button>
-                          <button onClick={async()=>{await ap("/api/admin/overtime",{action:"review",record_id:r.id,status:"approved",comp_type:"comp"});load();}}
-                            style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#4361ee",color:"#fff",fontSize:9,cursor:"pointer"}}>🔄補休</button>
-                          <button onClick={async()=>{await ap("/api/admin/overtime",{action:"review",record_id:r.id,status:"rejected"});load();}}
-                            style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>❌</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
+
+            {/* 每人休假卡片 */}
+            {ae.map(e => {
+              const yr = new Date().getFullYear();
+              // 從 leave-balances 整合的資料（如果已載入）
+              // 先用前端計算的簡易版
+              const eOt = otRecords.filter(r => r.employee_id === e.id);
+              const otHours = eOt.reduce((s,r) => s + (r.overtime_minutes||0)/60, 0);
+              const otPay = eOt.filter(r => r.comp_type === "pay" || r.comp_converted).reduce((s,r) => s + Number(r.amount||0), 0);
+              const compAvail = eOt.filter(r => r.comp_type === "comp" && !r.comp_used && !r.comp_converted).reduce((s,r) => s + Number(r.comp_hours||0), 0);
+              const compUsed = eOt.filter(r => r.comp_type === "comp" && r.comp_used).reduce((s,r) => s + Number(r.comp_hours||0), 0);
+              const compConverted = eOt.filter(r => r.comp_type === "comp" && r.comp_converted).reduce((s,r) => s + Number(r.comp_hours||0), 0);
+              const today2 = new Date().toLocaleDateString("sv-SE");
+              const soon = new Date(Date.now() + 14*86400000).toLocaleDateString("sv-SE");
+              const expiring = eOt.filter(r => r.comp_type === "comp" && !r.comp_used && !r.comp_converted && r.comp_expiry_date && r.comp_expiry_date <= soon && r.comp_expiry_date >= today2);
+              const expiringH = expiring.reduce((s,r) => s + Number(r.comp_hours||0), 0);
+              const annualDays = e.annual_leave_days || 0;
+
+              return (
+                <div key={e.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <div>
+                      <span style={{fontSize:14,fontWeight:600}}>{e.name}</span>
+                      <span style={{fontSize:10,color:"#888",marginLeft:6}}>{e.stores?e.stores.name:"總部"}</span>
+                      <span style={{fontSize:9,color:"#aaa",marginLeft:6}}>年資{e.service_months||0}月</span>
+                    </div>
+                  </div>
+
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(100px, 1fr))",gap:6,marginBottom:8}}>
+                    {/* 特休 */}
+                    <div style={{background:"#e6f1fb",borderRadius:6,padding:8,textAlign:"center"}}>
+                      <div style={{fontSize:9,color:"#185fa5"}}>🏖 特休</div>
+                      <div style={{fontSize:20,fontWeight:700,color:"#185fa5"}}>{annualDays}</div>
+                      <div style={{fontSize:9,color:"#888"}}>天</div>
+                      <button onClick={async()=>{
+                        const v=prompt(e.name+" 特休天數：",annualDays);if(v===null)return;
+                        await ap("/api/admin/leave-balances",{action:"update_balance",employee_id:e.id,annual_total:Number(v)});
+                        load();
+                      }} style={{fontSize:8,color:"#4361ee",background:"none",border:"none",cursor:"pointer",marginTop:2}}>✏️修改</button>
+                    </div>
+
+                    {/* 加班總時數 */}
+                    <div style={{background:"#faf8f5",borderRadius:6,padding:8,textAlign:"center"}}>
+                      <div style={{fontSize:9,color:"#666"}}>⏱ 加班</div>
+                      <div style={{fontSize:20,fontWeight:700,color:"#333"}}>{Math.round(otHours*10)/10}</div>
+                      <div style={{fontSize:9,color:"#888"}}>hr</div>
+                    </div>
+
+                    {/* 加班費 */}
+                    <div style={{background:"#fff8e6",borderRadius:6,padding:8,textAlign:"center"}}>
+                      <div style={{fontSize:9,color:"#8a6d00"}}>💰 加班費</div>
+                      <div style={{fontSize:16,fontWeight:700,color:"#8a6d00"}}>{fmt(otPay)}</div>
+                      <div style={{fontSize:9,color:"#888"}}>{compConverted>0?"含轉薪"+compConverted+"hr":""}</div>
+                    </div>
+
+                    {/* 補休可用 */}
+                    <div style={{background:compAvail>0?"#e6f9f0":"#f5f5f5",borderRadius:6,padding:8,textAlign:"center"}}>
+                      <div style={{fontSize:9,color:"#0a7c42"}}>🔄 補休可用</div>
+                      <div style={{fontSize:20,fontWeight:700,color:compAvail>0?"#0a7c42":"#ccc"}}>{compAvail>0?compAvail:0}</div>
+                      <div style={{fontSize:9,color:"#888"}}>hr{compUsed>0?" 已休"+compUsed:""}</div>
+                      {expiringH>0 && <div style={{fontSize:8,color:"#b91c1c"}}>{"⚠️"+expiringH+"hr即將到期"}</div>}
+                    </div>
+                  </div>
+
+                  {/* 操作列 */}
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                    {compAvail>0 && (
+                      <button onClick={async()=>{
+                        if(!confirm(e.name+" 補休"+compAvail+"hr全部轉現金？"))return;
+                        const ids=eOt.filter(r=>r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted).map(r=>r.id);
+                        const r=await ap("/api/admin/leave-balances",{action:"convert_to_cash",employee_id:e.id,record_ids:ids});
+                        alert("已轉換 "+(r.converted_hours||0)+"hr → "+fmt(r.amount));load();
+                      }} style={{padding:"3px 8px",borderRadius:4,border:"1px solid #b45309",background:"transparent",color:"#b45309",fontSize:9,cursor:"pointer"}}>
+                        💰 補休轉現金
+                      </button>
+                    )}
+                    {eOt.filter(r=>r.status==="pending").length>0 && (
+                      <span style={{fontSize:9,color:"#b91c1c",padding:"3px 0"}}>{"⏳ "+eOt.filter(r=>r.status==="pending").length+"筆待審核"}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* 加班明細 */}
+            {otRecords.length > 0 && (
+              <div style={{marginTop:12}}>
+                <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>{month+" 加班明細"}</h4>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                    <thead><tr style={{background:"#faf8f5"}}>{["日期","員工","時數","類型","金額/補休","狀態","操作"].map(h=><th key={h} style={{padding:5,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                    <tbody>{otRecords.map(r=>(
+                      <tr key={r.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                        <td style={{padding:5}}>{r.date}</td>
+                        <td style={{padding:5,fontWeight:500}}>{r.employees?r.employees.name:""}</td>
+                        <td style={{padding:5}}>{Math.round(r.overtime_minutes/60*10)/10+"hr"}</td>
+                        <td style={{padding:5}}>
+                          {r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted&&<span style={{background:"#e6f1fb",color:"#185fa5",padding:"1px 4px",borderRadius:3,fontSize:9}}>{"補休"+r.comp_hours+"hr"}</span>}
+                          {r.comp_type==="comp"&&r.comp_used&&<span style={{background:"#e6f9f0",color:"#0a7c42",padding:"1px 4px",borderRadius:3,fontSize:9}}>已休</span>}
+                          {r.comp_type==="comp"&&r.comp_converted&&<span style={{background:"#fef9c3",color:"#8a6d00",padding:"1px 4px",borderRadius:3,fontSize:9}}>轉薪</span>}
+                          {r.comp_type==="pay"&&<span style={{background:"#fff8e6",color:"#8a6d00",padding:"1px 4px",borderRadius:3,fontSize:9}}>{fmt(r.amount)}</span>}
+                          {r.comp_type==="pending"&&<span style={{background:"#f0f0f0",color:"#888",padding:"1px 4px",borderRadius:3,fontSize:9}}>待選</span>}
+                        </td>
+                        <td style={{padding:5,fontWeight:600}}>{r.comp_type==="pay"||r.comp_converted?fmt(r.amount):r.comp_type==="comp"?(r.comp_hours||0)+"hr":"-"}</td>
+                        <td style={{padding:5}}><Badge status={r.status} /></td>
+                        <td style={{padding:5}}>
+                          {r.status==="pending" && (
+                            <div style={{display:"flex",gap:2}}>
+                              <button onClick={async()=>{await ap("/api/admin/overtime",{action:"review",record_id:r.id,status:"approved",comp_type:"pay"});load();}}
+                                style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#b45309",color:"#fff",fontSize:9,cursor:"pointer"}}>💰</button>
+                              <button onClick={async()=>{await ap("/api/admin/overtime",{action:"review",record_id:r.id,status:"approved",comp_type:"comp"});load();}}
+                                style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#4361ee",color:"#fff",fontSize:9,cursor:"pointer"}}>🔄</button>
+                              <button onClick={async()=>{await ap("/api/admin/overtime",{action:"review",record_id:r.id,status:"rejected"});load();}}
+                                style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>❌</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             {(() => {
               const byEmp = {};
               otRecords.forEach(r => { const n = r.employees ? r.employees.name : "?"; byEmp[n] = (byEmp[n]||0) + (r.overtime_minutes||0); });

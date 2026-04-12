@@ -108,6 +108,25 @@ export async function POST(request) {
     return Response.json({ data });
   }
 
+  // 永久刪除
+  if (body.action === "delete") {
+    const eid = body.employee_id;
+    // 先清關聯資料
+    await supabase.from("schedules").delete().eq("employee_id", eid);
+    await supabase.from("attendances").delete().eq("employee_id", eid);
+    await supabase.from("leave_requests").delete().eq("employee_id", eid);
+    await supabase.from("leave_balances").delete().eq("employee_id", eid);
+    await supabase.from("overtime_records").delete().eq("employee_id", eid);
+    await supabase.from("payroll_records").delete().eq("employee_id", eid);
+    await supabase.from("violations").delete().eq("employee_id", eid);
+    await supabase.from("performance_reviews").delete().eq("employee_id", eid);
+    await supabase.from("bonus_records").delete().eq("employee_id", eid);
+    await supabase.from("employee_documents").delete().eq("employee_id", eid);
+    const { error } = await supabase.from("employees").delete().eq("id", eid);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ success: true });
+  }
+
   // 產生綁定碼
   if (body.action === "generate_bind_code") {
     const bindCode = generateBindCode();
