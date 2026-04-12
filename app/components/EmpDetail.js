@@ -229,6 +229,29 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
               )}
             </div>
           )}
+          {/* 合約操作（已簽約才顯示） */}
+          {(e.contract_signed || e.onboarding_completed) && (
+            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={() => {
+                const cd = docs.find(d => d.doc_type === "contract_pdf");
+                if (cd && cd.file_url) {
+                  if (cd.file_url.startsWith("data:text/html;base64,")) {
+                    const html = atob(cd.file_url.replace("data:text/html;base64,", ""));
+                    const w = window.open(); w.document.write(html); w.document.close();
+                  } else { window.open(cd.file_url, "_blank"); }
+                } else { alert("找不到合約文件"); }
+              }} style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid #4361ee", background: "#fff", color: "#4361ee", fontSize: 10, cursor: "pointer" }}>
+                📄 列印合約
+              </button>
+              <button onClick={async () => {
+                if (!e.email) { alert("此員工沒有設定 Email"); return; }
+                const r = await ap("/api/admin/documents", { action: "resend_email", employee_id: empId });
+                if (r.error) alert("❌ " + r.error); else alert("✅ 合約已寄至 " + e.email);
+              }} style={{ padding: "4px 10px", borderRadius: 5, border: "1px solid #0a7c42", background: "#fff", color: "#0a7c42", fontSize: 10, cursor: "pointer" }}>
+                📧 重寄合約
+              </button>
+            </div>
+          )}
           {e.probation_end_date && (
             <Row l="試用期" v={
               e.probation_status === "passed" ? "✅ 已通過" :

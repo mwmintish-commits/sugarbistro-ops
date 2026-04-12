@@ -203,36 +203,42 @@ export async function POST(request) {
     }
 
     // 儲存文件（身分證正反面分開）
+    const signedAt = new Date().toISOString();
+    const hireDate = emp.hire_date || new Date().toLocaleDateString("sv-SE");
+    const storeName = emp.stores?.name || "";
+    const empName = signature_name || emp.name;
     const docs = [
       { doc_type: "health_check", file_url: health_check_url },
       { doc_type: "id_card_front", file_url: id_front_url },
       { doc_type: "id_card_back", file_url: id_back_url },
-      { doc_type: "handbook_sign", signature_url: handbook_signature, signed_at: new Date().toISOString(), notes: JSON.stringify(handbook_content || []) },
-      { doc_type: "contract_sign", signature_url: contract_signature, signed_at: new Date().toISOString(), notes: contract_content || "" },
+      { doc_type: "handbook_sign", signature_url: handbook_signature, signed_at: signedAt, notes: JSON.stringify(handbook_content || []) },
+      { doc_type: "contract_sign", signature_url: contract_signature, signed_at: signedAt, notes: contract_content || "" },
     ];
+    // 產生可列印合約 HTML
+    const contractHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>勞動契約書 - ${empName}</title><style>body{font-family:'Noto Sans TC',system-ui,sans-serif;max-width:700px;margin:40px auto;padding:20px;color:#333;line-height:1.8}h1{text-align:center;font-size:22px;border-bottom:2px solid #333;padding-bottom:8px}table.info{width:100%;margin:16px 0}table.info td{padding:4px 8px;font-size:14px}table.info td:first-child{font-weight:bold;width:120px}.clause{margin:8px 0;font-size:14px}.sig{margin-top:30px;display:flex;gap:40px;align-items:flex-end}.sig img{border:1px solid #ddd;border-radius:4px;max-height:80px}.footer{text-align:center;font-size:11px;color:#888;margin-top:40px}@media print{body{margin:0;padding:20px}}</style></head><body><h1>勞動契約書</h1><table class="info"><tr><td>甲方（雇主）</td><td>小食糖 SUGARbISTRO</td></tr><tr><td>乙方（員工）</td><td>${empName}</td></tr><tr><td>身分證字號</td><td>${id_number||""}</td></tr><tr><td>服務門市</td><td>${storeName}</td></tr><tr><td>到職日期</td><td>${hireDate}</td></tr></table><hr><p>雙方同意依下列條款訂定本勞動契約：</p>${(contract_content||"一、乙方同意遵守甲方之員工行為規範與工作守則。\n二、乙方了解並同意季績效獎金制度之計算方式與發放條件。\n三、乙方之薪資、工時、休假依勞動基準法及甲方規定辦理。\n四、乙方同意甲方依法代扣勞健保及所得稅。\n五、乙方應對甲方之營業秘密負保密義務，離職後仍有效。\n六、任一方得依勞動基準法規定終止本合約。\n七、本合約自到職日起生效。\n八、本合約一式兩份，甲乙雙方各執一份為憑。").split("\n").map(l=>"<div class='clause'>"+l+"</div>").join("")}<div class="sig"><div><div style="font-size:12px;color:#888">員工簽名</div>${contract_signature?"<img src='"+contract_signature+"' />":""}<div style="font-size:12px">${empName}</div></div><div><div style="font-size:12px;color:#888">簽署日期</div><div>${signedAt.slice(0,10)}</div></div></div><div class="footer">小食糖 SUGARbISTRO ─ 此為電子簽署文件</div></body></html>`;
+    docs.push({ doc_type: "contract_pdf", file_url: "data:text/html;base64," + Buffer.from(contractHtml).toString("base64"), signed_at: signedAt, notes: "可列印合約" });
     for (const d of docs) {
       if (d.file_url || d.signature_url) {
         await supabase.from("employee_documents").insert({ employee_id: emp.id, ...d });
       }
     }
 
-    // 通知 + Email
+    // 通知（待審核）
     if (emp.line_uid) {
-      await pushText(emp.line_uid, "✅ 報到完成！\n👤 " + emp.name + "\n📝 合約已簽署，可以開始打卡了。" + (email ? "\n📧 合約副本已寄至 " + email : "")).catch(() => {});
+      await pushText(emp.line_uid, "✅ 報到資料已送出！\n👤 " + empName + "\n📝 合約已簽署\n\n⏳ 請等待總部審核，核准後即可開始打卡。" + (email ? "\n📧 合約副本已寄至 " + email : "")).catch(() => {});
     }
     // 寄送守則+合約副本
     if (email) {
       await sendOnboardingEmails({
-        email, name: signature_name || emp.name,
-        storeName: emp.stores?.name || "",
-        idNumber: id_number, hireDate: emp.hire_date || new Date().toLocaleDateString("sv-SE"),
+        email, name: empName, storeName,
+        idNumber: id_number, hireDate,
         handbookContent: handbook_content, contractContent: contract_content,
         handbookSig: handbook_signature, contractSig: contract_signature,
       });
     }
     const { data: admins } = await supabase.from("employees").select("line_uid").eq("role", "admin").eq("is_active", true);
     for (const a of admins || []) {
-      if (a.line_uid) await pushText(a.line_uid, "🆕 " + emp.name + " 已完成報到（含合約+體檢+守則簽署）" + (email ? "\n📧 副本已寄 " + email : "")).catch(() => {});
+      if (a.line_uid) await pushText(a.line_uid, "🆕 新人報到待審核\n👤 " + empName + "\n🏠 " + storeName + "\n\n📋 已簽署合約+守則\n👉 請至後台「員工」→「待審核」核准").catch(() => {});
     }
 
     return Response.json({ success: true });

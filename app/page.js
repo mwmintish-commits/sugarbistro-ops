@@ -480,19 +480,21 @@ export default function AdminPage() {
             {/* 待啟用 */}
             {emps.filter(e=>!e.is_active).length > 0 && (
               <div style={{marginBottom:12}}>
-                <h4 style={{fontSize:12,color:"#b45309",marginBottom:4}}>{"⏳ 待啟用（"+emps.filter(e=>!e.is_active).length+"）"}</h4>
+                <h4 style={{fontSize:12,color:"#b45309",marginBottom:4}}>{"⏳ 待審核（"+emps.filter(e=>!e.is_active).length+"）"}</h4>
                 <div style={{background:"#fff8e6",borderRadius:8,border:"1px solid #f0e6c8",overflow:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                    <thead><tr style={{background:"#fef3c7"}}>{["姓名","門市","合約","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#92400e"}}>{h}</th>)}</tr></thead>
                     <tbody>{emps.filter(e=>!e.is_active).map(e=>(
                       <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
                         <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}} onClick={()=>setDetailId(e.id)}>{e.name}</td>
                         <td style={{padding:6}}>{e.stores?e.stores.name:"總部"}</td>
+                        <td style={{padding:6}}>{e.onboarding_completed||e.contract_signed?<span style={{color:"#0a7c42"}}>✅已簽</span>:<span style={{color:"#b91c1c"}}>❌未簽</span>}</td>
                         <td style={{padding:6}}>{e.line_uid?"✅":"❌"}</td>
-                        <td style={{padding:6}}>
-                          <button onClick={async()=>{await ap("/api/admin/employees",{action:"activate",employee_id:e.id});load();}}
-                            style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>啟用</button>
-                          <button onClick={async()=>{if(!confirm("⚠️ 永久刪除「"+e.name+"」？\n此操作無法復原！"))return;const r=await sap("/api/admin/employees",{action:"delete",employee_id:e.id});if(r)load();}}
-                            style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>刪除</button>
+                        <td style={{padding:6,whiteSpace:"nowrap"}}>
+                          <button onClick={async()=>{if(!confirm("✅ 核准「"+e.name+"」？\n\n將啟用帳號並發送綁定碼通知"))return;const r=await sap("/api/admin/employees",{action:"activate",employee_id:e.id});if(r){alert("✅ 已核准！"+(r.bind_code?"\n綁定碼："+r.bind_code:""));load();}}}
+                            style={{padding:"2px 8px",borderRadius:4,border:"none",background:"#0a7c42",color:"#fff",fontSize:10,cursor:"pointer",marginRight:3}}>✅核准</button>
+                          <button onClick={async()=>{if(!confirm("⚠️ 退回「"+e.name+"」？\n此操作會永久刪除"))return;const r=await sap("/api/admin/employees",{action:"delete",employee_id:e.id});if(r)load();}}
+                            style={{padding:"2px 8px",borderRadius:4,border:"none",background:"#b91c1c",color:"#fff",fontSize:10,cursor:"pointer"}}>❌退回</button>
                         </td>
                       </tr>
                     ))}</tbody>
