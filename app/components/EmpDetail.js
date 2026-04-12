@@ -204,6 +204,31 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
             <div style={{ fontSize: 9, color: "#888", marginTop: 1 }}>留空=依到職日自動計算，填數字=手動設定（舊員工導入用）</div>
           </div>
           <Row l="合約" v={e.onboarding_completed ? "✅已簽" : "❌未簽"} />
+          {/* 報到連結 */}
+          {!e.onboarding_completed && (
+            <div style={{ marginTop: 6, padding: 8, background: "#fff8e6", borderRadius: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#8a6d00", marginBottom: 4 }}>📋 新人報到</div>
+              {e.bind_code ? (
+                <div>
+                  <div style={{ fontSize: 10, color: "#666", marginBottom: 4 }}>報到連結（傳給員工開啟）：</div>
+                  <div style={{ fontSize: 10, background: "#fff", padding: 6, borderRadius: 4, border: "1px solid #ddd", wordBreak: "break-all", userSelect: "all" }}>
+                    {window.location.origin + "/onboarding?token=" + e.bind_code}
+                  </div>
+                  <button onClick={() => { navigator.clipboard.writeText(window.location.origin + "/onboarding?token=" + e.bind_code); alert("✅ 已複製報到連結"); }}
+                    style={{ marginTop: 4, padding: "3px 10px", borderRadius: 4, border: "1px solid #4361ee", background: "transparent", color: "#4361ee", fontSize: 10, cursor: "pointer" }}>📋 複製連結</button>
+                </div>
+              ) : (
+                <button onClick={async () => {
+                  const r = await ap("/api/admin/employees", { action: "generate_bind_code", employee_id: empId });
+                  if (r.error) { alert("❌ " + r.error); return; }
+                  alert("✅ 綁定碼：" + r.bind_code + "\n\n報到連結：\n" + window.location.origin + "/onboarding?token=" + r.bind_code);
+                  reload();
+                }} style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: "#b45309", color: "#fff", fontSize: 11, cursor: "pointer" }}>
+                  🔗 產生報到連結
+                </button>
+              )}
+            </div>
+          )}
           {e.probation_end_date && (
             <Row l="試用期" v={
               e.probation_status === "passed" ? "✅ 已通過" :
