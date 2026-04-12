@@ -551,10 +551,18 @@ export default function AdminPage() {
                 </>
               )}
               <button onClick={async()=>{
-                const we2=new Date(new Date(ws).getTime()+6*86400000).toLocaleDateString("sv-SE");
-                if(!confirm("發布 "+ws+" ~ "+we2+" 的班表？"))return;
-                await ap("/api/admin/schedules",{action:"publish",week_start:ws,week_end:we2,store_id:sf||undefined});
-                alert("已發布");load();
+                let start, end, label;
+                if (sv === "week") {
+                  start = ws; end = new Date(new Date(ws).getTime()+6*86400000).toLocaleDateString("sv-SE");
+                  label = start+" ~ "+end;
+                } else {
+                  const [y,m] = month.split("-").map(Number);
+                  start = month+"-01"; end = new Date(y,m,0).toLocaleDateString("sv-SE");
+                  label = month+" 整月";
+                }
+                if(!confirm("📢 發布 "+label+" 的班表？\n\n發布後員工即可看到。"))return;
+                const r = await ap("/api/admin/schedules",{action:"publish",week_start:start,week_end:end,store_id:sf||undefined});
+                alert("✅ 已發布"+(r.published||0)+"筆，通知"+(r.notified||0)+"人");load();
               }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:11,cursor:"pointer",marginLeft:"auto"}}>
                 📢 發布班表
               </button>
@@ -610,7 +618,7 @@ export default function AdminPage() {
                             <td style={{padding:5,fontWeight:500,fontSize:11,position:"sticky",left:0,background:"#fff",zIndex:1}}>{emp.name}<br/><RB role={emp.role}/></td>
                             {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);return(
                               <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top"}}>
-                                {sc?(<div style={{background:sc.type==="leave"?(LT[sc.leave_type]||LT.off).bg:sc.published?"#e6f9f0":"#fff8e6",borderRadius:4,padding:"2px 3px",fontSize:9}}>
+                                {sc?(<div style={{background:sc.type==="leave"?(LT[sc.leave_type]||LT.off).bg:sc.published?"#e6f9f0":"#fff8e6",border:sc.published?"1.5px solid #0a7c42":"1.5px dashed #d4a017",borderRadius:4,padding:"2px 3px",fontSize:9}}>
                                   {sc.type==="leave"?<div style={{color:(LT[sc.leave_type]||LT.off).c,fontWeight:500}}>{(LT[sc.leave_type]||LT.off).l}</div>:<div><div style={{fontWeight:500}}>{sc.shifts?sc.shifts.name:""}</div><div style={{color:"#888"}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></div>}
                                   <div style={{textAlign:"right",marginTop:1}}><button onClick={(ev)=>{ev.stopPropagation();delSch(sc.id);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c",padding:"2px 4px"}}>✕刪</button></div>
                                 </div>):(<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else addSch(emp.id,v,date);}} style={{width:"100%",padding:1,borderRadius:3,border:"1px dashed #ddd",fontSize:9,color:"#ccc",background:"transparent",cursor:"pointer"}}><option value="">+</option><optgroup label="班別">{storeShifts.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</optgroup><optgroup label="休假">{Object.entries(LT).filter(([k])=>!["off","rest"].includes(k)).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select>)}
@@ -643,7 +651,7 @@ export default function AdminPage() {
                       const ds=storeScheds.filter(s=>s.date===date);const hol=holidays.find(h=>h.date===date);const isWe=new Date(date).getDay()===0||new Date(date).getDay()===6;
                       cells.push(<td key={date} style={{padding:3,verticalAlign:"top",border:"1px solid #f0eeea",minHeight:40,background:hol?"#fde8e8":isWe?"#faf8f5":"transparent"}}>
                         <div style={{fontSize:10,fontWeight:500,color:hol?"#b91c1c":"#666"}}>{d}{hol&&<span style={{fontSize:7,color:"#b91c1c",marginLeft:2}}>{hol.name}</span>}</div>
-                        {ds.slice(0,4).map(s=>(<div key={s.id} style={{background:s.type==="leave"?(LT[s.leave_type]||LT.off).bg:s.published?"#e6f9f0":"#fff8e6",borderRadius:2,padding:"0 2px",fontSize:8,marginBottom:1,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",color:s.type==="leave"?(LT[s.leave_type]||LT.off).c:"inherit"}}>{(s.employees?s.employees.name:"")+" "+(s.type==="leave"?(LT[s.leave_type]||LT.off).l:s.shifts?s.shifts.name:"")}</div>))}
+                        {ds.slice(0,4).map(s=>(<div key={s.id} style={{background:s.type==="leave"?(LT[s.leave_type]||LT.off).bg:s.published?"#e6f9f0":"#fff8e6",border:s.published?"1.5px solid #0a7c42":"1.5px dashed #d4a017",borderRadius:3,padding:"0 3px",fontSize:8,marginBottom:1,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",color:s.type==="leave"?(LT[s.leave_type]||LT.off).c:"inherit"}}>{(s.employees?s.employees.name:"")+" "+(s.type==="leave"?(LT[s.leave_type]||LT.off).l:s.shifts?s.shifts.name:"")}</div>))}
                       </td>);
                       if(cells.length===7){rows.push(<tr key={"r"+rows.length}>{cells}</tr>);cells=[];}
                     }
@@ -655,6 +663,28 @@ export default function AdminPage() {
                   </div>
                 </div>);
               })}
+              {/* 快速排班 */}
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10,marginTop:8}}>
+                <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>➕ 快速排班</h4>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"end"}}>
+                  <div><label style={{fontSize:9,color:"#888"}}>員工</label><select id="qs-emp" style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11,minWidth:80}}><option value="">選員工</option>{ae.filter(e=>!sf||e.store_id===sf).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+                  <div><label style={{fontSize:9,color:"#888"}}>班別</label><select id="qs-shift" style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11,minWidth:80}}><option value="">選班別</option>{shifts.filter(s=>!sf||s.store_id===sf).map(s=><option key={s.id} value={s.id}>{s.name+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}<optgroup label="休假">{Object.entries(LT).filter(([k])=>!["off","rest"].includes(k)).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select></div>
+                  <div><label style={{fontSize:9,color:"#888"}}>開始日</label><input id="qs-start" type="date" defaultValue={month+"-01"} style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
+                  <div><label style={{fontSize:9,color:"#888"}}>結束日</label><input id="qs-end" type="date" defaultValue={month+"-01"} style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
+                  <button onClick={async()=>{
+                    const eid=document.getElementById("qs-emp").value;const sid=document.getElementById("qs-shift").value;
+                    const start=document.getElementById("qs-start").value;const end=document.getElementById("qs-end").value;
+                    if(!eid||!sid||!start){alert("請選擇員工、班別、日期");return;}
+                    let d=new Date(start);const ed=new Date(end||start);let count=0;
+                    while(d<=ed){const ds=d.toLocaleDateString("sv-SE");
+                      if(sid.startsWith("leave:"))await ap("/api/admin/schedules",{action:"add_leave",employee_id:eid,date:ds,leave_type:sid.split(":")[1]});
+                      else{const s=shifts.find(x=>x.id===sid);await ap("/api/admin/schedules",{action:"create",employee_id:eid,store_id:s?s.store_id:sf,shift_id:sid,date:ds});}
+                      d.setDate(d.getDate()+1);count++;}
+                    alert("✅ 已排 "+count+" 天");load();
+                  }} style={{padding:"5px 14px",borderRadius:5,border:"none",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",height:28}}>排班</button>
+                </div>
+                <div style={{fontSize:9,color:"#888",marginTop:4}}>💡 選同一天=單天、選範圍=批次。也可用「週檢視」逐格排班。</div>
+              </div>
               </div>
             )}
           </div>

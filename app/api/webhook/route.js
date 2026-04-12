@@ -59,7 +59,8 @@ async function handleClockAction(rt, emp, type) {
 async function querySchedule(rt, emp) {
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
   const end = new Date(Date.now() + 14 * 86400000).toLocaleDateString("sv-SE");
-  const { data } = await supabase.from("schedules").select("*, shifts(name, start_time, end_time), stores(name)").eq("employee_id", emp.id).gte("date", today).lte("date", end).order("date");
+  // 員工只能看已發布的班表 + 預假
+  const { data } = await supabase.from("schedules").select("*, shifts(name, start_time, end_time), stores(name)").eq("employee_id", emp.id).gte("date", today).lte("date", end).or("published.eq.true,leave_type.eq.advance").order("date");
   const { data: hols } = await supabase.from("holidays").select("date, name").eq("is_active", true).gte("date", today).lte("date", end);
   const holMap = {};
   for (const h of hols || []) holMap[h.date] = h.name;
