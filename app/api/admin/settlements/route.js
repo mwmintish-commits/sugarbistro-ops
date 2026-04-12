@@ -47,3 +47,24 @@ export async function GET(request) {
 
   return Response.json({ data, summary });
 }
+
+export async function POST(request) {
+  const body = await request.json();
+
+  if (body.action === "update") {
+    const { settlement_id, ...updates } = body;
+    delete updates.action;
+    const { data, error } = await supabase.from("daily_settlements")
+      .update(updates).eq("id", settlement_id).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ data });
+  }
+
+  if (body.action === "delete") {
+    const { error } = await supabase.from("daily_settlements").delete().eq("id", body.settlement_id);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ success: true });
+  }
+
+  return Response.json({ error: "Unknown action" }, { status: 400 });
+}

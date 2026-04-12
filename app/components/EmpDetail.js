@@ -26,7 +26,9 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
     role: "", employment_type: "", store_id: "",
     labor_tier: "", health_tier: "",
     labor_start_date: "", health_start_date: "", hourly_rate: "", monthly_salary: "",
-    hire_date: "", annual_leave_override: ""
+    hire_date: "", annual_leave_override: "",
+    phone: "", email: "", birthday: "", id_number: "", address: "",
+    emergency_contact: "", emergency_phone: "", bank_name: "", bank_account: ""
   });
 
   const reload = () => {
@@ -44,7 +46,12 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
           hourly_rate: r.data.hourly_rate || "",
           monthly_salary: r.data.monthly_salary || "",
           hire_date: r.data.hire_date || "",
-          annual_leave_override: ""
+          annual_leave_override: "",
+          phone: r.data.phone || "", email: r.data.email || "",
+          birthday: r.data.birthday || "", id_number: r.data.id_number || "",
+          address: r.data.address || "",
+          emergency_contact: r.data.emergency_contact || "", emergency_phone: r.data.emergency_phone || "",
+          bank_name: r.data.bank_name || "", bank_account: r.data.bank_account || "",
         });
       }
       setLd(false);
@@ -62,6 +69,11 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
       role: form.role, employment_type: form.employment_type,
       store_id: form.store_id || null,
       hire_date: form.hire_date || null,
+      phone: form.phone || null, email: form.email || null,
+      birthday: form.birthday || null, id_number: form.id_number || null,
+      address: form.address || null,
+      emergency_contact: form.emergency_contact || null, emergency_phone: form.emergency_phone || null,
+      bank_name: form.bank_name || null, bank_account: form.bank_account || null,
       labor_tier: form.labor_tier ? Number(form.labor_tier) : null,
       health_tier: form.health_tier ? Number(form.health_tier) : null,
       labor_start_date: form.labor_start_date || null,
@@ -179,13 +191,23 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
 
         <div style={sec}>
           <h3 style={sh}>基本資料</h3>
-          <Row l="門市" v={e.stores ? e.stores.name : "總部"} />
-          <Row l="手機" v={e.phone} />
-          <Row l="Email" v={e.email} />
-          <Row l="生日" v={e.birthday} />
-          <Row l="身分證" v={e.id_number} />
-          <Row l="LINE" v={e.line_uid ? "✅已綁定" : "❌未綁定"} />
-          <Row l="帳號" v={e.is_active ? "✅啟用" : "❌停用"} />
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+            <div><label style={{fontSize:10,color:"#888"}}>手機</label><input value={form.phone} onChange={ev=>setForm({...form,phone:ev.target.value})} style={inp} /></div>
+            <div><label style={{fontSize:10,color:"#888"}}>Email</label><input value={form.email} onChange={ev=>setForm({...form,email:ev.target.value})} style={inp} /></div>
+            <div><label style={{fontSize:10,color:"#888"}}>生日</label><input type="date" value={form.birthday} onChange={ev=>setForm({...form,birthday:ev.target.value})} style={inp} /></div>
+            <div><label style={{fontSize:10,color:"#888"}}>身分證</label><input value={form.id_number} onChange={ev=>setForm({...form,id_number:ev.target.value})} style={inp} /></div>
+          </div>
+          <div style={{marginTop:4}}><label style={{fontSize:10,color:"#888"}}>地址</label><input value={form.address} onChange={ev=>setForm({...form,address:ev.target.value})} style={inp} /></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:4}}>
+            <div><label style={{fontSize:10,color:"#888"}}>緊急聯絡人</label><input value={form.emergency_contact} onChange={ev=>setForm({...form,emergency_contact:ev.target.value})} style={inp} /></div>
+            <div><label style={{fontSize:10,color:"#888"}}>緊急電話</label><input value={form.emergency_phone} onChange={ev=>setForm({...form,emergency_phone:ev.target.value})} style={inp} /></div>
+            <div><label style={{fontSize:10,color:"#888"}}>銀行</label><input value={form.bank_name} onChange={ev=>setForm({...form,bank_name:ev.target.value})} style={inp} /></div>
+            <div><label style={{fontSize:10,color:"#888"}}>銀行帳號</label><input value={form.bank_account} onChange={ev=>setForm({...form,bank_account:ev.target.value})} style={inp} /></div>
+          </div>
+          <div style={{marginTop:6,display:"flex",gap:8,fontSize:10}}>
+            <span style={{color:e.line_uid?"#0a7c42":"#b91c1c"}}>{e.line_uid?"✅ LINE已綁定":"❌ LINE未綁定"}</span>
+            <span style={{color:e.is_active?"#0a7c42":"#b91c1c"}}>{e.is_active?"✅ 帳號啟用":"❌ 帳號停用"}</span>
+          </div>
         </div>
 
         <div style={sec}>

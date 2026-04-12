@@ -1190,7 +1190,7 @@ export default function AdminPage() {
             )}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:700}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","營收","現金","LINE Pay","TWQR","UberEat","悠遊卡","餐券","應存","📸"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","營收","現金","LINE Pay","TWQR","UberEat","悠遊卡","餐券","應存","📸","✏️"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{stl.map(s=>(
                   <tr key={s.id} style={{borderBottom:"1px solid #f0eeea"}}>
                     <td style={{padding:"5px 4px",textAlign:"right"}}>{s.date?.slice(5)}</td>
@@ -1204,6 +1204,17 @@ export default function AdminPage() {
                     <td style={{padding:"5px 4px",textAlign:"right",color:s.meal_voucher_amount>0?"#0a7c42":"#ccc"}}>{s.meal_voucher_amount>0?fmt(s.meal_voucher_amount):"-"}</td>
                     <td style={{padding:"5px 4px",textAlign:"right",fontWeight:600,color:"#b45309"}}>{fmt(s.cash_to_deposit)}</td>
                     <td style={{padding:"5px 4px",textAlign:"center"}}>{s.image_url?<button onClick={()=>setSi(s.image_url)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>📸</button>:<span style={{color:"#ccc"}}>-</span>}</td>
+                    <td style={{padding:"5px 4px",textAlign:"center"}}>
+                      <button onClick={async()=>{
+                        const fields=[["net_sales","營收",s.net_sales],["cash_amount","現金",s.cash_amount],["line_pay_amount","LINE Pay",s.line_pay_amount],["twqr_amount","TWQR",s.twqr_amount],["uber_eat_amount","UberEat",s.uber_eat_amount],["easy_card_amount","悠遊卡",s.easy_card_amount],["meal_voucher_amount","餐券",s.meal_voucher_amount]];
+                        const updates={};let changed=false;
+                        for(const[k,label,val]of fields){const v=prompt(label+"：",val||0);if(v===null)return;if(Number(v)!==Number(val||0)){updates[k]=Number(v);changed=true;}}
+                        if(!changed){alert("無修改");return;}
+                        updates.cash_to_deposit=(updates.cash_amount??s.cash_amount)-(s.petty_cash_reserved||0);
+                        const r=await sap("/api/admin/settlements",{action:"update",settlement_id:s.id,...updates});
+                        if(r){alert("✅ 已更新");load();}
+                      }} style={{background:"none",border:"none",cursor:"pointer",fontSize:11}}>✏️</button>
+                    </td>
                   </tr>
                 ))}</tbody>
               </table>
