@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { ap, fmt, Badge, RB, Row, LT, ROLES, LABOR_SELF, HEALTH_SELF } from "./components/utils";
+import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, LABOR_SELF, HEALTH_SELF } from "./components/utils";
 import EmpDetail from "./components/EmpDetail";
 import SettingsMgr from "./components/SettingsMgr";
 import WorklogMgr from "./components/WorklogMgr";
@@ -491,7 +491,7 @@ export default function AdminPage() {
                         <td style={{padding:6}}>
                           <button onClick={async()=>{await ap("/api/admin/employees",{action:"activate",employee_id:e.id});load();}}
                             style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>啟用</button>
-                          <button onClick={async()=>{if(!confirm("⚠️ 永久刪除「"+e.name+"」？\n此操作無法復原！"))return;await ap("/api/admin/employees",{action:"delete",employee_id:e.id});load();}}
+                          <button onClick={async()=>{if(!confirm("⚠️ 永久刪除「"+e.name+"」？\n此操作無法復原！"))return;const r=await sap("/api/admin/employees",{action:"delete",employee_id:e.id});if(r)load();}}
                             style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>刪除</button>
                         </td>
                       </tr>
@@ -501,41 +501,36 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* 已啟用 */}
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead>
-                  <tr style={{background:"#faf8f5"}}>
-                    {["姓名","門市","角色","年資","特休","LINE","操作"].map(h =>
-                      <th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ae.map(e => (
-                    <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                      <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}}
-                        onClick={() => setDetailId(e.id)}>{e.name}</td>
-                      <td style={{padding:6}}>{e.stores?e.stores.name:"總部"}</td>
-                      <td style={{padding:6}}><RB role={e.role} /></td>
-                      <td style={{padding:6}}>{(e.service_months||0)+"月"}</td>
-                      <td style={{padding:6}}>{(e.annual_leave_days||0)+"hr"}</td>
-                      <td style={{padding:6}}>{e.line_uid?"✅":"❌"}</td>
-                      <td style={{padding:6}}>
-                        <button onClick={()=>deactivate(e.id)}
-                          style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>
-                          停用
-                        </button>
-                        <button onClick={async()=>{if(!confirm("⚠️ 永久刪除「"+e.name+"」？\n\n此操作會刪除所有排班/出勤/薪資/請假/考核紀錄，無法復原！"))return;if(!confirm("再次確認：真的要永久刪除嗎？"))return;await ap("/api/admin/employees",{action:"delete",employee_id:e.id});load();}}
-                          style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b91c1c",background:"transparent",color:"#b91c1c",fontSize:9,cursor:"pointer",marginLeft:2}}>
-                          🗑
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {/* 已啟用 — 按門市分組 */}
+            {(sf ? stores.filter(s=>s.id===sf) : stores).map(store => {
+              const storeEmps = ae.filter(e => e.store_id === store.id);
+              if (storeEmps.length === 0) return null;
+              return (
+                <div key={store.id} style={{marginBottom:10}}>
+                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
+                  <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                      <thead><tr style={{background:"#faf8f5"}}>{["姓名","角色","年資","特休","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                      <tbody>{storeEmps.map(e=>(
+                        <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                          <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}} onClick={()=>setDetailId(e.id)}>{e.name}</td>
+                          <td style={{padding:6}}><RB role={e.role} /></td>
+                          <td style={{padding:6}}>{(e.service_months||0)+"月"}</td>
+                          <td style={{padding:6}}>{(e.annual_leave_days||0)+"hr"}</td>
+                          <td style={{padding:6}}>{e.line_uid?"✅":"❌"}</td>
+                          <td style={{padding:6,whiteSpace:"nowrap"}}>
+                            <button onClick={async()=>{if(!confirm("停用"+e.name+"？"))return;const r=await sap("/api/admin/employees",{action:"deactivate",employee_id:e.id});if(r)load();}}
+                              style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>停用</button>
+                            <button onClick={async()=>{if(!confirm("⚠️ 永久刪除「"+e.name+"」？\n所有資料將被清除，無法復原！"))return;if(!confirm("再次確認刪除？"))return;const r=await sap("/api/admin/employees",{action:"delete",employee_id:e.id});if(r)load();}}
+                              style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b91c1c",background:"transparent",color:"#b91c1c",fontSize:9,cursor:"pointer",marginLeft:2}}>🗑</button>
+                          </td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -625,17 +620,23 @@ export default function AdminPage() {
             })()}
 
             {sv==="month" && (
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+              <div>
+              {(sf ? stores.filter(s=>s.id===sf) : stores).map(store => {
+                const storeScheds = scheds.filter(s => { const emp = emps.find(e=>e.id===s.employee_id); return emp && emp.store_id === store.id; });
+                if (storeScheds.length === 0 && !sf) return null;
+                return (
+                <div key={store.id} style={{marginBottom:10}}>
+                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name}</h4>
+                  <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
                   <thead><tr>{DAYS.map(d=><th key={d} style={{padding:4,textAlign:"center",fontWeight:500,color:"#888",width:"14.2%"}}>{d}</th>)}</tr></thead>
                   <tbody>{(() => {
                     const [y,m]=month.split("-").map(Number);const sd=new Date(y,m-1,1).getDay();const dim=new Date(y,m,0).getDate();
-                    const filteredScheds=sf?scheds.filter(s=>{const emp=emps.find(e=>e.id===s.employee_id);return emp&&emp.store_id===sf;}):scheds;
                     const rows=[];let cells=[];
                     for(let i=0;i<sd;i++)cells.push(<td key={"e"+i} style={{padding:3,border:"1px solid #f0eeea"}}/>);
                     for(let d=1;d<=dim;d++){
                       const date=y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0");
-                      const ds=filteredScheds.filter(s=>s.date===date);const hol=holidays.find(h=>h.date===date);const isWe=new Date(date).getDay()===0||new Date(date).getDay()===6;
+                      const ds=storeScheds.filter(s=>s.date===date);const hol=holidays.find(h=>h.date===date);const isWe=new Date(date).getDay()===0||new Date(date).getDay()===6;
                       cells.push(<td key={date} style={{padding:3,verticalAlign:"top",border:"1px solid #f0eeea",minHeight:40,background:hol?"#fde8e8":isWe?"#faf8f5":"transparent"}}>
                         <div style={{fontSize:10,fontWeight:500,color:hol?"#b91c1c":"#666"}}>{d}{hol&&<span style={{fontSize:7,color:"#b91c1c",marginLeft:2}}>{hol.name}</span>}</div>
                         {ds.slice(0,4).map(s=>(<div key={s.id} style={{background:s.type==="leave"?(LT[s.leave_type]||LT.off).bg:s.published?"#e6f9f0":"#fff8e6",borderRadius:2,padding:"0 2px",fontSize:8,marginBottom:1,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",color:s.type==="leave"?(LT[s.leave_type]||LT.off).c:"inherit"}}>{(s.employees?s.employees.name:"")+" "+(s.type==="leave"?(LT[s.leave_type]||LT.off).l:s.shifts?s.shifts.name:"")}</div>))}
@@ -647,6 +648,9 @@ export default function AdminPage() {
                     return rows;
                   })()}</tbody>
                 </table>
+                  </div>
+                </div>);
+              })}
               </div>
             )}
           </div>
@@ -668,10 +672,17 @@ export default function AdminPage() {
             </div>
 
             {attView === "records" && (
+              <div>
+              {(sf ? stores.filter(s=>s.id===sf) : stores).map(store => {
+                const storeAtt = att.filter(a => { const emp = emps.find(e=>e.id===a.employee_id); return emp && emp.store_id === store.id; });
+                if (storeAtt.length === 0 && !sf) return null;
+                return (
+                <div key={store.id} style={{marginBottom:10}}>
+                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeAtt.length+"筆）"}</h4>
               <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                   <thead><tr style={{background:"#faf8f5"}}>{["時間","員工","類型","距離","遲到","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
-                  <tbody>{att.map(a=>(
+                  <tbody>{storeAtt.map(a=>(
                     <tr key={a.id} style={{borderBottom:"1px solid #f0eeea",background:a.is_amendment?"#f0f8ff":"transparent"}}>
                       <td style={{padding:6,fontSize:10}}>{a.timestamp?new Date(a.timestamp).toLocaleString("zh-TW",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):""}{a.is_amendment&&<span style={{fontSize:8,color:"#4361ee",marginLeft:2}}>補</span>}</td>
                       <td style={{padding:6,fontWeight:500}}>{a.employees?a.employees.name:""}</td>
@@ -679,12 +690,15 @@ export default function AdminPage() {
                       <td style={{padding:6}}>{a.distance_meters?a.distance_meters+"m":"-"}</td>
                       <td style={{padding:6,color:a.late_minutes>0?"#b91c1c":"#0a7c42"}}>{a.late_minutes>0?a.late_minutes+"分":"準時"}</td>
                       <td style={{padding:6}}>
-                        <button onClick={async()=>{if(!confirm("確定刪除此打卡紀錄？"))return;await ap("/api/admin/attendance",{action:"delete",attendance_id:a.id});load();}}
+                        <button onClick={async()=>{if(!confirm("確定刪除此打卡紀錄？"))return;await sap("/api/admin/attendance",{action:"delete",attendance_id:a.id});load();}}
                           style={{padding:"4px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer",color:"#b91c1c"}}>🗑刪除</button>
                       </td>
                     </tr>
                   ))}</tbody>
                 </table>
+              </div>
+                </div>);
+              })}
               </div>
             )}
 
@@ -767,8 +781,14 @@ export default function AdminPage() {
               <button onClick={load} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>🔄 重新整理</button>
             </div>
 
-            {/* 每人休假卡片 */}
-            {ae.map(e => {
+            {/* 每人休假卡片 — 按門市分組 */}
+            {(sf ? stores.filter(s=>s.id===sf) : stores).map(store => {
+              const storeEmps = ae.filter(e => e.store_id === store.id);
+              if (storeEmps.length === 0) return null;
+              return (
+                <div key={store.id} style={{marginBottom:10}}>
+                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
+            {storeEmps.map(e => {
               // 當月加班（from otRecords）
               const eOtMonth = otRecords.filter(r => r.employee_id === e.id);
               const monthHours = eOtMonth.reduce((s,r) => s + (r.overtime_minutes||0)/60, 0);
@@ -852,6 +872,8 @@ export default function AdminPage() {
                 </div>
               );
             })}
+            </div>);
+            })}
 
             {/* 加班明細 */}
             {otRecords.length > 0 && (
@@ -930,10 +952,17 @@ export default function AdminPage() {
                 📱 LINE發送薪資條
               </button>
             </div>
+            {/* 薪資表 — 按門市分組 */}
+            {(sf ? stores.filter(s=>s.id===sf) : stores).map(store => {
+              const storeEmps = ae.filter(e => e.store_id === store.id);
+              if (storeEmps.length === 0) return null;
+              return (
+                <div key={store.id} style={{marginBottom:10}}>
+                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:750}}>
                 <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","勞保","健保","補充保費","加項","扣項","實發","存"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
-                <tbody>{ae.map(e=>{
+                <tbody>{storeEmps.map(e=>{
                   const wd = att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;
                   const bp = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate)*wd*8 : 0);
                   const ot = otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);
@@ -973,8 +1002,8 @@ export default function AdminPage() {
                           const deduct=Number(document.getElementById("pd-"+e.id).value||0);
                           const allowNote=document.getElementById("pan-"+e.id).value||"";
                           const deductNote=document.getElementById("pdn-"+e.id).value||"";
-                          await ap("/api/admin/employees",{action:"update",employee_id:e.id,default_allowance:allow,default_deduction:deduct,default_allowance_note:allowNote,default_deduction_note:deductNote});
-                          alert(e.name+" 加項「"+allowNote+"」$"+allow+"、扣項「"+deductNote+"」$"+deduct+" 已儲存");
+                          const r=await sap("/api/admin/employees",{action:"update",employee_id:e.id,default_allowance:allow,default_deduction:deduct,default_allowance_note:allowNote,default_deduction_note:deductNote});
+                          if(r) alert("✅ "+e.name+" 已儲存");
                         }} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:8,cursor:"pointer"}}>💾</button>
                       </td>
                     </tr>
@@ -982,6 +1011,8 @@ export default function AdminPage() {
                 })}</tbody>
               </table>
             </div>
+                </div>);
+            })}
           </div>
         )}
 
@@ -1147,7 +1178,7 @@ export default function AdminPage() {
             )}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:700}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","營收","現金","LINE Pay","TWQR","UberEat","悠遊卡","餐券","應存"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","營收","現金","LINE Pay","TWQR","UberEat","悠遊卡","餐券","應存","📸"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{stl.map(s=>(
                   <tr key={s.id} style={{borderBottom:"1px solid #f0eeea"}}>
                     <td style={{padding:"5px 4px",textAlign:"right"}}>{s.date?.slice(5)}</td>
@@ -1160,6 +1191,7 @@ export default function AdminPage() {
                     <td style={{padding:"5px 4px",textAlign:"right",color:s.easy_card_amount>0?"#0a7c42":"#ccc"}}>{s.easy_card_amount>0?fmt(s.easy_card_amount):"-"}</td>
                     <td style={{padding:"5px 4px",textAlign:"right",color:s.meal_voucher_amount>0?"#0a7c42":"#ccc"}}>{s.meal_voucher_amount>0?fmt(s.meal_voucher_amount):"-"}</td>
                     <td style={{padding:"5px 4px",textAlign:"right",fontWeight:600,color:"#b45309"}}>{fmt(s.cash_to_deposit)}</td>
+                    <td style={{padding:"5px 4px",textAlign:"center"}}>{s.image_url?<button onClick={()=>setSi(s.image_url)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>📸</button>:<span style={{color:"#ccc"}}>-</span>}</td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -1173,7 +1205,7 @@ export default function AdminPage() {
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"🏦 "+month+" 存款"}</h3>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","金額","應存","差異","說明","狀態"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","金額","應存","差異","說明","狀態","📸"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{dep.map(d=>(
                   <tr key={d.id} style={{borderBottom:"1px solid #f0eeea",background:Math.abs(d.difference||0)>500?"#fef9f9":"transparent"}}>
                     <td style={{padding:6}}>{d.deposit_date}</td>
@@ -1189,6 +1221,7 @@ export default function AdminPage() {
                       ) : <span style={{fontSize:10,color:"#ccc"}}>-</span>}
                     </td>
                     <td style={{padding:6}}><Badge status={d.status} /></td>
+                    <td style={{padding:6}}>{d.image_url?<button onClick={()=>setSi(d.image_url)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>📸</button>:<span style={{color:"#ccc"}}>-</span>}</td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -1282,7 +1315,7 @@ export default function AdminPage() {
             {/* 費用列表 */}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","類型","廠商","提交人","金額","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","類型","廠商","分類","提交人","金額","📸","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>
                   {exps.filter(e=>(expType==="all"||e.expense_type===expType)&&(!expSearch||(e.vendor_name||"").includes(expSearch))).map(e=>(
                     <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
@@ -1293,11 +1326,10 @@ export default function AdminPage() {
                         <div style={{fontWeight:500}}>{e.vendor_name||"-"}</div>
                         {e.invoice_number && <div style={{fontSize:9,color:"#4361ee"}}>{"🧾"+e.invoice_number}</div>}
                       </td>
+                      <td style={{padding:6,fontSize:10}}>{e.category_suggestion?<span style={{background:"#e6f1fb",color:"#185fa5",padding:"1px 4px",borderRadius:3,fontSize:9}}>{e.category_suggestion}</span>:<span style={{color:"#ccc"}}>-</span>}</td>
                       <td style={{padding:6,fontSize:10}}>{e.submitted_by_name||"-"}</td>
-                      <td style={{padding:6,fontWeight:600,cursor:e.image_url?"pointer":"default",textDecoration:e.image_url?"underline":"none"}}
-                        onClick={()=>e.image_url&&setSi(e.image_url)}>
-                        {fmt(e.amount)}
-                      </td>
+                      <td style={{padding:6,fontWeight:600}}>{fmt(e.amount)}</td>
+                      <td style={{padding:6}}>{e.image_url?<button onClick={()=>setSi(e.image_url)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>📸</button>:<span style={{color:"#ccc"}}>-</span>}</td>
                       <td style={{padding:6}}><Badge status={e.status} /></td>
                       <td style={{padding:6}}>
                         {e.status==="pending" && (

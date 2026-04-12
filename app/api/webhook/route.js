@@ -265,6 +265,11 @@ async function skipStep(uid, state) {
 async function confirmSettlement(uid, emp) {
   const state=await getUserState(uid); if(!state||state.current_flow!=="settlement_confirm") return false;
   const d=state.flow_data;
+  // Bug 10: 強制照片
+  if(!d.image_url){await pushText(uid,"❌ 日結必須上傳照片才能送出");return false;}
+  // Bug 10: 覆蓋警告
+  const{data:existing}=await supabase.from("daily_settlements").select("id").eq("store_id",d.store_id).eq("date",d.date).single().catch(()=>({data:null}));
+  if(existing)await pushText(uid,"⚠️ 注意："+d.date+" 已有日結紀錄，本次將覆蓋原資料").catch(()=>{});
   const{data:stl,error}=await supabase.from("daily_settlements").upsert({store_id:d.store_id,date:d.date,period_start:d.period_start,period_end:d.period_end,cashier_name:d.cashier_name,net_sales:d.net_sales,discount_total:d.discount_total,cash_amount:d.cash_amount,line_pay_amount:d.line_pay_amount,twqr_amount:d.twqr_amount,uber_eat_amount:d.uber_eat_amount,easy_card_amount:d.easy_card_amount,meal_voucher_amount:d.meal_voucher_amount,line_credit_amount:d.line_credit_amount,drink_voucher_amount:d.drink_voucher_amount,invoice_count:d.invoice_count,invoice_start:d.invoice_start,invoice_end:d.invoice_end,void_invoice_count:d.void_invoice_count,void_invoice_amount:d.void_invoice_amount,cash_in_register:d.cash_in_register,petty_cash_reserved:d.petty_cash_reserved,cash_to_deposit:d.cash_to_deposit,image_url:d.image_url,ai_raw_data:d.ai_raw_data,submitted_by:d.employee_id,submitted_at:new Date().toISOString()},{onConflict:"store_id,date"}).select().single();
   if(error){console.error(error);return false;}
   if(d.receipts?.length&&stl){for(const r of d.receipts){await supabase.from("settlement_receipts").insert({settlement_id:stl.id,receipt_type:r.type,image_url:r.image_url,serial_numbers:r.serial_numbers,ai_raw_data:r.ai_raw_data}).catch(()=>{});if((r.type==="meal_voucher"||r.type==="drink_voucher")&&r.serial_numbers?.length){for(const sn of r.serial_numbers){await supabase.from("voucher_serials").insert({serial_number:sn,voucher_type:r.type==="meal_voucher"?"meal":"drink",store_id:d.store_id,settlement_id:stl.id,date:d.date}).catch(()=>{});}}}}
@@ -619,8 +624,16 @@ async function handleEvent(event) {
       }
     }
 
-    const cats = await supabase.from("expense_categories").select("id, name").eq("is_active", true);
-    const cat = (cats.data || []).find(c => c.name === d.category_suggestion);
+    const cats = await supabase.from("expense_categories").select("*").eq("is_active", true);
+    const catList = cats.data || [];
+    // 先精確匹配，再用關鍵字匹配
+    let cat = catList.find(c => (c.category_name || c.name) === d.category_suggestion);
+    if (!cat && (d.vendor_name || d.description)) {
+      const searchText = (d.vendor_name || "") + (d.description || "");
+      cat = catList.find(c => (c.keywords || "").split(",").some(kw => kw && searchText.includes(kw)));
+    }
+    const pnlGroup = cat?.pnl_group || "";
+    const pnlItem = cat?.pnl_item || "";
     const baseDate = d.date || new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
 
     if (d.is_prepaid && d.prepaid_months > 1) {
@@ -648,6 +661,19 @@ async function handleEvent(event) {
       const { data: admins } = await supabase.from("employees").select("line_uid").eq("role", "admin").eq("is_active", true);
       if (admins) for (const a of admins) if (a.line_uid && a.line_uid !== userId) await pushText(a.line_uid, `📦 預付費用\n${d.store_name}｜${d.employee_name}\n${d.vendor_name || ""} ${fmt(d.amount)}（分${d.prepaid_months}個月 每月${fmt(monthlyAmt)}）`).catch(() => {});
       return replyWithQuickReply(rt, `✅ 預付費用已儲存！\n${d.vendor_name || ""} ${fmt(d.amount)}\n📆 分攤${d.prepaid_months}個月（每月${fmt(monthlyAmt)}）`, getMenu(emp.role));
+    }
+
+    // Bug 10: 強制上傳單據
+    if (!d.image_url) {
+      return replyText(rt, "❌ 必須上傳單據照片才能送出費用申請");
+    }
+
+    // Bug 10: 重複請款檢查
+    const { data: dup } = await supabase.from("expenses")
+      .select("id, date, amount").eq("store_id", d.store_id).eq("vendor_name", d.vendor_name || "")
+      .eq("amount", d.amount).eq("date", baseDate).limit(1);
+    if (dup && dup.length > 0) {
+      return replyText(rt, "❌ 重複請款！\n\n同門市、同廠商、同金額、同日期\n已有一筆 " + fmt(d.amount) + " 的費用紀錄\n\n如需修正請聯繫主管");
     }
 
     await supabase.from("expenses").insert({

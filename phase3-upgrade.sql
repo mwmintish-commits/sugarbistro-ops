@@ -264,3 +264,47 @@ BEGIN
     EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', t);
   END LOOP;
 END $$;
+
+-- Bug 3: leave_balances 欄位名統一（round4用annual_leave, phase2用annual_total）
+ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS annual_total NUMERIC DEFAULT 0;
+ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS sick_total NUMERIC DEFAULT 30;
+ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS personal_total NUMERIC DEFAULT 14;
+-- 如果舊欄位有資料，複製到新欄位
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='leave_balances' AND column_name='annual_leave') THEN
+    UPDATE leave_balances SET annual_total = annual_leave WHERE annual_total = 0 AND annual_leave > 0;
+  END IF;
+END $$;
+
+-- Bug 10a: 費用分類對照表（重建）
+DROP TABLE IF EXISTS expense_categories;
+CREATE TABLE expense_categories (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  keywords TEXT DEFAULT '',
+  category_name TEXT NOT NULL,
+  pnl_group TEXT DEFAULT '營業費用',
+  pnl_item TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  sort_order INTEGER DEFAULT 0
+);
+ALTER TABLE expense_categories DISABLE ROW LEVEL SECURITY;
+
+-- 預設分類（keywords 用逗號分隔）
+INSERT INTO expense_categories (keywords, category_name, pnl_group, pnl_item, sort_order) VALUES
+  ('加油,油料,汽油,柴油', '車資', '營業費用', '交通費', 1),
+  ('台電,電費,水費,台水', '水電費', '營業費用', '水電瓦斯', 2),
+  ('瓦斯,桶裝,天然氣', '瓦斯費', '營業費用', '水電瓦斯', 3),
+  ('食材,菜,肉,蛋,奶,魚,蝦,豬,牛,雞,蔬果', '食材', '營業成本', '原物料', 4),
+  ('紙袋,紙盒,包材,塑膠袋,封口', '包材', '營業成本', '包裝材料', 5),
+  ('清潔,洗碗,消毒,抹布,垃圾袋', '清潔用品', '營業費用', '消耗品', 6),
+  ('維修,修繕,修理,更換零件', '修繕費', '營業費用', '修繕維護', 7),
+  ('電話,網路,月租', '通訊費', '營業費用', '通訊費', 8),
+  ('房租,租金', '租金', '營業費用', '租金', 9),
+  ('保險,勞保,健保', '保險費', '營業費用', '保險費', 10);
+
+
+-- Bug 10a: 費用分類建議欄位
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS category_suggestion TEXT;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pnl_group TEXT;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pnl_item TEXT;

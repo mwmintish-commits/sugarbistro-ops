@@ -103,6 +103,53 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
         </div>
 
+        {/* 📄 文件檔案（最上方） */}
+        {docs.length > 0 && (
+          <div style={sec}>
+            <h3 style={sh}>📄 報到文件</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 6 }}>
+              {docs.map(doc => {
+                const labels = { health_check: "🏥 體檢表", id_card_front: "🪪 身分證正", id_card_back: "🪪 身分證反", id_card: "🪪 身分證", handbook_sign: "📖 守則簽署", contract_sign: "📝 合約簽署" };
+                const label = labels[doc.doc_type] || doc.doc_type;
+                return (
+                  <div key={doc.id} onClick={() => setShowDoc(doc)} style={{
+                    background: "#fff", border: "1px solid #e8e6e1", borderRadius: 6, padding: 6,
+                    textAlign: "center", cursor: "pointer", fontSize: 10
+                  }}>
+                    <div style={{ fontSize: 18 }}>{doc.file_url || doc.signature_url ? "📄" : "✍️"}</div>
+                    <div style={{ fontWeight: 500, marginTop: 2 }}>{label}</div>
+                    <div style={{ fontSize: 7, color: "#aaa" }}>{doc.created_at?.slice(0, 10)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {docs.length === 0 && (
+          <div style={{ ...sec, background: "#fef9c3" }}>
+            <div style={{ fontSize: 11, color: "#8a6d00" }}>📄 尚無報到文件</div>
+          </div>
+        )}
+
+        {/* 文件預覽彈窗 */}
+        {showDoc && (
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+            onClick={() => setShowDoc(null)}>
+            <div style={{ background: "#fff", borderRadius: 10, maxWidth: 500, width: "100%", maxHeight: "80vh", overflow: "auto", padding: 16 }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                <h4 style={{ fontSize: 14, fontWeight: 600 }}>
+                  {({ health_check: "🏥 體檢表", id_card_front: "🪪 身分證正面", id_card_back: "🪪 身分證反面", id_card: "🪪 身分證", handbook_sign: "📖 守則簽署", contract_sign: "📝 合約簽署" })[showDoc.doc_type] || showDoc.doc_type}
+                </h4>
+                <button onClick={() => setShowDoc(null)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer" }}>✕</button>
+              </div>
+              {showDoc.file_url && <img src={showDoc.file_url} alt="" style={{ width: "100%", borderRadius: 6, marginBottom: 8 }} />}
+              {showDoc.signature_url && <div><p style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>電子簽名</p><img src={showDoc.signature_url} alt="簽名" style={{ border: "1px solid #eee", borderRadius: 6, maxWidth: 200 }} /></div>}
+              {showDoc.signed_at && <p style={{ fontSize: 10, color: "#888", marginTop: 6 }}>簽署時間：{new Date(showDoc.signed_at).toLocaleString("zh-TW")}</p>}
+              {showDoc.file_url && <a href={showDoc.file_url} download style={{ display: "block", textAlign: "center", marginTop: 8, padding: "8px 16px", borderRadius: 6, background: "#4361ee", color: "#fff", fontSize: 12, textDecoration: "none", fontWeight: 600 }}>📥 下載 / 列印</a>}
+            </div>
+          </div>
+        )}
+
         <div style={sec}>
           <h3 style={sh}>基本資料</h3>
           <Row l="門市" v={e.stores ? e.stores.name : "總部"} />
@@ -203,62 +250,6 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
             </div>
           )}
         </div>
-
-        {/* 📄 文件檔案 */}
-        {docs.length > 0 && (
-          <div style={sec}>
-            <h3 style={sh}>📄 報到文件</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 6 }}>
-              {docs.map(doc => {
-                const labels = { health_check: "🏥 體檢表", id_card_front: "🪪 身分證正", id_card_back: "🪪 身分證反", id_card: "🪪 身分證", handbook_sign: "📖 守則簽署", contract_sign: "📝 合約簽署" };
-                const label = labels[doc.doc_type] || doc.doc_type;
-                const hasImage = doc.file_url || doc.signature_url;
-                return (
-                  <div key={doc.id} onClick={() => setShowDoc(doc)} style={{
-                    background: "#fff", border: "1px solid #e8e6e1", borderRadius: 6, padding: 8,
-                    textAlign: "center", cursor: "pointer", fontSize: 10
-                  }}>
-                    <div style={{ fontSize: 22 }}>{hasImage ? "📄" : "✍️"}</div>
-                    <div style={{ fontWeight: 500, marginTop: 2 }}>{label}</div>
-                    <div style={{ fontSize: 8, color: "#aaa" }}>{doc.created_at?.slice(0, 10)}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* 文件預覽彈窗 */}
-        {showDoc && (
-          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-            onClick={() => setShowDoc(null)}>
-            <div style={{ background: "#fff", borderRadius: 10, maxWidth: 500, width: "100%", maxHeight: "80vh", overflow: "auto", padding: 16 }} onClick={e => e.stopPropagation()}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                <h4 style={{ fontSize: 14, fontWeight: 600 }}>
-                  {({ health_check: "🏥 體檢表", id_card_front: "🪪 身分證正面", id_card_back: "🪪 身分證反面", id_card: "🪪 身分證", handbook_sign: "📖 守則簽署", contract_sign: "📝 合約簽署" })[showDoc.doc_type] || showDoc.doc_type}
-                </h4>
-                <button onClick={() => setShowDoc(null)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer" }}>✕</button>
-              </div>
-              {showDoc.file_url && (
-                <img src={showDoc.file_url} alt="" style={{ width: "100%", borderRadius: 6, marginBottom: 8 }} />
-              )}
-              {showDoc.signature_url && (
-                <div>
-                  <p style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>電子簽名</p>
-                  <img src={showDoc.signature_url} alt="簽名" style={{ border: "1px solid #eee", borderRadius: 6, maxWidth: 200 }} />
-                </div>
-              )}
-              {showDoc.signed_at && (
-                <p style={{ fontSize: 10, color: "#888", marginTop: 6 }}>簽署時間：{new Date(showDoc.signed_at).toLocaleString("zh-TW")}</p>
-              )}
-              {showDoc.file_url && (
-                <a href={showDoc.file_url} download style={{ display: "block", textAlign: "center", marginTop: 8, padding: "8px 16px", borderRadius: 6, background: "#4361ee", color: "#fff", fontSize: 12, textDecoration: "none", fontWeight: 600 }}>
-                  📥 下載 / 列印
-                </a>
-              )}
-            </div>
-          </div>
-        )}
 
         <button onClick={save} disabled={saving} style={{
           width: "100%", padding: "10px", borderRadius: 8, border: "none",

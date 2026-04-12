@@ -123,7 +123,7 @@ export async function POST(request) {
       await pushText(empData.line_uid, "⚠️ 你的帳號已被移除\n\n👤 " + empData.name + "\n\n如有疑問請聯繫總部。").catch(() => {});
       await supabase.from("user_states").delete().eq("line_uid", empData.line_uid);
     }
-    // 清關聯資料
+    // 清關聯資料（全部 FK 表）
     await supabase.from("schedules").delete().eq("employee_id", eid);
     await supabase.from("attendances").delete().eq("employee_id", eid);
     await supabase.from("leave_requests").delete().eq("employee_id", eid);
@@ -134,6 +134,12 @@ export async function POST(request) {
     await supabase.from("performance_reviews").delete().eq("employee_id", eid);
     await supabase.from("bonus_records").delete().eq("employee_id", eid);
     await supabase.from("employee_documents").delete().eq("employee_id", eid);
+    await supabase.from("swap_requests").delete().or("requester_id.eq." + eid + ",target_id.eq." + eid);
+    await supabase.from("work_logs").delete().eq("employee_id", eid);
+    await supabase.from("clock_amendments").delete().eq("employee_id", eid);
+    await supabase.from("clockin_tokens").delete().eq("employee_id", eid);
+    await supabase.from("daily_settlements").update({ submitted_by: null }).eq("submitted_by", eid);
+    await supabase.from("onboarding_records").update({ auto_employee_id: null }).eq("auto_employee_id", eid);
     const { error } = await supabase.from("employees").delete().eq("id", eid);
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ success: true });

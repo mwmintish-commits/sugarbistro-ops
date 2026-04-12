@@ -6,6 +6,15 @@ export function ap(u, b) {
     : fetch(u).then(r => r.json());
 }
 
+// 安全呼叫：失敗時 alert 錯誤
+export async function sap(u, b) {
+  try {
+    const r = await ap(u, b);
+    if (r.error) { alert("❌ " + r.error); return null; }
+    return r;
+  } catch (e) { alert("❌ 連線錯誤：" + e.message); return null; }
+}
+
 export const fmt = (n) => "$" + Number(n || 0).toLocaleString();
 
 export const ROLES = {
