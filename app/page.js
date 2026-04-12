@@ -16,7 +16,7 @@ const ROLE_TABS = {
     "reviews",
     "settlements","deposits","expenses","payments","pnl",
     "recipes","production","inventory","clients","orders","products","shifts","worklogs"],
-  store_manager: ["schedules","leaves","store_staff","shifts","worklogs",
+  store_manager: ["schedules","leaves","store_staff","shifts","worklogs","inventory",
     "announcements","settlements","deposits","expenses"]
 };
 const TAB_L = {
@@ -299,6 +299,9 @@ export default function AdminPage() {
 
   const lockedStore = auth.role === "store_manager" ? auth.store_id : null;
   const storeName = auth.role === "store_manager" ? auth.store_name : null;
+
+  // 門店主管鎖定門市
+  useEffect(() => { if (lockedStore && !sf) setSf(lockedStore); }, [lockedStore]);
 
   // ===== MAIN SHELL =====
   return (
@@ -1663,7 +1666,7 @@ export default function AdminPage() {
         {!ld && tab === "worklogs" && (
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📋 工作日誌</h3>
-            <WorklogMgr stores={stores} sf={sf} month={month} />
+            <WorklogMgr stores={stores} sf={sf} month={month} auth={auth} />
           </div>
         )}
 
