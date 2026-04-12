@@ -491,7 +491,7 @@ export default function AdminPage() {
                         <td style={{padding:6}}>
                           <button onClick={async()=>{await ap("/api/admin/employees",{action:"activate",employee_id:e.id});load();}}
                             style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>啟用</button>
-                          <button onClick={async()=>{if(!confirm("確定刪除"+e.name+"的資料？此操作無法復原"))return;await ap("/api/admin/employees",{action:"deactivate",employee_id:e.id});load();}}
+                          <button onClick={async()=>{if(!confirm("⚠️ 永久刪除「"+e.name+"」？\n此操作無法復原！"))return;await ap("/api/admin/employees",{action:"delete",employee_id:e.id});load();}}
                             style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>刪除</button>
                         </td>
                       </tr>
@@ -519,7 +519,7 @@ export default function AdminPage() {
                       <td style={{padding:6}}>{e.stores?e.stores.name:"總部"}</td>
                       <td style={{padding:6}}><RB role={e.role} /></td>
                       <td style={{padding:6}}>{(e.service_months||0)+"月"}</td>
-                      <td style={{padding:6}}>{(e.annual_leave_days||0)+"天"}</td>
+                      <td style={{padding:6}}>{(e.annual_leave_days||0)+"hr"}</td>
                       <td style={{padding:6}}>{e.line_uid?"✅":"❌"}</td>
                       <td style={{padding:6}}>
                         <button onClick={()=>deactivate(e.id)}
@@ -802,9 +802,9 @@ export default function AdminPage() {
                     <div style={{background:"#e6f1fb",borderRadius:6,padding:8,textAlign:"center"}}>
                       <div style={{fontSize:9,color:"#185fa5"}}>🏖 特休</div>
                       <div style={{fontSize:20,fontWeight:700,color:"#185fa5"}}>{annualDays}</div>
-                      <div style={{fontSize:9,color:"#888"}}>天</div>
+                      <div style={{fontSize:9,color:"#888"}}>hr</div>
                       <button onClick={async()=>{
-                        const v=prompt(e.name+" 特休天數：",annualDays);if(v===null)return;
+                        const v=prompt(e.name+" 特休時數(hr)：",annualDays);if(v===null)return;
                         await ap("/api/admin/leave-balances",{action:"update_balance",employee_id:e.id,annual_total:Number(v)});
                         load();
                       }} style={{fontSize:8,color:"#4361ee",background:"none",border:"none",cursor:"pointer",marginTop:2}}>✏️修改</button>
@@ -961,21 +961,27 @@ export default function AdminPage() {
                       <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}}>{ls>0?"-"+fmt(ls):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}}>{hs>0?"-"+fmt(hs):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:suppH>0?"#b91c1c":"#ccc"}}>{suppH>0?"-"+fmt(suppH):"-"}</td>
-                      <td style={{padding:"5px 4px",textAlign:"right"}}>
-                        <input type="number" id={"pa-"+e.id} defaultValue={e.default_allowance||""} placeholder="0"
-                          style={{width:50,padding:1,borderRadius:3,border:"1px solid #ddd",fontSize:9,textAlign:"right"}} />
+                      <td style={{padding:"5px 2px"}}>
+                        <input type="text" id={"pan-"+e.id} defaultValue={e.default_allowance_note||""} placeholder="名目"
+                          style={{width:40,padding:1,borderRadius:3,border:"1px solid #eee",fontSize:8,marginBottom:1}} />
+                        <input type="number" id={"pa-"+e.id} defaultValue={e.default_allowance||""} placeholder="$"
+                          style={{width:40,padding:1,borderRadius:3,border:"1px solid #ddd",fontSize:9,textAlign:"right"}} />
                       </td>
-                      <td style={{padding:"5px 4px",textAlign:"right"}}>
-                        <input type="number" id={"pd-"+e.id} defaultValue={e.default_deduction||""} placeholder="0"
-                          style={{width:50,padding:1,borderRadius:3,border:"1px solid #ddd",fontSize:9,textAlign:"right"}} />
+                      <td style={{padding:"5px 2px"}}>
+                        <input type="text" id={"pdn-"+e.id} defaultValue={e.default_deduction_note||""} placeholder="名目"
+                          style={{width:40,padding:1,borderRadius:3,border:"1px solid #eee",fontSize:8,marginBottom:1}} />
+                        <input type="number" id={"pd-"+e.id} defaultValue={e.default_deduction||""} placeholder="$"
+                          style={{width:40,padding:1,borderRadius:3,border:"1px solid #ddd",fontSize:9,textAlign:"right"}} />
                       </td>
                       <td style={{padding:"5px 4px",textAlign:"right",fontWeight:700,fontSize:12,color:"#0a7c42"}}>{fmt(net)}</td>
                       <td style={{padding:"5px 4px",textAlign:"center"}}>
                         <button onClick={async()=>{
                           const allow=Number(document.getElementById("pa-"+e.id).value||0);
                           const deduct=Number(document.getElementById("pd-"+e.id).value||0);
-                          await ap("/api/admin/employees",{action:"update",employee_id:e.id,default_allowance:allow,default_deduction:deduct});
-                          alert(e.name+" 加項$"+allow+" 扣項$"+deduct+" 已儲存（下月自動帶入）");
+                          const allowNote=document.getElementById("pan-"+e.id).value||"";
+                          const deductNote=document.getElementById("pdn-"+e.id).value||"";
+                          await ap("/api/admin/employees",{action:"update",employee_id:e.id,default_allowance:allow,default_deduction:deduct,default_allowance_note:allowNote,default_deduction_note:deductNote});
+                          alert(e.name+" 加項「"+allowNote+"」$"+allow+"、扣項「"+deductNote+"」$"+deduct+" 已儲存");
                         }} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:8,cursor:"pointer"}}>💾</button>
                       </td>
                     </tr>

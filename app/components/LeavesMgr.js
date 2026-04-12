@@ -109,7 +109,7 @@ export default function LeavesMgr({ lr, pl, rvLv, sf }) {
                         {b.annual_overridden && <span style={{ color: "#b45309" }}> ✏️</span>}
                       </div>
                       <button onClick={async () => {
-                        const v = prompt("修改特休天數（自動" + b.annual_auto + "天）：", b.annual_total);
+                        const v = prompt("修改特休時數（自動" + b.annual_auto + "hr）：", b.annual_total);
                         if (v === null) return;
                         await ap("/api/admin/leave-balances", { action: "update_balance", employee_id: b.employee_id, annual_total: Number(v) });
                         loadBal();
@@ -120,14 +120,14 @@ export default function LeavesMgr({ lr, pl, rvLv, sf }) {
                     <div style={{ background: "#fef9c3", borderRadius: 6, padding: 8, textAlign: "center" }}>
                       <div style={{ fontSize: 9, color: "#8a6d00" }}>🏥 病假</div>
                       <div style={{ fontSize: 18, fontWeight: 700, color: "#8a6d00" }}>{b.sick_remaining}</div>
-                      <div style={{ fontSize: 9, color: "#888" }}>{"用" + b.sick_used + " / 30天"}</div>
+                      <div style={{ fontSize: 9, color: "#888" }}>{"用" + b.sick_used + " / 240hr"}</div>
                     </div>
 
                     {/* 事假 */}
                     <div style={{ background: "#faf8f5", borderRadius: 6, padding: 8, textAlign: "center" }}>
                       <div style={{ fontSize: 9, color: "#666" }}>📋 事假</div>
                       <div style={{ fontSize: 18, fontWeight: 700, color: "#666" }}>{b.personal_remaining}</div>
-                      <div style={{ fontSize: 9, color: "#888" }}>{"用" + b.personal_used + " / 14天"}</div>
+                      <div style={{ fontSize: 9, color: "#888" }}>{"用" + b.personal_used + " / 112hr"}</div>
                     </div>
 
                     {/* 補休 */}
@@ -163,7 +163,7 @@ export default function LeavesMgr({ lr, pl, rvLv, sf }) {
             </div>
           )}
           <p style={{ fontSize: 9, color: "#999", marginTop: 6 }}>
-            特休以月份計算（到職滿6月→3天、12月→7天、24月→10天...），系統自動偵測門檻觸發。總部可✏️修改覆蓋。
+            特休以月份計算（到職滿6月→24hr、12月→56hr、24月→80hr...），系統自動偵測門檻觸發。總部可✏️修改覆蓋。
           </p>
         </div>
       )}

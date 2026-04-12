@@ -10,7 +10,7 @@ function calcServiceMonths(hireDate) {
   return (now.getFullYear() - hire.getFullYear()) * 12 + (now.getMonth() - hire.getMonth());
 }
 
-// 計算特休天數
+// 計算特休（小時，1天=8hr）
 function calcAnnualLeave(serviceMonths, type) {
   const rules = type === "parttime" ? [
     [6,12,1.5],[12,24,3.5],[24,36,5],[36,60,7],[60,120,7.5],[120,9999,7.5]
@@ -18,7 +18,7 @@ function calcAnnualLeave(serviceMonths, type) {
     [6,12,3],[12,24,7],[24,36,10],[36,60,14],[60,120,15],[120,180,16],[180,240,17],[240,300,18],[300,360,19],[360,9999,20]
   ];
   for (const [min, max, days] of rules) {
-    if (serviceMonths >= min && serviceMonths < max) return days;
+    if (serviceMonths >= min && serviceMonths < max) return days * 8;
   }
   return 0;
 }

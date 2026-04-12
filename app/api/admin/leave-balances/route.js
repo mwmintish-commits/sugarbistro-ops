@@ -1,21 +1,20 @@
 import { supabase, eom } from "@/lib/supabase";
 
+// 特休以小時計算（1天=8小時）
 function calcAnnualLeave(hireDate) {
   if (!hireDate) return 0;
   const now = new Date();
   const hire = new Date(hireDate);
-  // 以月份計算年資
   const months = (now.getFullYear() - hire.getFullYear()) * 12 + now.getMonth() - hire.getMonth();
-  // 如果當月日期還沒到到職日，扣回1個月
   const adjusted = now.getDate() < hire.getDate() ? months - 1 : months;
-  if (adjusted < 6) return 0;        // 未滿6個月
-  if (adjusted < 12) return 3;       // 滿6個月未滿1年
+  if (adjusted < 6) return 0;
+  if (adjusted < 12) return 3 * 8;    // 3天=24hr
   const years = Math.floor(adjusted / 12);
-  if (years < 2) return 7;           // 滿1年
-  if (years < 3) return 10;          // 滿2年
-  if (years < 5) return 14;          // 滿3年
-  if (years < 10) return 15;         // 滿5年
-  return Math.min(15 + (years - 10), 30); // 滿10年起+1
+  if (years < 2) return 7 * 8;        // 7天=56hr
+  if (years < 3) return 10 * 8;       // 10天=80hr
+  if (years < 5) return 14 * 8;       // 14天=112hr
+  if (years < 10) return 15 * 8;      // 15天=120hr
+  return Math.min(15 + (years - 10), 30) * 8;
 }
 
 // 計算到達下一個門檻的日期
@@ -62,7 +61,7 @@ export async function GET(request) {
 
     const used = { annual: 0, sick: 0, personal: 0, menstrual: 0 };
     for (const l of leaves || []) {
-      const days = l.half_day ? 0.5 : (Math.ceil((new Date(l.end_date) - new Date(l.start_date)) / 86400000) + 1);
+      const days = (l.half_day ? 0.5 : (Math.ceil((new Date(l.end_date) - new Date(l.start_date)) / 86400000) + 1)) * 8; // 轉小時
       if (used[l.leave_type] !== undefined) used[l.leave_type] += days;
     }
 
@@ -77,9 +76,9 @@ export async function GET(request) {
         annual_used: used.annual,
         annual_remaining: (balance?.annual_total || 0) - used.annual,
         sick_used: used.sick,
-        sick_remaining: 30 - used.sick,
+        sick_remaining: 240 - used.sick,
         personal_used: used.personal,
-        personal_remaining: 14 - used.personal,
+        personal_remaining: 112 - used.personal,
         menstrual_used: used.menstrual,
         overtime_comp_total: compTotal,
       }
@@ -113,7 +112,7 @@ export async function GET(request) {
       .gte("start_date", year + "-01-01").lte("start_date", year + "-12-31");
     const used = { annual: 0, sick: 0, personal: 0, menstrual: 0, comp_time: 0 };
     for (const l of leaves || []) {
-      const days = l.half_day ? 0.5 : (Math.ceil((new Date(l.end_date) - new Date(l.start_date)) / 86400000) + 1);
+      const days = (l.half_day ? 0.5 : (Math.ceil((new Date(l.end_date) - new Date(l.start_date)) / 86400000) + 1)) * 8; // 轉小時
       if (used[l.leave_type] !== undefined) used[l.leave_type] += days;
     }
 
@@ -162,8 +161,8 @@ export async function GET(request) {
       annual_used: used.annual, annual_remaining: annualDays - used.annual,
       next_milestone: milestone,
       // 病假/事假
-      sick_used: used.sick, sick_remaining: 30 - used.sick,
-      personal_used: used.personal, personal_remaining: 14 - used.personal,
+      sick_used: used.sick, sick_remaining: 240 - used.sick,
+      personal_used: used.personal, personal_remaining: 112 - used.personal,
       // 加班補休整合
       ot_total_hours: otTotalHours, ot_pay_total: otPayTotal,
       comp_available: compHours, comp_used: compUsedH, comp_converted: compConverted,
