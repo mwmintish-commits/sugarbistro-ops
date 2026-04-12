@@ -262,6 +262,12 @@ export default function AdminPage() {
     }
   };
 
+  const lockedStore = auth?.role === "store_manager" ? auth.store_id : null;
+  const storeName = auth?.role === "store_manager" ? auth.store_name : null;
+
+  // 門店主管鎖定門市（必須在所有 hooks 之後、條件 return 之前）
+  useEffect(() => { if (lockedStore && !sf) setSf(lockedStore); }, [lockedStore]);
+
   // ===== LOGIN =====
   if (!auth) {
     return (
@@ -297,11 +303,7 @@ export default function AdminPage() {
     );
   }
 
-  const lockedStore = auth.role === "store_manager" ? auth.store_id : null;
-  const storeName = auth.role === "store_manager" ? auth.store_name : null;
-
-  // 門店主管鎖定門市
-  useEffect(() => { if (lockedStore && !sf) setSf(lockedStore); }, [lockedStore]);
+  // lockedStore 已在上方定義
 
   // ===== MAIN SHELL =====
   return (
