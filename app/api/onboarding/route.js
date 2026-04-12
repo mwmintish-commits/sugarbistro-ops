@@ -68,9 +68,18 @@ async function sendOnboardingEmails({ email, name, storeName, idNumber, hireDate
 export async function GET(request) {
   const token = new URL(request.url).searchParams.get("token");
   if (!token) return Response.json({ error: "Missing token" }, { status: 400 });
+
+  // 先查 onboarding_records
   const { data } = await supabase.from("onboarding_records").select("*").eq("token", token).single();
-  if (!data) return Response.json({ error: "Invalid token" }, { status: 404 });
-  return Response.json({ data });
+  if (data) return Response.json({ data });
+
+  // fallback: 查 employees.bind_code（後台產生的報到連結）
+  const { data: emp } = await supabase.from("employees")
+    .select("id, name, phone, email, store_id, stores(name), hire_date, bind_code, onboarding_completed, contract_signed")
+    .eq("bind_code", token).single();
+  if (emp) return Response.json({ data: { ...emp, store_name: emp.stores?.name || "", token } });
+
+  return Response.json({ error: "連結無效或已過期" }, { status: 404 });
 }
 
 export async function POST(request) {
