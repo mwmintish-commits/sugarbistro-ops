@@ -57,7 +57,24 @@ export default function OnboardingPage() {
     }).catch(() => { setErr("載入失敗"); setLd(false); });
   }, []);
 
-  const f2b = (file) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
+  const f2b = (file) => new Promise((res) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const max = 1200;
+        let w = img.width, h = img.height;
+        if (w > max) { h = h * max / w; w = max; }
+        if (h > max) { w = w * max / h; h = max; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        res(canvas.toDataURL("image/jpeg", 0.6));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 
   const goNext = async () => {
     setErr("");
@@ -75,14 +92,30 @@ export default function OnboardingPage() {
     if (step === 4) {
       if (!agreed.contract || !sigs.contract) { setErr("請勾選同意並簽名"); return; }
       setSub(true);
-      const r = await ap("/api/onboarding", {
-        action: "complete", token: tk, ...form,
-        health_check_url: files.health_check,
-        id_front_url: files.id_front, id_back_url: files.id_back,
-        handbook_signature: sigs.handbook, contract_signature: sigs.contract,
-        handbook_content: handbook, contract_content: contractText,
-      });
-      if (r.success) setDone(true); else setErr(r.error || "提交失敗");
+      try {
+        const res = await fetch("/api/onboarding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "complete", token: tk, ...form,
+            health_check_url: files.health_check,
+            id_front_url: files.id_front, id_back_url: files.id_back,
+            handbook_signature: sigs.handbook, contract_signature: sigs.contract,
+            handbook_content: handbook, contract_content: contractText,
+          }),
+        });
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          alert("❌ 伺服器錯誤 " + res.status + "：" + txt.slice(0, 200));
+          setSub(false); return;
+        }
+        const r = await res.json().catch(() => null);
+        if (!r) { alert("❌ 回應格式錯誤"); setSub(false); return; }
+        if (r.success) { setDone(true); } else { alert("❌ " + (r.error || "提交失敗")); setErr(r.error || "提交失敗"); }
+      } catch (e) {
+        alert("❌ 連線錯誤：" + e.message);
+        setErr("連線錯誤：" + e.message);
+      }
       setSub(false); return;
     }
     setStep(step + 1);

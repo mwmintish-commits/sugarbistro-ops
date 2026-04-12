@@ -131,6 +131,7 @@ export async function POST(request) {
 
   // 6步驟報到完成（現有員工）
   if (body.action === "complete") {
+    try {
     const { token, signature_name, birthday, id_number, phone, email, address,
       emergency_contact, emergency_phone, emergency_relation,
       bank_name, bank_account,
@@ -156,7 +157,14 @@ export async function POST(request) {
       }
     }
 
-    if (!emp) return Response.json({ error: "找不到員工" }, { status: 404 });
+    if (!emp && phone) {
+      const { data: byPhone } = await supabase.from("employees")
+        .select("id, name, store_id, line_uid, stores(name), hire_date")
+        .eq("phone", phone).eq("is_active", true).single().catch(() => ({ data: null }));
+      if (byPhone) emp = byPhone;
+    }
+
+    if (!emp) return Response.json({ error: "找不到員工。請確認後台已新增此員工，並使用最新的報到連結。" }, { status: 404 });
 
     // 更新員工資料
     const { error: updateErr } = await supabase.from("employees").update({
@@ -202,6 +210,10 @@ export async function POST(request) {
     }
 
     return Response.json({ success: true });
+    } catch (e) {
+      console.error("Onboarding complete error:", e);
+      return Response.json({ error: "報到失敗：" + (e.message || "伺服器錯誤") }, { status: 500 });
+    }
   }
 
   return Response.json({ error: "Unknown action" }, { status: 400 });

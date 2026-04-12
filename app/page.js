@@ -502,7 +502,7 @@ export default function AdminPage() {
             )}
 
             {/* 已啟用 — 按門市分組 */}
-            {[...(sf ? stores.filter(s=>s.id===sf) : stores), {id:"__hq__",name:"總部"}].map(store => {
+            {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
               const storeEmps = store.id === "__hq__" ? ae.filter(e => !e.store_id || !stores.some(s=>s.id===e.store_id)) : ae.filter(e => e.store_id === store.id);
               if (storeEmps.length === 0) return null;
               return (
@@ -621,9 +621,10 @@ export default function AdminPage() {
 
             {sv==="month" && (
               <div>
-              {[...(sf ? stores.filter(s=>s.id===sf) : stores), {id:"__hq__",name:"總部"}].map(store => {
+              {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
                 const storeScheds = scheds.filter(s => { const emp = emps.find(e=>e.id===s.employee_id); return emp && (store.id==="__hq__" ? !emp.store_id : emp.store_id===store.id); });
-                if (storeScheds.length === 0 && !sf) return null;
+                const hasEmps = emps.some(e => store.id==="__hq__" ? !e.store_id : e.store_id===store.id);
+                if (!hasEmps) return null;
                 return (
                 <div key={store.id} style={{marginBottom:10}}>
                   <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name}</h4>
@@ -673,7 +674,7 @@ export default function AdminPage() {
 
             {attView === "records" && (
               <div>
-              {[...(sf ? stores.filter(s=>s.id===sf) : stores), {id:"__hq__",name:"總部"}].map(store => {
+              {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
                 const storeAtt = att.filter(a => { const emp = emps.find(e=>e.id===a.employee_id); return emp && (store.id==="__hq__" ? (!emp.store_id || !stores.some(st=>st.id===emp.store_id)) : emp.store_id === store.id); });
                 if (storeAtt.length === 0 && !sf) return null;
                 return (
@@ -782,7 +783,7 @@ export default function AdminPage() {
             </div>
 
             {/* 每人休假卡片 — 按門市分組 */}
-            {[...(sf ? stores.filter(s=>s.id===sf) : stores), {id:"__hq__",name:"總部"}].map(store => {
+            {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
               const storeEmps = store.id==="__hq__" ? ae.filter(e => !e.store_id || !stores.some(s=>s.id===e.store_id)) : ae.filter(e => e.store_id === store.id);
               if (storeEmps.length === 0) return null;
               return (
@@ -953,7 +954,7 @@ export default function AdminPage() {
               </button>
             </div>
             {/* 薪資表 — 按門市分組 */}
-            {(sf ? stores.filter(s=>s.id===sf) : stores).map(store => {
+            {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
               const storeEmps = store.id==="__hq__" ? ae.filter(e => !e.store_id || !stores.some(s=>s.id===e.store_id)) : ae.filter(e => e.store_id === store.id);
               if (storeEmps.length === 0) return null;
               return (

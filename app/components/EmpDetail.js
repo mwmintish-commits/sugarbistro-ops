@@ -133,7 +133,19 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
                   const file = ev.target.files[0]; if (!file) return;
                   const reader = new FileReader();
                   reader.onload = async () => {
-                    const url = reader.result;
+                    let url = reader.result;
+                    // 圖片壓縮（max 1200px, 品質60%）
+                    if (file.type.startsWith("image")) {
+                      url = await new Promise(res => {
+                        const img = new Image(); img.onload = () => {
+                          const c = document.createElement("canvas");
+                          const s = Math.min(1, 1200 / Math.max(img.width, img.height));
+                          c.width = img.width * s; c.height = img.height * s;
+                          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+                          res(c.toDataURL("image/jpeg", 0.6));
+                        }; img.src = url;
+                      });
+                    }
                     const payload = dt.includes("sign") ? { employee_id: empId, doc_type: dt, signature_url: url } : { employee_id: empId, doc_type: dt, file_url: url };
                     const r = await ap("/api/admin/documents", payload);
                     if (r.error) alert("❌ " + r.error); else { alert("✅ " + lb + " 已上傳"); reload(); }
