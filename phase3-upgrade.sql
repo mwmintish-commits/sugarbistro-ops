@@ -313,3 +313,9 @@ ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pnl_item TEXT;
 ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS leave_deduction NUMERIC DEFAULT 0;
 ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS leave_hours NUMERIC DEFAULT 0;
 ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS leave_detail TEXT;
+
+-- 日結表新增欄位
+ALTER TABLE daily_settlements ADD COLUMN IF NOT EXISTS remittance_amount NUMERIC DEFAULT 0;
+ALTER TABLE daily_settlements ADD COLUMN IF NOT EXISTS void_invoice_numbers TEXT;
+ALTER TABLE daily_settlements ADD COLUMN IF NOT EXISTS void_item_count INTEGER DEFAULT 0;
+ALTER TABLE daily_settlements ADD COLUMN IF NOT EXISTS void_item_amount NUMERIC DEFAULT 0;
