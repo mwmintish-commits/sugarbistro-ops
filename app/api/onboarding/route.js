@@ -3,30 +3,66 @@ import { supabase } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
 async function sendContractEmail(email, name, storeName, signedAt) {
+  // Legacy - kept for old flow
+}
+
+async function sendOnboardingEmails({ email, name, storeName, idNumber, hireDate, handbookContent, contractContent, handbookSig, contractSig }) {
   const RESEND_KEY = process.env.RESEND_API_KEY;
-  if (!RESEND_KEY) { console.log("No RESEND_API_KEY, skip email"); return; }
+  if (!RESEND_KEY || !email) { console.log("No RESEND_API_KEY or email, skip"); return; }
+  const signDate = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
+  const fromAddr = process.env.RESEND_FROM || "小食糖 <onboarding@resend.dev>";
+
+  // 共用樣式
+  const style = "font-family:'Noto Sans TC',sans-serif;max-width:700px;margin:0 auto;padding:30px;color:#333;line-height:1.8;";
+  const headerHtml = "<div style='text-align:center;margin-bottom:20px'><h1 style='font-size:22px;margin:0'>🍯 小食糖 SUGARbISTRO</h1></div>";
+  const footerHtml = "<hr style='margin:20px 0'/><div style='display:flex;justify-content:space-between;align-items:flex-end;margin-top:30px'>" +
+    "<div><p><b>員工姓名：</b>" + name + "</p><p><b>簽署日期：</b>" + signDate + "</p></div>" +
+    "<div style='text-align:center'><p style='font-size:10px;color:#888'>電子簽名</p>SIG_PLACEHOLDER</div></div>" +
+    "<p style='font-size:10px;color:#aaa;text-align:center;margin-top:20px'>此為系統自動發送之簽署副本，正本由總部存檔。</p>";
+
+  // 1. 員工守則 Email
   try {
+    let hbHtml = "";
+    const chapters = handbookContent || [];
+    for (const ch of chapters) {
+      const isWarn = (ch.title || "").includes("零容忍") || (ch.title || "").includes("最高");
+      hbHtml += "<h3 style='background:" + (isWarn ? "#fde8e8;color:#b91c1c" : "#f5f5f5;color:#333") + ";padding:6px 10px;border-radius:4px;font-size:14px'>" + ch.title + "</h3>";
+      for (const item of ch.items || []) hbHtml += "<p style='padding-left:16px;margin:4px 0;font-size:13px'>▸ " + item + "</p>";
+    }
+    const hbBody = "<div style='" + style + "'>" + headerHtml +
+      "<h2 style='text-align:center;font-size:18px'>員工行為規範與工作守則</h2>" +
+      "<p style='text-align:center;color:#888;font-size:12px'>適用對象：全體正職、兼職、試用期同仁</p>" +
+      hbHtml +
+      footerHtml.replace("SIG_PLACEHOLDER", handbookSig ? "<img src='" + handbookSig + "' style='height:50px' />" : "(已電子簽署)") +
+      "</div>";
     await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_KEY}` },
-      body: JSON.stringify({
-        from: "小食糖 <noreply@sugarbistro.tw>",
-        to: email,
-        subject: "【小食糖】員工行為規範與工作守則 - 簽署確認書",
-        html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
-          <h2 style="text-align:center">🍯 小食糖 SUGARbISTRO</h2>
-          <h3 style="text-align:center">員工行為規範與工作守則 - 簽署確認書</h3>
-          <hr/>
-          <p><b>員工姓名：</b>${name}</p>
-          <p><b>所屬門市：</b>${storeName}</p>
-          <p><b>簽署時間：</b>${new Date(signedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}</p>
-          <hr/>
-          <p>本人已詳細閱讀「小食糖 SUGARbISTRO 員工行為規範與工作守則」全文，瞭解並同意遵守所有規定。</p>
-          <p style="color:#888;font-size:12px">此為系統自動發送之簽署確認副本，正本由總部存檔。</p>
-        </div>`,
-      }),
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + RESEND_KEY },
+      body: JSON.stringify({ from: fromAddr, to: email, subject: "【小食糖】員工守則簽署確認 - " + name, html: hbBody }),
     });
-  } catch (e) { console.error("Email error:", e); }
+  } catch (e) { console.error("Handbook email error:", e); }
+
+  // 2. 工作合約 Email
+  try {
+    let ctHtml = "<p><b>甲方（雇主）：</b>小食糖 SUGARbISTRO</p>" +
+      "<p><b>乙方（員工）：</b>" + name + "</p>" +
+      "<p><b>身分證字號：</b>" + (idNumber || "") + "</p>" +
+      "<p><b>服務門市：</b>" + (storeName || "") + "</p>" +
+      "<p><b>到職日期：</b>" + (hireDate || "") + "</p>" +
+      "<hr style='margin:15px 0'/><p style='font-weight:600'>雙方同意依下列條款訂定本勞動契約：</p>";
+    const lines = (contractContent || "").split("\n").filter(Boolean);
+    for (const line of lines) ctHtml += "<p style='padding-left:8px;margin:6px 0;font-size:13px'>" + line + "</p>";
+    const ctBody = "<div style='" + style + "'>" + headerHtml +
+      "<h2 style='text-align:center;font-size:18px'>勞動契約書</h2>" +
+      ctHtml +
+      footerHtml.replace("SIG_PLACEHOLDER", contractSig ? "<img src='" + contractSig + "' style='height:50px' />" : "(已電子簽署)") +
+      "</div>";
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + RESEND_KEY },
+      body: JSON.stringify({ from: fromAddr, to: email, subject: "【小食糖】工作合約簽署確認 - " + name, html: ctBody }),
+    });
+  } catch (e) { console.error("Contract email error:", e); }
 }
 
 export async function GET(request) {
@@ -98,7 +134,9 @@ export async function POST(request) {
     const { token, signature_name, birthday, id_number, phone, email, address,
       emergency_contact, emergency_phone, emergency_relation,
       bank_name, bank_account,
-      health_check_url, id_card_url, handbook_signature, contract_signature } = body;
+      health_check_url, id_front_url, id_back_url,
+      handbook_signature, contract_signature,
+      handbook_content, contract_content } = body;
 
     // 找員工（by bind_code or token）
     let emp = null;
@@ -129,12 +167,13 @@ export async function POST(request) {
       onboarding_completed: true, onboarding_step: 5,
     }).eq("id", emp.id);
 
-    // 儲存文件
+    // 儲存文件（身分證正反面分開）
     const docs = [
       { doc_type: "health_check", file_url: health_check_url },
-      { doc_type: "id_card", file_url: id_card_url },
-      { doc_type: "handbook_sign", signature_url: handbook_signature, signed_at: new Date().toISOString() },
-      { doc_type: "contract_sign", signature_url: contract_signature, signed_at: new Date().toISOString() },
+      { doc_type: "id_card_front", file_url: id_front_url },
+      { doc_type: "id_card_back", file_url: id_back_url },
+      { doc_type: "handbook_sign", signature_url: handbook_signature, signed_at: new Date().toISOString(), notes: JSON.stringify(handbook_content || []) },
+      { doc_type: "contract_sign", signature_url: contract_signature, signed_at: new Date().toISOString(), notes: contract_content || "" },
     ];
     for (const d of docs) {
       if (d.file_url || d.signature_url) {
@@ -142,13 +181,23 @@ export async function POST(request) {
       }
     }
 
-    // 通知
+    // 通知 + Email
     if (emp.line_uid) {
-      await pushText(emp.line_uid, "✅ 報到完成！\n👤 " + emp.name + "\n📝 合約已簽署，可以開始打卡了。").catch(() => {});
+      await pushText(emp.line_uid, "✅ 報到完成！\n👤 " + emp.name + "\n📝 合約已簽署，可以開始打卡了。" + (email ? "\n📧 合約副本已寄至 " + email : "")).catch(() => {});
+    }
+    // 寄送守則+合約副本
+    if (email) {
+      await sendOnboardingEmails({
+        email, name: signature_name || emp.name,
+        storeName: emp.stores?.name || "",
+        idNumber: id_number, hireDate: emp.hire_date || new Date().toLocaleDateString("sv-SE"),
+        handbookContent: handbook_content, contractContent: contract_content,
+        handbookSig: handbook_signature, contractSig: contract_signature,
+      });
     }
     const { data: admins } = await supabase.from("employees").select("line_uid").eq("role", "admin").eq("is_active", true);
     for (const a of admins || []) {
-      if (a.line_uid) await pushText(a.line_uid, "🆕 " + emp.name + " 已完成6步驟報到（含合約+體檢+守則簽署）").catch(() => {});
+      if (a.line_uid) await pushText(a.line_uid, "🆕 " + emp.name + " 已完成報到（含合約+體檢+守則簽署）" + (email ? "\n📧 副本已寄 " + email : "")).catch(() => {});
     }
 
     return Response.json({ success: true });
