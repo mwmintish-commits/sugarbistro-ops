@@ -103,11 +103,11 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
         </div>
 
-        {/* 📄 文件檔案（最上方） */}
-        {docs.length > 0 && (
-          <div style={sec}>
-            <h3 style={sh}>📄 報到文件</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 6 }}>
+        {/* 📄 文件檔案（最上方）+ 上傳功能 */}
+        <div style={sec}>
+          <h3 style={sh}>📄 報到文件</h3>
+          {docs.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 6, marginBottom: 8 }}>
               {docs.map(doc => {
                 const labels = { health_check: "🏥 體檢表", id_card_front: "🪪 身分證正", id_card_back: "🪪 身分證反", id_card: "🪪 身分證", handbook_sign: "📖 守則簽署", contract_sign: "📝 合約簽署" };
                 const label = labels[doc.doc_type] || doc.doc_type;
@@ -123,13 +123,28 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
                 );
               })}
             </div>
+          )}
+          {/* 上傳按鈕 */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {[["health_check","🏥 體檢表"],["id_card_front","🪪 身分證正面"],["id_card_back","🪪 身分證反面"],["contract_sign","📝 合約"],["handbook_sign","📖 守則"]].map(([dt,lb]) => (
+              <label key={dt} style={{ padding: "3px 8px", borderRadius: 4, border: "1px dashed #ccc", fontSize: 9, cursor: "pointer", color: "#4361ee" }}>
+                {"📎 " + lb}
+                <input type="file" accept="image/*,.pdf" style={{ display: "none" }} onChange={async (ev) => {
+                  const file = ev.target.files[0]; if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = async () => {
+                    const url = reader.result;
+                    const payload = dt.includes("sign") ? { employee_id: empId, doc_type: dt, signature_url: url } : { employee_id: empId, doc_type: dt, file_url: url };
+                    const r = await ap("/api/admin/documents", payload);
+                    if (r.error) alert("❌ " + r.error); else { alert("✅ " + lb + " 已上傳"); reload(); }
+                  };
+                  reader.readAsDataURL(file);
+                  ev.target.value = "";
+                }} />
+              </label>
+            ))}
           </div>
-        )}
-        {docs.length === 0 && (
-          <div style={{ ...sec, background: "#fef9c3" }}>
-            <div style={{ fontSize: 11, color: "#8a6d00" }}>📄 尚無報到文件</div>
-          </div>
-        )}
+        </div>
 
         {/* 文件預覽彈窗 */}
         {showDoc && (

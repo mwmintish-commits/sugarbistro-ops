@@ -12,8 +12,9 @@ export async function GET(request) {
 export async function POST(request) {
   const body = await request.json();
 
-  if (body.action === "upload") {
-    const { employee_id, doc_type, file_url, signature_url, notes } = body;
+  // 上傳文件（支援 action:"upload" 或直接傳入）
+  const { employee_id, doc_type, file_url, signature_url, notes } = body;
+  if (employee_id && doc_type) {
     const { data, error } = await supabase.from("employee_documents").insert({
       employee_id, doc_type, file_url, signature_url,
       signed_at: signature_url ? new Date().toISOString() : null, notes

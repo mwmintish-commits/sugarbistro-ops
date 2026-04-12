@@ -502,8 +502,8 @@ export default function AdminPage() {
             )}
 
             {/* 已啟用 — 按門市分組 */}
-            {(sf ? stores.filter(s=>s.id===sf) : stores).map(store => {
-              const storeEmps = ae.filter(e => e.store_id === store.id);
+            {[...(sf ? stores.filter(s=>s.id===sf) : stores), {id:"__hq__",name:"總部"}].map(store => {
+              const storeEmps = store.id === "__hq__" ? ae.filter(e => !e.store_id || !stores.some(s=>s.id===e.store_id)) : ae.filter(e => e.store_id === store.id);
               if (storeEmps.length === 0) return null;
               return (
                 <div key={store.id} style={{marginBottom:10}}>
@@ -621,8 +621,8 @@ export default function AdminPage() {
 
             {sv==="month" && (
               <div>
-              {(sf ? stores.filter(s=>s.id===sf) : stores).map(store => {
-                const storeScheds = scheds.filter(s => { const emp = emps.find(e=>e.id===s.employee_id); return emp && emp.store_id === store.id; });
+              {[...(sf ? stores.filter(s=>s.id===sf) : stores), {id:"__hq__",name:"總部"}].map(store => {
+                const storeScheds = scheds.filter(s => store.id === "__hq__" ? !s.store_id : s.store_id === store.id);
                 if (storeScheds.length === 0 && !sf) return null;
                 return (
                 <div key={store.id} style={{marginBottom:10}}>
@@ -673,8 +673,8 @@ export default function AdminPage() {
 
             {attView === "records" && (
               <div>
-              {(sf ? stores.filter(s=>s.id===sf) : stores).map(store => {
-                const storeAtt = att.filter(a => { const emp = emps.find(e=>e.id===a.employee_id); return emp && emp.store_id === store.id; });
+              {[...(sf ? stores.filter(s=>s.id===sf) : stores), {id:"__hq__",name:"總部"}].map(store => {
+                const storeAtt = att.filter(a => { const emp = emps.find(e=>e.id===a.employee_id); return emp && (store.id==="__hq__" ? (!emp.store_id || !stores.some(st=>st.id===emp.store_id)) : emp.store_id === store.id); });
                 if (storeAtt.length === 0 && !sf) return null;
                 return (
                 <div key={store.id} style={{marginBottom:10}}>
@@ -782,8 +782,8 @@ export default function AdminPage() {
             </div>
 
             {/* 每人休假卡片 — 按門市分組 */}
-            {(sf ? stores.filter(s=>s.id===sf) : stores).map(store => {
-              const storeEmps = ae.filter(e => e.store_id === store.id);
+            {[...(sf ? stores.filter(s=>s.id===sf) : stores), {id:"__hq__",name:"總部"}].map(store => {
+              const storeEmps = store.id==="__hq__" ? ae.filter(e => !e.store_id || !stores.some(s=>s.id===e.store_id)) : ae.filter(e => e.store_id === store.id);
               if (storeEmps.length === 0) return null;
               return (
                 <div key={store.id} style={{marginBottom:10}}>
@@ -824,8 +824,8 @@ export default function AdminPage() {
                       <div style={{fontSize:28,fontWeight:700,color:"#185fa5",margin:"6px 0"}}>{annualDays}<span style={{fontSize:12,fontWeight:400}}> hr</span></div>
                       <button onClick={async()=>{
                         const v=prompt(e.name+" 特休時數(hr)：",annualDays);if(v===null)return;
-                        await ap("/api/admin/leave-balances",{action:"update_balance",employee_id:e.id,annual_total:Number(v)});
-                        load();
+                        const r=await sap("/api/admin/leave-balances",{action:"update_balance",employee_id:e.id,annual_total:Number(v)});
+                        if(r){alert("✅ "+e.name+" 特休已改為 "+v+"hr");load();}
                       }} style={{fontSize:9,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️修改</button>
                     </div>
                     <div style={{background:compAvail>0?"#e6f9f0":"#f5f5f5",borderRadius:8,padding:12,textAlign:"center"}}>
@@ -954,7 +954,7 @@ export default function AdminPage() {
             </div>
             {/* 薪資表 — 按門市分組 */}
             {(sf ? stores.filter(s=>s.id===sf) : stores).map(store => {
-              const storeEmps = ae.filter(e => e.store_id === store.id);
+              const storeEmps = store.id==="__hq__" ? ae.filter(e => !e.store_id || !stores.some(s=>s.id===e.store_id)) : ae.filter(e => e.store_id === store.id);
               if (storeEmps.length === 0) return null;
               return (
                 <div key={store.id} style={{marginBottom:10}}>
