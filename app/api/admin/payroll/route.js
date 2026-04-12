@@ -111,5 +111,22 @@ export async function POST(request) {
     return Response.json({ success: true, sent });
   }
 
+  // 薪資調整（加項/扣項/獎金）
+  if (body.action === "adjust") {
+    const { payroll_id, allowance, allowance_note, other_deduction, deduction_note, bonus_amount, bonus_note } = body;
+    const { data: rec } = await supabase.from("payroll_records").select("*").eq("id", payroll_id).single();
+    if (!rec) return Response.json({ error: "Not found" }, { status: 404 });
+    const net = Number(rec.base_salary||0) + Number(rec.overtime_pay||0)
+      - Number(rec.labor_self||0) - Number(rec.health_self||0) - Number(rec.supplementary_health||0)
+      + Number(allowance||0) - Number(other_deduction||0) + Number(bonus_amount||0);
+    const { data } = await supabase.from("payroll_records").update({
+      allowance: allowance||0, allowance_note,
+      other_deduction: other_deduction||0, deduction_note,
+      bonus_amount: bonus_amount||0, bonus_note,
+      net_salary: net,
+    }).eq("id", payroll_id).select().single();
+    return Response.json({ data });
+  }
+
   return Response.json({ error: "Unknown action" }, { status: 400 });
 }

@@ -844,8 +844,8 @@ export default function AdminPage() {
               </button>
             </div>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","勞保","健保","補充保費","實發"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:700}}>
+                <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","勞保","健保","補充保費","加項","扣項","實發"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{ae.map(e=>{
                   const wd = att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;
                   const bp = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate)*wd*8 : 0);
@@ -854,17 +854,26 @@ export default function AdminPage() {
                   const ls = e.labor_tier ? LABOR_SELF[e.labor_tier-1]||0 : 0;
                   const hs = e.health_tier ? HEALTH_SELF[e.health_tier-1]||0 : 0;
                   const suppH = e.employment_type==="parttime"&&bp>27470?Math.round(bp*0.0211):0;
+                  const net = bp+ot-ls-hs-suppH;
                   return (
                     <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                      <td style={{padding:6,fontWeight:500}}>{e.name}</td>
-                      <td style={{padding:6}}>{wd+"天"}</td>
-                      <td style={{padding:6}}>{fmt(bp)}</td>
-                      <td style={{padding:6,color:ot>0?"#b45309":"#ccc"}}>{ot>0?"+"+fmt(ot):"-"}</td>
-                      <td style={{padding:6,color:compH>0?"#4361ee":"#ccc"}}>{compH>0?compH+"hr":"-"}</td>
-                      <td style={{padding:6,color:"#888",fontSize:10}}>{ls>0?"-"+fmt(ls):"-"}</td>
-                      <td style={{padding:6,color:"#888",fontSize:10}}>{hs>0?"-"+fmt(hs):"-"}</td>
-                      <td style={{padding:6,color:suppH>0?"#b91c1c":"#ccc",fontSize:10}}>{suppH>0?"-"+fmt(suppH):"-"}</td>
-                      <td style={{padding:6,fontWeight:700,fontSize:13}}>{fmt(bp+ot-ls-hs-suppH)}</td>
+                      <td style={{padding:"5px 4px",fontWeight:500,textAlign:"left"}}>{e.name}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right"}}>{wd+"天"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right"}}>{fmt(bp)}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:ot>0?"#b45309":"#ccc"}}>{ot>0?"+"+fmt(ot):"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:compH>0?"#4361ee":"#ccc"}}>{compH>0?compH+"hr":"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}}>{ls>0?"-"+fmt(ls):"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}}>{hs>0?"-"+fmt(hs):"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:suppH>0?"#b91c1c":"#ccc"}}>{suppH>0?"-"+fmt(suppH):"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right"}}>
+                        <input type="number" id={"pa-"+e.id} defaultValue="" placeholder="0"
+                          style={{width:50,padding:1,borderRadius:3,border:"1px solid #ddd",fontSize:9,textAlign:"right"}} />
+                      </td>
+                      <td style={{padding:"5px 4px",textAlign:"right"}}>
+                        <input type="number" id={"pd-"+e.id} defaultValue="" placeholder="0"
+                          style={{width:50,padding:1,borderRadius:3,border:"1px solid #ddd",fontSize:9,textAlign:"right"}} />
+                      </td>
+                      <td style={{padding:"5px 4px",textAlign:"right",fontWeight:700,fontSize:12,color:"#0a7c42"}}>{fmt(net)}</td>
                     </tr>
                   );
                 })}</tbody>

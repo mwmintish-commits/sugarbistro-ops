@@ -168,3 +168,18 @@ BEGIN
     EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', t);
   END LOOP;
 END $$;
+
+-- 薪資其他加扣項
+ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS allowance NUMERIC DEFAULT 0;
+ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS allowance_note TEXT;
+ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS other_deduction NUMERIC DEFAULT 0;
+ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS deduction_note TEXT;
+ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS bonus_amount NUMERIC DEFAULT 0;
+ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS bonus_note TEXT;
+
+-- 員工休假總表擴充
+ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS sick_total INTEGER DEFAULT 30;
+ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS personal_total INTEGER DEFAULT 14;
+ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS modified_by UUID;
+ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS modified_at TIMESTAMPTZ;
