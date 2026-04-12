@@ -797,61 +797,54 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(100px, 1fr))",gap:6,marginBottom:8}}>
-                    {/* 特休 */}
-                    <div style={{background:"#e6f1fb",borderRadius:6,padding:8,textAlign:"center"}}>
-                      <div style={{fontSize:9,color:"#185fa5"}}>🏖 特休</div>
-                      <div style={{fontSize:20,fontWeight:700,color:"#185fa5"}}>{annualDays}</div>
-                      <div style={{fontSize:9,color:"#888"}}>hr</div>
+                  {/* 可用假期 */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
+                    <div style={{background:"#e6f1fb",borderRadius:8,padding:12,textAlign:"center"}}>
+                      <div style={{fontSize:11,color:"#185fa5",fontWeight:500}}>🏖 年度特休</div>
+                      <div style={{fontSize:28,fontWeight:700,color:"#185fa5",margin:"6px 0"}}>{annualDays}<span style={{fontSize:12,fontWeight:400}}> hr</span></div>
                       <button onClick={async()=>{
                         const v=prompt(e.name+" 特休時數(hr)：",annualDays);if(v===null)return;
                         await ap("/api/admin/leave-balances",{action:"update_balance",employee_id:e.id,annual_total:Number(v)});
                         load();
-                      }} style={{fontSize:8,color:"#4361ee",background:"none",border:"none",cursor:"pointer",marginTop:2}}>✏️修改</button>
+                      }} style={{fontSize:9,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️修改</button>
                     </div>
-
-                    {/* 加班（當月） */}
-                    <div style={{background:"#faf8f5",borderRadius:6,padding:8,textAlign:"center"}}>
-                      <div style={{fontSize:9,color:"#666"}}>⏱ 當月加班</div>
-                      <div style={{fontSize:20,fontWeight:700,color:"#333"}}>{Math.round(monthHours*10)/10}</div>
-                      <div style={{fontSize:9,color:"#888"}}>hr</div>
-                    </div>
-
-                    {/* 加班費（年度累計） */}
-                    <div style={{background:"#fff8e6",borderRadius:6,padding:8,textAlign:"center"}}>
-                      <div style={{fontSize:9,color:"#8a6d00"}}>💰 累計加班費</div>
-                      <div style={{fontSize:16,fontWeight:700,color:"#8a6d00"}}>{fmt(yearOtPay)}</div>
-                      <div style={{fontSize:9,color:"#888"}}>{compConverted>0?"含轉薪"+compConverted+"hr":""}</div>
-                    </div>
-
-                    {/* 補休可用（跨月累積） */}
-                    <div style={{background:compAvail>0?"#e6f9f0":"#f5f5f5",borderRadius:6,padding:8,textAlign:"center"}}>
-                      <div style={{fontSize:9,color:"#0a7c42"}}>🔄 補休可用</div>
-                      <div style={{fontSize:20,fontWeight:700,color:compAvail>0?"#0a7c42":"#ccc"}}>{compAvail>0?compAvail:0}</div>
-                      <div style={{fontSize:9,color:"#888"}}>hr{compUsed>0?" 已休"+compUsed:""}</div>
-                      {expiringH>0 && <div style={{fontSize:8,color:"#b91c1c"}}>{"⚠️"+expiringH+"hr即將到期"}</div>}
+                    <div style={{background:compAvail>0?"#e6f9f0":"#f5f5f5",borderRadius:8,padding:12,textAlign:"center"}}>
+                      <div style={{fontSize:11,color:"#0a7c42",fontWeight:500}}>🔄 補休餘額</div>
+                      <div style={{fontSize:28,fontWeight:700,color:compAvail>0?"#0a7c42":"#ccc",margin:"6px 0"}}>{compAvail>0?compAvail:0}<span style={{fontSize:12,fontWeight:400}}> hr</span></div>
+                      {compUsed>0 && <div style={{fontSize:9,color:"#888"}}>{"已使用 "+compUsed+"hr"}</div>}
+                      {expiringH>0 && <div style={{fontSize:9,color:"#b91c1c"}}>{"⚠️ "+expiringH+"hr 即將到期"}</div>}
                       <button onClick={async()=>{
-                        const v=prompt(e.name+" 補休調整\n正數=新增，負數=扣減\n目前可用："+compAvail+"hr\n\n輸入調整時數：","0");
+                        const v=prompt(e.name+" 補休調整\n正數=新增，負數=扣減\n目前餘額："+compAvail+"hr\n\n輸入調整時數：","0");
                         if(v===null||Number(v)===0)return;
                         const note=prompt("備註（選填）：","");
                         await ap("/api/admin/overtime",{action:"adjust_comp",employee_id:e.id,store_id:e.store_id,hours:Number(v),notes:note});
                         load();
-                      }} style={{fontSize:8,color:"#4361ee",background:"none",border:"none",cursor:"pointer",marginTop:2}}>✏️修改</button>
+                      }} style={{fontSize:9,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️修改</button>
                     </div>
                   </div>
 
+                  {/* 本月加班（小字補充） */}
+                  {monthHours > 0 && (
+                    <div style={{fontSize:10,color:"#888",marginBottom:4}}>{"⏱ 本月加班 "+Math.round(monthHours*10)/10+"hr（待審核或已核定，非自動累加至補休）"}</div>
+                  )}
+
                   {/* 操作列 */}
-                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                    {compAvail>0 && (
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
+                    {compAvail>0 && (<>
+                      <input type="number" id={"cv-"+e.id} placeholder="轉出時數" min="1" max={compAvail}
+                        style={{width:70,padding:"3px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:10}} />
                       <button onClick={async()=>{
-                        if(!confirm(e.name+" 補休"+compAvail+"hr全部轉現金？"))return;
+                        const hrs=Number(document.getElementById("cv-"+e.id).value||0);
+                        if(!hrs||hrs<=0){alert("請輸入轉出時數");return;}
+                        if(hrs>compAvail){alert("超過可用餘額 "+compAvail+"hr");return;}
+                        if(!confirm(e.name+" 補休轉現金 "+hrs+"hr？\n將自動加入本月薪資加項"))return;
                         const ids=eOtYear.filter(r=>r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted&&(!r.comp_expiry_date||r.comp_expiry_date>=today2)).map(r=>r.id);
-                        const r=await ap("/api/admin/leave-balances",{action:"convert_to_cash",employee_id:e.id,record_ids:ids});
-                        alert("已轉換 "+(r.converted_hours||0)+"hr → "+fmt(r.amount));load();
-                      }} style={{padding:"3px 8px",borderRadius:4,border:"1px solid #b45309",background:"transparent",color:"#b45309",fontSize:9,cursor:"pointer"}}>
-                        💰 補休轉現金
+                        await ap("/api/admin/overtime",{action:"convert_partial",employee_id:e.id,store_id:e.store_id,hours:hrs,record_ids:ids});
+                        load();
+                      }} style={{padding:"3px 10px",borderRadius:4,border:"none",background:"#b45309",color:"#fff",fontSize:10,cursor:"pointer"}}>
+                        💰 轉現金
                       </button>
-                    )}
+                    </>)}
                     {eOtMonth.filter(r=>r.status==="pending").length>0 && (
                       <span style={{fontSize:9,color:"#b91c1c",padding:"3px 0"}}>{"⏳ "+eOtMonth.filter(r=>r.status==="pending").length+"筆待審核"}</span>
                     )}

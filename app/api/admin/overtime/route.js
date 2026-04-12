@@ -167,5 +167,51 @@ export async function POST(request) {
     return Response.json({ success: true });
   }
 
+  // 部分補休轉現金（指定時數）+ 自動寫入薪資
+  if (body.action === "convert_partial") {
+    const { employee_id, store_id, hours } = body;
+    if (!hours || hours <= 0) return Response.json({ error: "Invalid hours" }, { status: 400 });
+    const { data: emp } = await supabase.from("employees")
+      .select("hourly_rate, monthly_salary, name").eq("id", employee_id).single();
+    const hr = emp?.hourly_rate || (emp?.monthly_salary ? Math.round(emp.monthly_salary / 30 / 8) : 190);
+    const amount = Math.round(hr * hours * 1.34);
+
+    let remain = hours;
+    const today = new Date().toLocaleDateString("sv-SE");
+    const { data: avail } = await supabase.from("overtime_records")
+      .select("id, comp_hours, date").eq("employee_id", employee_id)
+      .eq("comp_type", "comp").eq("comp_used", false).eq("comp_converted", false)
+      .gte("comp_expiry_date", today).order("comp_expiry_date");
+    for (const r of avail || []) {
+      if (remain <= 0) break;
+      if (Number(r.comp_hours) <= remain) {
+        await supabase.from("overtime_records").update({ comp_converted: true, amount: Math.round(hr * Number(r.comp_hours) * 1.34) }).eq("id", r.id);
+        remain -= Number(r.comp_hours);
+      } else {
+        const keepH = Number(r.comp_hours) - remain;
+        await supabase.from("overtime_records").update({ comp_hours: keepH }).eq("id", r.id);
+        await supabase.from("overtime_records").insert({
+          employee_id, store_id, date: r.date || today,
+          overtime_minutes: remain * 60, comp_type: "comp", comp_hours: remain,
+          comp_converted: true, amount: Math.round(hr * remain * 1.34),
+          status: "approved", notes: "部分轉現金",
+        });
+        remain = 0;
+      }
+    }
+    // 自動寫入當月薪資加項
+    const [y, m] = today.slice(0, 7).split("-").map(Number);
+    const { data: pr } = await supabase.from("payroll_records")
+      .select("id, allowance, allowance_note").eq("employee_id", employee_id).eq("year", y).eq("month", m).single()
+      .catch(() => ({ data: null }));
+    if (pr) {
+      await supabase.from("payroll_records").update({
+        allowance: Number(pr.allowance || 0) + amount,
+        allowance_note: (pr.allowance_note ? pr.allowance_note + "、" : "") + "補休轉現金" + hours + "hr",
+      }).eq("id", pr.id);
+    }
+    return Response.json({ success: true, converted_hours: hours, amount });
+  }
+
   return Response.json({ error: "Unknown action" }, { status: 400 });
 }

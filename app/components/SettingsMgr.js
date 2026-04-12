@@ -311,6 +311,9 @@ export default function SettingsMgr({ stores, load, month }) {
         }} style={{ marginTop: 6, padding: "5px 16px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer" }}>💾 儲存合約</button>
       </div>
 
+      {/* 獎金公式設定 */}
+      <BonusFormulaEditor />
+
       {/* 工作日誌模板管理 */}
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📋 工作日誌模板管理</h4>
@@ -541,6 +544,82 @@ export default function SettingsMgr({ stores, load, month }) {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function BonusFormulaEditor() {
+  const [bf, setBf] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const defaults = {
+    min_rate: 85, full_rate: 100, super_rate: 120, super_multiplier: 1.2,
+    review_full: 80, review_half: 70,
+    manager_weight: 1.2, staff_weight: 1.0,
+    att_score: 30, perf_score: 30, svc_score: 20, viol_score: 20,
+    late_deduct: 3, absent_deduct: 10, complaint_deduct: 5,
+    comp_convert_rate: 1.34,
+  };
+  useEffect(() => {
+    ap("/api/admin/system?key=bonus_formula").then(r => setBf(r.data || defaults)).catch(() => setBf(defaults));
+  }, []);
+  if (!bf) return null;
+  const upd = (k, v) => setBf({ ...bf, [k]: Number(v) });
+  const save = async () => {
+    setSaving(true);
+    await ap("/api/admin/system", { key: "bonus_formula", value: bf });
+    setSaving(false); alert("獎金公式已儲存");
+  };
+  const R = ({ label, k, unit }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid #f5f5f5" }}>
+      <span style={{ fontSize: 11 }}>{label}</span>
+      <div>
+        <input type="number" value={bf[k]} onChange={e => upd(k, e.target.value)}
+          style={{ width: 60, padding: 2, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "right" }} />
+        <span style={{ fontSize: 10, color: "#888", marginLeft: 4 }}>{unit || ""}</span>
+      </div>
+    </div>
+  );
+  return (
+    <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+      <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🏆 獎金計算公式設定</h4>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 4 }}>📊 達標率門檻</div>
+        <R label="最低發放門檻" k="min_rate" unit="%" />
+        <R label="全額發放門檻" k="full_rate" unit="%" />
+        <R label="加成發放門檻" k="super_rate" unit="%" />
+        <R label="加成倍率" k="super_multiplier" unit="×" />
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 4 }}>📝 考核分數門檻</div>
+        <R label="全額發放門檻" k="review_full" unit="分" />
+        <R label="半額發放門檻" k="review_half" unit="分" />
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 4 }}>⚖️ 職務加權</div>
+        <R label="主管加權" k="manager_weight" unit="×" />
+        <R label="一般員工" k="staff_weight" unit="×" />
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 4 }}>📋 考核配分</div>
+        <R label="出勤紀律" k="att_score" unit="分" />
+        <R label="工作完成度" k="perf_score" unit="分" />
+        <R label="服務態度" k="svc_score" unit="分" />
+        <R label="違規紀錄" k="viol_score" unit="分" />
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 4 }}>🔢 扣分標準</div>
+        <R label="遲到每次扣" k="late_deduct" unit="分" />
+        <R label="曠職每次扣" k="absent_deduct" unit="分" />
+        <R label="客訴每筆扣" k="complaint_deduct" unit="分" />
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 4 }}>💰 補休轉現金</div>
+        <R label="加班費倍率" k="comp_convert_rate" unit="×時薪" />
+      </div>
+      <button onClick={save} disabled={saving}
+        style={{ width: "100%", padding: "8px", borderRadius: 6, border: "none", background: saving ? "#ccc" : "#0a7c42", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+        {saving ? "儲存中..." : "💾 儲存公式設定"}
+      </button>
     </div>
   );
 }
