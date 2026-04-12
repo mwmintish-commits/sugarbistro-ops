@@ -103,7 +103,13 @@ export async function POST(request) {
 
   // 停用帳號
   if (body.action === "deactivate") {
-    const { data, error } = await supabase.from("employees").update({ is_active: false }).eq("id", body.employee_id).select().single();
+    const { data: empData } = await supabase.from("employees").select("line_uid, name").eq("id", body.employee_id).single();
+    // LINE 通知 + 解除綁定
+    if (empData?.line_uid) {
+      await pushText(empData.line_uid, "⚠️ 你的帳號已停用\n\n👤 " + empData.name + "\n\n如有疑問請聯繫總部。").catch(() => {});
+      await supabase.from("user_states").delete().eq("line_uid", empData.line_uid);
+    }
+    const { data, error } = await supabase.from("employees").update({ is_active: false, line_uid: null }).eq("id", body.employee_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
   }
@@ -111,7 +117,13 @@ export async function POST(request) {
   // 永久刪除
   if (body.action === "delete") {
     const eid = body.employee_id;
-    // 先清關聯資料
+    // LINE 通知 + 解除綁定
+    const { data: empData } = await supabase.from("employees").select("line_uid, name").eq("id", eid).single();
+    if (empData?.line_uid) {
+      await pushText(empData.line_uid, "⚠️ 你的帳號已被移除\n\n👤 " + empData.name + "\n\n如有疑問請聯繫總部。").catch(() => {});
+      await supabase.from("user_states").delete().eq("line_uid", empData.line_uid);
+    }
+    // 清關聯資料
     await supabase.from("schedules").delete().eq("employee_id", eid);
     await supabase.from("attendances").delete().eq("employee_id", eid);
     await supabase.from("leave_requests").delete().eq("employee_id", eid);
