@@ -823,8 +823,8 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 薪資"}
               <button onClick={()=>{
-                exportCSV("薪資_"+month+".csv",["員工","出勤天","底薪","加班費","勞保","健保","補充保費","實發"],
-                  ae.map(e=>{const wd=att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;const bp=e.monthly_salary?Number(e.monthly_salary):(e.hourly_rate?Number(e.hourly_rate)*wd*8:0);const ot=otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);const ls=e.labor_tier?LABOR_SELF[e.labor_tier-1]||0:0;const hs=e.health_tier?HEALTH_SELF[e.health_tier-1]||0:0;const suppH=e.employment_type==="parttime"&&bp>27470?Math.round(bp*0.0211):0;return[e.name,wd,bp,ot,ls,hs,suppH,bp+ot-ls-hs-suppH];}));
+                exportCSV("薪資_"+month+".csv",["員工","出勤天","底薪","加班費","勞保","健保","補充保費","加項","扣項","實發"],
+                  ae.map(e=>{const wd=att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;const bp=e.monthly_salary?Number(e.monthly_salary):(e.hourly_rate?Number(e.hourly_rate)*wd*8:0);const ot=otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);const ls=e.labor_tier?LABOR_SELF[e.labor_tier-1]||0:0;const hs=e.health_tier?HEALTH_SELF[e.health_tier-1]||0:0;const suppH=e.employment_type==="parttime"&&bp>29500?Math.round(bp*0.0211):0;const da=Number(e.default_allowance||0);const dd=Number(e.default_deduction||0);return[e.name,wd,bp,ot,ls,hs,suppH,da,dd,bp+ot-ls-hs-suppH+da-dd];}));
               }} style={{marginLeft:8,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
             </h3>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
@@ -846,8 +846,8 @@ export default function AdminPage() {
               </button>
             </div>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:700}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","勞保","健保","補充保費","加項","扣項","實發"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:750}}>
+                <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","勞保","健保","補充保費","加項","扣項","實發","存"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{ae.map(e=>{
                   const wd = att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;
                   const bp = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate)*wd*8 : 0);
@@ -855,8 +855,10 @@ export default function AdminPage() {
                   const compH = otRecords.filter(r=>r.employee_id===e.id&&r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted).reduce((s,r)=>s+Number(r.comp_hours||0),0);
                   const ls = e.labor_tier ? LABOR_SELF[e.labor_tier-1]||0 : 0;
                   const hs = e.health_tier ? HEALTH_SELF[e.health_tier-1]||0 : 0;
-                  const suppH = e.employment_type==="parttime"&&bp>27470?Math.round(bp*0.0211):0;
-                  const net = bp+ot-ls-hs-suppH;
+                  const suppH = e.employment_type==="parttime"&&bp>29500?Math.round(bp*0.0211):0;
+                  const da = Number(e.default_allowance||0);
+                  const dd = Number(e.default_deduction||0);
+                  const net = bp+ot-ls-hs-suppH+da-dd;
                   return (
                     <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
                       <td style={{padding:"5px 4px",fontWeight:500,textAlign:"left"}}>{e.name}</td>
@@ -868,14 +870,22 @@ export default function AdminPage() {
                       <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}}>{hs>0?"-"+fmt(hs):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:suppH>0?"#b91c1c":"#ccc"}}>{suppH>0?"-"+fmt(suppH):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right"}}>
-                        <input type="number" id={"pa-"+e.id} defaultValue="" placeholder="0"
+                        <input type="number" id={"pa-"+e.id} defaultValue={e.default_allowance||""} placeholder="0"
                           style={{width:50,padding:1,borderRadius:3,border:"1px solid #ddd",fontSize:9,textAlign:"right"}} />
                       </td>
                       <td style={{padding:"5px 4px",textAlign:"right"}}>
-                        <input type="number" id={"pd-"+e.id} defaultValue="" placeholder="0"
+                        <input type="number" id={"pd-"+e.id} defaultValue={e.default_deduction||""} placeholder="0"
                           style={{width:50,padding:1,borderRadius:3,border:"1px solid #ddd",fontSize:9,textAlign:"right"}} />
                       </td>
                       <td style={{padding:"5px 4px",textAlign:"right",fontWeight:700,fontSize:12,color:"#0a7c42"}}>{fmt(net)}</td>
+                      <td style={{padding:"5px 4px",textAlign:"center"}}>
+                        <button onClick={async()=>{
+                          const allow=Number(document.getElementById("pa-"+e.id).value||0);
+                          const deduct=Number(document.getElementById("pd-"+e.id).value||0);
+                          await ap("/api/admin/employees",{action:"update",employee_id:e.id,default_allowance:allow,default_deduction:deduct});
+                          alert(e.name+" 加項$"+allow+" 扣項$"+deduct+" 已儲存（下月自動帶入）");
+                        }} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:8,cursor:"pointer"}}>💾</button>
+                      </td>
                     </tr>
                   );
                 })}</tbody>
@@ -1441,9 +1451,10 @@ export default function AdminPage() {
                     const u=prompt("單位：","盒");
                     const rp=prompt("零售價：","0");
                     const wp=prompt("批發價(B2B)：","0");
+                    const dp=prompt("經銷價：","0");
                     const op=prompt("代工價(OEM)：","0");
                     const cp=prompt("成本價：","0");
-                    await ap("/api/admin/products",{action:"add_variant",product_id:p.id,spec_name:sn,unit:u,retail_price:Number(rp),wholesale_price:Number(wp),oem_price:Number(op),cost_price:Number(cp)});
+                    await ap("/api/admin/products",{action:"add_variant",product_id:p.id,spec_name:sn,unit:u,retail_price:Number(rp),wholesale_price:Number(wp),dealer_price:Number(dp),oem_price:Number(op),cost_price:Number(cp)});
                     load();
                   }} style={{padding:"3px 8px",borderRadius:4,border:"1px solid #4361ee",background:"transparent",color:"#4361ee",fontSize:10,cursor:"pointer"}}>
                     ＋規格
@@ -1451,7 +1462,7 @@ export default function AdminPage() {
                 </div>
                 {(p.variants||[]).length > 0 ? (
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
-                    <thead><tr style={{background:"#faf8f5"}}>{["規格","單位","零售價","批發價","代工價","成本","毛利率","操作"].map(h=><th key={h} style={{padding:4,textAlign:"center",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                    <thead><tr style={{background:"#faf8f5"}}>{["規格","單位","零售價","批發價","經銷價","代工價","成本","毛利率","操作"].map(h=><th key={h} style={{padding:4,textAlign:"center",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                     <tbody>{(p.variants||[]).map(v=>{
                       const margin=v.retail_price>0?Math.round((v.retail_price-v.cost_price)/v.retail_price*100):0;
                       return (
@@ -1460,15 +1471,18 @@ export default function AdminPage() {
                           <td style={{padding:4,textAlign:"center"}}>{v.unit}</td>
                           <td style={{padding:4,textAlign:"center",color:"#0a7c42",fontWeight:600}}>{fmt(v.retail_price)}</td>
                           <td style={{padding:4,textAlign:"center",color:"#185fa5"}}>{fmt(v.wholesale_price)}</td>
-                          <td style={{padding:4,textAlign:"center",color:"#8a6d00"}}>{v.oem_price>0?fmt(v.oem_price):"-"}</td>
+                          <td style={{padding:4,textAlign:"center",color:"#8a6d00"}}>{v.dealer_price>0?fmt(v.dealer_price):"-"}</td>
+                          <td style={{padding:4,textAlign:"center",color:"#993556"}}>{v.oem_price>0?fmt(v.oem_price):"-"}</td>
                           <td style={{padding:4,textAlign:"center",color:"#888"}}>{fmt(v.cost_price)}</td>
                           <td style={{padding:4,textAlign:"center",fontWeight:600,color:margin>=50?"#0a7c42":margin>=30?"#b45309":"#b91c1c"}}>{margin+"%"}</td>
                           <td style={{padding:4,textAlign:"center"}}>
                             <button onClick={async()=>{
                               const rp=prompt("零售價：",v.retail_price);if(rp===null)return;
                               const wp=prompt("批發價：",v.wholesale_price);
+                              const dp=prompt("經銷價：",v.dealer_price||0);
                               const op=prompt("代工價：",v.oem_price);
-                              await ap("/api/admin/products",{action:"update_variant",variant_id:v.id,retail_price:Number(rp),wholesale_price:Number(wp||0),oem_price:Number(op||0)});
+                              const cp=prompt("成本價：",v.cost_price);
+                              await ap("/api/admin/products",{action:"update_variant",variant_id:v.id,retail_price:Number(rp),wholesale_price:Number(wp||0),dealer_price:Number(dp||0),oem_price:Number(op||0),cost_price:Number(cp||0)});
                               load();
                             }} style={{fontSize:9,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️</button>
                             <button onClick={async()=>{if(!confirm("刪除此規格？"))return;await ap("/api/admin/products",{action:"delete_variant",variant_id:v.id});load();}}
@@ -1549,12 +1563,12 @@ export default function AdminPage() {
               })()}
             </div>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
-              <button onClick={async()=>{if(!clientList.length){alert("請先新增客戶");return;}const cn=prompt("客戶("+clientList.map(c=>c.name).join("/")+")：");const cl=clientList.find(c=>c.name.includes(cn));if(!cl)return alert("找不到");const pn=prompt("產品：");const q=prompt("數量：");const pr=prompt("單價：");await ap("/api/admin/orders",{action:"create",client_id:cl.id,type:cl.type==="oem"?"oem":"b2b",items:[{product_name:pn,quantity:Number(q),unit_price:Number(pr)}]});load();}}
+              <button onClick={async()=>{if(!clientList.length){alert("請先新增客戶");return;}const cn=prompt("客戶("+clientList.map(c=>c.name).join("/")+")：");const cl=clientList.find(c=>c.name.includes(cn));if(!cl)return alert("找不到");const pn=prompt("產品：");const q=prompt("數量：");const pr=prompt("單價：");const tt=prompt("含稅/未稅(included/excluded)：","included");await ap("/api/admin/orders",{action:"create",client_id:cl.id,type:cl.type==="oem"?"oem":"b2b",tax_type:tt,items:[{product_name:pn,quantity:Number(q),unit_price:Number(pr)}]});load();}}
                 style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增訂單</button>
             </div>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["單號","客戶","金額","帳齡","狀態","付款","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["單號","客戶","小計","稅額","總額","稅別","帳齡","狀態","付款","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{orderList.map(o=>{
                   const days = Math.floor((new Date() - new Date(o.order_date||o.created_at)) / 86400000);
                   const agingColor = days>90?"#b91c1c":days>60?"#b45309":days>30?"#8a6d00":"#0a7c42";
@@ -1562,7 +1576,10 @@ export default function AdminPage() {
                   <tr key={o.id} style={{borderBottom:"1px solid #f0eeea"}}>
                     <td style={{padding:6,fontSize:10}}>{o.order_number}</td>
                     <td style={{padding:6,fontWeight:500}}>{o.clients?o.clients.name:""}</td>
+                    <td style={{padding:6,fontSize:10}}>{fmt(o.subtotal||o.total_amount)}</td>
+                    <td style={{padding:6,fontSize:10,color:"#888"}}>{o.tax_amount>0?fmt(o.tax_amount):"-"}</td>
                     <td style={{padding:6,fontWeight:600}}>{fmt(o.total_amount)}</td>
+                    <td style={{padding:6,fontSize:9,color:"#888"}}>{o.tax_type==="excluded"?"未稅+5%":"含稅"}</td>
                     <td style={{padding:6,fontSize:10,color:agingColor,fontWeight:600}}>{days+"天"}</td>
                     <td style={{padding:6}}><Badge status={o.status} /></td>
                     <td style={{padding:6}}><Badge status={o.payment_status} /></td>

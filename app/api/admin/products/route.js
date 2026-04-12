@@ -65,11 +65,11 @@ export async function POST(request) {
 
   // 新增規格
   if (body.action === "add_variant") {
-    const { product_id, spec_name, sku, unit, retail_price, wholesale_price, oem_price, cost_price, recipe_id, inventory_item_id } = body;
+    const { product_id, spec_name, sku, unit, retail_price, wholesale_price, dealer_price, oem_price, cost_price, recipe_id, inventory_item_id } = body;
     const { data, error } = await supabase.from("product_variants").insert({
       product_id, spec_name, sku, unit,
       retail_price: retail_price || 0, wholesale_price: wholesale_price || 0,
-      oem_price: oem_price || 0, cost_price: cost_price || 0,
+      dealer_price: dealer_price || 0, oem_price: oem_price || 0, cost_price: cost_price || 0,
       recipe_id, inventory_item_id,
     }).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });

@@ -239,3 +239,28 @@ BEGIN
     EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', t);
   END LOOP;
 END $$;
+
+-- 產品加經銷價
+ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS dealer_price NUMERIC DEFAULT 0;
+
+-- 訂單含稅欄位
+ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS tax_type TEXT DEFAULT 'included';
+ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS tax_rate NUMERIC DEFAULT 5;
+ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS tax_amount NUMERIC DEFAULT 0;
+ALTER TABLE client_orders ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0;
+
+-- 員工薪資加扣項預設（每月自動帶入）
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS default_allowance NUMERIC DEFAULT 0;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS default_allowance_note TEXT;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS default_deduction NUMERIC DEFAULT 0;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS default_deduction_note TEXT;
+
+-- RLS
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', t);
+  END LOOP;
+END $$;

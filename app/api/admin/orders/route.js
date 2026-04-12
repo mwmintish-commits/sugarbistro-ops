@@ -38,13 +38,18 @@ export async function POST(request) {
   const body = await request.json();
 
   if (body.action === "create") {
-    const { client_id, type, delivery_date, shipping_address, shipping_method, notes, items } = body;
+    const { client_id, type, delivery_date, shipping_address, shipping_method, notes, items, tax_type } = body;
     const prefix = type === "oem" ? "OEM" : "B2B";
     const num = prefix + "-" + new Date().toISOString().slice(0, 10).replace(/-/g, "") + "-" + String(Math.floor(Math.random() * 999) + 1).padStart(3, "0");
-    const total = (items || []).reduce((s, i) => s + Number(i.quantity || 0) * Number(i.unit_price || 0), 0);
+    const subtotal = (items || []).reduce((s, i) => s + Number(i.quantity || 0) * Number(i.unit_price || 0), 0);
+    const txType = tax_type || "included";
+    const taxRate = 5;
+    const taxAmount = txType === "excluded" ? Math.round(subtotal * taxRate / 100) : Math.round(subtotal * taxRate / (100 + taxRate));
+    const total = txType === "excluded" ? subtotal + taxAmount : subtotal;
 
     const { data: order, error } = await supabase.from("client_orders").insert({
-      order_number: num, client_id, type, delivery_date, shipping_address, shipping_method, notes, total_amount: total,
+      order_number: num, client_id, type, delivery_date, shipping_address, shipping_method, notes,
+      subtotal, tax_type: txType, tax_rate: taxRate, tax_amount: taxAmount, total_amount: total,
     }).select("*, clients(name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
 

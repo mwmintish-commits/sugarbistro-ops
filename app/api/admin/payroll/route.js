@@ -29,7 +29,7 @@ export async function POST(request) {
     const { year, month, store_id } = body;
     const mk = year + "-" + String(month).padStart(2, "0");
     let empQ = supabase.from("employees")
-      .select("id, name, store_id, monthly_salary, hourly_rate, labor_tier, health_tier, employment_type, line_uid")
+      .select("id, name, store_id, monthly_salary, hourly_rate, labor_tier, health_tier, employment_type, line_uid, default_allowance, default_allowance_note, default_deduction, default_deduction_note")
       .eq("is_active", true);
     if (store_id) empQ = empQ.eq("store_id", store_id);
     const { data: emps } = await empQ;
@@ -60,11 +60,15 @@ export async function POST(request) {
       const ls = emp.labor_tier ? LABOR_SELF[emp.labor_tier - 1] || 0 : 0;
       const hs = emp.health_tier ? HEALTH_SELF[emp.health_tier - 1] || 0 : 0;
 
-      // ✦08 二代健保（兼職單次>基本工資27470）
-      const suppHealth = emp.employment_type === "parttime" && base > 27470
+      // 二代健保（兼職單次>基本工資29500）
+      const suppHealth = emp.employment_type === "parttime" && base > 29500
         ? Math.round(base * 0.0211) : 0;
 
-      const net = base + otPay - ls - hs - suppHealth;
+      // 加扣項（從員工預設帶入）
+      const allow = Number(emp.default_allowance || 0);
+      const deduct = Number(emp.default_deduction || 0);
+
+      const net = base + otPay - ls - hs - suppHealth + allow - deduct;
 
       await supabase.from("payroll_records").upsert({
         employee_id: emp.id, store_id: emp.store_id,
@@ -73,10 +77,12 @@ export async function POST(request) {
         overtime_pay: otPay, comp_hours: compH,
         labor_self: ls, health_self: hs,
         supplementary_health: suppHealth,
+        allowance: allow, allowance_note: emp.default_allowance_note || "",
+        other_deduction: deduct, deduction_note: emp.default_deduction_note || "",
         net_salary: net,
       }, { onConflict: "employee_id,year,month" });
 
-      results.push({ name: emp.name, base, otPay, ls, hs, suppHealth, net, workDays });
+      results.push({ name: emp.name, base, otPay, ls, hs, suppHealth, allow, deduct, net, workDays });
     }
     return Response.json({ success: true, data: results });
   }
