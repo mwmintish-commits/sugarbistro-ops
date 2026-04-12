@@ -101,6 +101,7 @@ export default function AdminPage() {
   const [prodList, setProdList] = useState([]);
   const [prodSum, setProdSum] = useState({});
   const [si, setSi] = useState(null);
+  const [editStl, setEditStl] = useState(null);
   const [attView, setAttView] = useState("records");
   const [amendments, setAmendments] = useState([]);
   const [monthlyReport, setMonthlyReport] = useState([]);
@@ -1214,46 +1215,48 @@ export default function AdminPage() {
             })()}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:700}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","營收","現金","TWQR","匯款","Uber","餐券","飲料券","LINE儲值","發票","作廢","應存","📸","✏️"].map(h=><th key={h} style={{padding:"4px 3px",textAlign:"right",fontWeight:500,color:"#666",fontSize:9}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","營收","現金","TWQR","匯款","Uber","餐券","飲料券","LINE儲值","發票","作廢","應存","📸","操作"].map(h=><th key={h} style={{padding:"4px 3px",textAlign:"right",fontWeight:500,color:"#666",fontSize:9}}>{h}</th>)}</tr></thead>
                 <tbody>{stl.map(s=>{
-                  // 稽核驗算
                   const paySum = [s.cash_amount,s.twqr_amount,s.uber_eat_amount,s.remittance_amount,s.line_pay_amount,s.easy_card_amount,s.meal_voucher_amount,s.drink_voucher_amount,s.line_credit_amount].reduce((a,v)=>a+Number(v||0),0);
                   const mismatch = Math.abs(Number(s.net_sales||0) - paySum) > 100;
                   const hasVoid = (s.void_invoice_count||0) > 0;
-                  const hasCancel = (s.void_item_count||0) > 0;
-                  const highDiscount = Number(s.discount_total||0) > Number(s.net_sales||0) * 0.1 && Number(s.discount_total||0) > 0;
                   const flags = [];
-                  if (mismatch) flags.push("💰差額" + fmt(Number(s.net_sales||0) - paySum));
-                  if (hasVoid) flags.push("🚨作廢" + s.void_invoice_count + "張$" + (s.void_invoice_amount||0));
-                  if (hasCancel) flags.push("⚠️註銷" + s.void_item_count + "品$" + (s.void_item_amount||0));
-                  if (highDiscount) flags.push("🔻折扣$" + (s.discount_total||0));
-                  const rowBg = mismatch ? "#fef2f2" : hasVoid ? "#fffbeb" : "transparent";
+                  if (mismatch) flags.push("💰差"+fmt(Number(s.net_sales||0)-paySum));
+                  if (hasVoid) flags.push("🚨作廢"+s.void_invoice_count);
+                  if (Number(s.discount_total||0)>Number(s.net_sales||0)*0.1&&s.discount_total>0) flags.push("🔻折扣");
+                  const isEdit = editStl === s.id;
+                  const ei = (field,val) => isEdit ? <input id={"stl-"+s.id+"-"+field} defaultValue={val||0} style={{width:55,padding:1,border:"1px solid #4361ee",borderRadius:3,fontSize:10,textAlign:"right"}} /> : null;
+                  const cv = (val,color) => <span style={{color:val>0?(color||"inherit"):"#ccc",fontSize:10}}>{val>0?fmt(val):"-"}</span>;
                   return (
-                  <tr key={s.id} style={{borderBottom:"1px solid #f0eeea",background:rowBg}}>
+                  <tr key={s.id} style={{borderBottom:"1px solid #f0eeea",background:mismatch?"#fef2f2":hasVoid?"#fffbeb":"transparent"}}>
                     <td style={{padding:"4px 3px",textAlign:"right",fontSize:10}}>{s.date?.slice(5)}{flags.length>0&&<div style={{fontSize:7,color:"#b91c1c"}}>{flags.join(" ")}</div>}</td>
                     <td style={{padding:"4px 3px",textAlign:"right",fontWeight:500,fontSize:10}}>{s.stores?s.stores.name:""}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right",fontWeight:700,color:"#0a7c42",fontSize:10}}>{fmt(s.net_sales)}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right",fontSize:10}}>{fmt(s.cash_amount)}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right",color:s.twqr_amount>0?"#0a7c42":"#ccc",fontSize:10}}>{s.twqr_amount>0?fmt(s.twqr_amount):"-"}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right",color:s.remittance_amount>0?"#185fa5":"#ccc",fontSize:10}}>{s.remittance_amount>0?fmt(s.remittance_amount):"-"}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right",color:s.uber_eat_amount>0?"#0a7c42":"#ccc",fontSize:10}}>{s.uber_eat_amount>0?fmt(s.uber_eat_amount):"-"}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right",color:s.meal_voucher_amount>0?"#b45309":"#ccc",fontSize:10}}>{s.meal_voucher_amount>0?fmt(s.meal_voucher_amount):"-"}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right",color:s.drink_voucher_amount>0?"#b45309":"#ccc",fontSize:10}}>{s.drink_voucher_amount>0?fmt(s.drink_voucher_amount):"-"}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right",color:s.line_credit_amount>0?"#4361ee":"#ccc",fontSize:10}}>{s.line_credit_amount>0?fmt(s.line_credit_amount):"-"}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("net_sales",s.net_sales):<span style={{fontWeight:700,color:"#0a7c42",fontSize:10}}>{fmt(s.net_sales)}</span>}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("cash_amount",s.cash_amount):<span style={{fontSize:10}}>{fmt(s.cash_amount)}</span>}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("twqr_amount",s.twqr_amount):cv(s.twqr_amount,"#0a7c42")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("remittance_amount",s.remittance_amount):cv(s.remittance_amount,"#185fa5")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("uber_eat_amount",s.uber_eat_amount):cv(s.uber_eat_amount,"#0a7c42")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("meal_voucher_amount",s.meal_voucher_amount):cv(s.meal_voucher_amount,"#b45309")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("drink_voucher_amount",s.drink_voucher_amount):cv(s.drink_voucher_amount,"#b45309")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("line_credit_amount",s.line_credit_amount):cv(s.line_credit_amount,"#4361ee")}</td>
                     <td style={{padding:"4px 3px",textAlign:"right",fontSize:9}}>{s.invoice_count||"-"}</td>
                     <td style={{padding:"4px 3px",textAlign:"right",color:s.void_invoice_count>0?"#b91c1c":"#ccc",fontSize:9}}>{s.void_invoice_count>0?s.void_invoice_count+"張":"-"}</td>
                     <td style={{padding:"4px 3px",textAlign:"right",fontWeight:600,color:"#b45309",fontSize:10}}>{fmt(s.cash_to_deposit)}</td>
-                    <td style={{padding:"5px 4px",textAlign:"center"}}>{s.image_url?<button onClick={()=>setSi(s.image_url)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>📸</button>:<span style={{color:"#ccc"}}>-</span>}</td>
-                    <td style={{padding:"5px 4px",textAlign:"center"}}>
-                      <button onClick={async()=>{
-                        const fields=[["net_sales","營收",s.net_sales],["cash_amount","現金",s.cash_amount],["line_pay_amount","LINE Pay",s.line_pay_amount],["twqr_amount","TWQR",s.twqr_amount],["uber_eat_amount","UberEat",s.uber_eat_amount],["easy_card_amount","悠遊卡",s.easy_card_amount],["meal_voucher_amount","餐券",s.meal_voucher_amount]];
-                        const updates={};let changed=false;
-                        for(const[k,label,val]of fields){const v=prompt(label+"：",val||0);if(v===null)return;if(Number(v)!==Number(val||0)){updates[k]=Number(v);changed=true;}}
-                        if(!changed){alert("無修改");return;}
-                        updates.cash_to_deposit=(updates.cash_amount??s.cash_amount)-(s.petty_cash_reserved||0);
-                        const r=await sap("/api/admin/settlements",{action:"update",settlement_id:s.id,...updates});
-                        if(r){alert("✅ 已更新");load();}
-                      }} style={{background:"none",border:"none",cursor:"pointer",fontSize:11}}>✏️</button>
+                    <td style={{padding:"4px",textAlign:"center"}}>{s.image_url?<button onClick={()=>setSi(s.image_url)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>📸</button>:<span style={{color:"#ccc"}}>-</span>}</td>
+                    <td style={{padding:"4px",textAlign:"center",whiteSpace:"nowrap"}}>
+                      {isEdit ? <>
+                        <button onClick={async()=>{
+                          const g=f=>Number(document.getElementById("stl-"+s.id+"-"+f)?.value||0);
+                          const updates={net_sales:g("net_sales"),cash_amount:g("cash_amount"),twqr_amount:g("twqr_amount"),remittance_amount:g("remittance_amount"),uber_eat_amount:g("uber_eat_amount"),meal_voucher_amount:g("meal_voucher_amount"),drink_voucher_amount:g("drink_voucher_amount"),line_credit_amount:g("line_credit_amount")};
+                          updates.cash_to_deposit=updates.cash_amount-(s.petty_cash_reserved||0);
+                          const r=await sap("/api/admin/settlements",{action:"update",settlement_id:s.id,...updates});
+                          if(r){setEditStl(null);load();}
+                        }} style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer"}}>💾</button>
+                        <button onClick={()=>setEditStl(null)} style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#888",color:"#fff",fontSize:9,cursor:"pointer",marginLeft:2}}>✕</button>
+                      </> : <>
+                        <button onClick={()=>setEditStl(s.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:10}}>✏️</button>
+                        <button onClick={async()=>{if(!confirm("刪除 "+s.date+" 日結？"))return;const r=await sap("/api/admin/settlements",{action:"delete",settlement_id:s.id});if(r)load();}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
+                      </>}
                     </td>
                   </tr>);
                 })}</tbody>
