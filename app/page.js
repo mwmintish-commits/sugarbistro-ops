@@ -1426,6 +1426,15 @@ export default function AdminPage() {
                   <div>
                     <span style={{fontSize:14,fontWeight:600}}>{p.name}</span>
                     <span style={{fontSize:10,color:"#888",marginLeft:6,background:"#faf8f5",padding:"1px 6px",borderRadius:3}}>{p.category||""}</span>
+                    <button onClick={async()=>{
+                      const n=prompt("修改產品名稱：",p.name);if(!n)return;
+                      const c=prompt("分類：",p.category||"");
+                      await ap("/api/admin/products",{action:"update",product_id:p.id,name:n,category:c});load();
+                    }} style={{fontSize:9,color:"#4361ee",background:"none",border:"none",cursor:"pointer",marginLeft:4}}>✏️</button>
+                    <button onClick={async()=>{
+                      if(!confirm("刪除產品「"+p.name+"」及所有規格？"))return;
+                      await ap("/api/admin/products",{action:"delete",product_id:p.id});load();
+                    }} style={{fontSize:9,color:"#b91c1c",background:"none",border:"none",cursor:"pointer"}}>🗑</button>
                   </div>
                   <button onClick={async()=>{
                     const sn=prompt("規格名稱（如：原味6入）：");if(!sn)return;
@@ -1486,12 +1495,27 @@ export default function AdminPage() {
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:8}}>
               {clientList.map(c=>(
                 <div key={c.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
-                  <div style={{display:"flex",justifyContent:"space-between"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                     <div style={{fontSize:13,fontWeight:600}}>{c.name}</div>
-                    <Badge status={c.type==="oem"?"planned":c.type==="b2b"?"approved":"pending"} />
+                    <div style={{display:"flex",gap:2,alignItems:"center"}}>
+                      <Badge status={c.type==="oem"?"planned":c.type==="b2b"?"approved":"pending"} />
+                      <button onClick={async()=>{
+                        const n=prompt("客戶名稱：",c.name);if(!n)return;
+                        const p=prompt("聯絡人：",c.contact_person||"");
+                        const ph=prompt("電話：",c.phone||"");
+                        const addr=prompt("地址：",c.address||"");
+                        const tax=prompt("統編：",c.tax_id||"");
+                        const pt=prompt("付款條件：",c.payment_terms||"");
+                        await ap("/api/admin/clients",{action:"update",client_id:c.id,name:n,contact_person:p,phone:ph,address:addr,tax_id:tax,payment_terms:pt});load();
+                      }} style={{fontSize:10,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️</button>
+                      <button onClick={async()=>{
+                        if(!confirm("刪除客戶「"+c.name+"」？"))return;
+                        await ap("/api/admin/clients",{action:"delete",client_id:c.id});load();
+                      }} style={{fontSize:10,color:"#b91c1c",background:"none",border:"none",cursor:"pointer"}}>🗑</button>
+                    </div>
                   </div>
-                  <div style={{fontSize:11,color:"#888"}}>{c.contact_person} · {c.phone}</div>
-                  <div style={{fontSize:10,color:"#888"}}>{c.payment_terms}{c.tax_id?" · 統編"+c.tax_id:""}</div>
+                  <div style={{fontSize:11,color:"#888"}}>{c.contact_person}{c.phone?" · "+c.phone:""}</div>
+                  <div style={{fontSize:10,color:"#888"}}>{c.payment_terms||""}{c.tax_id?" · 統編"+c.tax_id:""}{c.address?" · "+c.address:""}</div>
                 </div>
               ))}
             </div>
