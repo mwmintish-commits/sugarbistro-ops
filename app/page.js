@@ -632,7 +632,7 @@ export default function AdminPage() {
                                 {sc?(<div style={{background:sc.type==="leave"?(LT[sc.leave_type]||LT.off).bg:sc.published?"#e6f9f0":"#fff8e6",border:sc.published?"1.5px solid #0a7c42":"1.5px dashed #d4a017",borderRadius:4,padding:"2px 3px",fontSize:9}}>
                                   {sc.type==="leave"?<div style={{color:(LT[sc.leave_type]||LT.off).c,fontWeight:500}}>{(LT[sc.leave_type]||LT.off).l}</div>:<div><div style={{fontWeight:500}}>{sc.shifts?sc.shifts.name:""}</div><div style={{color:"#888"}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></div>}
                                   <div style={{textAlign:"right",marginTop:1}}><button onClick={(ev)=>{ev.stopPropagation();delSch(sc.id);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c",padding:"2px 4px"}}>✕刪</button></div>
-                                </div>):(<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else addSch(emp.id,v,date);}} style={{width:"100%",padding:1,borderRadius:3,border:"1px dashed #ddd",fontSize:9,color:"#ccc",background:"transparent",cursor:"pointer"}}><option value="">+</option><optgroup label="班別">{storeShifts.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</optgroup><optgroup label="休假">{Object.entries(LT).filter(([k])=>!["off","rest"].includes(k)).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select>)}
+                                </div>):(<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else addSch(emp.id,v,date);}} style={{width:"100%",padding:1,borderRadius:3,border:"1px dashed #ddd",fontSize:9,color:"#ccc",background:"transparent",cursor:"pointer"}}><option value="">+</option><optgroup label="班別">{storeShifts.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</optgroup><optgroup label="休假">{Object.entries(LT).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select>)}
                               </td>);})}
                           </tr>))}</tbody>
                       </table>
@@ -664,8 +664,7 @@ export default function AdminPage() {
                       cells.push(<td key={date} onClick={()=>setSchPop({date,storeId:store.id,storeName:store.name})} style={{padding:3,verticalAlign:"top",border:"1px solid #f0eeea",minHeight:48,background:hol?"#fde8e8":isSun?"#f0eeea":isSat?"#faf8f5":"transparent",cursor:"pointer"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                           <span style={{fontSize:10,fontWeight:500,color:hol?"#b91c1c":isSun?"#b91c1c":isSat?"#b45309":"#666"}}>{d}</span>
-                          {(hol||isSun)&&<span style={{fontSize:7,color:hol?"#b91c1c":"#888",background:hol?"#fecaca":"#e8e6e1",padding:"0 3px",borderRadius:2}}>{hol?hol.name:isSun?"例假":""}</span>}
-                          {isSat&&!hol&&<span style={{fontSize:7,color:"#888",background:"#e8e6e1",padding:"0 3px",borderRadius:2}}>休息</span>}
+                          {hol&&<span style={{fontSize:7,color:"#b91c1c",background:"#fecaca",padding:"0 3px",borderRadius:2}}>{hol.name}</span>}
                         </div>
                         {ds.slice(0,4).map(s=>(<div key={s.id} style={{background:s.type==="leave"?(LT[s.leave_type]||LT.off).bg:s.published?"#e6f9f0":"#fff8e6",border:s.type==="leave"?"1.5px solid "+(LT[s.leave_type]||LT.off).c:s.published?"1.5px solid #0a7c42":"1.5px dashed #d4a017",borderRadius:3,padding:"0 3px",fontSize:8,marginBottom:1,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",color:s.type==="leave"?(LT[s.leave_type]||LT.off).c:"inherit"}}>{(s.employees?s.employees.name:"")+" "+(s.type==="leave"?(LT[s.leave_type]||LT.off).l+(s.notes&&s.notes!=="預假"?" "+s.notes:""):s.shifts?s.shifts.name:"")}</div>))}
                         {ds.length===0&&<div style={{fontSize:9,color:"#ccc",textAlign:"center",marginTop:4}}>+</div>}
@@ -709,7 +708,7 @@ export default function AdminPage() {
                 <h4 style={{fontSize:11,fontWeight:500,color:"#888",marginBottom:6}}>➕ 快速排班</h4>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"end"}}>
                   <div><label style={{fontSize:9,color:"#888"}}>員工</label><select id="qs-emp" style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11,minWidth:80}}><option value="">選員工</option><option value="__all__">👥 全員排入</option>{ae.filter(e=>!sf||e.store_id===sf).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
-                  <div><label style={{fontSize:9,color:"#888"}}>班別</label><select id="qs-shift" style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11,minWidth:80}}><option value="">選班別</option>{shifts.filter(s=>!sf||s.store_id===sf).map(s=><option key={s.id} value={s.id}>{s.name+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}<optgroup label="休假">{Object.entries(LT).filter(([k])=>!["off","rest"].includes(k)).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select></div>
+                  <div><label style={{fontSize:9,color:"#888"}}>班別</label><select id="qs-shift" style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11,minWidth:80}}><option value="">選班別</option>{shifts.filter(s=>!sf||s.store_id===sf).map(s=><option key={s.id} value={s.id}>{s.name+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}<optgroup label="休假">{Object.entries(LT).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select></div>
                   <div><label style={{fontSize:9,color:"#888"}}>開始日</label><input id="qs-start" type="date" defaultValue={month+"-01"} style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
                   <div><label style={{fontSize:9,color:"#888"}}>結束日</label><input id="qs-end" type="date" defaultValue={month+"-01"} style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
                   <button onClick={async()=>{
@@ -2008,7 +2007,6 @@ export default function AdminPage() {
               </div>
               {/* 假日提醒 */}
               {popHol && <div style={{ background: "#fde8e8", borderRadius: 6, padding: "6px 10px", marginBottom: 8, fontSize: 11, color: "#b91c1c", fontWeight: 500 }}>{"🔴 國定假日：" + popHol.name + "（排班將詢問挪移或雙倍薪）"}</div>}
-              {isSun && !popHol && <div style={{ background: "#f0eeea", borderRadius: 6, padding: "6px 10px", marginBottom: 8, fontSize: 11, color: "#666" }}>{"📌 例假日（週日）出勤須符合勞基法規定"}</div>}
               {/* 已有排班 */}
               {scheds.filter(s => s.date === schPop.date && (schPop.storeId === "__hq__" ? !emps.find(e => e.id === s.employee_id)?.store_id : emps.find(e => e.id === s.employee_id)?.store_id === schPop.storeId)).map(s => (
                 <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", marginBottom: 4, borderRadius: 6, background: s.type === "leave" ? (LT[s.leave_type] || LT.off).bg : s.published ? "#e6f9f0" : "#fff8e6", border: s.published ? "1px solid #0a7c42" : "1px dashed #d4a017" }}>
@@ -2032,7 +2030,7 @@ export default function AdminPage() {
                   ))}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginTop: 6 }}>
-                  {[["annual", "🏖 特休"], ["advance", "📌 預假"], ["holiday_comp", "🔴 國定補假"], ["personal", "📋 事假"], ["sick", "🤒 病假"]].map(([k, l]) => (
+                  {[["off","⬛ 例假"],["rest","🔲 休息日"],["annual","🏖 特休"],["advance","📌 預假"],["holiday_comp","🔴 國定補假"],["personal","📋 事假"],["sick","🤒 病假"]].map(([k, l]) => (
                     <button key={k} onClick={async () => { const eid = document.getElementById("pop-emp").value; if (!eid) { alert("請選員工"); return; } await ap("/api/admin/schedules", { action: "add_leave", employee_id: eid, date: schPop.date, leave_type: k }); load(); }}
                       style={{ padding: "6px", borderRadius: 6, border: "1px solid #ddd", background: "#faf8f5", fontSize: 11, cursor: "pointer" }}>{l}</button>
                   ))}
