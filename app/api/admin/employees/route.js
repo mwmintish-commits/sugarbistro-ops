@@ -126,40 +126,44 @@ export async function POST(request) {
   // 永久刪除
   if (body.action === "delete") {
     const eid = body.employee_id;
-    // LINE 通知 + 解除綁定
-    const { data: empData } = await supabase.from("employees").select("line_uid, name").eq("id", eid).single();
-    if (empData?.line_uid) {
-      await pushText(empData.line_uid, "⚠️ 你的帳號已被移除\n\n👤 " + empData.name + "\n\n如有疑問請聯繫總部。").catch(() => {});
-      await supabase.from("user_states").delete().eq("line_uid", empData.line_uid);
+    try {
+      // LINE 通知
+      const { data: empData } = await supabase.from("employees").select("line_uid, name").eq("id", eid).single();
+      if (empData?.line_uid) {
+        await pushText(empData.line_uid, "⚠️ 帳號已移除\n👤 " + empData.name).catch(() => {});
+      }
+      // 並行清理所有 FK 表
+      await Promise.allSettled([
+        supabase.from("schedules").delete().eq("employee_id", eid),
+        supabase.from("attendances").delete().eq("employee_id", eid),
+        supabase.from("leave_requests").delete().eq("employee_id", eid),
+        supabase.from("leave_balances").delete().eq("employee_id", eid),
+        supabase.from("overtime_records").delete().eq("employee_id", eid),
+        supabase.from("payroll_records").delete().eq("employee_id", eid),
+        supabase.from("violations").delete().eq("employee_id", eid),
+        supabase.from("performance_reviews").delete().eq("employee_id", eid),
+        supabase.from("bonus_records").delete().eq("employee_id", eid),
+        supabase.from("employee_documents").delete().eq("employee_id", eid),
+        supabase.from("work_logs").delete().eq("employee_id", eid),
+        supabase.from("clock_amendments").delete().eq("employee_id", eid),
+        supabase.from("clockin_tokens").delete().eq("employee_id", eid),
+        supabase.from("admin_sessions").delete().eq("employee_id", eid),
+        supabase.from("incident_reports").delete().eq("employee_id", eid),
+        supabase.from("swap_requests").delete().or("requester_id.eq." + eid + ",target_id.eq." + eid),
+        supabase.from("user_states").delete().eq("line_uid", empData?.line_uid || "____"),
+        supabase.from("daily_settlements").update({ submitted_by: null }).eq("submitted_by", eid),
+        supabase.from("deposits").update({ submitted_by: null }).eq("submitted_by", eid),
+        supabase.from("expenses").update({ submitted_by: null }).eq("submitted_by", eid),
+        supabase.from("production_orders").update({ assigned_to: null }).eq("assigned_to", eid),
+        supabase.from("onboarding_records").update({ auto_employee_id: null }).eq("auto_employee_id", eid),
+        supabase.from("work_log_items").update({ completed_by: null }).eq("completed_by", eid),
+      ]);
+      const { error } = await supabase.from("employees").delete().eq("id", eid);
+      if (error) return Response.json({ error: "刪除失敗：" + error.message }, { status: 500 });
+      return Response.json({ success: true });
+    } catch (e) {
+      return Response.json({ error: "刪除失敗：" + (e.message || "未知錯誤") }, { status: 500 });
     }
-    // 清關聯資料（全部 FK 表，每張獨立 try-catch 防止不存在的表中斷流程）
-    const del = async (t, f, v) => { try { await supabase.from(t).delete().eq(f, v); } catch(e) {} };
-    const nul = async (t, f, v) => { try { await supabase.from(t).update({ [f]: null }).eq(f, v); } catch(e) {} };
-    await del("schedules", "employee_id", eid);
-    await del("attendances", "employee_id", eid);
-    await del("leave_requests", "employee_id", eid);
-    await del("leave_balances", "employee_id", eid);
-    await del("overtime_records", "employee_id", eid);
-    await del("payroll_records", "employee_id", eid);
-    await del("violations", "employee_id", eid);
-    await del("performance_reviews", "employee_id", eid);
-    await del("bonus_records", "employee_id", eid);
-    await del("employee_documents", "employee_id", eid);
-    await del("work_logs", "employee_id", eid);
-    await del("clock_amendments", "employee_id", eid);
-    await del("clockin_tokens", "employee_id", eid);
-    await del("admin_sessions", "employee_id", eid);
-    await del("incident_reports", "employee_id", eid);
-    await supabase.from("swap_requests").delete().or("requester_id.eq." + eid + ",target_id.eq." + eid).catch(() => {});
-    await nul("daily_settlements", "submitted_by", eid);
-    await nul("deposits", "submitted_by", eid);
-    await nul("expenses", "submitted_by", eid);
-    await nul("production_orders", "assigned_to", eid);
-    await nul("onboarding_records", "auto_employee_id", eid);
-    await nul("work_log_items", "completed_by", eid);
-    const { error } = await supabase.from("employees").delete().eq("id", eid);
-    if (error) return Response.json({ error: error.message }, { status: 500 });
-    return Response.json({ success: true });
   }
 
   // 產生綁定碼

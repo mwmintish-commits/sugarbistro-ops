@@ -622,7 +622,7 @@ export default function AdminPage() {
             {sv==="month" && (
               <div>
               {[...(sf ? stores.filter(s=>s.id===sf) : stores), {id:"__hq__",name:"總部"}].map(store => {
-                const storeScheds = scheds.filter(s => store.id === "__hq__" ? !s.store_id : s.store_id === store.id);
+                const storeScheds = scheds.filter(s => { const emp = emps.find(e=>e.id===s.employee_id); return emp && (store.id==="__hq__" ? !emp.store_id : emp.store_id===store.id); });
                 if (storeScheds.length === 0 && !sf) return null;
                 return (
                 <div key={store.id} style={{marginBottom:10}}>
