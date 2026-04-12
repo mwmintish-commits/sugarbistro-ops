@@ -141,49 +141,66 @@ export async function POST(request) {
   // 6步驟報到完成（現有員工）
   if (body.action === "complete") {
     try {
-    const { token, signature_name, birthday, id_number, phone, email, address,
+    const { token, employee_id, signature_name, birthday, id_number, phone, email, address,
       emergency_contact, emergency_phone, emergency_relation,
       bank_name, bank_account,
       health_check_url, id_front_url, id_back_url,
       handbook_signature, contract_signature,
       handbook_content, contract_content } = body;
 
-    // 找員工（by bind_code or token）
+    // 找員工（優先用 employee_id）
     let emp = null;
-    const { data: byCode } = await supabase.from("employees")
-      .select("id, name, store_id, line_uid, stores(name)")
-      .eq("bind_code", token).single();
-    if (byCode) emp = byCode;
-
-    if (!emp) {
-      const { data: byRecord } = await supabase.from("onboarding_records")
-        .select("auto_employee_id").eq("token", token).single();
-      if (byRecord?.auto_employee_id) {
-        const { data: e } = await supabase.from("employees")
-          .select("id, name, store_id, line_uid, stores(name)")
-          .eq("id", byRecord.auto_employee_id).single();
-        emp = e;
-      }
+    if (employee_id) {
+      const { data } = await supabase.from("employees")
+        .select("id, name, store_id, line_uid, stores(name)")
+        .eq("id", employee_id).single();
+      emp = data;
     }
-
+    if (!emp && token) {
+      const { data } = await supabase.from("employees")
+        .select("id, name, store_id, line_uid, stores(name)")
+        .eq("bind_code", token).single();
+      emp = data;
+    }
     if (!emp && phone) {
-      const { data: byPhone } = await supabase.from("employees")
-        .select("id, name, store_id, line_uid, stores(name), hire_date")
+      const { data } = await supabase.from("employees")
+        .select("id, name, store_id, line_uid, stores(name)")
         .eq("phone", phone).eq("is_active", true).limit(1).single();
-      if (byPhone) emp = byPhone;
+      emp = data;
     }
 
-    if (!emp) return Response.json({ error: "找不到員工。請確認後台已新增此員工，並使用最新的報到連結。" }, { status: 404 });
-
-    // 更新員工資料
-    const { error: updateErr } = await supabase.from("employees").update({
-      phone, email, birthday, id_number, address,
-      emergency_contact, emergency_phone,
-      bank_name, bank_account,
-      contract_signed: true, handbook_signed: true, bonus_policy_signed: true,
-      onboarding_completed: true, onboarding_step: 5,
-    }).eq("id", emp.id);
-    if (updateErr) return Response.json({ error: "更新員工資料失敗：" + updateErr.message }, { status: 500 });
+    // 找不到 → 自動建立員工（LINE 新人報到流程）
+    if (!emp) {
+      const rec = await supabase.from("onboarding_records").select("*").eq("token", token).single();
+      const r = rec.data || {};
+      const { data: newEmp, error: createErr } = await supabase.from("employees").insert({
+        name: signature_name || r.name || "新員工",
+        phone, email, birthday, id_number, address,
+        store_id: r.store_id || null,
+        line_uid: r.line_uid || null,
+        role: "staff",
+        employment_type: "regular",
+        hire_date: new Date().toLocaleDateString("sv-SE"),
+        is_active: true,
+        contract_signed: true, handbook_signed: true, bonus_policy_signed: true,
+        onboarding_completed: true, onboarding_step: 5,
+        emergency_contact, emergency_phone, bank_name, bank_account,
+      }).select("id, name, store_id, line_uid, stores(name)").single();
+      if (createErr) return Response.json({ error: "建立員工失敗：" + createErr.message }, { status: 500 });
+      emp = newEmp;
+      // 更新 onboarding_record 的 auto_employee_id
+      if (r.id) await supabase.from("onboarding_records").update({ auto_employee_id: emp.id }).eq("id", r.id);
+    } else {
+      // 已有員工 → 更新資料
+      const { error: updateErr } = await supabase.from("employees").update({
+        phone, email, birthday, id_number, address,
+        emergency_contact, emergency_phone,
+        bank_name, bank_account,
+        contract_signed: true, handbook_signed: true, bonus_policy_signed: true,
+        onboarding_completed: true, onboarding_step: 5,
+      }).eq("id", emp.id);
+      if (updateErr) return Response.json({ error: "更新員工資料失敗：" + updateErr.message }, { status: 500 });
+    }
 
     // 儲存文件（身分證正反面分開）
     const docs = [
