@@ -1193,18 +1193,24 @@ export default function AdminPage() {
               const alerts = [];
               stl.forEach(s => {
                 const paySum = [s.cash_amount,s.twqr_amount,s.uber_eat_amount,s.remittance_amount,s.line_pay_amount,s.easy_card_amount,s.meal_voucher_amount,s.drink_voucher_amount,s.line_credit_amount].reduce((a,v)=>a+Number(v||0),0);
-                if (Math.abs(Number(s.net_sales||0)-paySum)>100) alerts.push("💰 "+(s.stores?.name||"")+" "+s.date?.slice(5)+" 營收"+fmt(s.net_sales)+" ≠ 收款合計"+fmt(paySum));
-                if ((s.void_invoice_count||0)>0) alerts.push("🚨 "+(s.stores?.name||"")+" "+s.date?.slice(5)+" 作廢"+s.void_invoice_count+"張 $"+(s.void_invoice_amount||0));
-                if ((s.void_item_count||0)>0) alerts.push("⚠️ "+(s.stores?.name||"")+" "+s.date?.slice(5)+" 註銷"+s.void_item_count+"品 $"+(s.void_item_amount||0));
-                if (Number(s.discount_total||0)>Number(s.net_sales||0)*0.1&&s.discount_total>0) alerts.push("🔻 "+(s.stores?.name||"")+" "+s.date?.slice(5)+" 折扣$"+s.discount_total+" 佔"+(Math.round(s.discount_total/s.net_sales*100))+"%");
+                const diff = Number(s.net_sales||0)-paySum;
+                if (Math.abs(diff)>100) alerts.push({icon:"💰",store:s.stores?.name||"",date:s.date?.slice(5),msg:"營收"+fmt(s.net_sales)+" 但各收款方式合計僅"+fmt(paySum)+"，差額"+fmt(diff),tip:"→ 請核對收據照片，可能有漏登的支付方式",level:"high"});
+                if ((s.void_invoice_count||0)>0) alerts.push({icon:"🚨",store:s.stores?.name||"",date:s.date?.slice(5),msg:"發票作廢"+s.void_invoice_count+"張，金額$"+(s.void_invoice_amount||0),tip:"→ 請確認作廢原因是否合理",level:s.void_invoice_amount>1000?"high":"mid"});
+                if ((s.void_item_count||0)>0) alerts.push({icon:"⚠️",store:s.stores?.name||"",date:s.date?.slice(5),msg:"註銷"+s.void_item_count+"項商品，金額$"+(s.void_item_amount||0),tip:"→ 可能是做完不結帳後註銷",level:"mid"});
+                if (Number(s.discount_total||0)>Number(s.net_sales||0)*0.1&&s.discount_total>0) alerts.push({icon:"🔻",store:s.stores?.name||"",date:s.date?.slice(5),msg:"折扣$"+s.discount_total+"（佔營收"+Math.round(s.discount_total/s.net_sales*100)+"%）",tip:"→ 折扣異常高，請確認是否有未授權折扣",level:"high"});
               });
-              dep.forEach(d => { if(Math.abs(d.difference||0)>500) alerts.push("🏦 "+(d.stores?.name||"")+" "+d.deposit_date+" 存款差異"+fmt(d.difference)); });
+              dep.forEach(d => { if(Math.abs(d.difference||0)>500) alerts.push({icon:"🏦",store:d.stores?.name||"",date:d.deposit_date,msg:"存款差異"+fmt(d.difference),tip:"→ 請確認是否有未存入的現金",level:Math.abs(d.difference)>2000?"high":"mid"}); });
               return alerts.length ? (
-                <div style={{background:"#fef2f2",borderRadius:8,border:"1px solid #fecaca",padding:10,marginBottom:8}}>
-                  <h4 style={{fontSize:12,fontWeight:600,color:"#b91c1c",marginBottom:4}}>{"🚨 稽核警示（"+alerts.length+"項）"}</h4>
-                  {alerts.map((a,i)=><div key={i} style={{fontSize:10,color:"#7f1d1d",marginBottom:2}}>{a}</div>)}
+                <div style={{background:"#fef2f2",borderRadius:8,border:"1px solid #fecaca",padding:12,marginBottom:8}}>
+                  <h4 style={{fontSize:13,fontWeight:700,color:"#b91c1c",marginBottom:8}}>{"🚨 稽核警示（"+alerts.length+"項）"}</h4>
+                  {alerts.map((a,i)=>(
+                    <div key={i} style={{padding:8,marginBottom:4,borderRadius:6,background:a.level==="high"?"#fee2e2":"#fff8e6",border:"1px solid "+(a.level==="high"?"#fca5a5":"#fde68a")}}>
+                      <div style={{fontSize:11,fontWeight:600}}>{a.icon+" "+a.store+" "+a.date+" — "+a.msg}</div>
+                      <div style={{fontSize:10,color:"#666",marginTop:2}}>{a.tip}</div>
+                    </div>
+                  ))}
                 </div>
-              ) : <div style={{background:"#e6f9f0",borderRadius:8,padding:8,marginBottom:8,fontSize:11,color:"#0a7c42"}}>✅ 本月日結無異常</div>;
+              ) : <div style={{background:"#e6f9f0",borderRadius:8,padding:10,marginBottom:8,fontSize:12,color:"#0a7c42",fontWeight:500}}>✅ 本月日結核對無異常</div>;
             })()}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:700}}>
@@ -1888,8 +1894,16 @@ export default function AdminPage() {
 
         {/* IMAGE PREVIEW */}
         {si && (
-          <div onClick={()=>setSi(null)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,cursor:"pointer"}}>
-            <img src={si} alt="" style={{maxWidth:"90%",maxHeight:"90%",borderRadius:8}} />
+          <div onClick={()=>setSi(null)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:9999,cursor:"pointer",padding:16}}>
+            <img src={si} alt="" style={{maxWidth:"92%",maxHeight:"80%",borderRadius:8,objectFit:"contain"}}
+              onError={(e)=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}} />
+            <div style={{display:"none",color:"#fff",textAlign:"center",padding:20}}>
+              <div style={{fontSize:40,marginBottom:10}}>⚠️</div>
+              <div style={{fontSize:14,marginBottom:8}}>圖片無法載入</div>
+              <div style={{fontSize:11,color:"#aaa"}}>請至 Supabase → Storage → receipts bucket → 開啟 Public</div>
+              <div style={{fontSize:10,color:"#666",marginTop:8,wordBreak:"break-all",maxWidth:400}}>{si}</div>
+            </div>
+            <button onClick={()=>setSi(null)} style={{marginTop:12,padding:"8px 20px",borderRadius:6,border:"none",background:"#fff",color:"#333",fontSize:13,cursor:"pointer"}}>✕ 關閉</button>
           </div>
         )}
 

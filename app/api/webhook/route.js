@@ -115,21 +115,15 @@ async function handleLeaveType(rt, uid, typeCode, state) {
   const typeMap = { advance:"預假", annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假", comp_time:"補休", marriage:"婚假", funeral:"喪假", paternity:"陪產假", family_care:"家庭照顧假", maternity:"產假", official:"公假", work_injury:"公傷假" };
 
   if (typeCode === "advance") {
-    // 預假：選時段
-    await setUserState(uid, "advance_select_time", { ...state.flow_data, leave_type: "advance", leave_label: "預假" });
-    return replyWithQuickReply(rt, `📌 預假\n\n請選擇無法上班的時段：`, [
-      { type: "action", action: { type: "message", label: "整天無法上班", text: "預假:全天" } },
-      { type: "action", action: { type: "message", label: "18:00前無法", text: "預假:18前" } },
-      { type: "action", action: { type: "message", label: "16:00前無法", text: "預假:16前" } },
-      { type: "action", action: { type: "message", label: "14:00前無法", text: "預假:14前" } },
-      { type: "action", action: { type: "message", label: "12:00後無法", text: "預假:12後" } },
-      { type: "action", action: { type: "message", label: "14:00後無法", text: "預假:14後" } },
-      { type: "action", action: { type: "message", label: "16:00後無法", text: "預假:16後" } },
-      { type: "action", action: { type: "message", label: "18:00後無法", text: "預假:18後" } },
+    await setUserState(uid, "advance_select_mode", { ...state.flow_data, leave_type: "advance", leave_label: "預假" });
+    return replyWithQuickReply(rt, `📌 預假設定\n\n選擇方式：`, [
+      { type: "action", action: { type: "message", label: "📅 單次預假", text: "預假模式:單次" } },
+      { type: "action", action: { type: "message", label: "🔁 每週固定", text: "預假模式:每週" } },
+      { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
     ]);
   }
 
-  // 其他假別：選全天/半天 → 再選日期
+  // 其他假別
   await setUserState(uid, "leave_select_day_type", { ...state.flow_data, leave_type: typeCode, leave_label: typeMap[typeCode] });
   return replyWithQuickReply(rt, `假別：${typeMap[typeCode]}\n\n請選擇：`, [
     { type: "action", action: { type: "message", label: "📅 全日", text: "天數:full" } },
@@ -138,11 +132,87 @@ async function handleLeaveType(rt, uid, typeCode, state) {
   ]);
 }
 
+async function handleAdvanceMode(rt, uid, mode, state) {
+  const d = state.flow_data;
+  if (mode === "單次") {
+    await setUserState(uid, "advance_select_time", d);
+    return replyWithQuickReply(rt, `📅 單次預假\n\n請選擇時段：`, [
+      { type: "action", action: { type: "message", label: "整天無法", text: "預假:全天" } },
+      { type: "action", action: { type: "message", label: "18:00前無法", text: "預假:18前" } },
+      { type: "action", action: { type: "message", label: "16:00前無法", text: "預假:16前" } },
+      { type: "action", action: { type: "message", label: "14:00前無法", text: "預假:14前" } },
+      { type: "action", action: { type: "message", label: "12:00後無法", text: "預假:12後" } },
+      { type: "action", action: { type: "message", label: "14:00後無法", text: "預假:14後" } },
+    ]);
+  }
+  // 每週固定
+  await setUserState(uid, "advance_weekly_days", { ...d, selected_days: [] });
+  const dayNames = ["日","一","二","三","四","五","六"];
+  return replyWithQuickReply(rt, `🔁 每週固定預假\n\n請點選每週無法上班的日子\n（可多選，選完按「✅完成」）：`, [
+    ...dayNames.map((n,i) => ({ type:"action", action:{ type:"message", label:"週"+n, text:"預假週:"+i }})),
+    { type:"action", action:{ type:"message", label:"🔙 取消", text:"取消" }},
+  ]);
+}
+
+async function handleAdvanceWeekday(rt, uid, dayIdx, state) {
+  const d = state.flow_data;
+  const selected = [...(d.selected_days||[])];
+  const idx = Number(dayIdx);
+  if (!selected.includes(idx)) selected.push(idx);
+  selected.sort();
+  await setUserState(uid, "advance_weekly_days", { ...d, selected_days: selected });
+  const dayNames = ["日","一","二","三","四","五","六"];
+  const selectedText = selected.map(i => "週" + dayNames[i]).join("、");
+  const remaining = dayNames.map((n,i) => ({ i, n })).filter(x => !selected.includes(x.i));
+  const items = remaining.map(x => ({ type:"action", action:{ type:"message", label:"週"+x.n, text:"預假週:"+x.i }}));
+  items.push({ type:"action", action:{ type:"message", label:"✅ 完成（"+selectedText+"）", text:"預假週完成" }});
+  return replyWithQuickReply(rt, `已選：${selectedText}\n\n還有其他天嗎？`, items);
+}
+
+async function handleAdvanceWeeklyDone(rt, uid, state) {
+  const d = state.flow_data;
+  if (!d.selected_days?.length) return replyText(rt, "❌ 請至少選擇一天");
+  await setUserState(uid, "advance_weekly_time", d);
+  const dayNames = ["日","一","二","三","四","五","六"];
+  const selectedText = d.selected_days.map(i => "週" + dayNames[i]).join("、");
+  return replyWithQuickReply(rt, `🔁 每週 ${selectedText}\n\n這些天的時段？`, [
+    { type:"action", action:{ type:"message", label:"整天無法", text:"週時段:全天" }},
+    { type:"action", action:{ type:"message", label:"18:00前無法", text:"週時段:18前" }},
+    { type:"action", action:{ type:"message", label:"16:00前無法", text:"週時段:16前" }},
+    { type:"action", action:{ type:"message", label:"14:00前無法", text:"週時段:14前" }},
+    { type:"action", action:{ type:"message", label:"12:00後無法", text:"週時段:12後" }},
+    { type:"action", action:{ type:"message", label:"14:00後無法", text:"週時段:14後" }},
+  ]);
+}
+
+async function handleAdvanceWeeklyTime(rt, uid, timeText, state) {
+  const d = state.flow_data;
+  const timeNote = timeText === "全天" ? "整天無法上班" : timeText;
+  // 產生當月+下月的日期
+  const today = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
+  const dates = [];
+  const dayNames = ["日","一","二","三","四","五","六"];
+  for (let offset = 0; offset < 60; offset++) {
+    const dt = new Date(today); dt.setDate(dt.getDate() + offset);
+    if (d.selected_days.includes(dt.getDay())) {
+      dates.push(dt.toLocaleDateString("sv-SE"));
+    }
+  }
+  const selectedText = d.selected_days.map(i => "週" + dayNames[i]).join("、");
+  await setUserState(uid, "advance_weekly_confirm", { ...d, advance_time: timeNote, dates });
+  return replyWithQuickReply(rt,
+    `📌 每週固定預假確認\n━━━━━━━━━━━━━━\n👤 ${d.employee_name}\n📅 每週 ${selectedText}\n⏰ ${timeNote}\n\n將套用 ${dates.length} 天：\n${dates.slice(0,8).map(dt => dt.slice(5) + "(" + dayNames[new Date(dt).getDay()] + ")").join("、")}${dates.length>8?"...等":""}`,
+    [
+      { type:"action", action:{ type:"message", label:"✅ 確認登記", text:"確認週預假" }},
+      { type:"action", action:{ type:"message", label:"🔙 取消", text:"取消" }},
+    ]
+  );
+}
+
 async function handleAdvanceTime(rt, uid, timeText, state) {
   const d = state.flow_data;
   const timeNote = timeText === "全天" ? "整天無法上班" : timeText;
   await setUserState(uid, "advance_select_date", { ...d, advance_time: timeNote });
-  // 用 LINE datetimepicker 選日期
   return lineClient.replyMessage({ replyToken: rt, messages: [{ type: "text", text: `📌 預假：${timeNote}\n\n請選擇日期：`, quickReply: { items: [
     { type: "action", action: { type: "datetimepicker", label: "📅 選擇日期", data: "action=advance_date", mode: "date" } },
     { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
@@ -612,7 +682,22 @@ async function handleEvent(event) {
   // 請假流程
   if (text === "請假申請" || text === "預休假") return startLeaveRequest(rt, emp);
   if (text.startsWith("假別:") && state?.current_flow === "leave_select_type") return handleLeaveType(rt, userId, text.replace("假別:", ""), state);
+  if (text.startsWith("預假模式:") && state?.current_flow === "advance_select_mode") return handleAdvanceMode(rt, userId, text.replace("預假模式:", ""), state);
   if (text.startsWith("預假:") && state?.current_flow === "advance_select_time") return handleAdvanceTime(rt, userId, text.replace("預假:", ""), state);
+  if (text.startsWith("預假週:") && state?.current_flow === "advance_weekly_days") return handleAdvanceWeekday(rt, userId, text.replace("預假週:", ""), state);
+  if (text === "預假週完成" && state?.current_flow === "advance_weekly_days") return handleAdvanceWeeklyDone(rt, userId, state);
+  if (text.startsWith("週時段:") && state?.current_flow === "advance_weekly_time") return handleAdvanceWeeklyTime(rt, userId, text.replace("週時段:", ""), state);
+  if (text === "確認週預假" && state?.current_flow === "advance_weekly_confirm") {
+    const d = state.flow_data;
+    for (const date of d.dates || []) {
+      await supabase.from("schedules").upsert({ employee_id: d.employee_id, date, type: "leave", leave_type: "advance", notes: d.advance_time || "預假" }, { onConflict: "employee_id,date" });
+    }
+    await clearUserState(userId);
+    const dayNames = ["日","一","二","三","四","五","六"];
+    const { data: mgrs } = await supabase.from("employees").select("line_uid").in("role",["admin","store_manager"]).eq("is_active",true);
+    for (const m of mgrs||[]) if(m.line_uid&&m.line_uid!==userId) await pushText(m.line_uid, `📌 每週預假\n👤 ${d.employee_name}\n📅 每週${d.selected_days.map(i=>"週"+dayNames[i]).join("、")}\n⏰ ${d.advance_time}\n📋 共${d.dates.length}天`).catch(()=>{});
+    return replyWithQuickReply(rt, `✅ 每週預假已登記！\n\n📅 共 ${d.dates.length} 天\n⏰ ${d.advance_time}\n\n排班時會自動避開`, getMenu(emp.role));
+  }
   if (text.startsWith("天數:") && state?.current_flow === "leave_select_day_type") return handleLeaveDayType(rt, userId, text.replace("天數:", ""), state);
   if (state?.current_flow === "leave_select_date") return handleLeaveDate(rt, userId, text, state);
   if (text === "確認請假" && state?.current_flow === "leave_confirm") return confirmLeave(rt, userId, state);

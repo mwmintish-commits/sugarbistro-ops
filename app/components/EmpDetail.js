@@ -28,7 +28,8 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
     labor_start_date: "", health_start_date: "", hourly_rate: "", monthly_salary: "",
     hire_date: "", annual_leave_override: "",
     phone: "", email: "", birthday: "", id_number: "", address: "",
-    emergency_contact: "", emergency_phone: "", bank_name: "", bank_account: ""
+    emergency_contact: "", emergency_phone: "", bank_name: "", bank_account: "",
+    name: ""
   });
 
   const reload = () => {
@@ -52,6 +53,7 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
           address: r.data.address || "",
           emergency_contact: r.data.emergency_contact || "", emergency_phone: r.data.emergency_phone || "",
           bank_name: r.data.bank_name || "", bank_account: r.data.bank_account || "",
+          name: r.data.name || "",
         });
       }
       setLd(false);
@@ -66,6 +68,7 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
     setMsg("");
     await ap("/api/admin/employees", {
       action: "update", employee_id: empId,
+      name: form.name || null,
       role: form.role, employment_type: form.employment_type,
       store_id: form.store_id || null,
       hire_date: form.hire_date || null,
@@ -111,7 +114,7 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
     <div style={modal} onClick={onClose}>
       <div style={mbox} onClick={ev => ev.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600 }}>{"👤 " + e.name}</h2>
+          <h2 style={{ fontSize: 16, fontWeight: 600 }}>{"👤 "}<input value={form.name} onChange={ev=>setForm({...form,name:ev.target.value})} style={{border:"none",borderBottom:"1px solid #ddd",fontSize:16,fontWeight:600,width:120,padding:"0 2px"}} /></h2>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
         </div>
 
