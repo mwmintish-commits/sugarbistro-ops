@@ -2,8 +2,16 @@ import { supabase, eom } from "@/lib/supabase";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const month = searchParams.get("month"); // YYYY-MM
+  const id = searchParams.get("id");
+  const month = searchParams.get("month");
   const store_id = searchParams.get("store_id");
+
+  // 單筆查詢（用於日結確認頁）
+  if (id) {
+    const { data, error } = await supabase.from("daily_settlements").select("*, stores(name)").eq("id", id).single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ data });
+  }
 
   let query = supabase
     .from("daily_settlements")

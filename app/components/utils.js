@@ -24,6 +24,7 @@ export const ROLES = {
 
 export const LT = {
   advance: { l: "預假", c: "#b45309", bg: "#fef3c7" },
+  holiday_comp: { l: "國定補假", c: "#b91c1c", bg: "#fde8e8" },
   annual: { l: "特休", c: "#4361ee", bg: "#e6f1fb" },
   sick: { l: "病假", c: "#b45309", bg: "#fff8e6" },
   personal: { l: "事假", c: "#8a6d00", bg: "#fef9c3" },

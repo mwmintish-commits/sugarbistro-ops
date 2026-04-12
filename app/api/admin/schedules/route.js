@@ -43,32 +43,32 @@ export async function POST(request) {
   if (action === "create") {
     const { employee_id, store_id, shift_id, date, type, leave_type, half_day, note } = body;
 
-    // ✦03 一例一休檢核：排班前檢查連續工作天數
+    // 檢查是否有休假（預假/正式假）→ 跳過不覆蓋
+    if (type !== "leave") {
+      const { data: existing } = await supabase.from("schedules")
+        .select("id, type, leave_type").eq("employee_id", employee_id).eq("date", date).eq("type", "leave").limit(1);
+      if (existing?.length) {
+        const lt = { advance:"預假", annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假", comp_time:"補休", marriage:"婚假", funeral:"喪假" };
+        return Response.json({ skipped: true, warning: "⏭ " + date + " 已有" + (lt[existing[0].leave_type] || "休假") + "，已跳過" });
+      }
+    }
+
+    // 一例一休檢核
     if (type !== "leave") {
       const d = new Date(date);
       const checkStart = new Date(d.getTime() - 6 * 86400000).toLocaleDateString("sv-SE");
       const checkEnd = new Date(d.getTime() + 6 * 86400000).toLocaleDateString("sv-SE");
       const { data: nearby } = await supabase.from("schedules")
-        .select("date, type")
-        .eq("employee_id", employee_id)
-        .gte("date", checkStart).lte("date", checkEnd)
-        .order("date");
-      // 計算含本次排班後的連續工作天數
+        .select("date, type").eq("employee_id", employee_id)
+        .gte("date", checkStart).lte("date", checkEnd).order("date");
       const workDates = new Set((nearby || []).filter(s => s.type !== "leave").map(s => s.date));
       workDates.add(date);
       let maxConsecutive = 0, curr = 0;
       for (let i = -6; i <= 6; i++) {
         const dd = new Date(d.getTime() + i * 86400000).toLocaleDateString("sv-SE");
-        if (workDates.has(dd)) { curr++; maxConsecutive = Math.max(maxConsecutive, curr); }
-        else { curr = 0; }
+        if (workDates.has(dd)) { curr++; maxConsecutive = Math.max(maxConsecutive, curr); } else { curr = 0; }
       }
-      const warning = maxConsecutive >= 7
-        ? "⚠️ 違反一例一休：連續工作" + maxConsecutive + "天（勞基法§36規定每7天至少1天例假+1天休息日）"
-        : maxConsecutive === 6
-        ? "⚠️ 注意：已連續排班6天，再排1天將違反一例一休"
-        : null;
-
-      // 不硬擋，但回傳警示
+      const warning = maxConsecutive >= 7 ? "⚠️ 連續工作" + maxConsecutive + "天，違反一例一休" : maxConsecutive === 6 ? "⚠️ 已連續6天" : null;
       const { data, error } = await supabase.from("schedules").upsert({
         employee_id, store_id: store_id || null, shift_id: shift_id || null, date,
         type: type || "shift", leave_type, half_day, note, status: "scheduled",
@@ -83,6 +83,34 @@ export async function POST(request) {
     }, { onConflict: "employee_id,date" }).select("*, employees(name), shifts(name, start_time, end_time)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
+  }
+
+  // 複製上週班表
+  if (action === "copy_week") {
+    const { source_start, source_end, target_start, store_id } = body;
+    let q = supabase.from("schedules").select("employee_id, shift_id, store_id, type, leave_type, half_day, note")
+      .gte("date", source_start).lte("date", source_end).eq("type", "shift");
+    if (store_id) q = q.eq("store_id", store_id);
+    const { data: source } = await q;
+    if (!source?.length) return Response.json({ error: "上週無排班資料", copied: 0 });
+
+    const srcBase = new Date(source_start).getTime();
+    const tgtBase = new Date(target_start).getTime();
+    let copied = 0, skipped = 0;
+    for (const s of source) {
+      const srcDate = new Date(s.date || source_start);
+      const offset = Math.round((new Date(s.date || source_start).getTime() - srcBase) / 86400000);
+      const tgtDate = new Date(tgtBase + offset * 86400000).toLocaleDateString("sv-SE");
+      // 檢查目標日有無休假
+      const { data: ex } = await supabase.from("schedules").select("id").eq("employee_id", s.employee_id).eq("date", tgtDate).eq("type", "leave").limit(1);
+      if (ex?.length) { skipped++; continue; }
+      await supabase.from("schedules").upsert({
+        employee_id: s.employee_id, store_id: s.store_id, shift_id: s.shift_id,
+        date: tgtDate, type: "shift", status: "scheduled",
+      }, { onConflict: "employee_id,date" });
+      copied++;
+    }
+    return Response.json({ copied, skipped, message: "已複製" + copied + "筆" + (skipped ? "，跳過" + skipped + "筆（有休假）" : "") });
   }
 
   if (action === "add_leave") {

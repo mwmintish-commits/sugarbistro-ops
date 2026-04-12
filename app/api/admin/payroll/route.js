@@ -91,13 +91,27 @@ export async function POST(request) {
         }
       }
 
-      const net = base + otPay - ls - hs - suppHealth + allow - deduct - leaveDeduct;
+      // 國定假日出勤加班費（雙倍薪 = 加發一日工資）
+      let holidayPay = 0, holidayDays = 0;
+      const { data: holScheds } = await supabase.from("schedules")
+        .select("date, notes").eq("employee_id", emp.id).eq("type", "shift")
+        .gte("date", mk + "-01").lte("date", eom(mk))
+        .like("notes", "%國定假日出勤%");
+      holidayDays = (holScheds || []).length;
+      if (holidayDays > 0) {
+        const dailyRate = emp.monthly_salary ? Number(emp.monthly_salary) / 30
+          : (emp.hourly_rate ? Number(emp.hourly_rate) * 8 : 0);
+        holidayPay = Math.round(dailyRate * holidayDays);
+      }
+
+      const net = base + otPay + holidayPay - ls - hs - suppHealth + allow - deduct - leaveDeduct;
 
       await supabase.from("payroll_records").upsert({
         employee_id: emp.id, store_id: emp.store_id,
         year, month, base_salary: base, work_days: workDays,
         hourly_rate: emp.hourly_rate || 0,
         overtime_pay: otPay, comp_hours: compH,
+        holiday_pay: holidayPay, holiday_days: holidayDays,
         labor_self: ls, health_self: hs,
         supplementary_health: suppHealth,
         allowance: allow, allowance_note: emp.default_allowance_note || "",
@@ -106,7 +120,7 @@ export async function POST(request) {
         net_salary: net,
       }, { onConflict: "employee_id,year,month" });
 
-      results.push({ name: emp.name, base, otPay, ls, hs, suppHealth, allow, deduct, net, workDays });
+      results.push({ name: emp.name, base, otPay, holidayPay, ls, hs, suppHealth, allow, deduct, net, workDays });
     }
     return Response.json({ success: true, data: results });
   }

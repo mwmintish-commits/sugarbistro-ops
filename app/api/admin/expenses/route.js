@@ -2,10 +2,17 @@ import { supabase, auditLog } from "@/lib/supabase";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const type = searchParams.get("type"); // vendor, petty_cash, or all
+  const id = searchParams.get("id");
+  const type = searchParams.get("type");
   const store_id = searchParams.get("store_id");
   const month = searchParams.get("month");
   const status = searchParams.get("status");
+
+  if (id) {
+    const { data, error } = await supabase.from("expenses").select("*, stores(name)").eq("id", id).single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ data });
+  }
 
   if (searchParams.get("categories")) {
     const { data } = await supabase.from("expense_categories").select("*").eq("is_active", true).order("sort_order");
@@ -97,7 +104,7 @@ export async function POST(request) {
   }
 
   if (body.action === "update") {
-    const { expense_id, amount, vendor_name, category_suggestion, description, date, invoice_number } = body;
+    const { expense_id, amount, vendor_name, category_suggestion, description, date, invoice_number, status, edit_reason, edit_changes, edited_at } = body;
     const updates = {};
     if (amount !== undefined) updates.amount = amount;
     if (vendor_name !== undefined) updates.vendor_name = vendor_name;
@@ -105,6 +112,10 @@ export async function POST(request) {
     if (description !== undefined) updates.description = description;
     if (date !== undefined) updates.date = date;
     if (invoice_number !== undefined) updates.invoice_number = invoice_number;
+    if (status !== undefined) updates.status = status;
+    if (edit_reason !== undefined) updates.edit_reason = edit_reason;
+    if (edit_changes !== undefined) updates.edit_changes = edit_changes;
+    if (edited_at !== undefined) updates.edited_at = edited_at;
     const { data, error } = await supabase.from("expenses")
       .update(updates).eq("id", expense_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });

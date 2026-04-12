@@ -66,7 +66,7 @@ async function querySchedule(rt, emp) {
   for (const h of hols || []) holMap[h.date] = h.name;
 
   if (!data?.length) return replyText(rt, "📅 未來 14 天沒有排班。");
-  const leaveMap = { advance:"預假", annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假", off:"例假", rest:"休息日", comp_time:"補休", marriage:"婚假", funeral:"喪假", paternity:"陪產假", family_care:"家庭照顧假", maternity:"產假", official:"公假", work_injury:"公傷假" };
+  const leaveMap = { advance:"預假", holiday_comp:"國定補假", annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假", off:"例假", rest:"休息日", comp_time:"補休", marriage:"婚假", funeral:"喪假", paternity:"陪產假", family_care:"家庭照顧假", maternity:"產假", official:"公假", work_injury:"公傷假" };
   let msg = "📅 " + emp.name + " 的班表（14天）\n━━━━━━━━━━━━━━\n";
   let lastWeek = "";
   for (const s of data) {
@@ -357,7 +357,14 @@ async function handleSettlementImg(event, emp, state) {
     await pushText(uid, `📊 ${sd.store_name} ${dt}\n淨額${fmt(r.net_sales)}｜現金${fmt(r.cash_amount)}\nTWQR${fmt(r.twqr_amount)}｜匯款${fmt(r.remittance_amount||0)}\nUber${fmt(r.uber_eat_amount)}｜餐券${fmt(r.meal_voucher_amount)}\n飲料券${fmt(r.drink_voucher_amount||0)}｜LINE儲值${fmt(r.line_credit_amount||0)}\n發票${r.invoice_count||0}張${r.void_invoice_count?" 作廢"+r.void_invoice_count+"張":""}\n應存${fmt(ctd)}`);
     const ns = getNextStep(sd, null);
     if (ns) { await setUserState(uid, ns.flow, sd); await pushText(uid, `✅ POS已辨識\n\n${stepPrompt(ns,sd)}`); }
-    else { await setUserState(uid, "settlement_confirm", sd); await pushText(uid, "確認送出？"); await lineClient.pushMessage({ to:uid, messages:[{type:"text",text:"確認？",quickReply:{items:[{type:"action",action:{type:"message",label:"✅確認",text:"確認日結"}},{type:"action",action:{type:"message",label:"🔙取消",text:"取消"}}]}}] }); }
+    else {
+      // 存為草稿 + 送出確認連結
+      const{data:draft}=await supabase.from("daily_settlements").upsert({store_id:sd.store_id,date:dt,period_start:sd.period_start,period_end:sd.period_end,cashier_name:sd.cashier_name,net_sales:sd.net_sales,discount_total:sd.discount_total,cash_amount:sd.cash_amount,line_pay_amount:sd.line_pay_amount,twqr_amount:sd.twqr_amount,uber_eat_amount:sd.uber_eat_amount,easy_card_amount:sd.easy_card_amount,remittance_amount:sd.remittance_amount||0,meal_voucher_amount:sd.meal_voucher_amount,line_credit_amount:sd.line_credit_amount,drink_voucher_amount:sd.drink_voucher_amount,invoice_count:sd.invoice_count,invoice_start:sd.invoice_start,invoice_end:sd.invoice_end,void_invoice_count:sd.void_invoice_count,void_invoice_amount:sd.void_invoice_amount,void_invoice_numbers:sd.void_invoice_numbers||"",cash_in_register:sd.cash_in_register,petty_cash_reserved:sd.petty_cash_reserved,void_item_count:sd.void_item_count||0,void_item_amount:sd.void_item_amount||0,cash_to_deposit:sd.cash_to_deposit,image_url:sd.image_url,ai_raw_data:sd.ai_raw_data,submitted_by:sd.employee_id,submitted_at:new Date().toISOString(),status:"draft"},{onConflict:"store_id,date"}).select().single();
+      const reviewUrl = `${SITE}/settlement-review?id=${draft?.id||""}`;
+      await setUserState(uid, "settlement_confirm", sd);
+      await pushText(uid, `✅ AI辨識完成\n\n📝 核對修正：\n${reviewUrl}\n\n或直接確認：`);
+      await lineClient.pushMessage({ to:uid, messages:[{type:"text",text:"選擇操作：",quickReply:{items:[{type:"action",action:{type:"uri",label:"📝 開網頁核對",uri:reviewUrl}},{type:"action",action:{type:"message",label:"✅ 數字正確，直接送出",text:"確認日結"}},{type:"action",action:{type:"message",label:"📸 重拍",text:"重新拍照"}},{type:"action",action:{type:"message",label:"🔙 取消",text:"取消"}}]}}] });
+    }
   } catch(e) { await pushText(uid, "❌ "+e.message); }
 }
 async function handleReceiptImg(event, state) {
@@ -390,12 +397,8 @@ async function skipStep(uid, state) {
 async function confirmSettlement(uid, emp) {
   const state=await getUserState(uid); if(!state||state.current_flow!=="settlement_confirm") return false;
   const d=state.flow_data;
-  // Bug 10: 強制照片
   if(!d.image_url){await pushText(uid,"❌ 日結必須上傳照片才能送出");return false;}
-  // Bug 10: 覆蓋警告
-  const{data:existing}=await supabase.from("daily_settlements").select("id").eq("store_id",d.store_id).eq("date",d.date).limit(1).single();
-  if(existing)await pushText(uid,"⚠️ 注意："+d.date+" 已有日結紀錄，本次將覆蓋原資料").catch(()=>{});
-  const{data:stl,error}=await supabase.from("daily_settlements").upsert({store_id:d.store_id,date:d.date,period_start:d.period_start,period_end:d.period_end,cashier_name:d.cashier_name,net_sales:d.net_sales,discount_total:d.discount_total,cash_amount:d.cash_amount,line_pay_amount:d.line_pay_amount,twqr_amount:d.twqr_amount,uber_eat_amount:d.uber_eat_amount,easy_card_amount:d.easy_card_amount,remittance_amount:d.remittance_amount||0,meal_voucher_amount:d.meal_voucher_amount,line_credit_amount:d.line_credit_amount,drink_voucher_amount:d.drink_voucher_amount,invoice_count:d.invoice_count,invoice_start:d.invoice_start,invoice_end:d.invoice_end,void_invoice_count:d.void_invoice_count,void_invoice_amount:d.void_invoice_amount,void_invoice_numbers:d.void_invoice_numbers||"",cash_in_register:d.cash_in_register,petty_cash_reserved:d.petty_cash_reserved,void_item_count:d.void_item_count||0,void_item_amount:d.void_item_amount||0,cash_to_deposit:d.cash_to_deposit,image_url:d.image_url,ai_raw_data:d.ai_raw_data,submitted_by:d.employee_id,submitted_at:new Date().toISOString()},{onConflict:"store_id,date"}).select().single();
+  const{data:stl,error}=await supabase.from("daily_settlements").upsert({store_id:d.store_id,date:d.date,period_start:d.period_start,period_end:d.period_end,cashier_name:d.cashier_name,net_sales:d.net_sales,discount_total:d.discount_total,cash_amount:d.cash_amount,line_pay_amount:d.line_pay_amount,twqr_amount:d.twqr_amount,uber_eat_amount:d.uber_eat_amount,easy_card_amount:d.easy_card_amount,remittance_amount:d.remittance_amount||0,meal_voucher_amount:d.meal_voucher_amount,line_credit_amount:d.line_credit_amount,drink_voucher_amount:d.drink_voucher_amount,invoice_count:d.invoice_count,invoice_start:d.invoice_start,invoice_end:d.invoice_end,void_invoice_count:d.void_invoice_count,void_invoice_amount:d.void_invoice_amount,void_invoice_numbers:d.void_invoice_numbers||"",cash_in_register:d.cash_in_register,petty_cash_reserved:d.petty_cash_reserved,void_item_count:d.void_item_count||0,void_item_amount:d.void_item_amount||0,cash_to_deposit:d.cash_to_deposit,image_url:d.image_url,ai_raw_data:d.ai_raw_data,submitted_by:d.employee_id,submitted_at:new Date().toISOString(),status:"confirmed"},{onConflict:"store_id,date"}).select().single();
   if(error){console.error(error);return false;}
   if(d.receipts?.length&&stl){for(const r of d.receipts){await supabase.from("settlement_receipts").insert({settlement_id:stl.id,receipt_type:r.type,image_url:r.image_url,serial_numbers:r.serial_numbers,ai_raw_data:r.ai_raw_data}).catch(()=>{});if((r.type==="meal_voucher"||r.type==="drink_voucher")&&r.serial_numbers?.length){for(const sn of r.serial_numbers){await supabase.from("voucher_serials").insert({serial_number:sn,voucher_type:r.type==="meal_voucher"?"meal":"drink",store_id:d.store_id,settlement_id:stl.id,date:d.date}).catch(()=>{});}}}}
   const{data:adm}=await supabase.from("employees").select("line_uid").eq("role","admin").eq("is_active",true);
@@ -464,10 +467,22 @@ async function handleEvent(event) {
         msg += dupWarning;
 
         await pushText(uid2, msg);
+        // 存為草稿 + 送網頁確認連結
+        const{data:draft}=await supabase.from("expenses").insert({
+          store_id:d.store_id, expense_type:d.expense_type, date:r.date||new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"}),
+          amount:r.total_amount||0, vendor_name:r.vendor_name, description:expData.description,
+          category_suggestion:r.category_suggestion||"其他", invoice_number:r.invoice_number,
+          image_url:imgUrl, ai_raw_data:r, submitted_by:d.employee_id, submitted_by_name:d.employee_name,
+          month_key:(r.date||"").slice(0,7), status:"draft",
+          is_prepaid:r.is_prepaid||false, prepaid_months:r.prepaid_months||1,
+        }).select().single();
+        expData.draft_id = draft?.id;
+        await setUserState(uid2, "expense_confirm", expData);
+        const reviewUrl = `${SITE}/expense-review?id=${draft?.id||""}`;
         await lineClient.pushMessage({ to: uid2, messages: [{ type: "text", text: "請選擇操作：", quickReply: { items: [
+          { type: "action", action: { type: "uri", label: "📝 開網頁核對", uri: reviewUrl } },
           { type: "action", action: { type: "message", label: "✅ 確認送出", text: "確認費用" } },
           { type: "action", action: { type: "message", label: "✏️ 修改金額", text: "修改金額" } },
-          { type: "action", action: { type: "message", label: "✏️ 修改廠商", text: "修改廠商" } },
           { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
           { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
         ]}}]});
