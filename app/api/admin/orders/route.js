@@ -63,6 +63,54 @@ export async function POST(request) {
     if (tracking_number) updates.tracking_number = tracking_number;
     if (invoice_number) updates.invoice_number = invoice_number;
     if (paid_amount !== undefined) { updates.paid_amount = paid_amount; updates.paid_date = paid_date || new Date().toLocaleDateString("sv-SE"); updates.payment_status = "paid"; }
+
+    // ✦出貨自動扣庫存
+    if (status === "shipped") {
+      updates.shipped_date = shipped_date || new Date().toLocaleDateString("sv-SE");
+      const { data: items } = await supabase.from("client_order_items").select("*, product_variants:variant_id(inventory_item_id)").eq("order_id", order_id);
+      for (const item of items || []) {
+        const invItemId = item.product_variants?.inventory_item_id || item.item_id;
+        if (invItemId && item.quantity > 0) {
+          const { data: inv } = await supabase.from("inventory_items").select("current_stock").eq("id", invItemId).single();
+          if (inv) {
+            const newStock = Math.max(0, Number(inv.current_stock || 0) - Number(item.quantity));
+            await supabase.from("inventory_items").update({ current_stock: newStock }).eq("id", invItemId);
+            await supabase.from("inventory_movements").insert({
+              item_id: invItemId, type: "out", quantity: -Number(item.quantity),
+              reference_type: "order", reference_id: order_id,
+              notes: "訂單出貨 #" + (item.order_number || order_id.slice(0, 8)),
+            });
+          }
+        }
+      }
+    }
+
+    const { data } = await supabase.from("client_orders").update(updates).eq("id", order_id).select("*, clients(name)").single();
+    return Response.json({ data });
+  }
+
+  // 修改訂單品項
+  if (body.action === "update_items") {
+    const { order_id, items } = body;
+    // 刪除舊品項重建
+    await supabase.from("client_order_items").delete().eq("order_id", order_id);
+    const total = (items || []).reduce((s, i) => s + Number(i.quantity || 0) * Number(i.unit_price || 0), 0);
+    if (items?.length) {
+      const orderItems = items.map(i => ({
+        order_id, variant_id: i.variant_id, recipe_id: i.recipe_id, item_id: i.item_id,
+        product_name: i.product_name, quantity: i.quantity, unit: i.unit,
+        unit_price: i.unit_price, total_price: Number(i.quantity) * Number(i.unit_price),
+      }));
+      await supabase.from("client_order_items").insert(orderItems);
+    }
+    await supabase.from("client_orders").update({ total_amount: total }).eq("id", order_id);
+    return Response.json({ success: true, total });
+  }
+
+  // 修改訂單欄位（備註/交期/地址）
+  if (body.action === "update_order") {
+    const { order_id, ...updates } = body;
+    delete updates.action;
     const { data } = await supabase.from("client_orders").update(updates).eq("id", order_id).select("*, clients(name)").single();
     return Response.json({ data });
   }

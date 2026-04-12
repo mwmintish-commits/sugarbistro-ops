@@ -183,3 +183,59 @@ ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS personal_total INTEGER DEFAU
 ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS modified_by UUID;
 ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS modified_at TIMESTAMPTZ;
+
+-- ============================================
+-- 產品+規格+價格
+-- ============================================
+
+-- 產品主檔
+CREATE TABLE IF NOT EXISTS products (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT,
+  description TEXT,
+  image_url TEXT,
+  is_active BOOLEAN DEFAULT true,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 產品規格（SKU）
+CREATE TABLE IF NOT EXISTS product_variants (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  spec_name TEXT NOT NULL,
+  sku TEXT,
+  unit TEXT DEFAULT '個',
+  retail_price NUMERIC DEFAULT 0,
+  wholesale_price NUMERIC DEFAULT 0,
+  oem_price NUMERIC DEFAULT 0,
+  cost_price NUMERIC DEFAULT 0,
+  recipe_id UUID,
+  inventory_item_id UUID,
+  is_active BOOLEAN DEFAULT true,
+  sort_order INTEGER DEFAULT 0,
+  UNIQUE(product_id, spec_name)
+);
+
+-- 客戶特約價
+CREATE TABLE IF NOT EXISTS client_prices (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
+  variant_id UUID REFERENCES product_variants(id) ON DELETE CASCADE,
+  special_price NUMERIC NOT NULL,
+  UNIQUE(client_id, variant_id)
+);
+
+-- 訂單品項加 variant_id
+ALTER TABLE client_order_items ADD COLUMN IF NOT EXISTS variant_id UUID;
+
+-- RLS
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', t);
+  END LOOP;
+END $$;

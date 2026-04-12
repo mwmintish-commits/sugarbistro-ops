@@ -10,12 +10,12 @@ const ROLE_TABS = {
   admin: ["dashboard","employees","schedules","leaves","attendance","overtime","payroll",
     "reviews","bonus",
     "settlements","deposits","expenses","payments","pnl",
-    "recipes","production","inventory","clients","orders",
+    "recipes","production","inventory","clients","orders","products",
     "shifts","worklogs","announcements","settings"],
   manager: ["employees","schedules","leaves","attendance","overtime","payroll",
     "reviews",
     "settlements","deposits","expenses","payments","pnl",
-    "recipes","production","inventory","clients","orders","shifts","worklogs"],
+    "recipes","production","inventory","clients","orders","products","shifts","worklogs"],
   store_manager: ["schedules","leaves","store_staff","shifts","worklogs",
     "announcements","settlements","deposits","expenses"]
 };
@@ -26,7 +26,7 @@ const TAB_L = {
   settlements:"💰日結",
   deposits:"🏦存款",expenses:"📦費用",payments:"💳撥款",pnl:"📊損益",
   recipes:"📋配方",production:"🏭生產",inventory:"📊庫存",
-  clients:"👥客戶",orders:"📝訂單",shifts:"⏰班別",worklogs:"📋日誌",
+  clients:"👥客戶",orders:"📝訂單",products:"🏷️產品",shifts:"⏰班別",worklogs:"📋日誌",
   announcements:"📢公告",settings:"⚙️設定",store_staff:"👥本店員工"
 };
 const TAB_GROUPS = {
@@ -34,7 +34,7 @@ const TAB_GROUPS = {
   "人資":["employees","store_staff","schedules","leaves","attendance","overtime","payroll","reviews","bonus"],
   "財務":["settlements","deposits","expenses","payments","pnl"],
   "生產":["recipes","production","inventory"],
-  "業務":["clients","orders"],
+  "業務":["products","clients","orders"],
   "管理":["shifts","worklogs","announcements","settings"]
 };
 const DAYS = ["日","一","二","三","四","五","六"];
@@ -106,6 +106,7 @@ export default function AdminPage() {
   const [reminders, setReminders] = useState([]);
   const [rvData, setRvData] = useState([]);
   const [bnData, setBnData] = useState(null);
+  const [productList, setProductList] = useState([]);
   const pl = lr.filter(l => l.status === "pending");
   const ae = emps.filter(e => e.is_active);
 
@@ -179,6 +180,7 @@ export default function AdminPage() {
     }
     if (myTabs.includes("clients")) {
       ap("/api/admin/clients").then(r => setClientList(r.data||[]));
+      ap("/api/admin/products").then(r => setProductList(r.data||[])).catch(()=>{});
     }
     if (myTabs.includes("orders")) {
       ap("/api/admin/orders").then(r => { setOrderList(r.data||[]); setOrderSum(r.summary||{}); });
@@ -1407,6 +1409,74 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* PRODUCTS */}
+        {!ld && tab === "products" && (
+          <div>
+            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>🏷️ 產品管理</h3>
+            <button onClick={async()=>{
+              const n=prompt("產品名稱：");if(!n)return;
+              const c=prompt("分類（泡芙/餅乾/冰淇淋/棕櫚糖/飲品/其他）：","泡芙");
+              await ap("/api/admin/products",{action:"create",name:n,category:c});load();
+            }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
+              ＋新增產品
+            </button>
+            {productList.map(p=>(
+              <div key={p.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <div>
+                    <span style={{fontSize:14,fontWeight:600}}>{p.name}</span>
+                    <span style={{fontSize:10,color:"#888",marginLeft:6,background:"#faf8f5",padding:"1px 6px",borderRadius:3}}>{p.category||""}</span>
+                  </div>
+                  <button onClick={async()=>{
+                    const sn=prompt("規格名稱（如：原味6入）：");if(!sn)return;
+                    const u=prompt("單位：","盒");
+                    const rp=prompt("零售價：","0");
+                    const wp=prompt("批發價(B2B)：","0");
+                    const op=prompt("代工價(OEM)：","0");
+                    const cp=prompt("成本價：","0");
+                    await ap("/api/admin/products",{action:"add_variant",product_id:p.id,spec_name:sn,unit:u,retail_price:Number(rp),wholesale_price:Number(wp),oem_price:Number(op),cost_price:Number(cp)});
+                    load();
+                  }} style={{padding:"3px 8px",borderRadius:4,border:"1px solid #4361ee",background:"transparent",color:"#4361ee",fontSize:10,cursor:"pointer"}}>
+                    ＋規格
+                  </button>
+                </div>
+                {(p.variants||[]).length > 0 ? (
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
+                    <thead><tr style={{background:"#faf8f5"}}>{["規格","單位","零售價","批發價","代工價","成本","毛利率","操作"].map(h=><th key={h} style={{padding:4,textAlign:"center",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                    <tbody>{(p.variants||[]).map(v=>{
+                      const margin=v.retail_price>0?Math.round((v.retail_price-v.cost_price)/v.retail_price*100):0;
+                      return (
+                        <tr key={v.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                          <td style={{padding:4,fontWeight:500}}>{v.spec_name}{v.sku&&<span style={{fontSize:8,color:"#ccc",marginLeft:3}}>{v.sku}</span>}</td>
+                          <td style={{padding:4,textAlign:"center"}}>{v.unit}</td>
+                          <td style={{padding:4,textAlign:"center",color:"#0a7c42",fontWeight:600}}>{fmt(v.retail_price)}</td>
+                          <td style={{padding:4,textAlign:"center",color:"#185fa5"}}>{fmt(v.wholesale_price)}</td>
+                          <td style={{padding:4,textAlign:"center",color:"#8a6d00"}}>{v.oem_price>0?fmt(v.oem_price):"-"}</td>
+                          <td style={{padding:4,textAlign:"center",color:"#888"}}>{fmt(v.cost_price)}</td>
+                          <td style={{padding:4,textAlign:"center",fontWeight:600,color:margin>=50?"#0a7c42":margin>=30?"#b45309":"#b91c1c"}}>{margin+"%"}</td>
+                          <td style={{padding:4,textAlign:"center"}}>
+                            <button onClick={async()=>{
+                              const rp=prompt("零售價：",v.retail_price);if(rp===null)return;
+                              const wp=prompt("批發價：",v.wholesale_price);
+                              const op=prompt("代工價：",v.oem_price);
+                              await ap("/api/admin/products",{action:"update_variant",variant_id:v.id,retail_price:Number(rp),wholesale_price:Number(wp||0),oem_price:Number(op||0)});
+                              load();
+                            }} style={{fontSize:9,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️</button>
+                            <button onClick={async()=>{if(!confirm("刪除此規格？"))return;await ap("/api/admin/products",{action:"delete_variant",variant_id:v.id});load();}}
+                              style={{fontSize:9,color:"#b91c1c",background:"none",border:"none",cursor:"pointer"}}>✕</button>
+                          </td>
+                        </tr>
+                      );
+                    })}</tbody>
+                  </table>
+                ) : (
+                  <div style={{fontSize:10,color:"#ccc",textAlign:"center",padding:8}}>尚無規格，請點「＋規格」新增</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* CLIENTS */}
         {!ld && tab === "clients" && (
           <div>
@@ -1477,6 +1547,10 @@ export default function AdminPage() {
                       {o.payment_status!=="paid"&&<button onClick={async()=>{await ap("/api/admin/orders",{action:"update_status",order_id:o.id,status:"paid",paid_amount:o.total_amount});load();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b45309",color:"#fff",fontSize:9,cursor:"pointer",marginLeft:2}}>收款</button>}
                       {/* ✦23 訂單→工單 */}
                       {o.status==="confirmed"&&<button onClick={async()=>{const pn=o.items?.[0]?.product_name||prompt("產品名稱：");if(!pn)return;await ap("/api/admin/production",{action:"create",product_name:pn,planned_quantity:o.items?.[0]?.quantity||0,order_id:o.id,notes:"訂單#"+o.order_number});alert("生產工單已建立");load();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer",marginLeft:2}}>🏭工單</button>}
+                      <button onClick={async()=>{const r=await ap("/api/admin/orders?id="+o.id);const items=r.data?.items||[];alert("📦 "+o.order_number+" 明細\n"+items.map(i=>i.product_name+" ×"+i.quantity+" @"+i.unit_price+" = $"+i.total_price).join("\n")+"\n\n合計: $"+o.total_amount);}}
+                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid #ddd",background:"transparent",fontSize:9,cursor:"pointer",marginLeft:2}}>📋</button>
+                      {o.status!=="shipped"&&o.status!=="paid"&&o.payment_status!=="paid"&&<button onClick={async()=>{if(!confirm("刪除訂單 "+o.order_number+"？"))return;await ap("/api/admin/orders",{action:"delete",order_id:o.id});load();}}
+                        style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer",marginLeft:2}}>🗑</button>}
                     </td>
                   </tr>);
                 })}</tbody>
