@@ -15,12 +15,13 @@ export async function POST(request) {
   const { action } = body;
 
   if (action === "create") {
-    const { store_id, name, start_time, end_time, break_minutes, work_hours, role } = body;
+    const { store_id, name, start_time, end_time, break_minutes, work_hours, role, color } = body;
     const { data, error } = await supabase.from("shifts").insert({
       store_id, name, start_time, end_time,
       break_minutes: break_minutes || 60,
       work_hours: work_hours || 8,
-      role: role || "all",
+      role: role || "全場",
+      color: color || "#0a7c42",
     }).select("*, stores(name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });

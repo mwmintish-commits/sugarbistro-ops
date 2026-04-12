@@ -17,7 +17,7 @@ export async function GET(request) {
     return Response.json({ data });
   }
 
-  let query = supabase.from("schedules").select("*, employees(name, line_uid), shifts(name, start_time, end_time, role), stores(name)").order("date");
+  let query = supabase.from("schedules").select("*, employees(name, line_uid), shifts(name, start_time, end_time, role, color), stores(name)").order("date");
   if (store_id) query = query.eq("store_id", store_id);
   if (month) {
     const y = parseInt(month.split("-")[0]), m = parseInt(month.split("-")[1]);

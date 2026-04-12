@@ -82,7 +82,7 @@ export default function AdminPage() {
   const [es, setEs] = useState(null);
   const [sf2, setSf2] = useState({
     name:"",store_id:"",start_time:"10:00",end_time:"20:00",
-    break_minutes:60,role:"all"
+    break_minutes:60,role:"全場",color:"#0a7c42"
   });
   const [expType, setExpType] = useState("all");
   const [expSearch, setExpSearch] = useState("");
@@ -251,7 +251,8 @@ export default function AdminPage() {
   const editShift = (s) => {
     setSf2({
       name: s.name, store_id: s.store_id, start_time: s.start_time,
-      end_time: s.end_time, break_minutes: s.break_minutes, role: s.role || "all"
+      end_time: s.end_time, break_minutes: s.break_minutes, role: s.role || "全場",
+      color: s.color || "#0a7c42"
     });
     setEs(s); setSsf(true);
   };
@@ -666,7 +667,10 @@ export default function AdminPage() {
                           <span style={{fontSize:10,fontWeight:500,color:hol?"#b91c1c":isSun?"#b91c1c":isSat?"#b45309":"#666"}}>{d}</span>
                           {hol&&<span style={{fontSize:7,color:"#b91c1c",background:"#fecaca",padding:"0 3px",borderRadius:2}}>{hol.name}</span>}
                         </div>
-                        {ds.slice(0,4).map(s=>(<div key={s.id} style={{background:s.type==="leave"?(LT[s.leave_type]||LT.off).bg:s.published?"#e6f9f0":"#fff8e6",border:s.type==="leave"?"1.5px solid "+(LT[s.leave_type]||LT.off).c:s.published?"1.5px solid #0a7c42":"1.5px dashed #d4a017",borderRadius:3,padding:"0 3px",fontSize:8,marginBottom:1,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",color:s.type==="leave"?(LT[s.leave_type]||LT.off).c:"inherit"}}>{(s.employees?s.employees.name:"")+" "+(s.type==="leave"?(LT[s.leave_type]||LT.off).l+(s.notes&&s.notes!=="預假"?" "+s.notes:""):s.shifts?s.shifts.name:"")}</div>))}
+                        {ds.slice(0,5).map(s=>{const shColor=s.shifts?.color||"#0a7c42";const isLeave=s.type==="leave";return(<div key={s.id} style={{background:isLeave?(LT[s.leave_type]||LT.off).bg:s.published?"#e6f9f0":"#fff8e6",border:isLeave?("2px solid "+(LT[s.leave_type]||LT.off).c):s.published?("2px solid "+shColor):("2px dashed "+shColor),borderRadius:4,padding:"2px 4px",fontSize:9,marginBottom:2,color:isLeave?(LT[s.leave_type]||LT.off).c:shColor}}>
+                          <div style={{fontWeight:600,fontSize:9}}>{s.employees?s.employees.name:""}</div>
+                          {isLeave?<div style={{fontSize:8}}>{(LT[s.leave_type]||LT.off).l}{s.notes&&s.notes!=="預假"?" "+s.notes:""}</div>:<><div style={{fontSize:8}}>{s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role+" ":""}{s.shifts?s.shifts.name:""}</div><div style={{fontSize:7,opacity:0.7}}>{s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):""}</div></>}
+                        </div>);})}
                         {ds.length===0&&<div style={{fontSize:9,color:"#ccc",textAlign:"center",marginTop:4}}>+</div>}
                       </td>);
                       if(cells.length===7){rows.push(<tr key={"r"+rows.length}>{cells}</tr>);cells=[];}
@@ -1886,10 +1890,17 @@ export default function AdminPage() {
                     </select>
                   </div>
                   <div><label style={{fontSize:10,color:"#888"}}>名稱</label><input value={sf2.name} onChange={e=>setSf2({...sf2,name:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
-                  <div><label style={{fontSize:10,color:"#888"}}>角色</label>
-                    <select value={sf2.role} onChange={e=>setSf2({...sf2,role:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}>
-                      <option value="all">全場</option><option value="外場">外場</option><option value="內場">內場</option><option value="吧台">吧台</option><option value="烘焙">烘焙</option>
-                    </select>
+                  <div><label style={{fontSize:10,color:"#888"}}>崗位</label>
+                    <input list="role-list" value={sf2.role} onChange={e=>setSf2({...sf2,role:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} placeholder="輸入或選擇" />
+                    <datalist id="role-list">{[...new Set(shifts.map(s=>s.role).filter(Boolean)),"全場","外場","內場","吧台","烘焙","咖啡","禮盒"].map(r=><option key={r} value={r}/>)}</datalist>
+                  </div>
+                  <div><label style={{fontSize:10,color:"#888"}}>顏色</label>
+                    <div style={{display:"flex",gap:3,alignItems:"center"}}>
+                      <input type="color" value={sf2.color||"#0a7c42"} onChange={e=>setSf2({...sf2,color:e.target.value})} style={{width:28,height:28,border:"none",borderRadius:4,cursor:"pointer",padding:0}} />
+                      {["#0a7c42","#4361ee","#b45309","#b91c1c","#7c3aed","#0891b2","#be185d","#555"].map(c=>(
+                        <div key={c} onClick={()=>setSf2({...sf2,color:c})} style={{width:18,height:18,borderRadius:4,background:c,cursor:"pointer",border:sf2.color===c?"2px solid #000":"2px solid transparent"}} />
+                      ))}
+                    </div>
                   </div>
                   <div><label style={{fontSize:10,color:"#888"}}>上班</label><input type="time" value={sf2.start_time} onChange={e=>setSf2({...sf2,start_time:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
                   <div><label style={{fontSize:10,color:"#888"}}>下班</label><input type="time" value={sf2.end_time} onChange={e=>setSf2({...sf2,end_time:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
@@ -1908,13 +1919,14 @@ export default function AdminPage() {
                   </h4>
                   <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                      <thead><tr style={{background:"#faf8f5"}}>{["班別","角色","時間","休息","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{background:"#faf8f5"}}>{["班別","崗位","時間","休息","顏色","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                       <tbody>{ss.map(s=>(
                         <tr key={s.id} style={{borderBottom:"1px solid #f0eeea"}}>
                           <td style={{padding:6,fontWeight:500}}>{s.name}</td>
                           <td style={{padding:6}}>{s.role==="all"?"全場":s.role||"全場"}</td>
                           <td style={{padding:6}}>{(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</td>
                           <td style={{padding:6}}>{s.break_minutes+"分"}</td>
+                          <td style={{padding:6}}><div style={{width:16,height:16,borderRadius:3,background:s.color||"#0a7c42"}} /></td>
                           <td style={{padding:6}}>
                             <button onClick={()=>editShift(s)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,marginRight:2}}>✏️</button>
                             <button onClick={()=>delShift(s.id)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
