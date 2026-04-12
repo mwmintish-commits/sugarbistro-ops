@@ -308,3 +308,8 @@ INSERT INTO expense_categories (keywords, category_name, pnl_group, pnl_item, so
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS category_suggestion TEXT;
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pnl_group TEXT;
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pnl_item TEXT;
+
+-- 薪資表加請假扣款欄位
+ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS leave_deduction NUMERIC DEFAULT 0;
+ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS leave_hours NUMERIC DEFAULT 0;
+ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS leave_detail TEXT;

@@ -964,18 +964,26 @@ export default function AdminPage() {
                   <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:750}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","勞保","健保","補充保費","加項","扣項","實發","存"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","請假扣","勞保","健保","補充保費","加項","扣項","實發","存"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{storeEmps.map(e=>{
                   const wd = att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;
                   const bp = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate)*wd*8 : 0);
                   const ot = otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);
                   const compH = otRecords.filter(r=>r.employee_id===e.id&&r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted).reduce((s,r)=>s+Number(r.comp_hours||0),0);
+                  // 請假扣款（月薪制）
+                  const deductRates = {sick:0.5,personal:1,menstrual:0.5,family_care:1};
+                  const eLv = lr.filter(l=>l.employee_id===e.id&&l.status==="approved"&&l.start_date>=month+"-01"&&l.start_date<=month+"-31");
+                  let lvDeduct = 0;
+                  if (e.monthly_salary) {
+                    const dr = Number(e.monthly_salary)/30;
+                    eLv.forEach(l => { const days = l.half_day?0.5:(Math.ceil((new Date(l.end_date)-new Date(l.start_date))/86400000)+1); const rate=deductRates[l.leave_type]||0; if(rate>0)lvDeduct+=Math.round(dr*days*rate); });
+                  }
                   const ls = e.labor_tier ? LABOR_SELF[e.labor_tier-1]||0 : 0;
                   const hs = e.health_tier ? HEALTH_SELF[e.health_tier-1]||0 : 0;
                   const suppH = e.employment_type==="parttime"&&bp>29500?Math.round(bp*0.0211):0;
                   const da = Number(e.default_allowance||0);
                   const dd = Number(e.default_deduction||0);
-                  const net = bp+ot-ls-hs-suppH+da-dd;
+                  const net = bp+ot-ls-hs-suppH+da-dd-lvDeduct;
                   return (
                     <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
                       <td style={{padding:"5px 4px",fontWeight:500,textAlign:"left"}}>{e.name}</td>
@@ -983,6 +991,7 @@ export default function AdminPage() {
                       <td style={{padding:"5px 4px",textAlign:"right"}}>{fmt(bp)}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:ot>0?"#b45309":"#ccc"}}>{ot>0?"+"+fmt(ot):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:compH>0?"#4361ee":"#ccc"}}>{compH>0?compH+"hr":"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:lvDeduct>0?"#b91c1c":"#ccc"}}>{lvDeduct>0?"-"+fmt(lvDeduct):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}}>{ls>0?"-"+fmt(ls):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}}>{hs>0?"-"+fmt(hs):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:suppH>0?"#b91c1c":"#ccc"}}>{suppH>0?"-"+fmt(suppH):"-"}</td>

@@ -68,7 +68,30 @@ export async function POST(request) {
       const allow = Number(emp.default_allowance || 0);
       const deduct = Number(emp.default_deduction || 0);
 
-      const net = base + otPay - ls - hs - suppHealth + allow - deduct;
+      // 請假扣款（月薪制才需要；時薪制已反映在出勤天數）
+      let leaveDeduct = 0, leaveHours = 0, leaveDetail = "";
+      if (emp.monthly_salary) {
+        const { data: leaves } = await supabase.from("leave_requests")
+          .select("leave_type, start_date, end_date, half_day, status")
+          .eq("employee_id", emp.id).eq("status", "approved")
+          .gte("start_date", mk + "-01").lte("start_date", eom(mk));
+        const dailyRate = Number(emp.monthly_salary) / 30;
+        const deductRates = { sick: 0.5, personal: 1, menstrual: 0.5, family_care: 1 };
+        // 特休/補休/婚假/喪假/陪產假/公假/公傷假 = 有薪，不扣
+        for (const l of leaves || []) {
+          const days = l.half_day ? 0.5 : (Math.ceil((new Date(l.end_date) - new Date(l.start_date)) / 86400000) + 1);
+          const hrs = days * 8;
+          leaveHours += hrs;
+          const rate = deductRates[l.leave_type] || 0;
+          if (rate > 0) {
+            const amt = Math.round(dailyRate * days * rate);
+            leaveDeduct += amt;
+            leaveDetail += (leaveDetail ? "、" : "") + ({ sick:"病假", personal:"事假", menstrual:"生理假", family_care:"家庭照顧" }[l.leave_type] || l.leave_type) + days + "天";
+          }
+        }
+      }
+
+      const net = base + otPay - ls - hs - suppHealth + allow - deduct - leaveDeduct;
 
       await supabase.from("payroll_records").upsert({
         employee_id: emp.id, store_id: emp.store_id,
@@ -79,6 +102,7 @@ export async function POST(request) {
         supplementary_health: suppHealth,
         allowance: allow, allowance_note: emp.default_allowance_note || "",
         other_deduction: deduct, deduction_note: emp.default_deduction_note || "",
+        leave_deduction: leaveDeduct, leave_hours: leaveHours, leave_detail: leaveDetail,
         net_salary: net,
       }, { onConflict: "employee_id,year,month" });
 

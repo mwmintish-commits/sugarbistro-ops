@@ -170,16 +170,6 @@ async function handleLeaveDate(rt, uid, dateText, state) {
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return replyText(rt, "❌ 日期格式不正確，請用 YYYY-MM-DD");
 
-  // 非預假：檢查排班
-  if (d.leave_type !== "advance") {
-    const { data: scheds } = await supabase.from("schedules").select("date")
-      .eq("employee_id", d.employee_id).gte("date", startDate).lte("date", endDate || startDate)
-      .neq("type", "leave");
-    if (!scheds || scheds.length === 0) {
-      return replyText(rt, "❌ 此日期沒有排班，無法申請 " + d.leave_label + "\n\n如需提前標記不可上班日，請用「📌 預假」功能");
-    }
-  }
-
   await setUserState(uid, "leave_confirm", { ...d, start_date: startDate, end_date: endDate });
   const dayCount = Math.round((new Date(endDate) - new Date(startDate)) / 86400000) + 1;
   return replyWithQuickReply(rt,
