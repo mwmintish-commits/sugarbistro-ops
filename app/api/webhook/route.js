@@ -268,7 +268,7 @@ async function confirmSettlement(uid, emp) {
   // Bug 10: 強制照片
   if(!d.image_url){await pushText(uid,"❌ 日結必須上傳照片才能送出");return false;}
   // Bug 10: 覆蓋警告
-  const{data:existing}=await supabase.from("daily_settlements").select("id").eq("store_id",d.store_id).eq("date",d.date).single().catch(()=>({data:null}));
+  const{data:existing}=await supabase.from("daily_settlements").select("id").eq("store_id",d.store_id).eq("date",d.date).limit(1).single();
   if(existing)await pushText(uid,"⚠️ 注意："+d.date+" 已有日結紀錄，本次將覆蓋原資料").catch(()=>{});
   const{data:stl,error}=await supabase.from("daily_settlements").upsert({store_id:d.store_id,date:d.date,period_start:d.period_start,period_end:d.period_end,cashier_name:d.cashier_name,net_sales:d.net_sales,discount_total:d.discount_total,cash_amount:d.cash_amount,line_pay_amount:d.line_pay_amount,twqr_amount:d.twqr_amount,uber_eat_amount:d.uber_eat_amount,easy_card_amount:d.easy_card_amount,meal_voucher_amount:d.meal_voucher_amount,line_credit_amount:d.line_credit_amount,drink_voucher_amount:d.drink_voucher_amount,invoice_count:d.invoice_count,invoice_start:d.invoice_start,invoice_end:d.invoice_end,void_invoice_count:d.void_invoice_count,void_invoice_amount:d.void_invoice_amount,cash_in_register:d.cash_in_register,petty_cash_reserved:d.petty_cash_reserved,cash_to_deposit:d.cash_to_deposit,image_url:d.image_url,ai_raw_data:d.ai_raw_data,submitted_by:d.employee_id,submitted_at:new Date().toISOString()},{onConflict:"store_id,date"}).select().single();
   if(error){console.error(error);return false;}

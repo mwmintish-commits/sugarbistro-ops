@@ -160,7 +160,7 @@ export async function POST(request) {
     if (!emp && phone) {
       const { data: byPhone } = await supabase.from("employees")
         .select("id, name, store_id, line_uid, stores(name), hire_date")
-        .eq("phone", phone).eq("is_active", true).single().catch(() => ({ data: null }));
+        .eq("phone", phone).eq("is_active", true).limit(1).single();
       if (byPhone) emp = byPhone;
     }
 

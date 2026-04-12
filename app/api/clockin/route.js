@@ -98,7 +98,7 @@ export async function POST(request) {
     const minOt = settings?.overtime_min_minutes || 30;
     if (otMinutes >= minOt) {
       // 查國定假日
-      const { data: hol } = await supabase.from("national_holidays").select("id").eq("date", today).single().catch(() => ({ data: null }));
+      const { data: hol } = await supabase.from("national_holidays").select("id").eq("date", today).limit(1).single();
       const dayOfWeek = now.getDay();
       const otType = hol ? "holiday" : dayOfWeek === 0 ? "rest_1" : dayOfWeek === 6 ? "rest_1" : otMinutes <= 120 ? "weekday_1" : "weekday_2";
       const rates = { weekday_1: 1.34, weekday_2: 1.67, rest_1: 1.34, holiday: 2 };
