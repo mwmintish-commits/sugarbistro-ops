@@ -159,13 +159,14 @@ export async function POST(request) {
     if (!emp) return Response.json({ error: "找不到員工" }, { status: 404 });
 
     // 更新員工資料
-    await supabase.from("employees").update({
+    const { error: updateErr } = await supabase.from("employees").update({
       phone, email, birthday, id_number, address,
       emergency_contact, emergency_phone,
       bank_name, bank_account,
       contract_signed: true, handbook_signed: true, bonus_policy_signed: true,
       onboarding_completed: true, onboarding_step: 5,
     }).eq("id", emp.id);
+    if (updateErr) return Response.json({ error: "更新員工資料失敗：" + updateErr.message }, { status: 500 });
 
     // 儲存文件（身分證正反面分開）
     const docs = [

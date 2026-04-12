@@ -138,7 +138,14 @@ export async function POST(request) {
     await supabase.from("work_logs").delete().eq("employee_id", eid);
     await supabase.from("clock_amendments").delete().eq("employee_id", eid);
     await supabase.from("clockin_tokens").delete().eq("employee_id", eid);
+    await supabase.from("admin_sessions").delete().eq("employee_id", eid);
+    await supabase.from("verify_codes").delete().eq("employee_id", eid).catch(() => {});
+    await supabase.from("incident_reports").delete().eq("employee_id", eid).catch(() => {});
+    await supabase.from("work_log_items").update({ completed_by: null }).eq("completed_by", eid).catch(() => {});
     await supabase.from("daily_settlements").update({ submitted_by: null }).eq("submitted_by", eid);
+    await supabase.from("deposits").update({ submitted_by: null }).eq("submitted_by", eid).catch(() => {});
+    await supabase.from("expenses").update({ submitted_by: null }).eq("submitted_by", eid).catch(() => {});
+    await supabase.from("production_orders").update({ assigned_to: null }).eq("assigned_to", eid).catch(() => {});
     await supabase.from("onboarding_records").update({ auto_employee_id: null }).eq("auto_employee_id", eid);
     const { error } = await supabase.from("employees").delete().eq("id", eid);
     if (error) return Response.json({ error: error.message }, { status: 500 });
