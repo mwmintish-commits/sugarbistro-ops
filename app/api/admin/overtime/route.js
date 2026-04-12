@@ -3,13 +3,18 @@ import { supabase, eom } from "@/lib/supabase";
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const month = searchParams.get("month");
+  const year = searchParams.get("year");
   const store_id = searchParams.get("store_id");
   const employee_id = searchParams.get("employee_id");
 
   let query = supabase.from("overtime_records")
     .select("*, employees(name, store_id), stores(name)")
     .order("date", { ascending: false });
-  if (month) query = query.gte("date", month + "-01").lte("date", eom(month));
+  if (year) {
+    query = query.gte("date", year + "-01-01").lte("date", year + "-12-31");
+  } else if (month) {
+    query = query.gte("date", month + "-01").lte("date", eom(month));
+  }
   if (store_id) query = query.eq("store_id", store_id);
   if (employee_id) query = query.eq("employee_id", employee_id);
 
@@ -125,6 +130,40 @@ export async function POST(request) {
 
   if (body.action === "delete") {
     await supabase.from("overtime_records").delete().eq("id", body.record_id);
+    return Response.json({ success: true });
+  }
+
+  // 手動調整補休餘額
+  if (body.action === "adjust_comp") {
+    const { employee_id, store_id, hours, notes } = body;
+    const today = new Date().toLocaleDateString("sv-SE");
+    const expiry = new Date(Date.now() + 180 * 86400000).toLocaleDateString("sv-SE");
+    if (hours > 0) {
+      // 新增補休
+      await supabase.from("overtime_records").insert({
+        employee_id, store_id: store_id || null,
+        date: today, overtime_minutes: hours * 60,
+        comp_type: "comp", comp_hours: hours, comp_expiry_date: expiry,
+        status: "approved", notes: "總部手動調整：" + (notes || ""),
+      });
+    } else if (hours < 0) {
+      // 扣減補休：標記已使用
+      let remain = Math.abs(hours);
+      const { data: avail } = await supabase.from("overtime_records")
+        .select("id, comp_hours").eq("employee_id", employee_id)
+        .eq("comp_type", "comp").eq("comp_used", false).eq("comp_converted", false)
+        .gte("comp_expiry_date", today).order("comp_expiry_date");
+      for (const r of avail || []) {
+        if (remain <= 0) break;
+        if (Number(r.comp_hours) <= remain) {
+          await supabase.from("overtime_records").update({ comp_used: true }).eq("id", r.id);
+          remain -= Number(r.comp_hours);
+        } else {
+          await supabase.from("overtime_records").update({ comp_hours: Number(r.comp_hours) - remain }).eq("id", r.id);
+          remain = 0;
+        }
+      }
+    }
     return Response.json({ success: true });
   }
 

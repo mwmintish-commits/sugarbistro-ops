@@ -88,6 +88,7 @@ export default function AdminPage() {
   const [expSearch, setExpSearch] = useState("");
   const [otRecords, setOtRecords] = useState([]);
   const [otSum, setOtSum] = useState({});
+  const [otYearly, setOtYearly] = useState([]);
   const [pmtRecords, setPmtRecords] = useState([]);
   const [pmtSum, setPmtSum] = useState({});
   const [holidays, setHolidays] = useState([]);
@@ -159,6 +160,9 @@ export default function AdminPage() {
     if (myTabs.includes("overtime")) {
       ap("/api/admin/overtime?month=" + month + (sf ? "&store_id=" + sf : ""))
         .then(r => { setOtRecords(r.data||[]); setOtSum(r.summary||{}); });
+      // 年度加班（補休累積用）
+      ap("/api/admin/overtime?year=" + month.slice(0,4) + (sf ? "&store_id=" + sf : ""))
+        .then(r => setOtYearly(r.data||[])).catch(() => {});
     }
     if (myTabs.includes("payments")) {
       ap("/api/admin/payments")
@@ -765,18 +769,21 @@ export default function AdminPage() {
 
             {/* 每人休假卡片 */}
             {ae.map(e => {
-              const yr = new Date().getFullYear();
-              // 從 leave-balances 整合的資料（如果已載入）
-              // 先用前端計算的簡易版
-              const eOt = otRecords.filter(r => r.employee_id === e.id);
-              const otHours = eOt.reduce((s,r) => s + (r.overtime_minutes||0)/60, 0);
-              const otPay = eOt.filter(r => r.comp_type === "pay" || r.comp_converted).reduce((s,r) => s + Number(r.amount||0), 0);
-              const compAvail = eOt.filter(r => r.comp_type === "comp" && !r.comp_used && !r.comp_converted).reduce((s,r) => s + Number(r.comp_hours||0), 0);
-              const compUsed = eOt.filter(r => r.comp_type === "comp" && r.comp_used).reduce((s,r) => s + Number(r.comp_hours||0), 0);
-              const compConverted = eOt.filter(r => r.comp_type === "comp" && r.comp_converted).reduce((s,r) => s + Number(r.comp_hours||0), 0);
+              // 當月加班（from otRecords）
+              const eOtMonth = otRecords.filter(r => r.employee_id === e.id);
+              const monthHours = eOtMonth.reduce((s,r) => s + (r.overtime_minutes||0)/60, 0);
+
+              // 年度累計（from otYearly）
+              const eOtYear = otYearly.filter(r => r.employee_id === e.id);
+              const yearOtPay = eOtYear.filter(r => r.comp_type === "pay" || r.comp_converted).reduce((s,r) => s + Number(r.amount||0), 0);
+
+              // 補休可用 = 跨月累積（未使用+未過期）
               const today2 = new Date().toLocaleDateString("sv-SE");
+              const compAvail = eOtYear.filter(r => r.comp_type === "comp" && !r.comp_used && !r.comp_converted && (!r.comp_expiry_date || r.comp_expiry_date >= today2)).reduce((s,r) => s + Number(r.comp_hours||0), 0);
+              const compUsed = eOtYear.filter(r => r.comp_type === "comp" && r.comp_used).reduce((s,r) => s + Number(r.comp_hours||0), 0);
+              const compConverted = eOtYear.filter(r => r.comp_type === "comp" && r.comp_converted).reduce((s,r) => s + Number(r.comp_hours||0), 0);
               const soon = new Date(Date.now() + 14*86400000).toLocaleDateString("sv-SE");
-              const expiring = eOt.filter(r => r.comp_type === "comp" && !r.comp_used && !r.comp_converted && r.comp_expiry_date && r.comp_expiry_date <= soon && r.comp_expiry_date >= today2);
+              const expiring = eOtYear.filter(r => r.comp_type === "comp" && !r.comp_used && !r.comp_converted && r.comp_expiry_date && r.comp_expiry_date <= soon && r.comp_expiry_date >= today2);
               const expiringH = expiring.reduce((s,r) => s + Number(r.comp_hours||0), 0);
               const annualDays = e.annual_leave_days || 0;
 
@@ -803,26 +810,33 @@ export default function AdminPage() {
                       }} style={{fontSize:8,color:"#4361ee",background:"none",border:"none",cursor:"pointer",marginTop:2}}>✏️修改</button>
                     </div>
 
-                    {/* 加班總時數 */}
+                    {/* 加班（當月） */}
                     <div style={{background:"#faf8f5",borderRadius:6,padding:8,textAlign:"center"}}>
-                      <div style={{fontSize:9,color:"#666"}}>⏱ 加班</div>
-                      <div style={{fontSize:20,fontWeight:700,color:"#333"}}>{Math.round(otHours*10)/10}</div>
+                      <div style={{fontSize:9,color:"#666"}}>⏱ 當月加班</div>
+                      <div style={{fontSize:20,fontWeight:700,color:"#333"}}>{Math.round(monthHours*10)/10}</div>
                       <div style={{fontSize:9,color:"#888"}}>hr</div>
                     </div>
 
-                    {/* 加班費 */}
+                    {/* 加班費（年度累計） */}
                     <div style={{background:"#fff8e6",borderRadius:6,padding:8,textAlign:"center"}}>
-                      <div style={{fontSize:9,color:"#8a6d00"}}>💰 加班費</div>
-                      <div style={{fontSize:16,fontWeight:700,color:"#8a6d00"}}>{fmt(otPay)}</div>
+                      <div style={{fontSize:9,color:"#8a6d00"}}>💰 累計加班費</div>
+                      <div style={{fontSize:16,fontWeight:700,color:"#8a6d00"}}>{fmt(yearOtPay)}</div>
                       <div style={{fontSize:9,color:"#888"}}>{compConverted>0?"含轉薪"+compConverted+"hr":""}</div>
                     </div>
 
-                    {/* 補休可用 */}
+                    {/* 補休可用（跨月累積） */}
                     <div style={{background:compAvail>0?"#e6f9f0":"#f5f5f5",borderRadius:6,padding:8,textAlign:"center"}}>
                       <div style={{fontSize:9,color:"#0a7c42"}}>🔄 補休可用</div>
                       <div style={{fontSize:20,fontWeight:700,color:compAvail>0?"#0a7c42":"#ccc"}}>{compAvail>0?compAvail:0}</div>
                       <div style={{fontSize:9,color:"#888"}}>hr{compUsed>0?" 已休"+compUsed:""}</div>
                       {expiringH>0 && <div style={{fontSize:8,color:"#b91c1c"}}>{"⚠️"+expiringH+"hr即將到期"}</div>}
+                      <button onClick={async()=>{
+                        const v=prompt(e.name+" 補休調整\n正數=新增，負數=扣減\n目前可用："+compAvail+"hr\n\n輸入調整時數：","0");
+                        if(v===null||Number(v)===0)return;
+                        const note=prompt("備註（選填）：","");
+                        await ap("/api/admin/overtime",{action:"adjust_comp",employee_id:e.id,store_id:e.store_id,hours:Number(v),notes:note});
+                        load();
+                      }} style={{fontSize:8,color:"#4361ee",background:"none",border:"none",cursor:"pointer",marginTop:2}}>✏️修改</button>
                     </div>
                   </div>
 
@@ -831,15 +845,15 @@ export default function AdminPage() {
                     {compAvail>0 && (
                       <button onClick={async()=>{
                         if(!confirm(e.name+" 補休"+compAvail+"hr全部轉現金？"))return;
-                        const ids=eOt.filter(r=>r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted).map(r=>r.id);
+                        const ids=eOtYear.filter(r=>r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted&&(!r.comp_expiry_date||r.comp_expiry_date>=today2)).map(r=>r.id);
                         const r=await ap("/api/admin/leave-balances",{action:"convert_to_cash",employee_id:e.id,record_ids:ids});
                         alert("已轉換 "+(r.converted_hours||0)+"hr → "+fmt(r.amount));load();
                       }} style={{padding:"3px 8px",borderRadius:4,border:"1px solid #b45309",background:"transparent",color:"#b45309",fontSize:9,cursor:"pointer"}}>
                         💰 補休轉現金
                       </button>
                     )}
-                    {eOt.filter(r=>r.status==="pending").length>0 && (
-                      <span style={{fontSize:9,color:"#b91c1c",padding:"3px 0"}}>{"⏳ "+eOt.filter(r=>r.status==="pending").length+"筆待審核"}</span>
+                    {eOtMonth.filter(r=>r.status==="pending").length>0 && (
+                      <span style={{fontSize:9,color:"#b91c1c",padding:"3px 0"}}>{"⏳ "+eOtMonth.filter(r=>r.status==="pending").length+"筆待審核"}</span>
                     )}
                   </div>
                 </div>
