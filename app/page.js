@@ -1886,48 +1886,35 @@ export default function AdminPage() {
             {/* 崗位管理 */}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:10}}>
               <h4 style={{fontSize:13,fontWeight:600,marginBottom:8}}>🏷️ 崗位管理</h4>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
-                {positions.map((p,i) => (
-                  <div key={i} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:6,border:"2px solid "+p.color,background:p.color+"15"}}>
-                    <div style={{width:14,height:14,borderRadius:3,background:p.color}} />
-                    <span style={{fontSize:12,fontWeight:500,color:p.color}}>{p.name}</span>
-                    <button onClick={()=>{const name=prompt("修改崗位名稱：",p.name);if(!name)return;const c=prompt("修改顏色（#hex）：",p.color);const np=[...positions];np[i]={name,color:c||p.color};setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});}} style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"#888"}}>✏️</button>
-                    <button onClick={()=>{if(!confirm("刪除崗位「"+p.name+"」？"))return;const np=positions.filter((_,j)=>j!==i);setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});}} style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"#b91c1c"}}>✕</button>
-                  </div>
-                ))}
-                <button onClick={()=>{const name=prompt("新崗位名稱：");if(!name)return;const colors=["#0a7c42","#4361ee","#b45309","#b91c1c","#7c3aed","#0891b2","#be185d","#555"];const c=colors[positions.length%colors.length];const np=[...positions,{name,color:c}];setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});}} style={{padding:"4px 10px",borderRadius:6,border:"1px dashed #ccc",background:"transparent",fontSize:11,cursor:"pointer",color:"#888"}}>＋新增崗位</button>
-              </div>
-              <div style={{fontSize:9,color:"#888"}}>崗位顏色會自動套用到排班月曆</div>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead><tr style={{background:"#faf8f5"}}><th style={{padding:6,textAlign:"left",color:"#666",fontWeight:500}}>顏色</th><th style={{padding:6,textAlign:"left",color:"#666",fontWeight:500}}>崗位名稱</th><th style={{padding:6,textAlign:"center",color:"#666",fontWeight:500,width:60}}>操作</th></tr></thead>
+                <tbody>
+                  {positions.map((p,i) => (
+                    <tr key={i} style={{borderBottom:"1px solid #f0eeea"}}>
+                      <td style={{padding:6,width:50}}>
+                        <input type="color" value={p.color} onChange={e=>{const np=[...positions];np[i]={...np[i],color:e.target.value};setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});}} style={{width:32,height:28,border:"none",borderRadius:4,cursor:"pointer",padding:0}} />
+                      </td>
+                      <td style={{padding:6}}>
+                        <input value={p.name} onChange={e=>{const np=[...positions];np[i]={...np[i],name:e.target.value};setPositions(np);}} onBlur={()=>ap("/api/admin/system",{action:"set",key:"positions",value:positions})} style={{width:"100%",padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:12,fontWeight:500,color:p.color}} />
+                      </td>
+                      <td style={{padding:6,textAlign:"center"}}>
+                        <button onClick={()=>{if(!confirm("刪除崗位「"+p.name+"」？"))return;const np=positions.filter((_,j)=>j!==i);setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});}} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"#b91c1c"}}>🗑</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {/* 新增列 */}
+                  <tr style={{borderTop:"1px dashed #ddd"}}>
+                    <td style={{padding:6}}><input type="color" id="new-pos-color" defaultValue={["#0a7c42","#4361ee","#b45309","#b91c1c","#7c3aed","#0891b2","#be185d","#555"][positions.length%8]} style={{width:32,height:28,border:"none",borderRadius:4,cursor:"pointer",padding:0}} /></td>
+                    <td style={{padding:6}}><input id="new-pos-name" placeholder="輸入新崗位名稱..." style={{width:"100%",padding:"4px 8px",borderRadius:5,border:"1px dashed #ccc",fontSize:12}} onKeyDown={e=>{if(e.key==="Enter"){const name=e.target.value.trim();if(!name)return;const color=document.getElementById("new-pos-color").value;const np=[...positions,{name,color}];setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});e.target.value="";}}} /></td>
+                    <td style={{padding:6,textAlign:"center"}}><button onClick={()=>{const name=document.getElementById("new-pos-name").value.trim();if(!name){alert("請輸入名稱");return;}const color=document.getElementById("new-pos-color").value;const np=[...positions,{name,color}];setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});document.getElementById("new-pos-name").value="";}} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"#0a7c42",color:"#fff",fontSize:11,cursor:"pointer"}}>＋</button></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
-            {/* 崗位排班管理 */}
-            <button onClick={()=>{setSsf(!ssf);setEs(null);}}
-              style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:ssf?"#f0f0f0":"#1a1a1a",color:ssf?"#666":"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
-              {ssf?"✕":"＋新增崗位排班"}
-            </button>
-            {ssf && (
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8}}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:6}}>
-                  <div><label style={{fontSize:10,color:"#888"}}>門市</label>
-                    <select value={sf2.store_id} onChange={e=>setSf2({...sf2,store_id:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}>
-                      <option value="">選擇</option>{stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                  <div><label style={{fontSize:10,color:"#888"}}>崗位</label>
-                    <select value={sf2.role} onChange={e=>{const p=positions.find(x=>x.name===e.target.value);setSf2({...sf2,role:e.target.value,color:p?.color||sf2.color,name:e.target.value+"_"+sf2.start_time});}} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}>
-                      {positions.map(p=><option key={p.name} value={p.name}>{p.name}</option>)}
-                    </select>
-                  </div>
-                  <div><label style={{fontSize:10,color:"#888"}}>上班</label><input type="time" value={sf2.start_time} onChange={e=>setSf2({...sf2,start_time:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
-                  <div><label style={{fontSize:10,color:"#888"}}>下班</label><input type="time" value={sf2.end_time} onChange={e=>setSf2({...sf2,end_time:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
-                  <div><label style={{fontSize:10,color:"#888"}}>休息分</label><input type="number" value={sf2.break_minutes} onChange={e=>setSf2({...sf2,break_minutes:Number(e.target.value)})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
-                </div>
-                <button onClick={saveShift} style={{padding:"4px 14px",borderRadius:4,border:"none",background:"#0a7c42",color:"#fff",fontSize:11,cursor:"pointer"}}>{es?"💾儲存":"建立"}</button>
-              </div>
-            )}
+            {/* 崗位排班 — 按門市分組，行內編輯 */}
             {stores.filter(s=>!sf||s.id===sf).map(store=>{
               const ss = shifts.filter(s=>s.store_id===store.id);
-              if (!ss.length) return null;
               return (
                 <div key={store.id} style={{marginBottom:10}}>
                   <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>
@@ -1935,17 +1922,45 @@ export default function AdminPage() {
                   </h4>
                   <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                      <thead><tr style={{background:"#faf8f5"}}>{["崗位","時間","休息","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
-                      <tbody>{ss.map(s=>{const pc=positions.find(p=>p.name===s.role)?.color||s.color||"#0a7c42";return(
-                        <tr key={s.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                          <td style={{padding:6}}><span style={{padding:"2px 8px",borderRadius:4,background:pc+"20",color:pc,fontWeight:500,fontSize:11}}>{s.role==="all"?"全場":s.role||"全場"}</span></td>
-                          <td style={{padding:6,fontWeight:500}}>{(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</td>
-                          <td style={{padding:6}}>{s.break_minutes+"分"}</td>
-                          <td style={{padding:6}}>
+                      <thead><tr style={{background:"#faf8f5"}}>{["崗位","上班","下班","休息","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                      <tbody>
+                        {ss.map(s=>{const pc=positions.find(p=>p.name===s.role)?.color||s.color||"#0a7c42";const isEdit=es?.id===s.id;return(
+                        <tr key={s.id} style={{borderBottom:"1px solid #f0eeea",background:isEdit?"#f0f8ff":"transparent"}}>
+                          <td style={{padding:6}}>{isEdit?<select value={sf2.role} onChange={e=>{const p=positions.find(x=>x.name===e.target.value);setSf2({...sf2,role:e.target.value,color:p?.color||sf2.color});}} style={{padding:3,borderRadius:4,border:"1px solid #4361ee",fontSize:11}}>{positions.map(p=><option key={p.name} value={p.name}>{p.name}</option>)}</select>:<span style={{padding:"2px 8px",borderRadius:4,background:pc+"20",color:pc,fontWeight:500,fontSize:11}}>{s.role==="all"?"全場":s.role||"全場"}</span>}</td>
+                          <td style={{padding:6}}>{isEdit?<input type="time" value={sf2.start_time} onChange={e=>setSf2({...sf2,start_time:e.target.value})} style={{padding:2,borderRadius:4,border:"1px solid #4361ee",fontSize:11}} />:<span style={{fontWeight:500}}>{(s.start_time||"").slice(0,5)}</span>}</td>
+                          <td style={{padding:6}}>{isEdit?<input type="time" value={sf2.end_time} onChange={e=>setSf2({...sf2,end_time:e.target.value})} style={{padding:2,borderRadius:4,border:"1px solid #4361ee",fontSize:11}} />:<span style={{fontWeight:500}}>{(s.end_time||"").slice(0,5)}</span>}</td>
+                          <td style={{padding:6}}>{isEdit?<input type="number" value={sf2.break_minutes} onChange={e=>setSf2({...sf2,break_minutes:Number(e.target.value)})} style={{width:50,padding:2,borderRadius:4,border:"1px solid #4361ee",fontSize:11}} />:s.break_minutes+"分"}</td>
+                          <td style={{padding:6,whiteSpace:"nowrap"}}>{isEdit?<>
+                            <button onClick={async()=>{await saveShift();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",cursor:"pointer",fontSize:10,marginRight:2}}>💾</button>
+                            <button onClick={()=>{setEs(null);setSsf(false);}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#888",color:"#fff",cursor:"pointer",fontSize:10}}>✕</button>
+                          </>:<>
                             <button onClick={()=>editShift(s)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,marginRight:2}}>✏️</button>
                             <button onClick={()=>delShift(s.id)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
+                          </>}</td>
+                        </tr>);})}
+                        {/* 新增列 */}
+                        <tr style={{borderTop:"1px dashed #ccc",background:"#faf8f5"}}>
+                          <td style={{padding:6}}>
+                            <select id={"ns-role-"+store.id} style={{padding:3,borderRadius:4,border:"1px dashed #ccc",fontSize:11}}>
+                              {positions.map(p=><option key={p.name} value={p.name}>{p.name}</option>)}
+                            </select>
                           </td>
-                        </tr>);})}</tbody>
+                          <td style={{padding:6}}><input type="time" id={"ns-start-"+store.id} defaultValue="10:00" style={{padding:2,borderRadius:4,border:"1px dashed #ccc",fontSize:11}} /></td>
+                          <td style={{padding:6}}><input type="time" id={"ns-end-"+store.id} defaultValue="20:00" style={{padding:2,borderRadius:4,border:"1px dashed #ccc",fontSize:11}} /></td>
+                          <td style={{padding:6}}><input type="number" id={"ns-break-"+store.id} defaultValue="60" style={{width:50,padding:2,borderRadius:4,border:"1px dashed #ccc",fontSize:11}} /></td>
+                          <td style={{padding:6}}>
+                            <button onClick={async()=>{
+                              const role=document.getElementById("ns-role-"+store.id).value;
+                              const start=document.getElementById("ns-start-"+store.id).value;
+                              const end=document.getElementById("ns-end-"+store.id).value;
+                              const brk=document.getElementById("ns-break-"+store.id).value;
+                              const pc=positions.find(p=>p.name===role)?.color||"#0a7c42";
+                              await ap("/api/admin/shifts",{action:"create",store_id:store.id,name:role+" "+start+"~"+end,role,color:pc,start_time:start,end_time:end,break_minutes:Number(brk)});
+                              load();
+                            }} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"#0a7c42",color:"#fff",fontSize:10,cursor:"pointer"}}>＋新增</button>
+                          </td>
+                        </tr>
+                      </tbody>
                     </table>
                   </div>
                 </div>
