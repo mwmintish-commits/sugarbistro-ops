@@ -43,10 +43,10 @@ async function handleBinding(rt, userId, code) {
 
 // ===== 打卡 =====
 async function handleClockAction(rt, emp, type) {
-  // 未完成報到流程 → 擋住打卡
-  if (!emp.contract_signed || !emp.onboarding_completed) {
+  // 只擋「後台標記未啟用」的新人（待審核），已啟用的員工不擋
+  if (!emp.is_active) {
     const url = `${process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app"}/onboarding?bind_code=${emp.bind_code}`;
-    return replyText(rt, "❌ 請先完成報到流程（簽署合約+繳交資料）後才能打卡\n\n👉 " + url);
+    return replyText(rt, "❌ 帳號尚未啟用，請聯繫主管核准\n\n如未完成報到：\n👉 " + url);
   }
   const token = crypto.randomBytes(24).toString("hex");
   await supabase.from("clockin_tokens").insert({ token, employee_id: emp.id, type, store_id: emp.store_id, expires_at: new Date(Date.now() + 600000).toISOString() });
