@@ -70,10 +70,19 @@ export async function POST(request) {
   }
 
   if (body.action === "delete") {
-    await auditLog(null, null, "settlement_delete", "settlement", body.settlement_id, {});
-    const { error } = await supabase.from("daily_settlements").delete().eq("id", body.settlement_id);
-    if (error) return Response.json({ error: error.message }, { status: 500 });
-    return Response.json({ success: true });
+    const sid = body.settlement_id;
+    if (!sid) return Response.json({ error: "缺少 settlement_id" }, { status: 400 });
+    try {
+      await auditLog(null, null, "settlement_delete", "settlement", sid, {});
+      // 先刪除所有 FK 關聯表
+      await supabase.from("voucher_serials").delete().eq("settlement_id", sid);
+      await supabase.from("settlement_receipts").delete().eq("settlement_id", sid);
+      const { error } = await supabase.from("daily_settlements").delete().eq("id", sid);
+      if (error) return Response.json({ error: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    } catch(e) {
+      return Response.json({ error: "刪除失敗：" + e.message }, { status: 500 });
+    }
   }
 
   return Response.json({ error: "Unknown action" }, { status: 400 });

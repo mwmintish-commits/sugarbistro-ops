@@ -1,18 +1,25 @@
 "use client";
 
 export function ap(u, b) {
-  return b
-    ? fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).then(r => r.json())
-    : fetch(u).then(r => r.json());
+  const req = b
+    ? fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) })
+    : fetch(u);
+  return req.then(async r => {
+    const ct = r.headers.get("content-type") || "";
+    if (!ct.includes("json")) { const t = await r.text().catch(() => ""); return { error: t || "伺服器錯誤（非 JSON）" }; }
+    const text = await r.text().catch(() => "");
+    if (!text || !text.trim()) return { error: "伺服器回傳空白" };
+    try { return JSON.parse(text); } catch(e) { return { error: "回傳格式錯誤" }; }
+  }).catch(e => ({ error: e.message || "連線失敗" }));
 }
 
 // 安全呼叫：失敗時 alert 錯誤
 export async function sap(u, b) {
   try {
     const r = await ap(u, b);
-    if (r.error) { alert("❌ " + r.error); return null; }
+    if (!r || r.error) { alert("❌ " + (r?.error || "未知錯誤")); return null; }
     return r;
-  } catch (e) { alert("❌ 連線錯誤：" + e.message); return null; }
+  } catch (e) { alert("❌ " + (e.message || "連線失敗")); return null; }
 }
 
 export const fmt = (n) => "$" + Number(n || 0).toLocaleString();
