@@ -1361,26 +1361,28 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"🏦 "+month+" 存款"}</h3>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","金額","應存","差異","說明","狀態","📸"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
-                <tbody>{dep.map(d=>(
-                  <tr key={d.id} style={{borderBottom:"1px solid #f0eeea",background:Math.abs(d.difference||0)>500?"#fef9f9":"transparent"}}>
-                    <td style={{padding:6}}>{d.deposit_date}</td>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:700}}>
+                <thead><tr style={{background:"#faf8f5"}}>{["存款日","門市","對帳區間","金額","應存","差異","說明","狀態","📸","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666",fontSize:10}}>{h}</th>)}</tr></thead>
+                <tbody>{dep.map(d=>{const diffAbs=Math.abs(d.difference||0);return(
+                  <tr key={d.id} style={{borderBottom:"1px solid #f0eeea",background:diffAbs>2000?"#fef2f2":diffAbs>500?"#fffbeb":"transparent"}}>
+                    <td style={{padding:6,fontWeight:500}}>{d.deposit_date}</td>
                     <td style={{padding:6}}>{d.stores?d.stores.name:""}</td>
+                    <td style={{padding:6,fontSize:9,color:"#666"}}>{d.period_start&&d.period_end?(d.period_start+"~"+d.period_end):"-"}</td>
                     <td style={{padding:6,fontWeight:600}}>{fmt(d.amount)}</td>
                     <td style={{padding:6}}>{fmt(d.expected_cash)}</td>
-                    <td style={{padding:6,color:Math.abs(d.difference||0)>500?"#b91c1c":"#0a7c42",fontWeight:600}}>{fmt(d.difference)}</td>
+                    <td style={{padding:6,color:diffAbs>500?"#b91c1c":"#0a7c42",fontWeight:600}}>{fmt(d.difference)}</td>
                     <td style={{padding:6}}>
-                      {Math.abs(d.difference||0)>500 ? (
-                        <input defaultValue={d.difference_explanation||""} placeholder="請說明差異原因"
-                          onBlur={e=>{if(e.target.value)ap("/api/admin/deposits",{action:"update",deposit_id:d.id,difference_explanation:e.target.value});}}
-                          style={{padding:2,borderRadius:3,border:"1px solid #fbbf24",fontSize:10,width:100,background:"#fffbeb"}} />
-                      ) : <span style={{fontSize:10,color:"#ccc"}}>-</span>}
+                      <input defaultValue={d.difference_explanation||""} placeholder={diffAbs>500?"請說明差異原因":"-"}
+                        onBlur={e=>{if(e.target.value!==( d.difference_explanation||""))ap("/api/admin/deposits",{action:"update",deposit_id:d.id,difference_explanation:e.target.value});}}
+                        style={{padding:2,borderRadius:3,border:diffAbs>500?"1px solid #fbbf24":"1px solid #eee",fontSize:10,width:100,background:diffAbs>500?"#fffbeb":"transparent"}} />
                     </td>
                     <td style={{padding:6}}><Badge status={d.status} /></td>
                     <td style={{padding:6}}>{d.image_url?<button onClick={()=>setSi(d.image_url)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>📸</button>:<span style={{color:"#ccc"}}>-</span>}</td>
-                  </tr>
-                ))}</tbody>
+                    <td style={{padding:6,whiteSpace:"nowrap"}}>
+                      <button onClick={async()=>{const amt=prompt("修改存款金額：",d.amount);if(!amt)return;const ps=prompt("對帳起始日：",d.period_start||"");const pe=prompt("對帳結束日：",d.period_end||"");const updates={amount:Number(amt)};if(ps)updates.period_start=ps;if(pe)updates.period_end=pe;await sap("/api/admin/deposits",{action:"update",deposit_id:d.id,...updates});load();}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10}}>✏️</button>
+                      <button onClick={async()=>{if(!confirm("刪除此筆存款紀錄？"))return;await sap("/api/admin/deposits",{action:"delete",deposit_id:d.id});load();}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
+                    </td>
+                  </tr>);})}</tbody>
               </table>
             </div>
           </div>

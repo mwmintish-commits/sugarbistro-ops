@@ -26,13 +26,20 @@ export async function POST(request) {
   const body = await request.json();
 
   if (body.action === "update") {
-    const { deposit_id, difference_explanation } = body;
+    const { deposit_id, ...rest } = body;
+    delete rest.action;
     const updates = {};
-    if (difference_explanation !== undefined) updates.difference_explanation = difference_explanation;
+    ["difference_explanation","amount","period_start","period_end","deposit_date","status"].forEach(k=>{if(rest[k]!==undefined)updates[k]=rest[k];});
     const { data, error } = await supabase.from("deposits")
       .update(updates).eq("id", deposit_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
+  }
+
+  if (body.action === "delete") {
+    const { error } = await supabase.from("deposits").delete().eq("id", body.deposit_id);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ success: true });
   }
 
   return Response.json({ error: "Unknown action" }, { status: 400 });

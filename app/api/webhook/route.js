@@ -337,7 +337,11 @@ async function startSettlement(rt, emp) {
 async function handleStoreSelect(rt, uid, name, state) {
   const store = await matchStore(name); if (!store) return replyText(rt, "❌ 找不到門市");
   await setUserState(uid, "settlement_photo", { ...state.flow_data, store_id: store.id, store_name: store.name });
-  return replyText(rt, `🏠 ${store.name}｜👤 ${state.flow_data.employee_name}\n\n📸 拍照上傳 POS 日結單`);
+  const uploadUrl = `${SITE}/upload?type=settlement&store_id=${store.id}&store_name=${encodeURIComponent(store.name)}&employee_id=${state.flow_data.employee_id}&employee_name=${encodeURIComponent(state.flow_data.employee_name)}`;
+  return lineClient.replyMessage({ replyToken: rt, messages: [{ type: "text", text: `🏠 ${store.name}｜👤 ${state.flow_data.employee_name}\n\n📸 直接拍照上傳 POS 日結單\n\n或用網頁上傳多張：`, quickReply: { items: [
+    { type: "action", action: { type: "uri", label: "📤 網頁上傳（可多張）", uri: uploadUrl } },
+    { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+  ]}}]});
 }
 async function handleSettlementImg(event, emp, state) {
   const uid = event.source.userId;
@@ -407,9 +411,33 @@ async function confirmSettlement(uid, emp) {
 }
 
 // ===== 存款 =====
-async function startDeposit(rt,emp){if(emp.store_id&&emp.stores){await setUserState(emp.line_uid,"deposit_photo",{employee_name:emp.name,employee_id:emp.id,store_id:emp.store_id,store_name:emp.stores.name});return replyText(rt,`🏦 存款回報\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 拍照上傳存款單`);}const{data:stores}=await supabase.from("stores").select("*").eq("is_active",true);await setUserState(emp.line_uid,"deposit_select_store",{employee_name:emp.name,employee_id:emp.id});return replyWithQuickReply(rt,`🏦 存款回報\n👤 ${emp.name}`,stores.map(s=>({type:"action",action:{type:"message",label:s.name,text:`存款門市:${s.name}`}})));}
-async function handleDepStore(rt,uid,name,state){const store=await matchStore(name);if(!store)return replyText(rt,"❌");const{data:last}=await supabase.from("deposits").select("deposit_date").eq("store_id",store.id).order("deposit_date",{ascending:false}).limit(1).single();await setUserState(uid,"deposit_photo",{...state.flow_data,store_id:store.id,store_name:store.name,period_start:last?new Date(new Date(last.deposit_date).getTime()+86400000).toISOString().split("T")[0]:null});return replyText(rt,`🏦 ${store.name}\n📸 拍照上傳存款單`);}
-async function handleDepImg(event,emp,state){const uid=event.source.userId;await replyText(event.replyToken,"🏦 辨識中...");try{const b64=await downloadImageAsBase64(event.message.id);const r=await analyzeDepositSlip(b64);if(!r){await pushText(uid,"❌");return;}const d=state.flow_data,depDate=r.deposit_date||new Date().toISOString().split("T")[0],pStart=d.period_start||new Date(Date.now()-7*86400000).toISOString().split("T")[0];const{data:stls}=await supabase.from("daily_settlements").select("cash_to_deposit,cash_amount,petty_cash_reserved").eq("store_id",d.store_id).gte("date",pStart).lte("date",depDate);const exp=(stls||[]).reduce((s,r)=>s+Number(r.cash_amount||0),0);const amt=r.deposit_amount||0,diff=amt-exp,abs=Math.abs(diff);let st,em,tx;if(abs<=500){st="matched";em="✅";tx="吻合";}else if(abs<=2000){st="minor_diff";em="⚠️";tx="小差異";}else{st="anomaly";em="🚨";tx="異常";}const img=await uploadImage(b64,"deposits",`${d.store_id}_${depDate}_${Date.now()}`);await supabase.from("deposits").insert({store_id:d.store_id,deposit_date:depDate,amount:amt,bank_name:r.bank_name,bank_branch:r.bank_branch,account_number:r.account_number,depositor_name:d.employee_name,roc_date:r.roc_date,period_start:pStart,period_end:depDate,expected_cash:exp,difference:diff,status:st,image_url:img,ai_raw_data:r,submitted_by:d.employee_id});await pushText(uid,`🏦 ${d.store_name}\n存款${fmt(amt)} vs 應存${fmt(exp)}\n${em} ${tx}`);if(st!=="matched"){const{data:adm}=await supabase.from("employees").select("line_uid").eq("role","admin").eq("is_active",true);if(adm)for(const a of adm)if(a.line_uid)await pushText(a.line_uid,`${em} 存款${tx} ${d.store_name}｜${d.employee_name}\n${fmt(amt)} vs ${fmt(exp)}`).catch(()=>{});}await clearUserState(uid);}catch(e){await pushText(uid,"❌ "+e.message);}}
+async function startDeposit(rt,emp){
+  const uploadUrl=`${SITE}/upload?type=deposit&store_id=${emp.store_id}&store_name=${encodeURIComponent(emp.stores?.name||"")}&employee_id=${emp.id}&employee_name=${encodeURIComponent(emp.name)}`;
+  if(emp.store_id&&emp.stores){await setUserState(emp.line_uid,"deposit_photo",{employee_name:emp.name,employee_id:emp.id,store_id:emp.store_id,store_name:emp.stores.name});return lineClient.replyMessage({replyToken:rt,messages:[{type:"text",text:`🏦 存款回報\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 直接拍照上傳存款單\n或用網頁上傳多張：`,quickReply:{items:[{type:"action",action:{type:"uri",label:"📤 網頁上傳",uri:uploadUrl}},{type:"action",action:{type:"message",label:"🔙 取消",text:"取消"}}]}}]});}const{data:stores}=await supabase.from("stores").select("*").eq("is_active",true);await setUserState(emp.line_uid,"deposit_select_store",{employee_name:emp.name,employee_id:emp.id});return replyWithQuickReply(rt,`🏦 存款回報\n👤 ${emp.name}`,stores.map(s=>({type:"action",action:{type:"message",label:s.name,text:`存款門市:${s.name}`}})));}
+async function handleDepStore(rt,uid,name,state){const store=await matchStore(name);if(!store)return replyText(rt,"❌");const{data:last}=await supabase.from("deposits").select("deposit_date").eq("store_id",store.id).order("deposit_date",{ascending:false}).limit(1).single();await setUserState(uid,"deposit_photo",{...state.flow_data,store_id:store.id,store_name:store.name,period_start:last?new Date(new Date(last.deposit_date).getTime()+86400000).toISOString().split("T")[0]:null});const uploadUrl=`${SITE}/upload?type=deposit&store_id=${store.id}&store_name=${encodeURIComponent(store.name)}&employee_id=${state.flow_data.employee_id}&employee_name=${encodeURIComponent(state.flow_data.employee_name)}`;return lineClient.replyMessage({replyToken:rt,messages:[{type:"text",text:`🏦 ${store.name}\n\n📸 直接拍照上傳存款單\n或用網頁上傳多張：`,quickReply:{items:[{type:"action",action:{type:"uri",label:"📤 網頁上傳",uri:uploadUrl}},{type:"action",action:{type:"message",label:"🔙 取消",text:"取消"}}]}}]});}
+async function handleDepImg(event,emp,state){const uid=event.source.userId;await replyText(event.replyToken,"🏦 辨識中...");try{const b64=await downloadImageAsBase64(event.message.id);const r=await analyzeDepositSlip(b64);if(!r){await pushText(uid,"❌ 辨識失敗");return;}const d=state.flow_data,depDate=r.deposit_date||new Date().toISOString().split("T")[0],pStart=d.period_start||new Date(Date.now()-7*86400000).toISOString().split("T")[0];const img=await uploadImage(b64,"deposits",`${d.store_id}_${depDate}_${Date.now()}`);
+  // 存為待確認，顯示資訊讓員工核對
+  await setUserState(uid,"deposit_confirm",{...d,deposit_date:depDate,amount:r.deposit_amount||0,bank_name:r.bank_name,bank_branch:r.bank_branch,account_number:r.account_number,roc_date:r.roc_date,period_start:pStart,period_end:depDate,image_url:img,ai_raw_data:r});
+  await pushText(uid,`🏦 存款辨識結果\n━━━━━━━━━━━━━━\n🏠 ${d.store_name}\n💰 存款金額：${fmt(r.deposit_amount||0)}\n🏦 ${r.bank_name||""} ${r.bank_branch||""}\n📅 存款日期：${depDate}\n📅 對帳區間：${pStart} ~ ${depDate}\n\n請確認以上資訊：`);
+  await lineClient.pushMessage({to:uid,messages:[{type:"text",text:"選擇操作：",quickReply:{items:[
+    {type:"action",action:{type:"message",label:"✅ 確認送出",text:"確認存款"}},
+    {type:"action",action:{type:"message",label:"📅 修改區間",text:"修改存款區間"}},
+    {type:"action",action:{type:"message",label:"💰 修改金額",text:"修改存款金額"}},
+    {type:"action",action:{type:"message",label:"📸 重拍",text:"重新拍照"}},
+    {type:"action",action:{type:"message",label:"🔙 取消",text:"取消"}},
+  ]}}]});
+  }catch(e){await pushText(uid,"❌ "+e.message);}}
+async function confirmDeposit(rt,uid,state,emp){
+  const d=state.flow_data;
+  const{data:stls}=await supabase.from("daily_settlements").select("cash_to_deposit,cash_amount").eq("store_id",d.store_id).gte("date",d.period_start).lte("date",d.period_end);
+  const exp=(stls||[]).reduce((s,r)=>s+Number(r.cash_amount||0),0);
+  const amt=Number(d.amount)||0,diff=amt-exp,abs=Math.abs(diff);
+  let st,em,tx;if(abs<=500){st="matched";em="✅";tx="吻合";}else if(abs<=2000){st="minor_diff";em="⚠️";tx="小差異";}else{st="anomaly";em="🚨";tx="異常";}
+  await supabase.from("deposits").insert({store_id:d.store_id,deposit_date:d.deposit_date,amount:amt,bank_name:d.bank_name,bank_branch:d.bank_branch,account_number:d.account_number,depositor_name:d.employee_name,roc_date:d.roc_date,period_start:d.period_start,period_end:d.period_end,expected_cash:exp,difference:diff,status:st,image_url:d.image_url,ai_raw_data:d.ai_raw_data,submitted_by:d.employee_id});
+  if(st!=="matched"){const{data:adm}=await supabase.from("employees").select("line_uid").eq("role","admin").eq("is_active",true);if(adm)for(const a of adm)if(a.line_uid&&a.line_uid!==uid)await pushText(a.line_uid,`${em} 存款${tx} ${d.store_name}｜${d.employee_name}\n${fmt(amt)} vs ${fmt(exp)}（${d.period_start}~${d.period_end}）`).catch(()=>{});}
+  await clearUserState(uid);
+  return replyWithQuickReply(rt,`✅ 存款已登記\n\n🏠 ${d.store_name}\n💰 ${fmt(amt)} vs 應存 ${fmt(exp)}\n📅 ${d.period_start} ~ ${d.period_end}\n${em} ${tx}`,getMenu(emp?.role||"staff"));
+}
 
 async function queryRevenue(rt){const today=new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});const{data}=await supabase.from("daily_settlements").select("*, stores(name)").eq("date",today);if(!data?.length)return replyText(rt,`📊 ${today} 無日結`);let msg=`📊 ${today}\n`,tot=0;for(const s of data){msg+=`🔹${s.stores?.name} ${fmt(s.net_sales)}\n`;tot+=Number(s.net_sales||0);}msg+=`💰 合計${fmt(tot)}`;return replyText(rt,msg);}
 
@@ -733,6 +761,30 @@ async function handleEvent(event) {
   // 存款
   if (text.startsWith("存款門市:") && state?.current_flow === "deposit_select_store") return handleDepStore(rt, userId, text.replace("存款門市:", ""), state);
   if (text === "存款回報") return startDeposit(rt, emp);
+  if (text === "確認存款" && state?.current_flow === "deposit_confirm") return confirmDeposit(rt, userId, state, emp);
+  if (text === "修改存款區間" && state?.current_flow === "deposit_confirm") {
+    return replyText(rt, "請輸入對帳區間\n\n格式：YYYY-MM-DD~YYYY-MM-DD\n例如：2026-04-07~2026-04-13");
+  }
+  if (text === "修改存款金額" && state?.current_flow === "deposit_confirm") {
+    return replyText(rt, "請輸入正確存款金額（純數字）：");
+  }
+  if (state?.current_flow === "deposit_confirm" && text.includes("~")) {
+    const [s,e] = text.split("~").map(x=>x.trim());
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s) && /^\d{4}-\d{2}-\d{2}$/.test(e)) {
+      await setUserState(userId, "deposit_confirm", { ...state.flow_data, period_start: s, period_end: e });
+      return replyWithQuickReply(rt, `✅ 區間已修改：${s} ~ ${e}\n\n確認送出？`, [
+        { type:"action", action:{ type:"message", label:"✅ 確認送出", text:"確認存款" }},
+        { type:"action", action:{ type:"message", label:"🔙 取消", text:"取消" }},
+      ]);
+    }
+  }
+  if (state?.current_flow === "deposit_confirm" && /^\d+$/.test(text)) {
+    await setUserState(userId, "deposit_confirm", { ...state.flow_data, amount: Number(text) });
+    return replyWithQuickReply(rt, `✅ 金額已修改：${fmt(Number(text))}\n\n確認送出？`, [
+      { type:"action", action:{ type:"message", label:"✅ 確認送出", text:"確認存款" }},
+      { type:"action", action:{ type:"message", label:"🔙 取消", text:"取消" }},
+    ]);
+  }
   if (text === "今日營收") return queryRevenue(rt);
 
   // 月結單據
