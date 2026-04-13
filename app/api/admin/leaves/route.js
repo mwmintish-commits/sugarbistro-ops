@@ -1,4 +1,4 @@
-import { supabase, eom } from "@/lib/supabase";
+import { supabase, eom, auditLog } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
 export async function GET(request) {
@@ -47,6 +47,7 @@ export async function POST(request) {
       status, reviewed_by, reviewed_at: new Date().toISOString(),
     }).eq("id", request_id).select("*, employees(name, line_uid)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
+    await auditLog(reviewed_by, null, "leave_" + status, "leave", request_id, { employee: data?.employees?.name, leave_type: data?.leave_type, start: data?.start_date, end: data?.end_date });
 
     if (data?.employees?.line_uid) {
       const emoji = status === "approved" ? "✅" : "❌";

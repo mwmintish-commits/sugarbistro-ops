@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, auditLog } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
 export async function GET(request) {
@@ -149,11 +149,12 @@ export async function POST(request) {
       notified++;
     }
     await supabase.from("schedules").update({ published: true }).in("id", schedules.map(s => s.id));
+    await auditLog(null, null, "schedule_publish", "schedule", null, { week_start, week_end, store_id, count: schedules.length, notified });
     return Response.json({ published: schedules.length, notified });
   }
 
   if (action === "delete") {
-    // 先清除出勤紀錄的排班關聯，避免外鍵約束擋住
+    await auditLog(null, null, "schedule_delete", "schedule", body.schedule_id, {});
     await supabase.from("attendances").update({ schedule_id: null }).eq("schedule_id", body.schedule_id);
     const { error } = await supabase.from("schedules").delete().eq("id", body.schedule_id);
     if (error) return Response.json({ error: error.message }, { status: 500 });

@@ -11,7 +11,7 @@ const ROLE_TABS = {
     "reviews","bonus",
     "settlements","deposits","expenses","payments","pnl",
     "recipes","production","inventory","clients","orders","products",
-    "shifts","worklogs","announcements","settings"],
+    "shifts","worklogs","announcements","audit","settings"],
   manager: ["employees","schedules","leaves","attendance","overtime","payroll",
     "reviews",
     "settlements","deposits","expenses","payments","pnl",
@@ -27,7 +27,7 @@ const TAB_L = {
   deposits:"🏦存款",expenses:"📦費用",payments:"💳撥款",pnl:"📊損益",
   recipes:"📋配方",production:"🏭生產",inventory:"📊庫存",
   clients:"👥客戶",orders:"📝訂單",products:"🏷️產品",shifts:"⏰班別",worklogs:"📋日誌",
-  announcements:"📢公告",settings:"⚙️設定",store_staff:"👥本店員工"
+  announcements:"📢公告",audit:"📋操作日誌",settings:"⚙️設定",store_staff:"👥本店員工"
 };
 const TAB_GROUPS = {
   "總覽":["dashboard"],
@@ -35,7 +35,7 @@ const TAB_GROUPS = {
   "財務":["settlements","deposits","expenses","payments","pnl"],
   "生產":["recipes","production","inventory"],
   "業務":["products","clients","orders"],
-  "管理":["shifts","worklogs","announcements","settings"]
+  "管理":["shifts","worklogs","announcements","audit","settings"]
 };
 const DAYS = ["日","一","二","三","四","五","六"];
 // ✦34 CSV匯出
@@ -79,6 +79,8 @@ export default function AdminPage() {
     return d.toLocaleDateString("sv-SE");
   });
   const [ssf, setSsf] = useState(false);
+  const [positions, setPositions] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [es, setEs] = useState(null);
   const [sf2, setSf2] = useState({
     name:"",store_id:"",start_time:"10:00",end_time:"20:00",
@@ -172,6 +174,8 @@ export default function AdminPage() {
     }
     ap("/api/admin/holidays?month=" + month)
       .then(r => setHolidays(r.data||[])).catch(() => {});
+    ap("/api/admin/system?key=positions")
+      .then(r => setPositions(r.data?.value || [{ name: "全場", color: "#0a7c42" }, { name: "外場", color: "#4361ee" }, { name: "內場", color: "#b45309" }, { name: "吧台", color: "#7c3aed" }, { name: "烘焙", color: "#be185d" }])).catch(() => {});
     if (myTabs.includes("attendance")) {
       ap("/api/admin/attendance?type=amendments&month=" + month + (sf ? "&store_id=" + sf : ""))
         .then(r => setAmendments(r.data||[])).catch(() => {});
@@ -667,9 +671,9 @@ export default function AdminPage() {
                           <span style={{fontSize:10,fontWeight:500,color:hol?"#b91c1c":isSun?"#b91c1c":isSat?"#b45309":"#666"}}>{d}</span>
                           {hol&&<span style={{fontSize:7,color:"#b91c1c",background:"#fecaca",padding:"0 3px",borderRadius:2}}>{hol.name}</span>}
                         </div>
-                        {ds.slice(0,5).map(s=>{const shColor=s.shifts?.color||"#0a7c42";const isLeave=s.type==="leave";return(<div key={s.id} style={{background:isLeave?(LT[s.leave_type]||LT.off).bg:s.published?"#e6f9f0":"#fff8e6",border:isLeave?("2px solid "+(LT[s.leave_type]||LT.off).c):s.published?("2px solid "+shColor):("2px dashed "+shColor),borderRadius:4,padding:"2px 4px",fontSize:9,marginBottom:2,color:isLeave?(LT[s.leave_type]||LT.off).c:shColor}}>
-                          <div style={{fontWeight:600,fontSize:9}}>{s.employees?s.employees.name:""}</div>
-                          {isLeave?<div style={{fontSize:8}}>{(LT[s.leave_type]||LT.off).l}{s.notes&&s.notes!=="預假"?" "+s.notes:""}</div>:<><div style={{fontSize:8}}>{s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role+" ":""}{s.shifts?s.shifts.name:""}</div><div style={{fontSize:7,opacity:0.7}}>{s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):""}</div></>}
+                        {ds.slice(0,5).map(s=>{const posColor=positions.find(p=>p.name===s.shifts?.role)?.color||s.shifts?.color||"#0a7c42";const isLeave=s.type==="leave";return(<div key={s.id} style={{background:isLeave?(LT[s.leave_type]||LT.off).bg:s.published?posColor+"12":"#fff8e6",border:isLeave?("2px solid "+(LT[s.leave_type]||LT.off).c):s.published?("2px solid "+posColor):("3px dashed "+posColor),borderRadius:5,padding:"3px 5px",fontSize:9,marginBottom:2,lineHeight:1.3}}>
+                          <div style={{fontWeight:600,color:isLeave?(LT[s.leave_type]||LT.off).c:posColor}}>{s.employees?s.employees.name:""}</div>
+                          {isLeave?<div style={{fontSize:8,color:isLeave?(LT[s.leave_type]||LT.off).c:"#888"}}>{(LT[s.leave_type]||LT.off).l}{s.notes&&s.notes!=="預假"?" "+s.notes:""}</div>:<><div style={{fontSize:8,color:posColor}}>{s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role+"・":""}{s.shifts?s.shifts.name:""}</div><div style={{fontSize:7,color:"#888"}}>{s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):""}</div></>}
                         </div>);})}
                         {ds.length===0&&<div style={{fontSize:9,color:"#ccc",textAlign:"center",marginTop:4}}>+</div>}
                       </td>);
@@ -1877,6 +1881,24 @@ export default function AdminPage() {
         {/* SHIFTS */}
         {!ld && tab === "shifts" && (
           <div>
+            {/* 崗位管理 */}
+            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:10}}>
+              <h4 style={{fontSize:13,fontWeight:600,marginBottom:8}}>🏷️ 崗位管理</h4>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                {positions.map((p,i) => (
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:6,border:"2px solid "+p.color,background:p.color+"15"}}>
+                    <div style={{width:14,height:14,borderRadius:3,background:p.color}} />
+                    <span style={{fontSize:12,fontWeight:500,color:p.color}}>{p.name}</span>
+                    <button onClick={()=>{const name=prompt("修改崗位名稱：",p.name);if(!name)return;const c=prompt("修改顏色（#hex）：",p.color);const np=[...positions];np[i]={name,color:c||p.color};setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});}} style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"#888"}}>✏️</button>
+                    <button onClick={()=>{if(!confirm("刪除崗位「"+p.name+"」？"))return;const np=positions.filter((_,j)=>j!==i);setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});}} style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"#b91c1c"}}>✕</button>
+                  </div>
+                ))}
+                <button onClick={()=>{const name=prompt("新崗位名稱：");if(!name)return;const colors=["#0a7c42","#4361ee","#b45309","#b91c1c","#7c3aed","#0891b2","#be185d","#555"];const c=colors[positions.length%colors.length];const np=[...positions,{name,color:c}];setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});}} style={{padding:"4px 10px",borderRadius:6,border:"1px dashed #ccc",background:"transparent",fontSize:11,cursor:"pointer",color:"#888"}}>＋新增崗位</button>
+              </div>
+              <div style={{fontSize:9,color:"#888"}}>崗位顏色會自動套用到班別和排班月曆</div>
+            </div>
+
+            {/* 班別管理 */}
             <button onClick={()=>{setSsf(!ssf);setEs(null);}}
               style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:ssf?"#f0f0f0":"#1a1a1a",color:ssf?"#666":"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
               {ssf?"✕":"＋新增班別"}
@@ -1889,18 +1911,11 @@ export default function AdminPage() {
                       <option value="">選擇</option>{stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                   </div>
-                  <div><label style={{fontSize:10,color:"#888"}}>名稱</label><input value={sf2.name} onChange={e=>setSf2({...sf2,name:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
+                  <div><label style={{fontSize:10,color:"#888"}}>班別名稱</label><input value={sf2.name} onChange={e=>setSf2({...sf2,name:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
                   <div><label style={{fontSize:10,color:"#888"}}>崗位</label>
-                    <input list="role-list" value={sf2.role} onChange={e=>setSf2({...sf2,role:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} placeholder="輸入或選擇" />
-                    <datalist id="role-list">{[...new Set(shifts.map(s=>s.role).filter(Boolean)),"全場","外場","內場","吧台","烘焙","咖啡","禮盒"].map(r=><option key={r} value={r}/>)}</datalist>
-                  </div>
-                  <div><label style={{fontSize:10,color:"#888"}}>顏色</label>
-                    <div style={{display:"flex",gap:3,alignItems:"center"}}>
-                      <input type="color" value={sf2.color||"#0a7c42"} onChange={e=>setSf2({...sf2,color:e.target.value})} style={{width:28,height:28,border:"none",borderRadius:4,cursor:"pointer",padding:0}} />
-                      {["#0a7c42","#4361ee","#b45309","#b91c1c","#7c3aed","#0891b2","#be185d","#555"].map(c=>(
-                        <div key={c} onClick={()=>setSf2({...sf2,color:c})} style={{width:18,height:18,borderRadius:4,background:c,cursor:"pointer",border:sf2.color===c?"2px solid #000":"2px solid transparent"}} />
-                      ))}
-                    </div>
+                    <select value={sf2.role} onChange={e=>{const p=positions.find(x=>x.name===e.target.value);setSf2({...sf2,role:e.target.value,color:p?.color||sf2.color});}} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}>
+                      {positions.map(p=><option key={p.name} value={p.name}>{p.name}</option>)}
+                    </select>
                   </div>
                   <div><label style={{fontSize:10,color:"#888"}}>上班</label><input type="time" value={sf2.start_time} onChange={e=>setSf2({...sf2,start_time:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
                   <div><label style={{fontSize:10,color:"#888"}}>下班</label><input type="time" value={sf2.end_time} onChange={e=>setSf2({...sf2,end_time:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
@@ -1919,20 +1934,18 @@ export default function AdminPage() {
                   </h4>
                   <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                      <thead><tr style={{background:"#faf8f5"}}>{["班別","崗位","時間","休息","顏色","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
-                      <tbody>{ss.map(s=>(
+                      <thead><tr style={{background:"#faf8f5"}}>{["班別","崗位","時間","休息","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                      <tbody>{ss.map(s=>{const pc=positions.find(p=>p.name===s.role)?.color||s.color||"#0a7c42";return(
                         <tr key={s.id} style={{borderBottom:"1px solid #f0eeea"}}>
                           <td style={{padding:6,fontWeight:500}}>{s.name}</td>
-                          <td style={{padding:6}}>{s.role==="all"?"全場":s.role||"全場"}</td>
+                          <td style={{padding:6}}><span style={{padding:"2px 8px",borderRadius:4,background:pc+"20",color:pc,fontWeight:500,fontSize:10}}>{s.role==="all"?"全場":s.role||"全場"}</span></td>
                           <td style={{padding:6}}>{(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</td>
                           <td style={{padding:6}}>{s.break_minutes+"分"}</td>
-                          <td style={{padding:6}}><div style={{width:16,height:16,borderRadius:3,background:s.color||"#0a7c42"}} /></td>
                           <td style={{padding:6}}>
                             <button onClick={()=>editShift(s)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,marginRight:2}}>✏️</button>
                             <button onClick={()=>delShift(s.id)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
                           </td>
-                        </tr>
-                      ))}</tbody>
+                        </tr>);})}</tbody>
                     </table>
                   </div>
                 </div>
@@ -1984,6 +1997,29 @@ export default function AdminPage() {
         )}
 
         {/* SETTINGS */}
+
+        {/* AUDIT LOGS */}
+        {!ld && tab === "audit" && (
+          <div>
+            <button onClick={async()=>{const r=await ap("/api/admin/audit?month="+month);setAuditLogs(r.data||[]);}} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>🔄 載入{month}日誌</button>
+            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:600}}>
+                <thead><tr style={{background:"#faf8f5"}}>{["時間","操作者","動作","對象","詳情"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <tbody>{auditLogs.length===0?<tr><td colSpan={5} style={{padding:20,textAlign:"center",color:"#ccc"}}>按上方按鈕載入日誌</td></tr>:auditLogs.map(l=>{
+                  const actionLabels={login:"🔐登入",employee_update:"👤修改員工",employee_delete:"🗑刪除員工",settlement_update:"💰修改日結",settlement_delete:"🗑刪除日結",schedule_publish:"📢發布班表",schedule_delete:"🗑刪除排班",leave_approved:"✅核准休假",leave_rejected:"❌駁回休假",payroll_generate:"💰結算薪資",expense_approved:"✅核准費用",expense_rejected:"❌駁回費用"};
+                  return(
+                  <tr key={l.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                    <td style={{padding:6,fontSize:9,whiteSpace:"nowrap"}}>{l.created_at?new Date(l.created_at).toLocaleString("zh-TW",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):""}</td>
+                    <td style={{padding:6,fontWeight:500}}>{l.user_name||l.user_id?.slice(0,8)||"系統"}</td>
+                    <td style={{padding:6}}>{actionLabels[l.action]||l.action}</td>
+                    <td style={{padding:6,fontSize:9}}>{l.target_type||""}</td>
+                    <td style={{padding:6,fontSize:9,maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:l.details?"pointer":"default"}} onClick={()=>{if(l.details)alert(JSON.stringify(l.details,null,2));}}>{l.details?JSON.stringify(l.details).slice(0,60)+"...":"-"}</td>
+                  </tr>);})}</tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {!ld && tab === "settings" && (
           <SettingsMgr stores={stores} load={load} month={month} />
         )}

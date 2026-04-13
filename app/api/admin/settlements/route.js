@@ -1,4 +1,4 @@
-import { supabase, eom } from "@/lib/supabase";
+import { supabase, eom, auditLog } from "@/lib/supabase";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -65,10 +65,12 @@ export async function POST(request) {
     const { data, error } = await supabase.from("daily_settlements")
       .update(updates).eq("id", settlement_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
+    await auditLog(null, null, "settlement_update", "settlement", settlement_id, { date: data?.date, store_id: data?.store_id, changes: updates });
     return Response.json({ data });
   }
 
   if (body.action === "delete") {
+    await auditLog(null, null, "settlement_delete", "settlement", body.settlement_id, {});
     const { error } = await supabase.from("daily_settlements").delete().eq("id", body.settlement_id);
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ success: true });

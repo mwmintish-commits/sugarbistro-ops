@@ -1,4 +1,4 @@
-import { supabase, eom } from "@/lib/supabase";
+import { supabase, eom, auditLog } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
 const LABOR_SELF = [738,758,795,833,870,908,955,1002,1050,1098,1145,1145,1145,1145,1145,1145,1145,1145,1145,1145];
@@ -122,6 +122,7 @@ export async function POST(request) {
 
       results.push({ name: emp.name, base, otPay, holidayPay, ls, hs, suppHealth, allow, deduct, net, workDays });
     }
+    await auditLog(null, null, "payroll_generate", "payroll", null, { year, month, store_id, count: results.length });
     return Response.json({ success: true, data: results });
   }
 
