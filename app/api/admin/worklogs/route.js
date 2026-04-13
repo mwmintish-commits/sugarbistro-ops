@@ -61,6 +61,37 @@ export async function GET(request) {
     return Response.json({ data });
   }
 
+  // 清潔狀態：週/月清潔項目 + 本週/本月是否完成
+  if (type === "cleaning_status") {
+    const { data: templates } = await supabase.from("work_log_templates").select("*").eq("store_id", store_id).eq("is_active", true).in("frequency", ["weekly", "monthly"]).order("sort_order");
+    
+    // 本週範圍
+    const d = new Date(date);
+    const dayOfWeek = d.getDay();
+    const weekStart = new Date(d.getTime() - dayOfWeek * 86400000).toLocaleDateString("sv-SE");
+    const weekEnd = new Date(d.getTime() + (6 - dayOfWeek) * 86400000).toLocaleDateString("sv-SE");
+    // 本月範圍
+    const monthStart = date.slice(0, 7) + "-01";
+    const monthEnd = eom(date.slice(0, 7));
+
+    const result = [];
+    for (const t of templates || []) {
+      const range = t.frequency === "weekly" ? [weekStart, weekEnd] : [monthStart, monthEnd];
+      const { data: done } = await supabase.from("work_log_items").select("id, completed_by_name, completed_at").eq("store_id", store_id).eq("template_id", t.id).eq("completed", true).gte("date", range[0]).lte("date", range[1]).limit(1);
+      result.push({
+        id: t.id + "_" + t.frequency,
+        template_id: t.id,
+        item_name: t.item,
+        category: t.category,
+        frequency: t.frequency,
+        completed_this_period: done && done.length > 0,
+        last_done_by: done?.[0]?.completed_by_name || null,
+        last_done_at: done?.[0]?.completed_at || null,
+      });
+    }
+    return Response.json({ data: result });
+  }
+
   // 盤點回報查詢
   if (type === "inventory") {
     let q = supabase.from("work_log_items")
@@ -176,6 +207,29 @@ export async function POST(request) {
     const { data, error } = await supabase.from("work_log_templates").insert(copies).select();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data, count: copies.length });
+  }
+
+  // 清潔項目完成/取消
+  if (body.action === "toggle_cleaning") {
+    const { item_id, store_id, employee_id, employee_name, completed, frequency, date } = body;
+    if (completed) {
+      // 新增一筆完成記錄
+      await supabase.from("work_log_items").insert({
+        store_id, date, template_id: item_id, item_name: body.item_name || "",
+        category: "清潔", shift_type: "during", frequency,
+        completed: true, completed_by: employee_id, completed_by_name: employee_name,
+        completed_at: new Date().toISOString(),
+      });
+    } else {
+      // 取消：刪除本週/月的完成記錄
+      const d = new Date(date);
+      const dayOfWeek = d.getDay();
+      const range = frequency === "weekly"
+        ? [new Date(d.getTime() - dayOfWeek * 86400000).toLocaleDateString("sv-SE"), new Date(d.getTime() + (6 - dayOfWeek) * 86400000).toLocaleDateString("sv-SE")]
+        : [date.slice(0, 7) + "-01", date.slice(0, 7) + "-31"];
+      await supabase.from("work_log_items").delete().eq("store_id", store_id).eq("template_id", item_id).eq("completed", true).gte("date", range[0]).lte("date", range[1]);
+    }
+    return Response.json({ success: true });
   }
 
   return Response.json({ error: "Unknown action" }, { status: 400 });

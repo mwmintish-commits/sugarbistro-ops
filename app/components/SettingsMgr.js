@@ -35,6 +35,8 @@ export default function SettingsMgr({ stores, load, month }) {
   const [wlCopyTarget, setWlCopyTarget] = useState("");
   const [invNew, setInvNew] = useState({ category: "庫存盤點", item: "" });
   const [roleTabs, setRoleTabs] = useState(null);
+  const [backups, setBackups] = useState([]);
+  const [backupLoading, setBackupLoading] = useState(false);
 
   const ALL_TABS = [
     { key:"dashboard", label:"🏠總覽", group:"總覽" },
@@ -66,9 +68,9 @@ export default function SettingsMgr({ stores, load, month }) {
   const ROLE_NAMES = { manager:"🏠管理員", store_manager:"🏪門市主管" };
 
   useEffect(() => {
-    ap("/api/admin/system?key=company_name").then(r => { if (r.data) setCompanyName(r.data); }).catch(() => {});
-    ap("/api/admin/system?key=handbook").then(r => { setHb(r.data || DEFAULT_HB); setHbLoading(false); }).catch(() => { setHb(DEFAULT_HB); setHbLoading(false); });
-    ap("/api/admin/system?key=contract").then(r => { if (r.data) setContractText(r.data); }).catch(() => {});
+    ap("/api/admin/system?key=company_name").then(r => { if (r.data?.value) setCompanyName(r.data.value); }).catch(() => {});
+    ap("/api/admin/system?key=handbook").then(r => { setHb(r.data?.value || DEFAULT_HB); setHbLoading(false); }).catch(() => { setHb(DEFAULT_HB); setHbLoading(false); });
+    ap("/api/admin/system?key=contract").then(r => { if (r.data?.value) setContractText(r.data.value); }).catch(() => {});
     ap("/api/admin/holidays?year=" + new Date().getFullYear()).then(r => setHols(r.data || [])).catch(() => {});
     ap("/api/admin/attendance?type=settings").then(r => { if (r.data) setClockSettings(r.data); }).catch(() => {});
     ap("/api/admin/system?key=role_tabs").then(r => { if (r.data?.value) setRoleTabs(r.data.value); else setRoleTabs({ manager:["employees","schedules","leaves","attendance","overtime","payroll","reviews","settlements","deposits","expenses","payments","pnl","recipes","production","inventory","clients","orders","products","shifts","worklogs"], store_manager:["schedules","leaves","store_staff","shifts","worklogs","inventory","announcements","settlements","deposits","expenses"] }); }).catch(() => {});
@@ -106,27 +108,31 @@ export default function SettingsMgr({ stores, load, month }) {
       {/* 門市管理 */}
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🏠 門市管理</h4>
-        {stores.map(s => (
-          <div key={s.id} style={{ display: "flex", gap: 4, alignItems: "center", padding: "4px 0", borderBottom: "1px solid #f0eeea", fontSize: 11 }}>
-            <span style={{ fontWeight: 500, flex: 1 }}>{s.name}</span>
-            <span style={{ color: "#888", flex: 1 }}>{s.address || "未設定地址"}</span>
-            <button onClick={() => {
-              const n = prompt("修改門市名稱：", s.name);
-              if (n) ap("/api/admin/stores", { action: "update_targets", store_id: s.id, name: n }).then(() => { alert("已更新"); load(); });
-            }} style={{ padding: "1px 6px", borderRadius: 3, border: "1px solid #ddd", background: "transparent", fontSize: 9, cursor: "pointer" }}>✏️</button>
-          </div>
-        ))}
-        <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-          <input value={newStore.name} onChange={e => setNewStore({ ...newStore, name: e.target.value })}
-            placeholder="新門市名稱" style={{ flex: 1, padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} />
-          <input value={newStore.address} onChange={e => setNewStore({ ...newStore, address: e.target.value })}
-            placeholder="地址" style={{ flex: 2, padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} />
-          <button onClick={() => {
-            if (!newStore.name) return;
-            ap("/api/admin/stores", { action: "create", name: newStore.name, address: newStore.address })
-              .then(() => { setNewStore({ name: "", address: "" }); alert("已新增"); load(); });
-          }} style={{ padding: "4px 10px", borderRadius: 4, border: "none", background: newStore.name ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>＋</button>
-        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+          <thead><tr style={{ background: "#faf8f5" }}>
+            <th style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>門市名稱</th>
+            <th style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>地址</th>
+            <th style={{ padding: 6, textAlign: "center", fontWeight: 500, color: "#666", width: 40 }}>💾</th>
+          </tr></thead>
+          <tbody>
+            {stores.map(s => (
+              <tr key={s.id} style={{ borderBottom: "1px solid #f0eeea" }}>
+                <td style={{ padding: 4 }}><input id={"sn-"+s.id} defaultValue={s.name} style={{ width: "100%", padding: "4px 6px", border: "1px solid #eee", borderRadius: 4, fontSize: 11, fontWeight: 500 }} /></td>
+                <td style={{ padding: 4 }}><input id={"sa-"+s.id} defaultValue={s.address||""} placeholder="輸入完整地址" style={{ width: "100%", padding: "4px 6px", border: "1px solid #eee", borderRadius: 4, fontSize: 11 }} /></td>
+                <td style={{ padding: 4, textAlign: "center" }}><button onClick={()=>{
+                  const name=document.getElementById("sn-"+s.id).value;
+                  const addr=document.getElementById("sa-"+s.id).value;
+                  ap("/api/admin/stores",{action:"update_targets",store_id:s.id,name,address:addr}).then(()=>{alert("✅ 已儲存");load();});
+                }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>💾</button></td>
+              </tr>
+            ))}
+            <tr style={{ borderTop: "1px dashed #ddd" }}>
+              <td style={{ padding: 4 }}><input value={newStore.name} onChange={e=>setNewStore({...newStore,name:e.target.value})} placeholder="新門市名稱" style={{ width: "100%", padding: "4px 6px", border: "1px dashed #ccc", borderRadius: 4, fontSize: 11 }} /></td>
+              <td style={{ padding: 4 }}><input value={newStore.address} onChange={e=>setNewStore({...newStore,address:e.target.value})} placeholder="地址" style={{ width: "100%", padding: "4px 6px", border: "1px dashed #ccc", borderRadius: 4, fontSize: 11 }} /></td>
+              <td style={{ padding: 4, textAlign: "center" }}><button onClick={()=>{if(!newStore.name)return;ap("/api/admin/stores",{action:"create",name:newStore.name,address:newStore.address}).then(()=>{setNewStore({name:"",address:""});load();});}} style={{ padding: "2px 8px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 10, cursor: "pointer" }}>＋</button></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       {/* 打卡設定 */}
@@ -241,10 +247,25 @@ export default function SettingsMgr({ stores, load, month }) {
                 style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: "#4361ee", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                 📍 站在門市定位
               </button>
-              <a href={`https://www.google.com/maps?q=${s.latitude||25},${s.longitude||121}`} target="_blank" rel="noopener"
-                style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", fontSize: 11, cursor: "pointer", textDecoration: "none", color: "#333" }}>
-                🗺️ 開Google地圖
-              </a>
+              <button onClick={async () => {
+                const addr = s.address || prompt("輸入門市地址（例：台北市大安區忠孝東路四段1號）：");
+                if (!addr) return;
+                const btn2 = document.getElementById("geo-btn-" + s.id);
+                if (btn2) btn2.textContent = "⏳ 搜尋中...";
+                try {
+                  const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(addr + " 台灣") + "&limit=1");
+                  const data = await r.json();
+                  if (data && data[0]) {
+                    document.getElementById("lat-" + s.id).value = Number(data[0].lat).toFixed(6);
+                    document.getElementById("lng-" + s.id).value = Number(data[0].lon).toFixed(6);
+                    if (btn2) btn2.textContent = "✅ 找到了";
+                    alert("✅ 地址定位成功！\n\n" + data[0].display_name + "\n📍 " + Number(data[0].lat).toFixed(6) + ", " + Number(data[0].lon).toFixed(6) + "\n\n請確認地圖位置後按💾儲存");
+                  } else { if (btn2) btn2.textContent = "❌ 未找到"; alert("❌ 找不到此地址，請嘗試更詳細的地址"); }
+                } catch(e) { if (btn2) btn2.textContent = "❌ 錯誤"; alert("搜尋失敗：" + e.message); }
+              }} id={"geo-btn-" + s.id}
+                style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", fontSize: 11, cursor: "pointer", color: "#333" }}>
+                🔍 用地址搜尋座標
+              </button>
             </div>
             
             {/* 座標微調 */}
@@ -626,6 +647,50 @@ export default function SettingsMgr({ stores, load, month }) {
               style={{ marginTop: 8, width: "100%", padding: 8, borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               💾 儲存權限設定
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* 備份管理 */}
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+        <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>💾 資料備份</h4>
+        <div style={{ fontSize: 10, color: "#888", marginBottom: 8 }}>每日凌晨 Cron 自動備份到 Storage，保留 30 天。也可手動備份或下載。</div>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
+          <button onClick={async () => {
+            setBackupLoading(true);
+            const r = await ap("/api/admin/backup", { action: "backup" });
+            setBackupLoading(false);
+            if (r.success) alert("✅ 備份完成\n\n" + r.total_records + " 筆資料 / " + r.size_kb + " KB\n存放：Storage/backups/" + r.date + ".json");
+            else alert("❌ " + (r.error || "備份失敗"));
+          }} disabled={backupLoading}
+            style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: backupLoading ? "#ccc" : "#0a7c42", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+            {backupLoading ? "⏳ 備份中..." : "💾 立即備份"}
+          </button>
+          <a href="/api/admin/backup?action=download" target="_blank" rel="noopener"
+            style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #4361ee", background: "#fff", color: "#4361ee", fontSize: 11, fontWeight: 600, cursor: "pointer", textDecoration: "none" }}>
+            📥 下載完整 JSON
+          </a>
+          <button onClick={async () => {
+            const r = await ap("/api/admin/backup?action=list");
+            setBackups(r.data || []);
+          }} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", fontSize: 11, cursor: "pointer" }}>
+            📋 查看備份紀錄
+          </button>
+        </div>
+        {backups.length > 0 && (
+          <div style={{ maxHeight: 200, overflow: "auto", border: "1px solid #f0eeea", borderRadius: 6 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+              <thead><tr style={{ background: "#faf8f5" }}>
+                <th style={{ padding: 4, textAlign: "left", color: "#666" }}>日期</th>
+                <th style={{ padding: 4, textAlign: "right", color: "#666" }}>大小</th>
+              </tr></thead>
+              <tbody>{backups.map((b, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid #f0eeea" }}>
+                  <td style={{ padding: 4 }}>{b.name?.replace(".json", "")}</td>
+                  <td style={{ padding: 4, textAlign: "right", color: "#888" }}>{b.metadata?.size ? Math.round(b.metadata.size / 1024) + " KB" : "-"}</td>
+                </tr>
+              ))}</tbody>
+            </table>
           </div>
         )}
       </div>

@@ -14,7 +14,7 @@ const DAYS = ["日","一","二","三","四","五","六"];
 const MI = (label, text) => ({ type: "action", action: { type: "message", label, text } });
 const MU = (label, url) => ({ type: "action", action: { type: "uri", label, uri: url } });
 const SITE = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
-const MENU_BASE = [MI("📍 上班打卡", "上班打卡"), MI("📍 下班打卡", "下班打卡"), MI("📅 我的班表", "我的班表"), MI("🙋 請假/預休", "請假申請"), MI("🏖 我的假勤", "我的假勤"), MI("💰 我的薪資", "我的薪資"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報"), MI("🔧 補打卡", "補打卡"), MI("🔄 調班申請", "調班申請")];
+const MENU_BASE = [MI("📍 上班打卡", "上班打卡"), MI("📍 下班打卡", "下班打卡"), MI("📋 工作日誌", "工作日誌"), MI("📅 我的班表", "我的班表"), MI("🙋 請假/預休", "請假申請"), MI("🏖 我的假勤", "我的假勤"), MI("💰 我的薪資", "我的薪資"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報"), MI("📊 銷售回報", "銷售回報"), MI("🔧 補打卡", "補打卡")];
 const MENU_SM = [...MENU_BASE, MI("📦 月結單據", "月結單據"), MI("💰 零用金", "零用金"), MU("🔗 後台", SITE)];
 const MENU_MGR = [...MENU_SM, MI("🏢 總部代付", "總部代付"), MI("📊 今日營收", "今日營收")];
 const MENU_ADMIN = [MU("🔗 管理後台", SITE), MI("📊 今日營收", "今日營收"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報"), MI("📦 月結單據", "月結單據"), MI("💰 零用金", "零用金"), MI("🏢 總部代付", "總部代付"), MI("📅 我的班表", "我的班表")];
@@ -533,6 +533,27 @@ async function handleEvent(event) {
       } catch (e) { await pushText(uid2, "❌ " + e.message); }
       return;
     }
+    // 銷售回報照片
+    if (state?.current_flow === "sales_photo") {
+      const uid2 = event.source.userId;
+      await replyText(event.replyToken, "📊 AI 辨識 POS 銷售中...");
+      try {
+        const b64 = await downloadImageAsBase64(event.message.id);
+        const { analyzePosSales } = await import("@/lib/anthropic");
+        const r = await analyzePosSales(b64);
+        if (!r || !r.items?.length) { await pushText(uid2, "❌ 辨識失敗，請確保拍到品項名稱和數量"); return; }
+        const d = state.flow_data;
+        // 匹配品名 → stock_items
+        const res = await fetch(new URL("/api/admin/stock", SITE), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "import_sales", store_id: d.store_id, date: r.date || new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }), items: r.items, source: "photo", submitted_by: d.employee_id }) }).then(x => x.json());
+        let msg = `📊 POS 銷售已匯入\n🏠 ${d.store_name}\n━━━━━━━━━━━━━━\n`;
+        msg += `✅ 匹配 ${res.matched||0} 項 / 共 ${res.total||0} 項\n`;
+        if (res.unmatched?.length) msg += `\n⚠️ 未匹配（盤點品項中找不到）：\n${res.unmatched.join("、")}\n\n這些品項需先在後台「盤點品項設定」中新增`;
+        msg += `\n\n銷售數據已用於庫存差異計算`;
+        await pushText(uid2, msg);
+        await clearUserState(uid2);
+      } catch (e) { await pushText(uid2, "❌ " + e.message); }
+      return;
+    }
     return replyText(event.replyToken, "📷 請先選功能再拍照");
   }
   // Postback 事件（LINE 日期選擇器回傳）
@@ -816,6 +837,30 @@ async function handleEvent(event) {
     ]);
   }
   if (text === "今日營收") return queryRevenue(rt);
+
+  // 盤點
+  if (text === "盤點" || text === "進貨") {
+    const store = emp.store_id && emp.stores ? emp.stores : null;
+    if (!store) return replyText(rt, "❌ 請先綁定門市");
+    const url = `${SITE}/worklog?eid=${emp.id}&sid=${emp.store_id}&name=${encodeURIComponent(emp.name)}`;
+    return lineClient.replyMessage({ replyToken: rt, messages: [{ type: "text", text: `📋 盤點和進貨已整合到工作日誌中\n\n點下方開啟：`, quickReply: { items: [{ type: "action", action: { type: "uri", label: "📋 開啟工作日誌", uri: url } }] } }] });
+  }
+
+  // 工作日誌
+  if (text === "工作日誌" || text === "日誌") {
+    const store = emp.store_id && emp.stores ? emp.stores : null;
+    if (!store) return replyText(rt, "❌ 請先綁定門市");
+    const url = `${SITE}/worklog?eid=${emp.id}&sid=${emp.store_id}&name=${encodeURIComponent(emp.name)}`;
+    return lineClient.replyMessage({ replyToken: rt, messages: [{ type: "text", text: `📋 工作日誌\n🏠 ${store.name}｜👤 ${emp.name}\n\n含工作清單、盤點、進貨、清潔`, quickReply: { items: [{ type: "action", action: { type: "uri", label: "📋 開啟工作日誌", uri: url } }] } }] });
+  }
+
+  // 銷售回報（拍 POS 品項銷售統計）
+  if (text === "銷售回報") {
+    const store = emp.store_id && emp.stores ? emp.stores : null;
+    if (!store) return replyText(rt, "❌ 請先綁定門市");
+    await setUserState(emp.line_uid, "sales_photo", { employee_id: emp.id, employee_name: emp.name, store_id: emp.store_id, store_name: store.name });
+    return replyText(rt, `📊 POS 銷售回報\n🏠 ${store.name}\n\n請截圖或拍照 iCHEF「品項銷售統計」\n（報表中心 → 品項銷售統計 → 今日）\n\n📸 拍照上傳`);
+  }
 
   // 月結單據
   if (text === "月結單據") {

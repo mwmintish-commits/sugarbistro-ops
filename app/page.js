@@ -10,13 +10,13 @@ const ROLE_TABS = {
   admin: ["dashboard","employees","schedules","leaves","attendance","overtime","payroll",
     "reviews","bonus",
     "settlements","deposits","expenses","payments","pnl",
-    "recipes","production","inventory","clients","orders","products",
+    "recipes","production","inventory","stock","clients","orders","products",
     "shifts","worklogs","announcements","audit","settings"],
   manager: ["employees","schedules","leaves","attendance","overtime","payroll",
     "reviews",
     "settlements","deposits","expenses","payments","pnl",
-    "recipes","production","inventory","clients","orders","products","shifts","worklogs"],
-  store_manager: ["schedules","leaves","store_staff","shifts","worklogs","inventory",
+    "recipes","production","inventory","stock","clients","orders","products","shifts","worklogs"],
+  store_manager: ["schedules","leaves","store_staff","shifts","worklogs","inventory","stock",
     "announcements","settlements","deposits","expenses"]
 };
 const TAB_L = {
@@ -25,7 +25,7 @@ const TAB_L = {
   reviews:"📝考核",bonus:"🏆獎金",
   settlements:"💰日結",
   deposits:"🏦存款",expenses:"📦費用",payments:"💳撥款",pnl:"📊損益",
-  recipes:"📋配方",production:"🏭生產",inventory:"📊庫存",
+  recipes:"📋配方",production:"🏭生產",inventory:"📊庫存",stock:"📦盤點",
   clients:"👥客戶",orders:"📝訂單",products:"🏷️產品",shifts:"⏰崗位",worklogs:"📋日誌",
   announcements:"📢公告",audit:"📋操作日誌",settings:"⚙️設定",store_staff:"👥本店員工"
 };
@@ -33,7 +33,7 @@ const TAB_GROUPS = {
   "總覽":["dashboard"],
   "人資":["employees","store_staff","schedules","leaves","attendance","overtime","payroll","reviews","bonus"],
   "財務":["settlements","deposits","expenses","payments","pnl"],
-  "生產":["recipes","production","inventory"],
+  "生產":["recipes","production","inventory","stock"],
   "業務":["products","clients","orders"],
   "管理":["shifts","worklogs","announcements","audit","settings"]
 };
@@ -69,6 +69,10 @@ export default function AdminPage() {
   const [att, setAtt] = useState([]);
   const [lr, setLr] = useState([]);
   const [exps, setExps] = useState([]);
+  const [stockItems, setStockItems] = useState([]);
+  const [stockReport, setStockReport] = useState([]);
+  const [stockDate, setStockDate] = useState(new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }));
+  const [restockNeeds, setRestockNeeds] = useState([]);
   const [expSum, setExpSum] = useState({});
   const [pnl, setPnl] = useState(null);
   const [anns, setAnns] = useState([]);
@@ -1783,6 +1787,109 @@ export default function AdminPage() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* STOCK COUNTS */}
+        {!ld && tab === "stock" && (
+          <div>
+            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📦 每日盤點</h3>
+            <div style={{display:"flex",gap:4,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+              <input type="date" value={stockDate} onChange={e=>setStockDate(e.target.value)} style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11}} />
+              <button onClick={async()=>{
+                const sid=sf||stores[0]?.id;if(!sid){alert("請選門市");return;}
+                const r=await ap("/api/admin/stock?type=variance&store_id="+sid+"&date="+stockDate);
+                setStockReport(r.data||[]);
+              }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"#4361ee",color:"#fff",fontSize:11,cursor:"pointer"}}>📊 載入差異報告</button>
+              <button onClick={async()=>{
+                const r=await ap("/api/admin/stock?type=restock");
+                setRestockNeeds(r.data||[]);
+              }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"#b45309",color:"#fff",fontSize:11,cursor:"pointer"}}>📋 明日備料需求</button>
+            </div>
+
+            {/* 備料需求 */}
+            {restockNeeds.length>0&&(
+              <div style={{background:"#fff8e6",borderRadius:8,border:"1px solid #f0e6c8",padding:12,marginBottom:12}}>
+                <h4 style={{fontSize:12,fontWeight:600,color:"#b45309",marginBottom:6}}>📋 備料需求（庫存低於標準量）</h4>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                  <thead><tr style={{background:"#fef3c7"}}>{["門市","品項","現有","標準","需補","單位"].map(h=><th key={h} style={{padding:4,textAlign:"left",fontWeight:500,color:"#92400e"}}>{h}</th>)}</tr></thead>
+                  <tbody>{restockNeeds.map((n,i)=>(
+                    <tr key={i} style={{borderBottom:"1px solid #f0eeea"}}>
+                      <td style={{padding:4}}>{n.store_name}</td>
+                      <td style={{padding:4,fontWeight:500}}>{n.item_name}</td>
+                      <td style={{padding:4,color:"#b91c1c",fontWeight:600}}>{n.current}</td>
+                      <td style={{padding:4}}>{n.par_level}</td>
+                      <td style={{padding:4,color:"#0a7c42",fontWeight:600}}>{n.need}</td>
+                      <td style={{padding:4}}>{n.unit}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
+
+            {/* 差異報告 */}
+            {stockReport.length>0&&(
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto",marginBottom:12}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:500}}>
+                  <thead><tr style={{background:"#faf8f5"}}>{["品項","早盤","進貨","銷售","理論","晚盤","差異","狀態"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                  <tbody>{stockReport.map((r,i)=>(
+                    <tr key={i} style={{borderBottom:"1px solid #f0eeea",background:r.alert?"#fef2f2":r.need_restock?"#fffbeb":"transparent"}}>
+                      <td style={{padding:6,fontWeight:500}}>{r.name}<span style={{fontSize:9,color:"#888",marginLeft:4}}>{r.unit}</span></td>
+                      <td style={{padding:6}}>{r.morning!==null?r.morning:"-"}</td>
+                      <td style={{padding:6,color:r.delivered>0?"#0a7c42":"#ccc"}}>{r.delivered>0?"+"+r.delivered:"-"}</td>
+                      <td style={{padding:6,color:r.sold>0?"#b91c1c":"#ccc"}}>{r.sold>0?"-"+r.sold:"-"}</td>
+                      <td style={{padding:6,color:"#888"}}>{r.theoretical!==null?r.theoretical:"-"}</td>
+                      <td style={{padding:6,fontWeight:600}}>{r.evening!==null?r.evening:"-"}</td>
+                      <td style={{padding:6,fontWeight:600,color:r.alert?"#b91c1c":r.variance!==null&&r.variance!==0?"#b45309":"#0a7c42"}}>{r.variance!==null?(r.variance>0?"+":"")+r.variance:"-"}</td>
+                      <td style={{padding:6}}>{r.alert?"🚨異常":r.need_restock?"⚠️要補":"✅"}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
+
+            {/* 盤點品項管理 */}
+            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:12}}>
+              <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>⚙️ 盤點品項設定</h4>
+              <div style={{display:"flex",gap:4,marginBottom:8}}>
+                <button onClick={async()=>{
+                  const sid=sf||stores[0]?.id;if(!sid){alert("請選門市");return;}
+                  const r=await ap("/api/admin/stock?type=items&store_id="+sid);setStockItems(r.data||[]);
+                }} style={{padding:"4px 10px",borderRadius:4,border:"1px solid #ddd",fontSize:10,cursor:"pointer"}}>🔄 載入品項</button>
+                <button onClick={async()=>{
+                  const sid=sf||stores[0]?.id;if(!sid){alert("請選門市");return;}
+                  const name=prompt("品項名稱：");if(!name)return;
+                  const cat=prompt("分類（食材/成品/飲料/包材）：","食材");
+                  const unit=prompt("單位：","個");
+                  const par=prompt("標準庫存量（低於此值→要補）：","10");
+                  await ap("/api/admin/stock",{action:"add_item",store_id:sid,name,category:cat,unit,par_level:Number(par)});
+                  const r=await ap("/api/admin/stock?type=items&store_id="+sid);setStockItems(r.data||[]);
+                }} style={{padding:"4px 10px",borderRadius:4,border:"none",background:"#1a1a1a",color:"#fff",fontSize:10,cursor:"pointer"}}>＋新增品項</button>
+                {stores.length>1&&<button onClick={async()=>{
+                  const from=sf||stores[0]?.id;const toName=prompt("複製品項到哪個門市？\n"+stores.map(s=>s.name).join(" / "));                  const to=stores.find(s=>s.name.includes(toName));if(!to){alert("找不到門市");return;}
+                  const r=await ap("/api/admin/stock",{action:"copy_items",from_store_id:from,to_store_id:to.id});
+                  alert("已複製 "+(r.copied||0)+" 項到 "+to.name);
+                }} style={{padding:"4px 10px",borderRadius:4,border:"1px solid #ddd",fontSize:10,cursor:"pointer"}}>📋 複製到其他門市</button>}
+              </div>
+              {stockItems.length>0&&(
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                  <thead><tr style={{background:"#faf8f5"}}>{["品項","分類","單位","標準量","警示值","操作"].map(h=><th key={h} style={{padding:4,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                  <tbody>{stockItems.map(item=>(
+                    <tr key={item.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                      <td style={{padding:4,fontWeight:500}}>{item.name}</td>
+                      <td style={{padding:4,fontSize:10,color:"#888"}}>{item.category}</td>
+                      <td style={{padding:4}}>{item.unit}</td>
+                      <td style={{padding:4}}>{item.par_level}</td>
+                      <td style={{padding:4}}>{item.alert_threshold}</td>
+                      <td style={{padding:4}}>
+                        <button onClick={async()=>{const par=prompt("標準量：",item.par_level);if(par===null)return;await ap("/api/admin/stock",{action:"update_item",item_id:item.id,par_level:Number(par)});const r=await ap("/api/admin/stock?type=items&store_id="+(sf||stores[0]?.id));setStockItems(r.data||[]);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10}}>✏️</button>
+                        <button onClick={async()=>{if(!confirm("停用「"+item.name+"」？"))return;await ap("/api/admin/stock",{action:"delete_item",item_id:item.id});const r=await ap("/api/admin/stock?type=items&store_id="+(sf||stores[0]?.id));setStockItems(r.data||[]);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
+                      </td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              )}
+            </div>
           </div>
         )}
 

@@ -43,6 +43,12 @@ export async function GET(request) {
     reminders.push("⚠️ " + (i.stores?.name || "") + " " + i.name + " 庫存" + i.current_stock + "（安全量" + i.safe_stock + "）");
   }
 
+  // 每日自動備份（無論有無提醒都執行）
+  try {
+    const backupRes = await fetch(new URL("/api/admin/backup?action=auto&key=" + (key || ""), request.url)).then(r => r.json());
+    if (backupRes.success) reminders.push("💾 自動備份完成（" + backupRes.size_kb + "KB / " + backupRes.total_records + "筆）");
+  } catch {}
+
   if (reminders.length === 0) return Response.json({ success: true, reminders: 0 });
 
   // 推送給 admin

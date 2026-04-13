@@ -84,7 +84,11 @@ export default function ClockInPage() {
 
   if (loading) return <C>載入中...</C>;
 
-  if (result) return (
+  if (result) {
+    const wlUrl = `/worklog?eid=${info?.employee_id||""}&sid=${info?.store?.id||""}&name=${encodeURIComponent(info?.employee_name||"")}`;
+    // 3 秒後自動跳轉工作日誌
+    setTimeout(() => { window.location.href = wlUrl; }, 3000);
+    return (
     <Box><C>
       <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
       <h1 style={{ fontSize: 20, fontWeight: 600 }}>{typeLabel}成功</h1>
@@ -94,9 +98,11 @@ export default function ClockInPage() {
         {distance !== null && <R l="距離" v={`${result.distance}m`} />}
         {result.late_minutes > 0 && <R l="遲到" v={<span style={{ color: "#b91c1c" }}>{result.late_minutes} 分鐘</span>} />}
       </div>
-      <p style={{ fontSize: 13, color: "#999", marginTop: 16 }}>可以關閉此頁面了</p>
+      <div style={{ marginTop: 16, textAlign: "center", fontSize: 12, color: "#888" }}>3 秒後自動進入工作日誌...</div>
+      <a href={wlUrl} style={{ display: "block", width: "100%", padding: 14, borderRadius: 10, background: "#0a7c42", color: "#fff", fontSize: 15, fontWeight: 600, textAlign: "center", textDecoration: "none", marginTop: 8 }}>📋 立即進入工作日誌</a>
     </C></Box>
-  );
+    );
+  }
 
   return (
     <Box>

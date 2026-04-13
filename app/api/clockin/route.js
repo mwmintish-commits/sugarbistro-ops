@@ -21,7 +21,7 @@ export async function GET(request) {
   const { data: schedule } = await supabase.from("schedules").select("*, shifts(*)").eq("employee_id", t.employee_id).eq("date", today).single();
 
   return Response.json({
-    employee_name: emp?.name, type: t.type,
+    employee_name: emp?.name, employee_id: t.employee_id, type: t.type,
     store: emp?.stores ? { name: emp.stores.name, latitude: emp.stores.latitude, longitude: emp.stores.longitude, radius_m: emp.stores.radius_m } : null,
     schedule: schedule ? { shift_name: schedule.shifts?.name, start_time: schedule.shifts?.start_time, end_time: schedule.shifts?.end_time } : null,
   });
