@@ -322,7 +322,7 @@ function getNextStep(data, cur) {
 }
 function stepPrompt(step, data) {
   const m = { receipt_ubereats:`🛵 UberEats ${fmt(data.uber_eat_amount)}\n上傳對帳單`, receipt_meal_voucher:`🎫 餐券 ${fmt(data.meal_voucher_amount)}\n上傳餐券（含流水號）`, receipt_line_credit:`📱 LINE儲值金 ${fmt(data.line_credit_amount)}\n上傳單據`, receipt_drink_voucher:`🎫 飲料券 ${fmt(data.drink_voucher_amount)}\n上傳飲料券` };
-  return (m[step.flow]||"") + "\n輸入「跳過」略過";
+  return (m[step.flow]||"") + "\n\n📸 請拍照上傳";
 }
 
 async function startSettlement(rt, emp) {
@@ -384,18 +384,34 @@ async function handleReceiptImg(event, state) {
     const type=flow.replace("receipt_",""), imgUrl=await uploadImage(b64,"receipts_detail",`${type}_${Date.now()}`);
     data.receipts=data.receipts||[]; data.receipts.push({type,image_url:imgUrl,ai_raw_data:ai,serial_numbers:serials});
     data.audit_results=data.audit_results||[]; data.audit_results.push({type,message:msg,has_issue:msg.includes("🚨")||msg.includes("⚠️")});
-    await pushText(uid, msg);
-    const ns=getNextStep(data,flow);
-    if(ns){await setUserState(uid,ns.flow,data);await pushText(uid,stepPrompt(ns,data));}
-    else{await setUserState(uid,"settlement_confirm",data);await lineClient.pushMessage({to:uid,messages:[{type:"text",text:"所有單據完成，確認送出？",quickReply:{items:[{type:"action",action:{type:"message",label:"✅確認",text:"確認日結"}},{type:"action",action:{type:"message",label:"🔙取消",text:"取消"}}]}}]});}
+    // 累計張數
+    const stepCount = data.receipts.filter(r=>r.type===type).length;
+    await setUserState(uid, flow, data);
+    await pushText(uid, msg + `\n（本項第 ${stepCount} 張）`);
+    // 問是否還有更多
+    const typeLabel = {ubereats:"UberEats",meal_voucher:"餐券",line_credit:"LINE儲值金",drink_voucher:"飲料券"}[type]||type;
+    await lineClient.pushMessage({to:uid,messages:[{type:"text",text:`還有更多${typeLabel}照片嗎？`,quickReply:{items:[
+      {type:"action",action:{type:"message",label:"📸 繼續拍下一張",text:"繼續拍照"}},
+      {type:"action",action:{type:"message",label:`✅ ${typeLabel}完成`,text:"單據完成"}},
+    ]}}]});
   } catch(e) { await pushText(uid, "❌ "+e.message); }
 }
 async function skipStep(uid, state) {
-  const data=state.flow_data; data.audit_results=data.audit_results||[]; data.audit_results.push({type:state.current_flow.replace("receipt_",""),message:"⏭️跳過",has_issue:true});
+  // 檢查該步驟是否有金額 → 有金額不能跳過
+  const data=state.flow_data;
+  const stepField = RECEIPT_STEPS.find(s=>s.flow===state.current_flow);
+  if (stepField && Number(data[stepField.field]||0) > 0) {
+    return "❌ " + ({receipt_ubereats:"UberEats",receipt_meal_voucher:"餐券",receipt_line_credit:"LINE儲值金",receipt_drink_voucher:"飲料券"}[state.current_flow]||"此項") + "有 " + fmt(data[stepField.field]) + "，必須上傳單據稽核\n\n📸 請拍照上傳";
+  }
+  data.audit_results=data.audit_results||[]; data.audit_results.push({type:state.current_flow.replace("receipt_",""),message:"⏭️跳過（金額$0）",has_issue:false});
   const ns=getNextStep(data,state.current_flow);
   if(ns){await setUserState(uid,ns.flow,data);return stepPrompt(ns,data);}
+  // 完成 → 存草稿 + 送網頁核對
+  const d=data;const dt=d.date;
+  const{data:draft}=await supabase.from("daily_settlements").upsert({store_id:d.store_id,date:dt,net_sales:d.net_sales,cash_amount:d.cash_amount,twqr_amount:d.twqr_amount,uber_eat_amount:d.uber_eat_amount,meal_voucher_amount:d.meal_voucher_amount,drink_voucher_amount:d.drink_voucher_amount,line_credit_amount:d.line_credit_amount,remittance_amount:d.remittance_amount||0,cash_to_deposit:d.cash_to_deposit,image_url:d.image_url,ai_raw_data:d.ai_raw_data,submitted_by:d.employee_id,status:"draft"},{onConflict:"store_id,date"}).select().single();
+  const reviewUrl=`${SITE}/settlement-review?id=${draft?.id||""}`;
   await setUserState(uid,"settlement_confirm",data);
-  await lineClient.pushMessage({to:uid,messages:[{type:"text",text:"確認送出？",quickReply:{items:[{type:"action",action:{type:"message",label:"✅確認",text:"確認日結"}},{type:"action",action:{type:"message",label:"🔙取消",text:"取消"}}]}}]});
+  await lineClient.pushMessage({to:uid,messages:[{type:"text",text:"選擇操作：",quickReply:{items:[{type:"action",action:{type:"uri",label:"📝 開網頁核對",uri:reviewUrl}},{type:"action",action:{type:"message",label:"✅ 直接送出",text:"確認日結"}},{type:"action",action:{type:"message",label:"🔙 取消",text:"取消"}}]}}]});
   return null;
 }
 async function confirmSettlement(uid, emp) {
@@ -756,7 +772,21 @@ async function handleEvent(event) {
     if (state?.current_flow?.includes("settlement") && state?.flow_data?.store_id) { await setUserState(userId, "settlement_photo", { employee_name: state.flow_data.employee_name, employee_id: state.flow_data.employee_id, store_id: state.flow_data.store_id, store_name: state.flow_data.store_name }); return replyText(rt, "📸 重新拍照"); }
     if (state?.current_flow?.includes("expense") && state?.flow_data?.store_id) { await setUserState(userId, "expense_photo", state.flow_data); return replyText(rt, "📸 請重新拍照上傳單據"); }
   }
-  if (text === "跳過" && state?.current_flow?.startsWith("receipt_")) { const m = await skipStep(userId, state); return m ? replyText(rt, "⏭️\n\n" + m) : undefined; }
+  if (text === "跳過" && state?.current_flow?.startsWith("receipt_")) { const m = await skipStep(userId, state); return m ? replyText(rt, m) : undefined; }
+  if (text === "繼續拍照" && state?.current_flow?.startsWith("receipt_")) { return replyText(rt, "📸 請繼續拍照上傳"); }
+  if (text === "單據完成" && state?.current_flow?.startsWith("receipt_")) {
+    const data = state.flow_data;
+    const ns = getNextStep(data, state.current_flow);
+    if (ns) { await setUserState(userId, ns.flow, data); return replyText(rt, stepPrompt(ns, data)); }
+    // 全部完成 → 存草稿 + 網頁核對
+    const d = data, dt = d.date;
+    const{data:draft}=await supabase.from("daily_settlements").upsert({store_id:d.store_id,date:dt,net_sales:d.net_sales,cash_amount:d.cash_amount,twqr_amount:d.twqr_amount,uber_eat_amount:d.uber_eat_amount,meal_voucher_amount:d.meal_voucher_amount,drink_voucher_amount:d.drink_voucher_amount,line_credit_amount:d.line_credit_amount,remittance_amount:d.remittance_amount||0,cash_to_deposit:d.cash_to_deposit,image_url:d.image_url,ai_raw_data:d.ai_raw_data,submitted_by:d.employee_id,status:"draft"},{onConflict:"store_id,date"}).select().single();
+    const reviewUrl = `${SITE}/settlement-review?id=${draft?.id||""}`;
+    await setUserState(userId, "settlement_confirm", data);
+    const auditSummary = (data.audit_results||[]).map(a=>a.message).join("\n");
+    await pushText(userId, `✅ 所有單據稽核完成\n${auditSummary}\n\n📝 核對修正：\n${reviewUrl}`);
+    return lineClient.pushMessage({to:userId,messages:[{type:"text",text:"選擇操作：",quickReply:{items:[{type:"action",action:{type:"uri",label:"📝 開網頁核對",uri:reviewUrl}},{type:"action",action:{type:"message",label:"✅ 直接送出",text:"確認日結"}},{type:"action",action:{type:"message",label:"🔙 取消",text:"取消"}}]}}]});
+  }
 
   // 存款
   if (text.startsWith("存款門市:") && state?.current_flow === "deposit_select_store") return handleDepStore(rt, userId, text.replace("存款門市:", ""), state);
