@@ -26,7 +26,7 @@ const TAB_L = {
   settlements:"💰日結",
   deposits:"🏦存款",expenses:"📦費用",payments:"💳撥款",pnl:"📊損益",
   recipes:"📋配方",production:"🏭生產",inventory:"📊庫存",
-  clients:"👥客戶",orders:"📝訂單",products:"🏷️產品",shifts:"⏰班別",worklogs:"📋日誌",
+  clients:"👥客戶",orders:"📝訂單",products:"🏷️產品",shifts:"⏰崗位",worklogs:"📋日誌",
   announcements:"📢公告",audit:"📋操作日誌",settings:"⚙️設定",store_staff:"👥本店員工"
 };
 const TAB_GROUPS = {
@@ -245,10 +245,12 @@ export default function AdminPage() {
     load();
   };
   const saveShift = async () => {
+    const autoName = (sf2.role||"全場") + " " + (sf2.start_time||"").slice(0,5) + "~" + (sf2.end_time||"").slice(0,5);
+    const payload = { ...sf2, name: sf2.name || autoName };
     if (es) {
-      await ap("/api/admin/shifts", { action: "update", shift_id: es.id, ...sf2 });
+      await ap("/api/admin/shifts", { action: "update", shift_id: es.id, ...payload });
     } else {
-      await ap("/api/admin/shifts", { action: "create", ...sf2 });
+      await ap("/api/admin/shifts", { action: "create", ...payload });
     }
     setSsf(false); setEs(null); load();
   };
@@ -635,9 +637,9 @@ export default function AdminPage() {
                             {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);return(
                               <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top"}}>
                                 {sc?(<div style={{background:sc.type==="leave"?(LT[sc.leave_type]||LT.off).bg:sc.published?"#e6f9f0":"#fff8e6",border:sc.published?"1.5px solid #0a7c42":"1.5px dashed #d4a017",borderRadius:4,padding:"2px 3px",fontSize:9}}>
-                                  {sc.type==="leave"?<div style={{color:(LT[sc.leave_type]||LT.off).c,fontWeight:500}}>{(LT[sc.leave_type]||LT.off).l}</div>:<div><div style={{fontWeight:500}}>{sc.shifts?sc.shifts.name:""}</div><div style={{color:"#888"}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></div>}
+                                  {sc.type==="leave"?<div style={{color:(LT[sc.leave_type]||LT.off).c,fontWeight:500}}>{(LT[sc.leave_type]||LT.off).l}</div>:<div><div style={{fontWeight:500,color:sc.shifts?.color||"#0a7c42"}}>{sc.shifts?.role&&sc.shifts.role!=="all"?sc.shifts.role:"全場"}</div><div style={{color:"#888"}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></div>}
                                   <div style={{textAlign:"right",marginTop:1}}><button onClick={(ev)=>{ev.stopPropagation();delSch(sc.id);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c",padding:"2px 4px"}}>✕刪</button></div>
-                                </div>):(<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else addSch(emp.id,v,date);}} style={{width:"100%",padding:1,borderRadius:3,border:"1px dashed #ddd",fontSize:9,color:"#ccc",background:"transparent",cursor:"pointer"}}><option value="">+</option><optgroup label="班別">{storeShifts.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</optgroup><optgroup label="休假">{Object.entries(LT).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select>)}
+                                </div>):(<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else addSch(emp.id,v,date);}} style={{width:"100%",padding:1,borderRadius:3,border:"1px dashed #ddd",fontSize:9,color:"#ccc",background:"transparent",cursor:"pointer"}}><option value="">+</option><optgroup label="崗位">{storeShifts.map(s=><option key={s.id} value={s.id}>{(s.role==="all"?"全場":s.role||"全場")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}</optgroup><optgroup label="休假">{Object.entries(LT).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select>)}
                               </td>);})}
                           </tr>))}</tbody>
                       </table>
@@ -673,7 +675,7 @@ export default function AdminPage() {
                         </div>
                         {ds.slice(0,5).map(s=>{const posColor=positions.find(p=>p.name===s.shifts?.role)?.color||s.shifts?.color||"#0a7c42";const isLeave=s.type==="leave";return(<div key={s.id} style={{background:isLeave?(LT[s.leave_type]||LT.off).bg:s.published?posColor+"12":"#fff8e6",border:isLeave?("2px solid "+(LT[s.leave_type]||LT.off).c):s.published?("2px solid "+posColor):("3px dashed "+posColor),borderRadius:5,padding:"3px 5px",fontSize:9,marginBottom:2,lineHeight:1.3}}>
                           <div style={{fontWeight:600,color:isLeave?(LT[s.leave_type]||LT.off).c:posColor}}>{s.employees?s.employees.name:""}</div>
-                          {isLeave?<div style={{fontSize:8,color:isLeave?(LT[s.leave_type]||LT.off).c:"#888"}}>{(LT[s.leave_type]||LT.off).l}{s.notes&&s.notes!=="預假"?" "+s.notes:""}</div>:<><div style={{fontSize:8,color:posColor}}>{s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role+"・":""}{s.shifts?s.shifts.name:""}</div><div style={{fontSize:7,color:"#888"}}>{s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):""}</div></>}
+                          {isLeave?<div style={{fontSize:8,color:(LT[s.leave_type]||LT.off).c}}>{(LT[s.leave_type]||LT.off).l}{s.notes&&s.notes!=="預假"?" "+s.notes:""}</div>:<><div style={{fontSize:8,color:posColor}}>{s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role:"全場"}</div><div style={{fontSize:7,color:"#888"}}>{s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):""}</div></>}
                         </div>);})}
                         {ds.length===0&&<div style={{fontSize:9,color:"#ccc",textAlign:"center",marginTop:4}}>+</div>}
                       </td>);
@@ -702,7 +704,7 @@ export default function AdminPage() {
                   }} style={{padding:"6px 12px",borderRadius:6,border:"1px solid #4361ee",background:"#fff",color:"#4361ee",fontSize:11,cursor:"pointer"}}>📋 複製上週班表</button>
                   <button onClick={async()=>{
                     if(!sf){alert("請先選擇門市");return;}
-                    const sid=document.getElementById("qs-shift")?.value;if(!sid){alert("請先選班別");return;}
+                    const sid=document.getElementById("qs-shift")?.value;if(!sid){alert("請先選崗位");return;}
                     const date=document.getElementById("qs-start")?.value;if(!date){alert("請選日期");return;}
                     const storeEmps=ae.filter(e=>e.store_id===sf);
                     if(!confirm("全員排班："+storeEmps.length+"人 排入 "+date))return;
@@ -716,13 +718,13 @@ export default function AdminPage() {
                 <h4 style={{fontSize:11,fontWeight:500,color:"#888",marginBottom:6}}>➕ 快速排班</h4>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"end"}}>
                   <div><label style={{fontSize:9,color:"#888"}}>員工</label><select id="qs-emp" style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11,minWidth:80}}><option value="">選員工</option><option value="__all__">👥 全員排入</option>{ae.filter(e=>!sf||e.store_id===sf).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
-                  <div><label style={{fontSize:9,color:"#888"}}>班別</label><select id="qs-shift" style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11,minWidth:80}}><option value="">選班別</option>{shifts.filter(s=>!sf||s.store_id===sf).map(s=><option key={s.id} value={s.id}>{s.name+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}<optgroup label="休假">{Object.entries(LT).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select></div>
+                  <div><label style={{fontSize:9,color:"#888"}}>班別</label><select id="qs-shift" style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11,minWidth:80}}><option value="">選崗位</option>{shifts.filter(s=>!sf||s.store_id===sf).map(s=><option key={s.id} value={s.id}>{(s.role==="all"?"全場":s.role||"全場")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}<optgroup label="休假">{Object.entries(LT).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select></div>
                   <div><label style={{fontSize:9,color:"#888"}}>開始日</label><input id="qs-start" type="date" defaultValue={month+"-01"} style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
                   <div><label style={{fontSize:9,color:"#888"}}>結束日</label><input id="qs-end" type="date" defaultValue={month+"-01"} style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
                   <button onClick={async()=>{
                     const eid=document.getElementById("qs-emp").value;const sid=document.getElementById("qs-shift").value;
                     const start=document.getElementById("qs-start").value;const end=document.getElementById("qs-end").value;
-                    if(!eid||!sid||!start){alert("請選擇員工、班別、日期");return;}
+                    if(!eid||!sid||!start){alert("請選擇員工、崗位、日期");return;}
                     const empIds=eid==="__all__"?ae.filter(e=>!sf||e.store_id===sf).map(e=>e.id):[eid];
                     let count=0,skip=0;
                     for(const id of empIds){let d=new Date(start);const ed=new Date(end||start);
@@ -1895,13 +1897,13 @@ export default function AdminPage() {
                 ))}
                 <button onClick={()=>{const name=prompt("新崗位名稱：");if(!name)return;const colors=["#0a7c42","#4361ee","#b45309","#b91c1c","#7c3aed","#0891b2","#be185d","#555"];const c=colors[positions.length%colors.length];const np=[...positions,{name,color:c}];setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});}} style={{padding:"4px 10px",borderRadius:6,border:"1px dashed #ccc",background:"transparent",fontSize:11,cursor:"pointer",color:"#888"}}>＋新增崗位</button>
               </div>
-              <div style={{fontSize:9,color:"#888"}}>崗位顏色會自動套用到班別和排班月曆</div>
+              <div style={{fontSize:9,color:"#888"}}>崗位顏色會自動套用到排班月曆</div>
             </div>
 
-            {/* 班別管理 */}
+            {/* 崗位排班管理 */}
             <button onClick={()=>{setSsf(!ssf);setEs(null);}}
               style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:ssf?"#f0f0f0":"#1a1a1a",color:ssf?"#666":"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
-              {ssf?"✕":"＋新增班別"}
+              {ssf?"✕":"＋新增崗位排班"}
             </button>
             {ssf && (
               <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8}}>
@@ -1911,9 +1913,8 @@ export default function AdminPage() {
                       <option value="">選擇</option>{stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                   </div>
-                  <div><label style={{fontSize:10,color:"#888"}}>班別名稱</label><input value={sf2.name} onChange={e=>setSf2({...sf2,name:e.target.value})} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
                   <div><label style={{fontSize:10,color:"#888"}}>崗位</label>
-                    <select value={sf2.role} onChange={e=>{const p=positions.find(x=>x.name===e.target.value);setSf2({...sf2,role:e.target.value,color:p?.color||sf2.color});}} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}>
+                    <select value={sf2.role} onChange={e=>{const p=positions.find(x=>x.name===e.target.value);setSf2({...sf2,role:e.target.value,color:p?.color||sf2.color,name:e.target.value+"_"+sf2.start_time});}} style={{width:"100%",padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}}>
                       {positions.map(p=><option key={p.name} value={p.name}>{p.name}</option>)}
                     </select>
                   </div>
@@ -1934,12 +1935,11 @@ export default function AdminPage() {
                   </h4>
                   <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                      <thead><tr style={{background:"#faf8f5"}}>{["班別","崗位","時間","休息","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{background:"#faf8f5"}}>{["崗位","時間","休息","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                       <tbody>{ss.map(s=>{const pc=positions.find(p=>p.name===s.role)?.color||s.color||"#0a7c42";return(
                         <tr key={s.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                          <td style={{padding:6,fontWeight:500}}>{s.name}</td>
-                          <td style={{padding:6}}><span style={{padding:"2px 8px",borderRadius:4,background:pc+"20",color:pc,fontWeight:500,fontSize:10}}>{s.role==="all"?"全場":s.role||"全場"}</span></td>
-                          <td style={{padding:6}}>{(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</td>
+                          <td style={{padding:6}}><span style={{padding:"2px 8px",borderRadius:4,background:pc+"20",color:pc,fontWeight:500,fontSize:11}}>{s.role==="all"?"全場":s.role||"全場"}</span></td>
+                          <td style={{padding:6,fontWeight:500}}>{(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</td>
                           <td style={{padding:6}}>{s.break_minutes+"分"}</td>
                           <td style={{padding:6}}>
                             <button onClick={()=>editShift(s)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,marginRight:2}}>✏️</button>
@@ -2059,23 +2059,23 @@ export default function AdminPage() {
               {scheds.filter(s => s.date === schPop.date && (schPop.storeId === "__hq__" ? !emps.find(e => e.id === s.employee_id)?.store_id : emps.find(e => e.id === s.employee_id)?.store_id === schPop.storeId)).map(s => (
                 <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", marginBottom: 4, borderRadius: 6, background: s.type === "leave" ? (LT[s.leave_type] || LT.off).bg : s.published ? "#e6f9f0" : "#fff8e6", border: s.published ? "1px solid #0a7c42" : "1px dashed #d4a017" }}>
                   <div>
-                    <span style={{ fontSize: 11 }}>{(s.employees?.name || "") + " " + (s.type === "leave" ? (LT[s.leave_type] || LT.off).l : s.shifts?.name || "")}</span>
+                    <span style={{ fontSize: 11 }}>{(s.employees?.name || "") + " " + (s.type === "leave" ? (LT[s.leave_type] || LT.off).l : (s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role:"全場") + " " + (s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):""))}</span>
                     {s.notes && <div style={{ fontSize: 8, color: "#888" }}>{s.notes}</div>}
                   </div>
                   <button onClick={async () => { await ap("/api/admin/schedules", { action: "delete", schedule_id: s.id }); load(); }} style={{ background: "none", border: "none", color: "#b91c1c", cursor: "pointer", fontSize: 11 }}>✕刪</button>
                 </div>
               ))}
               <div style={{ borderTop: "1px solid #eee", marginTop: 8, paddingTop: 8 }}>
-                <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>選員工 + 班別排入：</div>
+                <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>選員工 + 崗位排入：</div>
                 <select id="pop-emp" style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, marginBottom: 6 }}>
                   <option value="">選員工</option>
                   {ae.filter(e => schPop.storeId === "__hq__" ? !e.store_id : e.store_id === schPop.storeId).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                  {shifts.filter(s => schPop.storeId === "__hq__" || s.store_id === schPop.storeId).map(s => (
+                  {shifts.filter(s => schPop.storeId === "__hq__" || s.store_id === schPop.storeId).map(s => {const pc=positions.find(p=>p.name===s.role)?.color||s.color||"#0a7c42";return(
                     <button key={s.id} onClick={() => { const eid = document.getElementById("pop-emp").value; if (!eid) { alert("請選員工"); return; } schedOnHol(eid, s.id, s.name); }}
-                      style={{ padding: "8px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", fontSize: 11, cursor: "pointer", textAlign: "left" }}>{s.name}<div style={{ fontSize: 9, color: "#888" }}>{(s.start_time || "").slice(0, 5) + "~" + (s.end_time || "").slice(0, 5)}</div></button>
-                  ))}
+                      style={{ padding: "8px", borderRadius: 6, border: "1px solid #ddd", background: pc+"10", fontSize: 11, cursor: "pointer", textAlign: "left" }}><span style={{color:pc,fontWeight:600}}>{s.role==="all"?"全場":s.role||"全場"}</span><div style={{ fontSize: 9, color: "#888" }}>{(s.start_time || "").slice(0, 5) + "~" + (s.end_time || "").slice(0, 5)}</div></button>
+                  );})}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginTop: 6 }}>
                   {[["off","⬛ 例假"],["rest","🔲 休息日"],["annual","🏖 特休"],["advance","📌 預假"],["holiday_comp","🔴 國定補假"],["personal","📋 事假"],["sick","🤒 病假"]].map(([k, l]) => (
