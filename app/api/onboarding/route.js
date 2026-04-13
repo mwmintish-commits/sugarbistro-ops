@@ -181,7 +181,7 @@ export async function POST(request) {
         role: "staff",
         employment_type: "regular",
         hire_date: new Date().toLocaleDateString("sv-SE"),
-        is_active: true,
+        is_active: false,  // 待主管核准
         contract_signed: true, handbook_signed: true, bonus_policy_signed: true,
         onboarding_completed: true, onboarding_step: 5,
         emergency_contact, emergency_phone, bank_name, bank_account,

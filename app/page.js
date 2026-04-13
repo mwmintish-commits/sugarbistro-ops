@@ -50,6 +50,7 @@ function exportCSV(filename, headers, rows) {
 
 export default function AdminPage() {
   const [auth, setAuth] = useState(null);
+  const [customRoleTabs, setCustomRoleTabs] = useState(null);
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState(1);
@@ -124,7 +125,8 @@ export default function AdminPage() {
     ap("/api/admin/stores").then(d => setStores(d.data || []));
   }, []);
 
-  const myTabs = auth ? (ROLE_TABS[auth.role] || ROLE_TABS.staff || []) : [];
+  const effectiveRoleTabs = auth?.role === "admin" ? ROLE_TABS : { ...ROLE_TABS, ...(customRoleTabs || {}) };
+  const myTabs = auth ? (effectiveRoleTabs[auth.role] || ROLE_TABS[auth.role] || []) : [];
   useEffect(() => {
     if (auth && myTabs.length > 0 && !tab) setTab(myTabs[0]);
   }, [auth]);
@@ -176,6 +178,8 @@ export default function AdminPage() {
       .then(r => setHolidays(r.data||[])).catch(() => {});
     ap("/api/admin/system?key=positions")
       .then(r => setPositions(r.data?.value || [{ name: "全場", color: "#0a7c42" }, { name: "外場", color: "#4361ee" }, { name: "內場", color: "#b45309" }, { name: "吧台", color: "#7c3aed" }, { name: "烘焙", color: "#be185d" }])).catch(() => {});
+    ap("/api/admin/system?key=role_tabs")
+      .then(r => { if (r.data?.value) setCustomRoleTabs(r.data.value); }).catch(() => {});
     if (myTabs.includes("attendance")) {
       ap("/api/admin/attendance?type=amendments&month=" + month + (sf ? "&store_id=" + sf : ""))
         .then(r => setAmendments(r.data||[])).catch(() => {});

@@ -94,17 +94,21 @@ export async function POST(request) {
   // 啟用帳號（總部核發權限）
   if (body.action === "activate") {
     const { employee_id } = body;
-    const bindCode = generateBindCode();
-    const { data, error } = await supabase.from("employees").update({
-      is_active: true,
-      bind_code: bindCode,
-      bind_code_expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    }).eq("id", employee_id).select("*, stores(name)").single();
+    const updates = { is_active: true };
+    // 查看是否已有 LINE 綁定
+    const { data: check } = await supabase.from("employees").select("line_uid, name, stores(name)").eq("id", employee_id).single();
+    let bindCode = null;
+    if (!check?.line_uid) {
+      bindCode = generateBindCode();
+      updates.bind_code = bindCode;
+      updates.bind_code_expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    }
+    const { data, error } = await supabase.from("employees").update(updates).eq("id", employee_id).select("*, stores(name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
 
     // 通知員工帳號已啟用
     if (data.line_uid) {
-      await pushText(data.line_uid, `✅ 帳號已啟用！\n\n👤 ${data.name}\n🏠 ${data.stores?.name || "總部"}\n🔑 綁定碼：${bindCode}\n\n你已經可以使用系統了，輸入「選單」查看功能列表。\n\n如需重新綁定請輸入：綁定 ${bindCode}`).catch(() => {});
+      await pushText(data.line_uid, `✅ 帳號已啟用！\n\n👤 ${data.name}\n🏠 ${data.stores?.name || "總部"}\n\n你已經可以使用打卡、請假等功能了！`).catch(() => {});
     }
 
     return Response.json({ data, bind_code: bindCode });

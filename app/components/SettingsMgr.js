@@ -34,6 +34,36 @@ export default function SettingsMgr({ stores, load, month }) {
   });
   const [wlCopyTarget, setWlCopyTarget] = useState("");
   const [invNew, setInvNew] = useState({ category: "庫存盤點", item: "" });
+  const [roleTabs, setRoleTabs] = useState(null);
+
+  const ALL_TABS = [
+    { key:"dashboard", label:"🏠總覽", group:"總覽" },
+    { key:"employees", label:"👥員工", group:"人資" },
+    { key:"schedules", label:"📅排班", group:"人資" },
+    { key:"leaves", label:"🙋請假", group:"人資" },
+    { key:"attendance", label:"📍出勤", group:"人資" },
+    { key:"overtime", label:"🏖休假表", group:"人資" },
+    { key:"payroll", label:"💰薪資", group:"人資" },
+    { key:"reviews", label:"📝考核", group:"人資" },
+    { key:"bonus", label:"🏆獎金", group:"人資" },
+    { key:"settlements", label:"💰日結", group:"財務" },
+    { key:"deposits", label:"🏦存款", group:"財務" },
+    { key:"expenses", label:"📦費用", group:"財務" },
+    { key:"payments", label:"💳撥款", group:"財務" },
+    { key:"pnl", label:"📊損益", group:"財務" },
+    { key:"recipes", label:"📋配方", group:"生產" },
+    { key:"production", label:"🏭生產", group:"生產" },
+    { key:"inventory", label:"📊庫存", group:"生產" },
+    { key:"products", label:"🏷️產品", group:"業務" },
+    { key:"clients", label:"👥客戶", group:"業務" },
+    { key:"orders", label:"📝訂單", group:"業務" },
+    { key:"shifts", label:"⏰崗位", group:"管理" },
+    { key:"worklogs", label:"📋日誌", group:"管理" },
+    { key:"announcements", label:"📢公告", group:"管理" },
+    { key:"audit", label:"📋操作日誌", group:"管理" },
+    { key:"settings", label:"⚙️設定", group:"管理" },
+  ];
+  const ROLE_NAMES = { manager:"🏠管理員", store_manager:"🏪門市主管" };
 
   useEffect(() => {
     ap("/api/admin/system?key=company_name").then(r => { if (r.data) setCompanyName(r.data); }).catch(() => {});
@@ -41,6 +71,7 @@ export default function SettingsMgr({ stores, load, month }) {
     ap("/api/admin/system?key=contract").then(r => { if (r.data) setContractText(r.data); }).catch(() => {});
     ap("/api/admin/holidays?year=" + new Date().getFullYear()).then(r => setHols(r.data || [])).catch(() => {});
     ap("/api/admin/attendance?type=settings").then(r => { if (r.data) setClockSettings(r.data); }).catch(() => {});
+    ap("/api/admin/system?key=role_tabs").then(r => { if (r.data?.value) setRoleTabs(r.data.value); else setRoleTabs({ manager:["employees","schedules","leaves","attendance","overtime","payroll","reviews","settlements","deposits","expenses","payments","pnl","recipes","production","inventory","clients","orders","products","shifts","worklogs"], store_manager:["schedules","leaves","store_staff","shifts","worklogs","inventory","announcements","settlements","deposits","expenses"] }); }).catch(() => {});
   }, []);
 
   const loadWlTemplates = () => {
@@ -504,6 +535,48 @@ export default function SettingsMgr({ stores, load, month }) {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* 權限管理 */}
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+        <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🔐 角色權限管理</h4>
+        <div style={{ fontSize: 10, color: "#888", marginBottom: 8 }}>👑總部管理員 擁有所有權限（不可修改）。以下設定其他角色的可見功能：</div>
+        {roleTabs && (
+          <div style={{ overflow: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+              <thead><tr style={{ background: "#faf8f5" }}>
+                <th style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>功能</th>
+                {Object.keys(ROLE_NAMES).map(r => <th key={r} style={{ padding: 6, textAlign: "center", fontWeight: 500, color: "#666", minWidth: 70 }}>{ROLE_NAMES[r]}</th>)}
+              </tr></thead>
+              <tbody>
+                {["總覽","人資","財務","生產","業務","管理"].map(group => {
+                  const tabs = ALL_TABS.filter(t => t.group === group);
+                  return [
+                    <tr key={"g-"+group}><td colSpan={3} style={{ padding: "6px 6px 2px", fontWeight: 600, fontSize: 10, color: "#888", background: "#faf8f5" }}>{group}</td></tr>,
+                    ...tabs.map(t => (
+                      <tr key={t.key} style={{ borderBottom: "1px solid #f5f3f0" }}>
+                        <td style={{ padding: "4px 6px", fontSize: 11 }}>{t.label}</td>
+                        {Object.keys(ROLE_NAMES).map(role => {
+                          const on = (roleTabs[role] || []).includes(t.key);
+                          return <td key={role} style={{ padding: "4px 6px", textAlign: "center" }}>
+                            <button onClick={() => { const nr = { ...roleTabs }; if (on) nr[role] = (nr[role] || []).filter(x => x !== t.key); else nr[role] = [...(nr[role] || []), t.key]; setRoleTabs(nr); }}
+                              style={{ width: 36, height: 22, borderRadius: 11, border: "none", background: on ? "#0a7c42" : "#ddd", cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
+                              <div style={{ width: 16, height: 16, borderRadius: "50%", background: "#fff", position: "absolute", top: 3, left: on ? 17 : 3, transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
+                            </button>
+                          </td>;
+                        })}
+                      </tr>
+                    ))
+                  ];
+                })}
+              </tbody>
+            </table>
+            <button onClick={async () => { await ap("/api/admin/system", { key: "role_tabs", value: roleTabs }); alert("✅ 權限已儲存，重新登入後生效"); }}
+              style={{ marginTop: 8, width: "100%", padding: 8, borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              💾 儲存權限設定
+            </button>
           </div>
         )}
       </div>
