@@ -3,8 +3,8 @@ import { supabase } from "@/lib/supabase";
 export async function GET(request) {
   const key = new URL(request.url).searchParams.get("key");
   if (!key) return Response.json({ error: "Missing key" }, { status: 400 });
-  const { data } = await supabase.from("system_settings").select("*").eq("key", key).single();
-  return Response.json({ data: data ? data.value : null });
+  const { data, error } = await supabase.from("system_settings").select("*").eq("key", key).maybeSingle();
+  return Response.json({ data: data || null });
 }
 
 export async function POST(request) {
