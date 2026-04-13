@@ -32,13 +32,35 @@ export default function ClockInPage() {
   async function getLocation() {
     setGpsLoading(true); setError(null);
     try {
-      const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }));
-      const c = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) };
-      setPosition(c);
-      if (info?.store?.latitude && info?.store?.longitude) {
-        setDistance(calcDist(c.lat, c.lng, info.store.latitude, info.store.longitude));
+      // 使用 watchPosition 持續取最佳定位（最多 8 秒）
+      let bestPos = null;
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          if (!bestPos || pos.coords.accuracy < bestPos.coords.accuracy) {
+            bestPos = pos;
+            const c = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) };
+            setPosition(c);
+            if (info?.store?.latitude && info?.store?.longitude) {
+              setDistance(calcDist(c.lat, c.lng, info.store.latitude, info.store.longitude));
+            }
+          }
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+      // 8 秒後停止
+      await new Promise(res => setTimeout(res, 8000));
+      navigator.geolocation.clearWatch(watchId);
+      if (!bestPos) {
+        // fallback 單次
+        const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }));
+        const c = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) };
+        setPosition(c);
+        if (info?.store?.latitude && info?.store?.longitude) {
+          setDistance(calcDist(c.lat, c.lng, info.store.latitude, info.store.longitude));
+        }
       }
-    } catch { setError("無法定位，請開啟 GPS 並允許權限"); }
+    } catch { setError("無法定位，請開啟 GPS 並允許位置權限"); }
     setGpsLoading(false);
   }
 
@@ -104,18 +126,27 @@ export default function ClockInPage() {
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: 14, marginBottom: 10 }}>
             {!position ? (
               <button onClick={getLocation} disabled={gpsLoading} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: gpsLoading ? "#ccc" : "#4361ee", color: "#fff", fontSize: 15, cursor: "pointer" }}>
-                {gpsLoading ? "📍 定位中..." : "📍 取得目前位置"}
+                {gpsLoading ? "📍 定位中（約5秒）..." : "📍 取得目前位置"}
               </button>
             ) : (
               <div>
-                <R l="你的位置" v={<span style={{ fontSize: 10, fontFamily: "monospace" }}>{position.lat.toFixed(6)}, {position.lng.toFixed(6)}</span>} />
-                <R l="精度" v={"±" + position.accuracy + "m"} />
+                {/* 小地圖 */}
+                {hasStoreGPS && (
+                  <div style={{ borderRadius: 8, overflow: "hidden", border: "1px solid #e8e6e1", marginBottom: 8 }}>
+                    <iframe
+                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${Math.min(position.lng,info.store.longitude)-0.002},${Math.min(position.lat,info.store.latitude)-0.001},${Math.max(position.lng,info.store.longitude)+0.002},${Math.max(position.lat,info.store.latitude)+0.001}&layer=mapnik&marker=${position.lat},${position.lng}`}
+                      style={{ width: "100%", height: 130, border: "none" }} loading="lazy" />
+                  </div>
+                )}
+                <R l="GPS精度" v={<span style={{ color: position.accuracy <= 30 ? "#0a7c42" : position.accuracy <= 100 ? "#b45309" : "#b91c1c", fontWeight: 600 }}>
+                  {"±" + position.accuracy + "m "}{position.accuracy <= 30 ? "🟢 精準" : position.accuracy <= 100 ? "🟡 普通" : "🔴 較差"}
+                </span>} />
                 {hasStoreGPS && distance !== null && (
                   <R l="距門市" v={<span style={{ fontWeight: 600, fontSize: 16, color: isInRange ? "#0a7c42" : "#b91c1c" }}>
-                    {distance}m {isInRange ? "✅ 範圍內" : `❌ 超出範圍（限${maxRange}m）`}
+                    {distance}m {isInRange ? "✅ 範圍內" : `❌ 超出（限${maxRange}m）`}
                   </span>} />
                 )}
-                {!hasStoreGPS && <R l="門市GPS" v="未設定（請聯繫總部設定門市座標）" />}
+                {!hasStoreGPS && <R l="門市GPS" v="未設定（請聯繫總部）" />}
                 <button onClick={getLocation} style={{ marginTop: 8, padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "transparent", fontSize: 11, cursor: "pointer" }}>🔄 重新定位</button>
               </div>
             )}

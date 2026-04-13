@@ -197,38 +197,87 @@ export default function SettingsMgr({ stores, load, month }) {
 
       {/* GPS 打卡範圍 */}
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
-        <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📍 門市GPS打卡範圍</h4>
-        <p style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>設定門市座標和打卡範圍，員工超出範圍將無法打卡。</p>
+        <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>📍 門市GPS打卡範圍</h4>
+        <p style={{ fontSize: 10, color: "#888", marginBottom: 10 }}>到門市現場按「📍定位」自動抓取精確座標，或手動微調。地圖會即時預覽位置。</p>
         {stores.map(s => (
-          <div key={s.id} style={{ padding: "6px 0", borderBottom: "1px solid #f0eeea" }}>
-            <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4 }}>{s.name}</div>
-            <div style={{ display: "flex", gap: 4 }}>
+          <div key={s.id} style={{ padding: 10, marginBottom: 8, borderRadius: 8, border: "1px solid #e8e6e1", background: "#faf8f5" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{"🏠 " + s.name}</div>
+            
+            {/* 地圖預覽 */}
+            {s.latitude && s.longitude ? (
+              <div style={{ marginBottom: 8, borderRadius: 6, overflow: "hidden", border: "1px solid #ddd" }}>
+                <iframe
+                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${s.longitude-0.003},${s.latitude-0.002},${s.longitude+0.003},${s.latitude+0.002}&layer=mapnik&marker=${s.latitude},${s.longitude}`}
+                  style={{ width: "100%", height: 150, border: "none" }} loading="lazy" />
+                <div style={{ fontSize: 9, color: "#888", padding: "4px 6px", background: "#f5f5f5", display: "flex", justifyContent: "space-between" }}>
+                  <span>📍 {s.latitude?.toFixed(6)}, {s.longitude?.toFixed(6)}</span>
+                  <span>⭕ 打卡半徑 {s.radius_m || 200}m</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: 20, textAlign: "center", background: "#f0f0f0", borderRadius: 6, marginBottom: 8, fontSize: 11, color: "#888" }}>
+                尚未設定座標，請點下方「📍 定位」按鈕
+              </div>
+            )}
+            
+            {/* 操作按鈕 */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap" }}>
+              <button onClick={() => {
+                if (!navigator.geolocation) { alert("此瀏覽器不支援定位"); return; }
+                const btn = document.getElementById("loc-btn-" + s.id);
+                if (btn) btn.textContent = "⏳ 定位中...";
+                navigator.geolocation.getCurrentPosition(
+                  (pos) => {
+                    document.getElementById("lat-" + s.id).value = pos.coords.latitude.toFixed(6);
+                    document.getElementById("lng-" + s.id).value = pos.coords.longitude.toFixed(6);
+                    const acc = Math.round(pos.coords.accuracy);
+                    if (btn) btn.textContent = "✅ 精度 " + acc + "m";
+                    alert("✅ 已定位！精度 " + acc + "m\n\n" + pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6) + "\n\n請按💾儲存");
+                  },
+                  (err) => { if (btn) btn.textContent = "❌ 失敗"; alert("定位失敗：" + err.message); },
+                  { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                );
+              }} id={"loc-btn-" + s.id}
+                style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: "#4361ee", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                📍 站在門市定位
+              </button>
+              <a href={`https://www.google.com/maps?q=${s.latitude||25},${s.longitude||121}`} target="_blank" rel="noopener"
+                style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", fontSize: 11, cursor: "pointer", textDecoration: "none", color: "#333" }}>
+                🗺️ 開Google地圖
+              </a>
+            </div>
+            
+            {/* 座標微調 */}
+            <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 9, color: "#888" }}>緯度</label>
-                <input type="number" step="0.0001" id={"lat-" + s.id} defaultValue={s.latitude || ""} placeholder="22.6273"
-                  style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }} />
+                <input type="number" step="0.000001" id={"lat-" + s.id} defaultValue={s.latitude || ""} placeholder="25.033000"
+                  style={{ width: "100%", padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 9, color: "#888" }}>經度</label>
-                <input type="number" step="0.0001" id={"lng-" + s.id} defaultValue={s.longitude || ""} placeholder="120.3014"
-                  style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }} />
+                <input type="number" step="0.000001" id={"lng-" + s.id} defaultValue={s.longitude || ""} placeholder="121.565000"
+                  style={{ width: "100%", padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }} />
               </div>
-              <div style={{ width: 60 }}>
-                <label style={{ fontSize: 9, color: "#888" }}>範圍m</label>
-                <input type="number" id={"rad-" + s.id} defaultValue={s.radius_m || 200}
-                  style={{ width: "100%", padding: 3, borderRadius: 4, border: "1px solid #ddd", fontSize: 10, textAlign: "center" }} />
+              <div style={{ width: 70 }}>
+                <label style={{ fontSize: 9, color: "#888" }}>範圍(m)</label>
+                <select id={"rad-" + s.id} defaultValue={s.radius_m || 200}
+                  style={{ width: "100%", padding: 4, borderRadius: 4, border: "1px solid #ddd", fontSize: 11 }}>
+                  <option value="50">50m</option><option value="100">100m</option>
+                  <option value="150">150m</option><option value="200">200m</option>
+                  <option value="300">300m</option><option value="500">500m</option>
+                </select>
               </div>
               <button onClick={() => {
                 const lat = document.getElementById("lat-" + s.id).value;
                 const lng = document.getElementById("lng-" + s.id).value;
                 const rad = document.getElementById("rad-" + s.id).value;
+                if (!lat || !lng) { alert("請先定位或輸入座標"); return; }
                 ap("/api/admin/stores", {
                   action: "update_targets", store_id: s.id,
-                  latitude: lat ? Number(lat) : null,
-                  longitude: lng ? Number(lng) : null,
-                  radius_m: rad ? Number(rad) : 200
-                }).then(() => alert(s.name + " GPS已儲存"));
-              }} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 9, cursor: "pointer", alignSelf: "flex-end" }}>💾</button>
+                  latitude: Number(lat), longitude: Number(lng), radius_m: Number(rad) || 200
+                }).then(() => { alert("✅ " + s.name + " GPS已儲存"); load(); });
+              }} style={{ padding: "4px 12px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>💾</button>
             </div>
           </div>
         ))}
