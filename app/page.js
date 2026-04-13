@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, LABOR_SELF, HEALTH_SELF } from "./components/utils";
 import EmpDetail from "./components/EmpDetail";
-import SettingsMgr from "./components/SettingsMgr";
+import SettingsMgr, { BonusFormulaEditor } from "./components/SettingsMgr";
 import WorklogMgr from "./components/WorklogMgr";
 import LeavesMgr from "./components/LeavesMgr";
 
@@ -1256,6 +1256,9 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
+
+            {/* 獎金公式設定 */}
+            {auth.role === "admin" && <BonusFormulaEditor />}
           </div>
         )}
 
