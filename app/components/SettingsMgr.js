@@ -105,51 +105,54 @@ export default function SettingsMgr({ stores, load, month }) {
         </div>
       </div>
 
-      {/* 門市管理（含GPS、目標、預算） */}
+      {/* 門市管理（含定位、目標、預算） */}
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🏠 門市管理</h4>
         {stores.map(s => (
           <div key={s.id} style={{ padding: 10, marginBottom: 8, borderRadius: 8, border: "1px solid #e8e6e1", background: "#faf8f5" }}>
             <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
-              <input id={"sn-"+s.id} defaultValue={s.name} style={{ flex: 1, padding: "5px 8px", border: "1px solid #eee", borderRadius: 6, fontSize: 12, fontWeight: 600 }} />
-              <input id={"sa-"+s.id} defaultValue={s.address||""} placeholder="地址" style={{ flex: 2, padding: "5px 8px", border: "1px solid #eee", borderRadius: 6, fontSize: 11 }} />
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>名稱</label><input id={"sn-"+s.id} defaultValue={s.name} style={{ width: "100%", padding: "5px 8px", border: "1px solid #eee", borderRadius: 6, fontSize: 12, fontWeight: 600 }} /></div>
             </div>
-            {/* GPS + 地圖 */}
-            <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "flex-end", flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: 100 }}>
-                <label style={{ fontSize: 9, color: "#888" }}>緯度</label>
-                <input type="number" step="0.000001" id={"lat-"+s.id} defaultValue={s.latitude||""} placeholder="25.033" style={{ width: "100%", padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }} />
-              </div>
-              <div style={{ flex: 1, minWidth: 100 }}>
-                <label style={{ fontSize: 9, color: "#888" }}>經度</label>
-                <input type="number" step="0.000001" id={"lng-"+s.id} defaultValue={s.longitude||""} placeholder="121.56" style={{ width: "100%", padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }} />
-              </div>
-              <div style={{ width: 60 }}>
-                <label style={{ fontSize: 9, color: "#888" }}>範圍</label>
-                <select id={"rad-"+s.id} defaultValue={s.radius_m||200} style={{ width: "100%", padding: "4px", borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }}>
-                  <option value="50">50m</option><option value="100">100m</option><option value="150">150m</option><option value="200">200m</option><option value="300">300m</option><option value="500">500m</option>
-                </select>
-              </div>
-              <button onClick={() => {
-                if (!navigator.geolocation) { alert("不支援定位"); return; }
-                const btn = document.getElementById("loc-btn-"+s.id);
-                if (btn) btn.textContent = "⏳";
-                navigator.geolocation.getCurrentPosition(pos => {
-                  document.getElementById("lat-"+s.id).value = pos.coords.latitude.toFixed(6);
-                  document.getElementById("lng-"+s.id).value = pos.coords.longitude.toFixed(6);
-                  if (btn) btn.textContent = "✅" + Math.round(pos.coords.accuracy) + "m";
-                }, err => { if (btn) btn.textContent = "❌"; alert("失敗：" + err.message); }, { enableHighAccuracy: true, timeout: 15000 });
-              }} id={"loc-btn-"+s.id} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "#4361ee", color: "#fff", fontSize: 10, cursor: "pointer" }}>📍定位</button>
-            </div>
-            {/* 目標 + 預算 */}
             <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "flex-end" }}>
-              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>日目標</label><input type="number" id={"dt-"+s.id} defaultValue={s.daily_target||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }} /></div>
-              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>月預算</label><input type="number" id={"eb-"+s.id} defaultValue={s.monthly_expense_budget||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 10 }} /></div>
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>地址</label><input id={"sa-"+s.id} defaultValue={s.address||""} placeholder="輸入完整地址" style={{ width: "100%", padding: "5px 8px", border: "1px solid #eee", borderRadius: 6, fontSize: 11 }} /></div>
+              <button onClick={async () => {
+                const addr = document.getElementById("sa-"+s.id).value;
+                if (!addr) { alert("請先輸入地址"); return; }
+                const btn = document.getElementById("geo-btn-"+s.id);
+                if (btn) btn.textContent = "⏳ 查詢中...";
+                try {
+                  const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(addr) + "&limit=1&countrycodes=tw").then(x => x.json());
+                  if (r && r[0]) {
+                    document.getElementById("lat-"+s.id).value = Number(r[0].lat).toFixed(6);
+                    document.getElementById("lng-"+s.id).value = Number(r[0].lon).toFixed(6);
+                    // Update map preview
+                    const iframe = document.getElementById("map-"+s.id);
+                    if (iframe) iframe.src = "https://www.openstreetmap.org/export/embed.html?bbox=" + (Number(r[0].lon)-0.003) + "," + (Number(r[0].lat)-0.002) + "," + (Number(r[0].lon)+0.003) + "," + (Number(r[0].lat)+0.002) + "&layer=mapnik&marker=" + r[0].lat + "," + r[0].lon;
+                    document.getElementById("map-wrap-"+s.id).style.display = "block";
+                    if (btn) btn.textContent = "✅ 已定位";
+                  } else {
+                    if (btn) btn.textContent = "❌ 找不到";
+                    alert("找不到此地址，請輸入更詳細的地址");
+                  }
+                } catch { if (btn) btn.textContent = "❌ 失敗"; }
+              }} id={"geo-btn-"+s.id} style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: "#4361ee", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>📍 查詢位置</button>
             </div>
             {/* 地圖預覽 */}
-            {s.latitude && s.longitude && <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #eee", marginBottom: 6, height: 100 }}>
-              <iframe src={`https://www.openstreetmap.org/export/embed.html?bbox=${s.longitude-0.003},${s.latitude-0.002},${s.longitude+0.003},${s.latitude+0.002}&layer=mapnik&marker=${s.latitude},${s.longitude}`} style={{ width: "100%", height: 100, border: "none" }} loading="lazy" />
-            </div>}
+            <div id={"map-wrap-"+s.id} style={{ display: s.latitude && s.longitude ? "block" : "none", borderRadius: 6, overflow: "hidden", border: "1px solid #eee", marginBottom: 6 }}>
+              <iframe id={"map-"+s.id} src={s.latitude && s.longitude ? `https://www.openstreetmap.org/export/embed.html?bbox=${s.longitude-0.003},${s.latitude-0.002},${s.longitude+0.003},${s.latitude+0.002}&layer=mapnik&marker=${s.latitude},${s.longitude}` : ""} style={{ width: "100%", height: 120, border: "none" }} loading="lazy" />
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 8px", background: "#f5f5f5", fontSize: 9, color: "#888" }}>
+                <span>{"📍 " + (s.latitude ? s.latitude.toFixed(4) + ", " + s.longitude.toFixed(4) : "未設定")}</span>
+                <span>{"打卡範圍 " + (s.radius_m || 200) + "m"}</span>
+              </div>
+            </div>
+            {/* 隱藏座標 + 範圍 + 目標 */}
+            <input type="hidden" id={"lat-"+s.id} defaultValue={s.latitude||""} />
+            <input type="hidden" id={"lng-"+s.id} defaultValue={s.longitude||""} />
+            <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "flex-end" }}>
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>打卡範圍</label><select id={"rad-"+s.id} defaultValue={s.radius_m||200} style={{ width: "100%", padding: "4px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="50">50m</option><option value="100">100m</option><option value="150">150m</option><option value="200">200m</option><option value="300">300m</option><option value="500">500m</option></select></div>
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>日營收目標</label><input type="number" id={"dt-"+s.id} defaultValue={s.daily_target||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} /></div>
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>月費用預算</label><input type="number" id={"eb-"+s.id} defaultValue={s.monthly_expense_budget||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} /></div>
+            </div>
             <button onClick={() => {
               const lat = document.getElementById("lat-"+s.id).value;
               const lng = document.getElementById("lng-"+s.id).value;
@@ -159,7 +162,7 @@ export default function SettingsMgr({ stores, load, month }) {
               const name = document.getElementById("sn-"+s.id).value;
               const addr = document.getElementById("sa-"+s.id).value;
               ap("/api/admin/stores", { action: "update_targets", store_id: s.id, name, address: addr, latitude: lat ? Number(lat) : null, longitude: lng ? Number(lng) : null, radius_m: Number(rad) || 200, daily_target: Number(dt) || 0, monthly_expense_budget: Number(eb) || 0 }).then(() => { alert("✅ " + name + " 已儲存"); load(); });
-            }} style={{ width: "100%", padding: "6px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>💾 儲存 {s.name}</button>
+            }} style={{ width: "100%", padding: "7px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>💾 儲存 {s.name}</button>
           </div>
         ))}
         {/* 新增門市 */}
@@ -215,27 +218,6 @@ export default function SettingsMgr({ stores, load, month }) {
           ))}
         </div>
         <p style={{ fontSize: 10, color: "#888", marginTop: 6 }}>點擊可啟用/停用，停用的假日不標紅、不計雙倍薪</p>
-      </div>
-
-      {/* 工作日誌權限 */}
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
-        <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📋 工作日誌權限</h4>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 12 }}>允許門店主管修改日誌模板</div>
-            <div style={{ fontSize: 10, color: "#888" }}>開啟後主管可新增/刪除本店工作項目</div>
-          </div>
-          <button id="wl-perm-btn" data-on="true" onClick={() => {
-            const btn = document.getElementById("wl-perm-btn");
-            const curr = btn.dataset.on === "true";
-            const next = !curr;
-            ap("/api/admin/system", { key: "worklog_manager_edit", value: next }).then(() => {
-              btn.dataset.on = String(next);
-              btn.style.background = next ? "#0a7c42" : "#ccc";
-              btn.textContent = next ? "ON" : "OFF";
-            });
-          }} style={{ padding: "4px 12px", borderRadius: 12, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", minWidth: 44 }}>ON</button>
-        </div>
       </div>
 
       {/* 員工守則 */}
@@ -298,133 +280,6 @@ export default function SettingsMgr({ stores, load, month }) {
           await ap("/api/admin/system", { key: "contract", value: contractText });
           alert("合約已儲存");
         }} style={{ marginTop: 6, padding: "5px 16px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer" }}>💾 儲存合約</button>
-      </div>
-
-      {/* 📋 工作日誌 & 盤點設定 */}
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
-        <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📋 工作日誌 & 盤點設定</h4>
-        <select value={wlStore} onChange={e => setWlStore(e.target.value)}
-          style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, marginBottom: 10, width: "100%" }}>
-          <option value="">選擇門市</option>
-          {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-
-        {wlStore && (
-          <div>
-            {/* 按 shift_type 分組顯示 */}
-            {[
-              { type: "opening", label: "☀️ 開店", cats: ["開店準備", "清潔消毒", "溫度記錄", "設備維護"] },
-              { type: "during", label: "🔥 營業中", cats: ["營業中", "食材管理", "服務品質", "環境整潔"] },
-              { type: "closing", label: "🌙 閉店", cats: ["打烊作業", "清潔消毒", "食材管理"] },
-            ].map(section => {
-              const sectionItems = wlTemplates.filter(t => t.shift_type === section.type && t.frequency === "daily");
-              return (
-                <div key={section.type} style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#444", padding: "4px 8px", background: "#faf8f5", borderRadius: 4, marginBottom: 4 }}>
-                    {section.label + "（" + sectionItems.length + "項）"}
-                  </div>
-                  {sectionItems.map(t => (
-                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderBottom: "1px solid #f0eeea", fontSize: 11 }}>
-                      <span style={{ fontSize: 9, color: "#888", minWidth: 40 }}>{t.category || ""}</span>
-                      <span style={{ flex: 1, fontWeight: 500 }}>{t.item}</span>
-                      {t.requires_value && <span style={{ fontSize: 8, background: "#e6f9f0", color: "#0a7c42", padding: "0 4px", borderRadius: 3 }}>{"📊" + (t.value_label || "")}</span>}
-                      {t.role !== "all" && <span style={{ fontSize: 8, background: "#fef9c3", color: "#8a6d00", padding: "0 4px", borderRadius: 3 }}>{t.role}</span>}
-                      <button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadWlTemplates(); }}
-                        style={{ fontSize: 10, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-
-            {/* 🧹 細部清潔（週/月） */}
-            {(() => {
-              const deepItems = wlTemplates.filter(t => t.frequency === "weekly" || t.frequency === "monthly");
-              return deepItems.length > 0 ? (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#444", padding: "4px 8px", background: "#faf8f5", borderRadius: 4, marginBottom: 4 }}>
-                    {"🧹 細部清潔（" + deepItems.length + "項）"}
-                  </div>
-                  {deepItems.map(t => (
-                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderBottom: "1px solid #f0eeea", fontSize: 11 }}>
-                      <span style={{ fontSize: 9, padding: "0 4px", borderRadius: 3, background: t.frequency === "weekly" ? "#e6f1fb" : "#fde8e8", color: t.frequency === "weekly" ? "#185fa5" : "#b91c1c" }}>{t.frequency === "weekly" ? "週" : "月"}</span>
-                      <span style={{ flex: 1, fontWeight: 500 }}>{t.item}</span>
-                      <span style={{ fontSize: 9, color: "#888" }}>{t.category}</span>
-                      <button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadWlTemplates(); }}
-                        style={{ fontSize: 10, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button>
-                    </div>
-                  ))}
-                </div>
-              ) : null;
-            })()}
-
-            {/* 新增表單 */}
-            <div style={{ background: "#faf8f5", borderRadius: 8, padding: 10, marginTop: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>＋ 新增工作項目</div>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
-                <select value={wlNew.shift_type} onChange={e => {
-                  const st = e.target.value;
-                  const freq = st === "deep" ? "weekly" : "daily";
-                  const cat = st === "opening" ? "開店準備" : st === "during" ? "營業中" : st === "closing" ? "打烊作業" : "清潔";
-                  setWlNew({ ...wlNew, shift_type: st === "deep" ? "opening" : st, frequency: freq, category: cat });
-                }} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
-                  <option value="opening">☀️ 開店</option>
-                  <option value="during">🔥 營業</option>
-                  <option value="closing">🌙 閉店</option>
-                  <option value="deep">🧹 清潔</option>
-                </select>
-                {wlNew.frequency !== "daily" && (
-                  <select value={wlNew.frequency} onChange={e => setWlNew({ ...wlNew, frequency: e.target.value })}
-                    style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
-                    <option value="weekly">每週</option>
-                    <option value="monthly">每月</option>
-                  </select>
-                )}
-                {wlNew.frequency === "weekly" && (
-                  <select value={wlNew.weekday} onChange={e => setWlNew({ ...wlNew, weekday: e.target.value })}
-                    style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
-                    <option value="">不指定</option>
-                    {["日", "一", "二", "三", "四", "五", "六"].map((d, i) => <option key={i} value={i}>{d}</option>)}
-                  </select>
-                )}
-                <select value={wlNew.category} onChange={e => setWlNew({ ...wlNew, category: e.target.value })}
-                  style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
-                  {["開店準備", "營業中", "打烊作業", "清潔", "食材管理", "溫度記錄", "設備維護", "環境整潔", "服務品質"].map(c =>
-                    <option key={c} value={c}>{c}</option>
-                  )}
-                </select>
-                <select value={wlNew.role} onChange={e => setWlNew({ ...wlNew, role: e.target.value })}
-                  style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
-                  <option value="all">全員</option><option value="外場">外場</option><option value="內場">內場</option><option value="吧台">吧台</option><option value="烘焙">烘焙</option>
-                </select>
-              </div>
-              <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
-                <input value={wlNew.item} onChange={e => setWlNew({ ...wlNew, item: e.target.value })}
-                  placeholder="工作項目名稱" onKeyDown={e => { if (e.key === "Enter" && wlNew.item) { ap("/api/admin/worklogs", { action: "add_template", store_id: wlStore, ...wlNew }); setWlNew({ ...wlNew, item: "" }); setTimeout(loadWlTemplates, 300); } }}
-                  style={{ flex: 1, padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12 }} />
-                <button onClick={async () => { if (!wlNew.item) return; await ap("/api/admin/worklogs", { action: "add_template", store_id: wlStore, ...wlNew }); setWlNew({ ...wlNew, item: "" }); loadWlTemplates(); }} disabled={!wlNew.item}
-                  style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: wlNew.item ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 12, cursor: "pointer" }}>新增</button>
-              </div>
-              <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, cursor: "pointer" }}>
-                <input type="checkbox" checked={wlNew.requires_value} onChange={e => setWlNew({ ...wlNew, requires_value: e.target.checked })} />
-                需輸入數值
-                {wlNew.requires_value && <input value={wlNew.value_label} onChange={e => setWlNew({ ...wlNew, value_label: e.target.value })} placeholder="單位" style={{ width: 40, padding: 2, borderRadius: 3, border: "1px solid #ddd", fontSize: 10, marginLeft: 4 }} />}
-              </label>
-            </div>
-
-            {/* 複製 */}
-            {wlTemplates.length > 0 && (
-              <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-                <select value={wlCopyTarget} onChange={e => setWlCopyTarget(e.target.value)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
-                  <option value="">複製到門市...</option>
-                  {stores.filter(s => s.id !== wlStore).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-                <button onClick={async () => { if (!wlCopyTarget) return; await ap("/api/admin/worklogs", { action: "copy_to_store", from_store_id: wlStore, to_store_id: wlCopyTarget }); alert("已複製"); }} disabled={!wlCopyTarget}
-                  style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: wlCopyTarget ? "#4361ee" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>📋 複製</button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* 權限管理 */}
@@ -625,6 +480,84 @@ export function BonusFormulaEditor() {
         style={{ width: "100%", padding: "8px", borderRadius: 6, border: "none", background: saving ? "#ccc" : "#0a7c42", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
         {saving ? "儲存中..." : "💾 儲存公式設定"}
       </button>
+    </div>
+  );
+}
+
+export function WorklogSettings({ stores }) {
+  const [wlStore, setWlStore] = useState("");
+  const [wlTemplates, setWlTemplates] = useState([]);
+  const [wlCopyTarget, setWlCopyTarget] = useState("");
+  const [wlNew, setWlNew] = useState({ category: "清潔", item: "", role: "all", shift_type: "opening", frequency: "daily", weekday: "", requires_value: false, value_label: "" });
+  const loadT = () => { if (!wlStore) return; ap("/api/admin/worklogs?type=templates&store_id=" + wlStore).then(r => setWlTemplates(r.data || [])); };
+  useEffect(() => { loadT(); }, [wlStore]);
+
+  const WL_CATS = ["清潔", "食材管理", "溫度記錄", "設備維護", "環境整潔", "服務品質", "其他"];
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
+      <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📋 工作日誌模板設定</h4>
+      <select value={wlStore} onChange={e => setWlStore(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, marginBottom: 10, width: "100%" }}>
+        <option value="">選擇門市</option>
+        {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+      {wlStore && <div>
+        {[
+          { type: "opening", label: "☀️ 開店" },
+          { type: "during", label: "🔥 營業中" },
+          { type: "closing", label: "🌙 閉店" },
+        ].map(sec => {
+          const si = wlTemplates.filter(t => t.shift_type === sec.type && t.frequency === "daily");
+          return <div key={sec.type} style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#444", padding: "4px 8px", background: "#faf8f5", borderRadius: 4, marginBottom: 4 }}>{sec.label + "（" + si.length + "）"}</div>
+            {si.map(t => <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderBottom: "1px solid #f0eeea", fontSize: 11 }}>
+              <span style={{ fontSize: 9, color: "#888", minWidth: 40 }}>{t.category}</span>
+              <span style={{ flex: 1, fontWeight: 500 }}>{t.item}</span>
+              {t.requires_value && <span style={{ fontSize: 8, background: "#e6f9f0", color: "#0a7c42", padding: "0 4px", borderRadius: 3 }}>{"📊" + (t.value_label || "")}</span>}
+              {t.role !== "all" && <span style={{ fontSize: 8, background: "#fef9c3", color: "#8a6d00", padding: "0 4px", borderRadius: 3 }}>{t.role}</span>}
+              <button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 10, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+            </div>)}
+          </div>;
+        })}
+        {(() => { const di = wlTemplates.filter(t => t.frequency === "weekly" || t.frequency === "monthly"); return di.length > 0 ? <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#444", padding: "4px 8px", background: "#faf8f5", borderRadius: 4, marginBottom: 4 }}>{"🧹 細部清潔（" + di.length + "）"}</div>
+          {di.map(t => <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderBottom: "1px solid #f0eeea", fontSize: 11 }}>
+            <span style={{ fontSize: 9, padding: "0 4px", borderRadius: 3, background: t.frequency === "weekly" ? "#e6f1fb" : "#fde8e8", color: t.frequency === "weekly" ? "#185fa5" : "#b91c1c" }}>{t.frequency === "weekly" ? "週" : "月"}</span>
+            <span style={{ flex: 1, fontWeight: 500 }}>{t.item}</span>
+            <span style={{ fontSize: 9, color: "#888" }}>{t.category}</span>
+            <button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 10, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+          </div>)}
+        </div> : null; })()}
+        <div style={{ background: "#faf8f5", borderRadius: 8, padding: 10, marginTop: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>＋ 新增工作項目</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+            <select value={wlNew.shift_type + (wlNew.frequency !== "daily" ? "_deep" : "")} onChange={e => {
+              const v = e.target.value; const isDeep = v.includes("_deep");
+              setWlNew({ ...wlNew, shift_type: isDeep ? "opening" : v, frequency: isDeep ? "weekly" : "daily", category: "清潔" });
+            }} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
+              <option value="opening">☀️ 開店</option><option value="during">🔥 營業</option><option value="closing">🌙 閉店</option><option value="opening_deep">🧹 清潔</option>
+            </select>
+            {wlNew.frequency !== "daily" && <select value={wlNew.frequency} onChange={e => setWlNew({ ...wlNew, frequency: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="weekly">每週</option><option value="monthly">每月</option></select>}
+            {wlNew.frequency === "weekly" && <select value={wlNew.weekday} onChange={e => setWlNew({ ...wlNew, weekday: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="">不指定</option>{["日","一","二","三","四","五","六"].map((d,i) => <option key={i} value={i}>{d}</option>)}</select>}
+            <select value={wlNew.category} onChange={e => setWlNew({ ...wlNew, category: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
+              {WL_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select value={wlNew.role} onChange={e => setWlNew({ ...wlNew, role: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="all">全員</option><option value="外場">外場</option><option value="內場">內場</option><option value="吧台">吧台</option><option value="烘焙">烘焙</option></select>
+          </div>
+          <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+            <input value={wlNew.item} onChange={e => setWlNew({ ...wlNew, item: e.target.value })} placeholder="工作項目名稱" onKeyDown={e => { if (e.key === "Enter" && wlNew.item) { ap("/api/admin/worklogs", { action: "add_template", store_id: wlStore, ...wlNew }); setWlNew({ ...wlNew, item: "" }); setTimeout(loadT, 300); } }} style={{ flex: 1, padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12 }} />
+            <button onClick={async () => { if (!wlNew.item) return; await ap("/api/admin/worklogs", { action: "add_template", store_id: wlStore, ...wlNew }); setWlNew({ ...wlNew, item: "" }); loadT(); }} disabled={!wlNew.item} style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: wlNew.item ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 12, cursor: "pointer" }}>新增</button>
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, cursor: "pointer" }}>
+            <input type="checkbox" checked={wlNew.requires_value} onChange={e => setWlNew({ ...wlNew, requires_value: e.target.checked })} />需輸入數值
+            {wlNew.requires_value && <input value={wlNew.value_label} onChange={e => setWlNew({ ...wlNew, value_label: e.target.value })} placeholder="單位" style={{ width: 40, padding: 2, borderRadius: 3, border: "1px solid #ddd", fontSize: 10, marginLeft: 4 }} />}
+          </label>
+        </div>
+        {wlTemplates.length > 0 && <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+          <select value={wlCopyTarget} onChange={e => setWlCopyTarget(e.target.value)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="">複製到門市...</option>{stores.filter(s => s.id !== wlStore).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+          <button onClick={async () => { if (!wlCopyTarget) return; await ap("/api/admin/worklogs", { action: "copy_to_store", from_store_id: wlStore, to_store_id: wlCopyTarget }); alert("已複製"); }} disabled={!wlCopyTarget} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: wlCopyTarget ? "#4361ee" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>📋 複製</button>
+        </div>}
+      </div>}
     </div>
   );
 }

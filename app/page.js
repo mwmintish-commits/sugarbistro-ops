@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, LABOR_SELF, HEALTH_SELF } from "./components/utils";
 import EmpDetail from "./components/EmpDetail";
-import SettingsMgr, { BonusFormulaEditor } from "./components/SettingsMgr";
+import SettingsMgr, { BonusFormulaEditor, WorklogSettings } from "./components/SettingsMgr";
 import WorklogMgr from "./components/WorklogMgr";
 import LeavesMgr from "./components/LeavesMgr";
 
@@ -2090,6 +2090,7 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📋 工作日誌</h3>
             <WorklogMgr stores={stores} sf={sf} month={month} auth={auth} />
+            {auth.role === "admin" && <WorklogSettings stores={stores} />}
           </div>
         )}
 
