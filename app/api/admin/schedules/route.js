@@ -41,15 +41,23 @@ export async function POST(request) {
   const { action } = body;
 
   if (action === "create") {
-    const { employee_id, store_id, shift_id, date, type, leave_type, half_day, note } = body;
+    const { employee_id, store_id, shift_id, date, type, leave_type, half_day, note, is_rest_day } = body;
 
-    // 檢查是否有休假（預假/正式假）→ 跳過不覆蓋
+    // 如果是排班，檢查是否已有假別
     if (type !== "leave") {
       const { data: existing } = await supabase.from("schedules")
         .select("id, type, leave_type").eq("employee_id", employee_id).eq("date", date).eq("type", "leave").limit(1);
       if (existing?.length) {
         const lt = { advance:"預假", annual:"特休", sick:"病假", personal:"事假", menstrual:"生理假", comp_time:"補休", marriage:"婚假", funeral:"喪假" };
-        return Response.json({ skipped: true, warning: "⏭ " + date + " 已有" + (lt[existing[0].leave_type] || "休假") + "，已跳過" });
+        // 如果是休息日，轉為「休息日加班」= 排班 + is_rest_day
+        if (existing[0].leave_type === "rest") {
+          await supabase.from("schedules").delete().eq("id", existing[0].id);
+          // 繼續往下建立排班 + is_rest_day = true
+        } else if (existing[0].leave_type === "off") {
+          return Response.json({ skipped: true, warning: "⚠️ " + date + " 為例假日，依法不可排班。如需出勤請改為休息日。" });
+        } else {
+          return Response.json({ skipped: true, warning: "⏭ " + date + " 已有" + (lt[existing[0].leave_type] || "休假") + "，已跳過" });
+        }
       }
     }
 
@@ -68,13 +76,32 @@ export async function POST(request) {
         const dd = new Date(d.getTime() + i * 86400000).toLocaleDateString("sv-SE");
         if (workDates.has(dd)) { curr++; maxConsecutive = Math.max(maxConsecutive, curr); } else { curr = 0; }
       }
-      const warning = maxConsecutive >= 7 ? "⚠️ 連續工作" + maxConsecutive + "天，違反一例一休" : maxConsecutive === 6 ? "⚠️ 已連續6天" : null;
+      // 判斷是否為休息日加班
+      const restDayWork = is_rest_day || false;
+      const warning = maxConsecutive >= 7 ? "⚠️ 連續工作" + maxConsecutive + "天，違反一例一休" : maxConsecutive === 6 ? "⚠️ 已連續6天" : restDayWork ? "💰 休息日加班，依法加成計薪" : null;
       const { data, error } = await supabase.from("schedules").upsert({
         employee_id, store_id: store_id || null, shift_id: shift_id || null, date,
         type: type || "shift", leave_type, half_day, note, status: "scheduled",
+        is_rest_day: restDayWork,
       }, { onConflict: "employee_id,date" }).select("*, employees(name), shifts(name, start_time, end_time)").single();
       if (error) return Response.json({ error: error.message }, { status: 500 });
       return Response.json({ data, warning });
+    }
+
+    // 如果新增休息日，檢查是否已有排班 → 標記為休息日加班
+    if (type === "leave" && (leave_type === "rest" || leave_type === "off")) {
+      const { data: existing } = await supabase.from("schedules")
+        .select("id, type, shift_id").eq("employee_id", employee_id).eq("date", date).eq("type", "shift").limit(1);
+      if (existing?.length && leave_type === "rest") {
+        // 已有排班 → 標記為休息日加班
+        const { data, error } = await supabase.from("schedules").update({ is_rest_day: true })
+          .eq("id", existing[0].id).select("*, employees(name), shifts(name, start_time, end_time)").single();
+        if (error) return Response.json({ error: error.message }, { status: 500 });
+        return Response.json({ data, message: "💰 已標記為休息日加班" });
+      }
+      if (existing?.length && leave_type === "off") {
+        return Response.json({ error: "⚠️ 此日已有排班，例假日不可工作。請先刪除排班或改為休息日。" });
+      }
     }
 
     const { data, error } = await supabase.from("schedules").upsert({

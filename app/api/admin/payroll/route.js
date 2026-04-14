@@ -104,7 +104,29 @@ export async function POST(request) {
         holidayPay = Math.round(dailyRate * holidayDays);
       }
 
-      const net = base + otPay + holidayPay - ls - hs - suppHealth + allow - deduct - leaveDeduct;
+      // 休息日加班費（前2hr 1.34×、後6hr 1.67×）
+      let restDayPay = 0, restDayCount = 0;
+      const { data: restScheds } = await supabase.from("schedules")
+        .select("date, shift_id, shifts(start_time, end_time)").eq("employee_id", emp.id).eq("type", "shift").eq("is_rest_day", true)
+        .gte("date", mk + "-01").lte("date", eom(mk));
+      restDayCount = (restScheds || []).length;
+      if (restDayCount > 0) {
+        const hourlyRate = emp.hourly_rate ? Number(emp.hourly_rate)
+          : (emp.monthly_salary ? Number(emp.monthly_salary) / 30 / 8 : 0);
+        for (const rs of restScheds || []) {
+          const st = rs.shifts?.start_time, et = rs.shifts?.end_time;
+          let hrs = 8;
+          if (st && et) {
+            const [sh, sm] = st.split(":").map(Number), [eh, em] = et.split(":").map(Number);
+            hrs = Math.max(0, (eh * 60 + em - sh * 60 - sm) / 60);
+          }
+          const first2 = Math.min(hrs, 2), after = Math.max(0, hrs - 2);
+          // 加成部分 = (1.34-1)×前2hr + (1.67-1)×後hr（底薪已含1×）
+          restDayPay += Math.round(hourlyRate * (first2 * 0.34 + after * 0.67));
+        }
+      }
+
+      const net = base + otPay + holidayPay + restDayPay - ls - hs - suppHealth + allow - deduct - leaveDeduct;
 
       await supabase.from("payroll_records").upsert({
         employee_id: emp.id, store_id: emp.store_id,
@@ -112,6 +134,7 @@ export async function POST(request) {
         hourly_rate: emp.hourly_rate || 0,
         overtime_pay: otPay, comp_hours: compH,
         holiday_pay: holidayPay, holiday_days: holidayDays,
+        rest_day_pay: restDayPay, rest_day_count: restDayCount,
         labor_self: ls, health_self: hs,
         supplementary_health: suppHealth,
         allowance: allow, allowance_note: emp.default_allowance_note || "",
@@ -120,7 +143,7 @@ export async function POST(request) {
         net_salary: net,
       }, { onConflict: "employee_id,year,month" });
 
-      results.push({ name: emp.name, base, otPay, holidayPay, ls, hs, suppHealth, allow, deduct, net, workDays });
+      results.push({ name: emp.name, base, otPay, holidayPay, restDayPay, ls, hs, suppHealth, allow, deduct, net, workDays });
     }
     await auditLog(null, null, "payroll_generate", "payroll", null, { year, month, store_id, count: results.length });
     return Response.json({ success: true, data: results });

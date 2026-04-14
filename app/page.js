@@ -683,7 +683,7 @@ export default function AdminPage() {
                         </div>
                         {ds.slice(0,5).map(s=>{const posColor=positions.find(p=>p.name===s.shifts?.role)?.color||s.shifts?.color||"#0a7c42";const isLeave=s.type==="leave";return(<div key={s.id} style={{background:isLeave?(LT[s.leave_type]||LT.off).bg:s.published?posColor+"12":"#fff8e6",border:isLeave?("2px solid "+(LT[s.leave_type]||LT.off).c):s.published?("2px solid "+posColor):("3px dashed "+posColor),borderRadius:5,padding:"3px 5px",fontSize:9,marginBottom:2,lineHeight:1.3}}>
                           <div style={{fontWeight:600,color:isLeave?(LT[s.leave_type]||LT.off).c:posColor}}>{s.employees?s.employees.name:""}</div>
-                          {isLeave?<div style={{fontSize:8,color:(LT[s.leave_type]||LT.off).c}}>{(LT[s.leave_type]||LT.off).l}{s.notes&&s.notes!=="預假"?" "+s.notes:""}</div>:<><div style={{fontSize:8,color:posColor}}>{s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role:"全場"}</div><div style={{fontSize:7,color:"#888"}}>{s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):""}</div></>}
+                          {isLeave?<div style={{fontSize:8,color:(LT[s.leave_type]||LT.off).c}}>{(LT[s.leave_type]||LT.off).l}{s.notes&&s.notes!=="預假"?" "+s.notes:""}</div>:<><div style={{fontSize:8,color:posColor}}>{s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role:"全場"}{s.is_rest_day?" 💰":""}</div><div style={{fontSize:7,color:"#888"}}>{s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):""}</div></>}
                         </div>);})}
                         {ds.length===0&&<div style={{fontSize:9,color:"#ccc",textAlign:"center",marginTop:4}}>+</div>}
                       </td>);
@@ -2191,7 +2191,7 @@ export default function AdminPage() {
               {scheds.filter(s => s.date === schPop.date && (schPop.storeId === "__hq__" ? !emps.find(e => e.id === s.employee_id)?.store_id : emps.find(e => e.id === s.employee_id)?.store_id === schPop.storeId)).map(s => (
                 <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", marginBottom: 4, borderRadius: 6, background: s.type === "leave" ? (LT[s.leave_type] || LT.off).bg : s.published ? "#e6f9f0" : "#fff8e6", border: s.published ? "1px solid #0a7c42" : "1px dashed #d4a017" }}>
                   <div>
-                    <span style={{ fontSize: 11 }}>{(s.employees?.name || "") + " " + (s.type === "leave" ? (LT[s.leave_type] || LT.off).l : (s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role:"全場") + " " + (s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):""))}</span>
+                    <span style={{ fontSize: 11 }}>{(s.employees?.name || "") + " " + (s.type === "leave" ? (LT[s.leave_type] || LT.off).l : (s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role:"全場") + " " + (s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):"") + (s.is_rest_day ? " 💰休息日" : ""))}</span>
                     {s.notes && <div style={{ fontSize: 8, color: "#888" }}>{s.notes}</div>}
                   </div>
                   <button onClick={async () => { await ap("/api/admin/schedules", { action: "delete", schedule_id: s.id }); load(); }} style={{ background: "none", border: "none", color: "#b91c1c", cursor: "pointer", fontSize: 11 }}>✕刪</button>
@@ -2211,7 +2211,7 @@ export default function AdminPage() {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginTop: 6 }}>
                   {[["off","⬛ 例假"],["rest","🔲 休息日"],["annual","🏖 特休"],["advance","📌 預假"],["holiday_comp","🔴 國定補假"],["personal","📋 事假"],["sick","🤒 病假"]].map(([k, l]) => (
-                    <button key={k} onClick={async () => { const eid = document.getElementById("pop-emp").value; if (!eid) { alert("請選員工"); return; } await ap("/api/admin/schedules", { action: "add_leave", employee_id: eid, date: schPop.date, leave_type: k }); load(); }}
+                    <button key={k} onClick={async () => { const eid = document.getElementById("pop-emp").value; if (!eid) { alert("請選員工"); return; } const r = await ap("/api/admin/schedules", { action: "add_leave", employee_id: eid, date: schPop.date, leave_type: k }); if (r.message) alert(r.message); if (r.error) alert(r.error); load(); }}
                       style={{ padding: "6px", borderRadius: 6, border: "1px solid #ddd", background: "#faf8f5", fontSize: 11, cursor: "pointer" }}>{l}</button>
                   ))}
                 </div>
