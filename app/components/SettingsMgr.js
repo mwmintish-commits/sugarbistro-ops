@@ -170,15 +170,21 @@ export default function SettingsMgr({ stores, load, month }) {
               <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>日營收目標</label><input type="number" id={"dt-"+s.id} defaultValue={s.daily_target||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} /></div>
               <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>月費用預算</label><input type="number" id={"eb-"+s.id} defaultValue={s.monthly_expense_budget||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} /></div>
             </div>
-            <button onClick={() => {
-              const lat = document.getElementById("lat-"+s.id).value;
-              const lng = document.getElementById("lng-"+s.id).value;
-              const rad = document.getElementById("rad-"+s.id).value;
-              const dt = document.getElementById("dt-"+s.id).value;
-              const eb = document.getElementById("eb-"+s.id).value;
-              const name = document.getElementById("sn-"+s.id).value;
-              const addr = document.getElementById("sa-"+s.id).value;
-              ap("/api/admin/stores", { action: "update_targets", store_id: s.id, name, address: addr, latitude: lat ? Number(lat) : null, longitude: lng ? Number(lng) : null, radius_m: Number(rad) || 200, daily_target: Number(dt) || 0, monthly_expense_budget: Number(eb) || 0 }).then(() => { alert("✅ " + name + " 已儲存"); load(); });
+            <button onClick={async () => {
+              try {
+                const lat = document.getElementById("lat-"+s.id)?.value;
+                const lng = document.getElementById("lng-"+s.id)?.value;
+                const rad = document.getElementById("rad-"+s.id)?.value;
+                const dt = document.getElementById("dt-"+s.id)?.value;
+                const eb = document.getElementById("eb-"+s.id)?.value;
+                const name = document.getElementById("sn-"+s.id)?.value;
+                const addr = document.getElementById("sa-"+s.id)?.value;
+                if (!name) { alert("請輸入門市名稱"); return; }
+                const r = await ap("/api/admin/stores", { action: "update_targets", store_id: s.id, name, address: addr || "", latitude: lat ? Number(lat) : null, longitude: lng ? Number(lng) : null, radius_m: Number(rad) || 200, daily_target: Number(dt) || 0, monthly_expense_budget: Number(eb) || 0 });
+                if (r.error) { alert("❌ 儲存失敗：" + r.error); return; }
+                alert("✅ " + name + " 已儲存");
+                load();
+              } catch (e) { alert("❌ " + (e.message || "儲存失敗")); }
             }} style={{ width: "100%", padding: "7px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>💾 儲存 {s.name}</button>
           </div>
         ))}
