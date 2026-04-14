@@ -32,18 +32,29 @@ export async function GET(request) {
     .reduce((s, o) => s + Number(o.total_amount || 0), 0);
 
   // 支出
-  let expQ = supabase.from("expenses").select("amount, expense_type, stores(name)")
+  let expQ = supabase.from("expenses").select("amount, expense_type, store_id, is_shared, stores(name)")
     .gte("date", month + "-01").lte("date", eom(month)).in("status", ["pending", "approved"]);
-  if (store_id) expQ = expQ.eq("store_id", store_id);
+  if (store_id) expQ = expQ.or("store_id.eq." + store_id + ",store_id.is.null");
   const { data: expenses } = await expQ;
 
   const vendorTotal = (expenses || []).filter(e => e.expense_type === "vendor").reduce((s, e) => s + Number(e.amount || 0), 0);
   const pettyTotal = (expenses || []).filter(e => e.expense_type === "petty_cash").reduce((s, e) => s + Number(e.amount || 0), 0);
   const hqTotal = (expenses || []).filter(e => e.expense_type === "hq_advance").reduce((s, e) => s + Number(e.amount || 0), 0);
+  const sharedTotal = (expenses || []).filter(e => e.is_shared || !e.store_id).reduce((s, e) => s + Number(e.amount || 0), 0);
   const expenseByStore = {};
+  const { data: activeStores } = await supabase.from("stores").select("id, name").eq("is_active", true);
+  const storeCount = (activeStores || []).length || 1;
+  const sharedPerStore = Math.round(sharedTotal / storeCount);
   for (const e of expenses || []) {
-    const name = e.stores?.name || "未知";
-    expenseByStore[name] = (expenseByStore[name] || 0) + Number(e.amount || 0);
+    if (e.is_shared || !e.store_id) {
+      // 均攤到每間店
+      for (const st of activeStores || []) {
+        expenseByStore[st.name] = (expenseByStore[st.name] || 0) + Math.round(Number(e.amount || 0) / storeCount);
+      }
+    } else {
+      const name = e.stores?.name || "未知";
+      expenseByStore[name] = (expenseByStore[name] || 0) + Number(e.amount || 0);
+    }
   }
 
   // 人事成本
@@ -65,8 +76,7 @@ export async function GET(request) {
   // ✦26 門市比較
   let storeComparison = null;
   if (compare === "stores") {
-    const { data: allStores } = await supabase.from("stores").select("id, name").eq("is_active", true);
-    storeComparison = (allStores || []).map(st => ({
+    storeComparison = (activeStores || []).map(st => ({
       name: st.name,
       revenue: revenueByStore[st.name] || 0,
       expense: (expenseByStore[st.name] || 0) + (laborByStore[st.name] || 0),
@@ -89,7 +99,7 @@ export async function GET(request) {
 
   return Response.json({
     revenue: { total: totalRevenue, byStore: revenueByStore, b2b: b2bRevenue, oem: oemRevenue },
-    expenses: { total: totalExpense, vendor: vendorTotal, petty_cash: pettyTotal, hq_advance: hqTotal, labor: laborTotal, byStore: expenseByStore },
+    expenses: { total: totalExpense, vendor: vendorTotal, petty_cash: pettyTotal, hq_advance: hqTotal, shared: sharedTotal, shared_per_store: sharedPerStore, labor: laborTotal, byStore: expenseByStore },
     profit: { net, margin, total_income: totalIncome },
     storeComparison,
     trend,

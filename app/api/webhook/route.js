@@ -512,21 +512,26 @@ async function handleEvent(event) {
 
         await pushText(uid2, msg);
         // 存為草稿 + 送網頁確認連結
+        const isHq = d.store_id === "__hq__";
         const{data:draft}=await supabase.from("expenses").insert({
-          store_id:d.store_id, expense_type:d.expense_type, date:r.date||new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"}),
+          store_id: isHq ? null : d.store_id, expense_type:d.expense_type, date:r.date||new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"}),
           amount:r.total_amount||0, vendor_name:r.vendor_name, description:expData.description,
           category_suggestion:r.category_suggestion||"其他", invoice_number:r.invoice_number,
           image_url:imgUrl, ai_raw_data:r, submitted_by:d.employee_id, submitted_by_name:d.employee_name,
           month_key:(r.date||"").slice(0,7), status:"draft",
           is_prepaid:r.is_prepaid||false, prepaid_months:r.prepaid_months||1,
+          is_shared: isHq,
         }).select().single();
         expData.draft_id = draft?.id;
         await setUserState(uid2, "expense_confirm", expData);
         const reviewUrl = `${SITE}/expense-review?id=${draft?.id||""}`;
-        await lineClient.pushMessage({ to: uid2, messages: [{ type: "text", text: "請選擇操作：", quickReply: { items: [
-          { type: "action", action: { type: "uri", label: "📝 開網頁核對", uri: reviewUrl } },
+        await lineClient.pushMessage({ to: uid2, messages: [{ type: "text", text: "辨識結果如有錯誤，可修改或開網頁完整編輯：", quickReply: { items: [
+          { type: "action", action: { type: "uri", label: "📝 開網頁修改", uri: reviewUrl } },
           { type: "action", action: { type: "message", label: "✅ 確認送出", text: "確認費用" } },
-          { type: "action", action: { type: "message", label: "✏️ 修改金額", text: "修改金額" } },
+          { type: "action", action: { type: "message", label: "✏️ 改金額", text: "修改金額" } },
+          { type: "action", action: { type: "message", label: "✏️ 改廠商", text: "修改廠商" } },
+          { type: "action", action: { type: "message", label: "✏️ 改日期", text: "修改日期" } },
+          { type: "action", action: { type: "message", label: "✏️ 改分類", text: "修改分類" } },
           { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
           { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
         ]}}]});
@@ -888,14 +893,26 @@ async function handleEvent(event) {
     }
     const { data: stores } = await supabase.from("stores").select("*").eq("is_active", true);
     await setUserState(userId, "expense_select_store", { employee_id: emp.id, employee_name: emp.name, expense_type: "hq_advance" });
-    return replyWithQuickReply(rt, "🏢 總部代付回報\n👤 " + emp.name + "\n\n選擇門市：", stores.map(s => ({ type: "action", action: { type: "message", label: s.name, text: `費用門市:${s.name}` } })));
+    return replyWithQuickReply(rt, "🏢 總部代付回報\n👤 " + emp.name + "\n\n選擇歸屬：", [
+      { type: "action", action: { type: "message", label: "🏢 總部（全店均攤）", text: "費用門市:總部" } },
+      ...stores.map(s => ({ type: "action", action: { type: "message", label: s.name, text: `費用門市:${s.name}` } }))
+    ]);
   }
   if (text.startsWith("費用門市:") && state?.current_flow === "expense_select_store") {
-    const store = await matchStore(text.replace("費用門市:", ""));
-    if (!store) return replyText(rt, "❌ 找不到門市");
-    await setUserState(userId, "expense_photo", { ...state.flow_data, store_id: store.id, store_name: store.name });
+    const storeName = text.replace("費用門市:", "");
+    let storeId = null, storeLabel = "";
+    if (storeName === "總部") {
+      storeId = "__hq__";
+      storeLabel = "總部（全店均攤）";
+    } else {
+      const store = await matchStore(storeName);
+      if (!store) return replyText(rt, "❌ 找不到門市");
+      storeId = store.id;
+      storeLabel = store.name;
+    }
+    await setUserState(userId, "expense_photo", { ...state.flow_data, store_id: storeId, store_name: storeLabel });
     const label = state.flow_data.expense_type === "vendor" ? "廠商送貨單" : state.flow_data.expense_type === "hq_advance" ? "總部代付單據" : "零用金收據";
-    return replyText(rt, `🏠 ${store.name}\n\n📸 請拍照上傳${label}`);
+    return replyText(rt, `🏠 ${storeLabel}\n\n📸 請拍照上傳${label}`);
   }
   // 修改金額
   if (text === "修改金額" && state?.current_flow === "expense_confirm") {
@@ -907,9 +924,10 @@ async function handleEvent(event) {
     if (isNaN(amt) || amt <= 0) return replyText(rt, "請輸入正確的數字金額：");
     const updated = { ...state.flow_data, amount: amt };
     await setUserState(userId, "expense_confirm", updated);
+    if (state.flow_data.draft_id) await supabase.from("expenses").update({ amount: amt }).eq("id", state.flow_data.draft_id);
     return replyWithQuickReply(rt, "已修改金額為 " + fmt(amt) + "\n確認送出？", [
       { type: "action", action: { type: "message", label: "✅ 確認", text: "確認費用" } },
-      { type: "action", action: { type: "message", label: "✏️ 修改廠商", text: "修改廠商" } },
+      { type: "action", action: { type: "message", label: "✏️ 改廠商", text: "修改廠商" } },
       { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
     ]);
   }
@@ -921,9 +939,44 @@ async function handleEvent(event) {
   if (state?.current_flow === "expense_edit_vendor") {
     const updated = { ...state.flow_data, vendor_name: text };
     await setUserState(userId, "expense_confirm", updated);
+    if (state.flow_data.draft_id) await supabase.from("expenses").update({ vendor_name: text }).eq("id", state.flow_data.draft_id);
     return replyWithQuickReply(rt, "已修改廠商為「" + text + "」\n確認送出？", [
       { type: "action", action: { type: "message", label: "✅ 確認", text: "確認費用" } },
-      { type: "action", action: { type: "message", label: "✏️ 修改金額", text: "修改金額" } },
+      { type: "action", action: { type: "message", label: "✏️ 改金額", text: "修改金額" } },
+      { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+    ]);
+  }
+  // 修改日期
+  if (text === "修改日期" && state?.current_flow === "expense_confirm") {
+    await setUserState(userId, "expense_edit_date", state.flow_data);
+    return replyText(rt, "請輸入正確日期（格式 YYYY-MM-DD，如 2026-04-14）：");
+  }
+  if (state?.current_flow === "expense_edit_date") {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(text)) return replyText(rt, "格式錯誤，請輸入 YYYY-MM-DD（如 2026-04-14）：");
+    const updated = { ...state.flow_data, date: text };
+    await setUserState(userId, "expense_confirm", updated);
+    if (state.flow_data.draft_id) await supabase.from("expenses").update({ date: text, month_key: text.slice(0, 7) }).eq("id", state.flow_data.draft_id);
+    return replyWithQuickReply(rt, "已修改日期為 " + text + "\n確認送出？", [
+      { type: "action", action: { type: "message", label: "✅ 確認", text: "確認費用" } },
+      { type: "action", action: { type: "message", label: "✏️ 其他修改", text: "修改金額" } },
+      { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+    ]);
+  }
+  // 修改分類
+  if (text === "修改分類" && state?.current_flow === "expense_confirm") {
+    return replyWithQuickReply(rt, "選擇正確的費用分類：", [
+      "食材原料", "包材耗材", "飲料原料", "清潔用品", "設備維修", "租金", "水電費", "瓦斯費", "電信費", "廣告行銷", "印刷費", "其他"
+    ].map(c => ({ type: "action", action: { type: "message", label: c, text: "分類:" + c } })));
+  }
+  if (text.startsWith("分類:") && state?.current_flow === "expense_confirm") {
+    const cat = text.replace("分類:", "");
+    const updated = { ...state.flow_data, category_suggestion: cat };
+    await setUserState(userId, "expense_confirm", updated);
+    if (state.flow_data.draft_id) await supabase.from("expenses").update({ category_suggestion: cat }).eq("id", state.flow_data.draft_id);
+    return replyWithQuickReply(rt, "已修改分類為「" + cat + "」\n確認送出？", [
+      { type: "action", action: { type: "message", label: "✅ 確認", text: "確認費用" } },
+      { type: "action", action: { type: "message", label: "✏️ 其他修改", text: "修改金額" } },
       { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
     ]);
   }

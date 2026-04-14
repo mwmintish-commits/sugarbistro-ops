@@ -1490,7 +1490,7 @@ export default function AdminPage() {
                   {exps.filter(e=>(expType==="all"||e.expense_type===expType)&&(!expSearch||(e.vendor_name||"").includes(expSearch))).map(e=>(
                     <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
                       <td style={{padding:6}}>{e.date}</td>
-                      <td style={{padding:6}}>{e.stores?e.stores.name:""}</td>
+                      <td style={{padding:6}}>{e.stores?e.stores.name:<span style={{color:"#b45309",fontSize:10}}>🏢總部</span>}</td>
                       <td style={{padding:6}}>{e.expense_type==="vendor"?"📦":e.expense_type==="hq_advance"?"🏢":"💰"}</td>
                       <td style={{padding:6}}>
                         <div style={{fontWeight:500}}>{e.vendor_name||"-"}</div>
@@ -1577,6 +1577,7 @@ export default function AdminPage() {
                 <Row l="月結廠商" v={fmt(pnl.expenses?.vendor)} />
                 <Row l="零用金" v={fmt(pnl.expenses?.petty_cash)} />
                 {pnl.expenses?.hq_advance > 0 && <Row l="總部代付" v={fmt(pnl.expenses.hq_advance)} />}
+                {pnl.expenses?.shared > 0 && <Row l={"總部均攤（÷" + stores.length + "店）"} v={fmt(pnl.expenses.shared_per_store) + "/店"} />}
                 <Row l="人事成本" v={fmt(pnl.expenses?.labor)} />
               </div>
             </div>

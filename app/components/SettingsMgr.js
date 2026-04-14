@@ -115,41 +115,58 @@ export default function SettingsMgr({ stores, load, month }) {
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "flex-end" }}>
               <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>地址</label><input id={"sa-"+s.id} defaultValue={s.address||""} placeholder="輸入完整地址" style={{ width: "100%", padding: "5px 8px", border: "1px solid #eee", borderRadius: 6, fontSize: 11 }} /></div>
-              <button onClick={async () => {
-                const addr = document.getElementById("sa-"+s.id).value;
-                if (!addr) { alert("請先輸入地址"); return; }
-                const btn = document.getElementById("geo-btn-"+s.id);
-                if (btn) btn.textContent = "⏳ 查詢中...";
-                try {
-                  const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(addr) + "&limit=1&countrycodes=tw").then(x => x.json());
-                  if (r && r[0]) {
-                    document.getElementById("lat-"+s.id).value = Number(r[0].lat).toFixed(6);
-                    document.getElementById("lng-"+s.id).value = Number(r[0].lon).toFixed(6);
-                    // Update map preview
-                    const iframe = document.getElementById("map-"+s.id);
-                    if (iframe) iframe.src = "https://www.openstreetmap.org/export/embed.html?bbox=" + (Number(r[0].lon)-0.003) + "," + (Number(r[0].lat)-0.002) + "," + (Number(r[0].lon)+0.003) + "," + (Number(r[0].lat)+0.002) + "&layer=mapnik&marker=" + r[0].lat + "," + r[0].lon;
-                    document.getElementById("map-wrap-"+s.id).style.display = "block";
-                    if (btn) btn.textContent = "✅ 已定位";
-                  } else {
-                    if (btn) btn.textContent = "❌ 找不到";
-                    alert("找不到此地址，請輸入更詳細的地址");
-                  }
-                } catch { if (btn) btn.textContent = "❌ 失敗"; }
-              }} id={"geo-btn-"+s.id} style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: "#4361ee", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>📍 查詢位置</button>
+            </div>
+            {/* 定位方式 */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap" }}>
+              <button onClick={() => {
+                const addr = document.getElementById("sa-"+s.id).value || s.name;
+                window.open("https://www.google.com/maps/search/" + encodeURIComponent(addr), "_blank");
+                alert("請在 Google Maps 找到門市位置後：\n\n1. 右鍵點擊門市位置\n2. 點擊座標數字（會自動複製）\n3. 回來貼到下方「緯度, 經度」欄位\n\n格式範例：25.033964, 121.564468");
+              }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #4361ee", background: "#fff", color: "#4361ee", fontSize: 11, cursor: "pointer" }}>🗺️ Google Maps 查詢</button>
+              <button onClick={() => {
+                if (!navigator.geolocation) { alert("不支援定位"); return; }
+                const btn = document.getElementById("loc-btn-"+s.id);
+                if (btn) btn.textContent = "⏳ 定位中...";
+                navigator.geolocation.getCurrentPosition(pos => {
+                  document.getElementById("lat-"+s.id).value = pos.coords.latitude.toFixed(6);
+                  document.getElementById("lng-"+s.id).value = pos.coords.longitude.toFixed(6);
+                  const iframe = document.getElementById("map-"+s.id);
+                  if (iframe) iframe.src = "https://www.openstreetmap.org/export/embed.html?bbox=" + (pos.coords.longitude-0.003) + "," + (pos.coords.latitude-0.002) + "," + (pos.coords.longitude+0.003) + "," + (pos.coords.latitude+0.002) + "&layer=mapnik&marker=" + pos.coords.latitude + "," + pos.coords.longitude;
+                  document.getElementById("map-wrap-"+s.id).style.display = "block";
+                  if (btn) btn.textContent = "✅ 精度" + Math.round(pos.coords.accuracy) + "m";
+                }, err => { if (btn) btn.textContent = "❌"; alert("定位失敗：" + err.message + "\n\n請用 Google Maps 查詢方式"); }, { enableHighAccuracy: true, timeout: 15000 });
+              }} id={"loc-btn-"+s.id} style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer" }}>📍 到現場定位</button>
+            </div>
+            {/* 座標輸入（從 Google Maps 複製貼上） */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 6, alignItems: "flex-end" }}>
+              <div style={{ flex: 2 }}>
+                <label style={{ fontSize: 9, color: "#888" }}>緯度, 經度（從 Google Maps 複製）</label>
+                <input id={"coords-"+s.id} defaultValue={s.latitude && s.longitude ? s.latitude + ", " + s.longitude : ""} placeholder="25.033964, 121.564468"
+                  onChange={e => {
+                    const parts = e.target.value.split(",").map(x => x.trim());
+                    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                      document.getElementById("lat-"+s.id).value = parts[0];
+                      document.getElementById("lng-"+s.id).value = parts[1];
+                      const iframe = document.getElementById("map-"+s.id);
+                      if (iframe) iframe.src = "https://www.openstreetmap.org/export/embed.html?bbox=" + (Number(parts[1])-0.003) + "," + (Number(parts[0])-0.002) + "," + (Number(parts[1])+0.003) + "," + (Number(parts[0])+0.002) + "&layer=mapnik&marker=" + parts[0] + "," + parts[1];
+                      document.getElementById("map-wrap-"+s.id).style.display = "block";
+                    }
+                  }}
+                  style={{ width: "100%", padding: "5px 8px", border: "1px solid #ddd", borderRadius: 6, fontSize: 11 }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 9, color: "#888" }}>打卡範圍</label>
+                <select id={"rad-"+s.id} defaultValue={s.radius_m||200} style={{ width: "100%", padding: "5px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="50">50m</option><option value="100">100m</option><option value="150">150m</option><option value="200">200m</option><option value="300">300m</option><option value="500">500m</option></select>
+              </div>
             </div>
             {/* 地圖預覽 */}
             <div id={"map-wrap-"+s.id} style={{ display: s.latitude && s.longitude ? "block" : "none", borderRadius: 6, overflow: "hidden", border: "1px solid #eee", marginBottom: 6 }}>
               <iframe id={"map-"+s.id} src={s.latitude && s.longitude ? `https://www.openstreetmap.org/export/embed.html?bbox=${s.longitude-0.003},${s.latitude-0.002},${s.longitude+0.003},${s.latitude+0.002}&layer=mapnik&marker=${s.latitude},${s.longitude}` : ""} style={{ width: "100%", height: 120, border: "none" }} loading="lazy" />
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 8px", background: "#f5f5f5", fontSize: 9, color: "#888" }}>
-                <span>{"📍 " + (s.latitude ? s.latitude.toFixed(4) + ", " + s.longitude.toFixed(4) : "未設定")}</span>
-                <span>{"打卡範圍 " + (s.radius_m || 200) + "m"}</span>
-              </div>
             </div>
-            {/* 隱藏座標 + 範圍 + 目標 */}
             <input type="hidden" id={"lat-"+s.id} defaultValue={s.latitude||""} />
             <input type="hidden" id={"lng-"+s.id} defaultValue={s.longitude||""} />
+            {/* 目標 + 預算 */}
             <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "flex-end" }}>
-              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>打卡範圍</label><select id={"rad-"+s.id} defaultValue={s.radius_m||200} style={{ width: "100%", padding: "4px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="50">50m</option><option value="100">100m</option><option value="150">150m</option><option value="200">200m</option><option value="300">300m</option><option value="500">500m</option></select></div>
               <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>日營收目標</label><input type="number" id={"dt-"+s.id} defaultValue={s.daily_target||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} /></div>
               <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>月費用預算</label><input type="number" id={"eb-"+s.id} defaultValue={s.monthly_expense_budget||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} /></div>
             </div>
