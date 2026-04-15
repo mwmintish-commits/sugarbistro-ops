@@ -468,75 +468,51 @@ async function handleEvent(event) {
     if (state?.current_flow?.startsWith("receipt_")) return handleReceiptImg(event, state);
     if (state?.current_flow === "expense_photo") {
       const uid2 = event.source.userId;
-      await replyText(event.replyToken, "📸 上傳中...");
+      const d = state.flow_data;
+      const isHq = d.store_id === "__hq__";
+      const today2 = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+      const typeLabel = d.expense_type === "vendor" ? "📦 月結" : d.expense_type === "hq_advance" ? "🏢 代付" : "💰 零用金";
+      
       try {
-        const d = state.flow_data;
-        const isHq = d.store_id === "__hq__";
-        const today2 = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
-        const typeLabel = d.expense_type === "vendor" ? "📦 月結" : d.expense_type === "hq_advance" ? "🏢 代付" : "💰 零用金";
-        
-        // Step 1: 下載圖片
+        // 1. 下載 + 上傳（4秒內完成，不做AI）
         const b64 = await downloadImageAsBase64(event.message.id);
-        if (!b64) { await pushText(uid2, "❌ 圖片下載失敗，請重新拍照"); return; }
-        
-        // Step 2: 上傳圖片到 Storage
         let imgUrl = "";
-        try { imgUrl = await uploadImage(b64, "expenses", `${d.expense_type}_${Date.now()}`); } catch (ue) { console.log("upload err:", ue.message); }
+        try { imgUrl = await uploadImage(b64, "expenses", `${d.expense_type}_${Date.now()}`); } catch {}
         
-        // Step 3: AI 辨識（可失敗）
-        let r = null;
-        try { r = await analyzeExpenseReceipt(b64); } catch (ae) { console.log("ai err:", ae.message); }
-        const aiOk = !!(r && r.total_amount);
-        
-        // Step 4: 存草稿
-        const expDate = r?.date || today2;
-        const insertData = {
-          store_id: isHq ? null : d.store_id, expense_type: d.expense_type, date: expDate,
-          amount: r?.total_amount || 0, vendor_name: r?.vendor_name || "",
-          image_url: imgUrl || null, submitted_by: d.employee_id,
-          month_key: expDate.slice(0, 7), status: "draft",
-        };
-        let draft = null;
-        if (d.draft_id) {
-          try { const res = await supabase.from("expenses").update(insertData).eq("id", d.draft_id).select().single(); if (!res.error) draft = res.data; } catch {}
-        }
-        if (!draft) {
-          try { const res = await supabase.from("expenses").insert(insertData).select().single(); if (!res.error) draft = res.data; } catch (ie) { console.log("insert err:", ie.message); }
-        }
-        
-        // Step 5: 回傳結果
-        const expData = { ...d, amount: r?.total_amount || 0, vendor_name: r?.vendor_name || "", date: expDate, category_suggestion: r?.category_suggestion || "其他", invoice_number: r?.invoice_number || null, image_url: imgUrl, draft_id: draft?.id || d.draft_id };
+        // 2. 建草稿（只存照片，金額0）
+        let draftId = d.draft_id || null;
+        const insertData = { store_id: isHq ? null : d.store_id, expense_type: d.expense_type, date: today2, amount: 0, vendor_name: "", image_url: imgUrl, submitted_by: d.employee_id, month_key: today2.slice(0, 7), status: "draft" };
+        try {
+          if (draftId) {
+            await supabase.from("expenses").update({ image_url: imgUrl }).eq("id", draftId);
+          } else {
+            const { data: dr } = await supabase.from("expenses").insert(insertData).select("id").single();
+            draftId = dr?.id;
+          }
+        } catch (ie) { console.error("expense insert:", ie); }
+
+        // 3. 立即回覆（在超時前完成）
+        const expData = { ...d, image_url: imgUrl, draft_id: draftId, amount: 0, date: today2 };
         await setUserState(uid2, "expense_confirm", expData);
+        const reviewUrl = `${SITE}/expense-review?id=${draftId || ""}`;
+        const aiUrl = `${SITE}/api/admin/expenses?action=ai_recognize&id=${draftId}`;
         
-        if (aiOk) {
-          let msg = typeLabel + " 辨識結果\n━━━━━━━━━━━━━━";
-          msg += "\n🏠 " + (d.store_name || "");
-          msg += "\n🏢 " + (r.vendor_name || "未知");
-          msg += "\n📅 " + (r.date || today2);
-          msg += "\n💰 " + fmt(r.total_amount);
-          msg += "\n📋 " + (r.category_suggestion || "其他");
-          if (r.invoice_number) msg += "\n🧾 " + r.invoice_number;
-          if (r.items?.length) msg += "\n" + r.items.slice(0, 5).map(i => "　▸ " + (i.name||"") + " " + fmt(i.amount)).join("\n");
-          await pushText(uid2, msg);
-        } else {
-          await pushText(uid2, typeLabel + " 📸 照片已留檔" + (imgUrl ? "✅" : "") + "\n🏠 " + (d.store_name || "") + "\n\n" + (r ? "AI 辨識不完整" : "AI 無法辨識此單據") + "\n請手動填寫：");
-        }
-        
-        const reviewUrl = `${SITE}/expense-review?id=${draft?.id || ""}`;
-        const qr = [
-          ...(draft ? [{ type: "action", action: { type: "uri", label: "📝 網頁修改", uri: reviewUrl } }] : []),
-          ...(aiOk ? [{ type: "action", action: { type: "message", label: "✅ 確認", text: "確認費用" } }] : []),
-          { type: "action", action: { type: "message", label: "✏️ 金額", text: "修改金額" } },
-          { type: "action", action: { type: "message", label: "✏️ 廠商", text: "修改廠商" } },
-          { type: "action", action: { type: "message", label: "✏️ 日期", text: "修改日期" } },
-          { type: "action", action: { type: "message", label: "✏️ 分類", text: "修改分類" } },
-          { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
-          { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
-        ];
-        await lineClient.pushMessage({ to: uid2, messages: [{ type: "text", text: aiOk ? "確認或修改：" : "請填寫資訊：", quickReply: { items: qr } }] });
+        await lineClient.replyMessage({ replyToken: event.replyToken, messages: [{
+          type: "text",
+          text: typeLabel + " 📸 照片已儲存 ✅\n🏠 " + (d.store_name || "") + "\n\n請選擇操作：",
+          quickReply: { items: [
+            { type: "action", action: { type: "uri", label: "🤖 AI辨識+修改", uri: reviewUrl } },
+            { type: "action", action: { type: "message", label: "✏️ 填金額", text: "修改金額" } },
+            { type: "action", action: { type: "message", label: "✏️ 填廠商", text: "修改廠商" } },
+            { type: "action", action: { type: "message", label: "✏️ 填日期", text: "修改日期" } },
+            { type: "action", action: { type: "message", label: "✏️ 選分類", text: "修改分類" } },
+            { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
+            { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+          ]}
+        }] });
       } catch (err) {
-        console.error("expense_photo error:", err);
-        try { await pushText(uid2, "❌ 處理失敗：" + (err?.message || "未知錯誤") + "\n\n請重新拍照或聯繫管理員"); } catch {}
+        console.error("expense_photo:", err);
+        try { await replyText(event.replyToken, "❌ " + (err?.message || "處理失敗")); } catch {}
       }
       return;
     }
@@ -873,7 +849,8 @@ async function handleEvent(event) {
   if (text === "月結單據") {
     if (emp.store_id && emp.stores) {
       await setUserState(userId, "expense_photo", { employee_id: emp.id, employee_name: emp.name, expense_type: "vendor", store_id: emp.store_id, store_name: emp.stores.name });
-      return replyText(rt, `📦 月結廠商單據\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 請拍照上傳廠商送貨單`);
+      const u = `${SITE}/upload?type=expense&expense_type=vendor&store_id=${emp.store_id}&store_name=${encodeURIComponent(emp.stores.name)}&employee_id=${emp.id}&employee_name=${encodeURIComponent(emp.name)}`;
+      return lineClient.replyMessage({ replyToken: rt, messages: [{ type: "text", text: `📦 月結廠商單據\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 直接拍照，或網頁批次上傳：`, quickReply: { items: [{ type: "action", action: { type: "uri", label: "📤 多張上傳/Excel", uri: u } }] } }] });
     }
     const { data: stores } = await supabase.from("stores").select("*").eq("is_active", true);
     await setUserState(userId, "expense_select_store", { employee_id: emp.id, employee_name: emp.name, expense_type: "vendor" });
@@ -882,7 +859,8 @@ async function handleEvent(event) {
   if (text === "零用金") {
     if (emp.store_id && emp.stores) {
       await setUserState(userId, "expense_photo", { employee_id: emp.id, employee_name: emp.name, expense_type: "petty_cash", store_id: emp.store_id, store_name: emp.stores.name });
-      return replyText(rt, `💰 零用金回報\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 請拍照上傳零用金收據`);
+      const u = `${SITE}/upload?type=expense&expense_type=petty_cash&store_id=${emp.store_id}&store_name=${encodeURIComponent(emp.stores.name)}&employee_id=${emp.id}&employee_name=${encodeURIComponent(emp.name)}`;
+      return lineClient.replyMessage({ replyToken: rt, messages: [{ type: "text", text: `💰 零用金回報\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 直接拍照，或網頁批次上傳：`, quickReply: { items: [{ type: "action", action: { type: "uri", label: "📤 多張上傳/Excel", uri: u } }] } }] });
     }
     const { data: stores } = await supabase.from("stores").select("*").eq("is_active", true);
     await setUserState(userId, "expense_select_store", { employee_id: emp.id, employee_name: emp.name, expense_type: "petty_cash" });
@@ -891,7 +869,8 @@ async function handleEvent(event) {
   if (text === "總部代付") {
     if (emp.store_id && emp.stores) {
       await setUserState(userId, "expense_photo", { employee_id: emp.id, employee_name: emp.name, expense_type: "hq_advance", store_id: emp.store_id, store_name: emp.stores.name });
-      return replyText(rt, `🏢 總部代付回報\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 請拍照上傳總部代付單據`);
+      const u = `${SITE}/upload?type=expense&expense_type=hq_advance&store_id=${emp.store_id}&store_name=${encodeURIComponent(emp.stores.name)}&employee_id=${emp.id}&employee_name=${encodeURIComponent(emp.name)}`;
+      return lineClient.replyMessage({ replyToken: rt, messages: [{ type: "text", text: `🏢 總部代付\n👤 ${emp.name}\n🏠 ${emp.stores.name}\n\n📸 直接拍照，或網頁批次上傳：`, quickReply: { items: [{ type: "action", action: { type: "uri", label: "📤 多張上傳/Excel", uri: u } }] } }] });
     }
     const { data: stores } = await supabase.from("stores").select("*").eq("is_active", true);
     await setUserState(userId, "expense_select_store", { employee_id: emp.id, employee_name: emp.name, expense_type: "hq_advance" });
@@ -914,7 +893,10 @@ async function handleEvent(event) {
     }
     await setUserState(userId, "expense_photo", { ...state.flow_data, store_id: storeId, store_name: storeLabel });
     const label = state.flow_data.expense_type === "vendor" ? "廠商送貨單" : state.flow_data.expense_type === "hq_advance" ? "總部代付單據" : "零用金收據";
-    return replyText(rt, `🏠 ${storeLabel}\n\n📸 請拍照上傳${label}`);
+    const uploadUrl = `${SITE}/upload?type=expense&expense_type=${state.flow_data.expense_type}&store_id=${storeId}&store_name=${encodeURIComponent(storeLabel)}&employee_id=${state.flow_data.employee_id}&employee_name=${encodeURIComponent(state.flow_data.employee_name)}`;
+    return lineClient.replyMessage({ replyToken: rt, messages: [{ type: "text", text: `🏠 ${storeLabel}\n\n📸 直接拍照上傳${label}\n或用網頁批次上傳：`, quickReply: { items: [
+      { type: "action", action: { type: "uri", label: "📤 網頁上傳（多張/Excel）", uri: uploadUrl } },
+    ]}}]});
   }
   // 修改金額
   if (text === "修改金額" && state?.current_flow === "expense_confirm") {

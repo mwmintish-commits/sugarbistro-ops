@@ -41,6 +41,29 @@ export async function GET(request) {
 export async function POST(request) {
   const body = await request.json();
 
+  // AI 辨識（從 expense-review 頁面呼叫，不在 webhook 裡）
+  if (body.action === "ai_recognize") {
+    const { expense_id, image_url } = body;
+    let imgSrc = image_url;
+    if (!imgSrc && expense_id) {
+      const { data: exp } = await supabase.from("expenses").select("image_url").eq("id", expense_id).single();
+      imgSrc = exp?.image_url;
+    }
+    if (!imgSrc) return Response.json({ error: "無圖片" });
+    try {
+      // 下載圖片轉 base64
+      const imgRes = await fetch(imgSrc);
+      const buf = Buffer.from(await imgRes.arrayBuffer());
+      const b64 = buf.toString("base64");
+      // AI 辨識
+      const { analyzeExpenseReceipt } = await import("@/lib/anthropic");
+      const r = await analyzeExpenseReceipt(b64);
+      return Response.json({ data: r });
+    } catch (e) {
+      return Response.json({ error: e.message });
+    }
+  }
+
   if (body.action === "create") {
     const { store_id, category_id, expense_type, date, amount, vendor_name, description, image_url, ai_raw_data, submitted_by } = body;
     const monthKey = date?.slice(0, 7);
@@ -118,6 +141,7 @@ export async function POST(request) {
     if (edit_reason !== undefined) updates.edit_reason = edit_reason;
     if (edit_changes !== undefined) updates.edit_changes = edit_changes;
     if (edited_at !== undefined) updates.edited_at = edited_at;
+    if (body.month_key !== undefined) updates.month_key = body.month_key;
     const { data, error } = await supabase.from("expenses")
       .update(updates).eq("id", expense_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
