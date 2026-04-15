@@ -574,6 +574,34 @@ async function handleEvent(event) {
     const rt = event.replyToken;
     if (!state) return;
 
+    // 補打卡：選日期
+    if (pb.data === "action=amend_date" && state.current_flow === "amend_date") {
+      const date = pb.params?.date;
+      if (!date) return replyText(rt, "❌ 請選擇日期");
+      await setUserState(userId, "amend_type", { ...state.flow_data, date });
+      return replyWithQuickReply(rt, "📅 " + date + "\n請選擇打卡類型：", [
+        { type: "action", action: { type: "message", label: "🌅 上班", text: "補登:clock_in" } },
+        { type: "action", action: { type: "message", label: "🌙 下班", text: "補登:clock_out" } },
+        { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+      ]);
+    }
+    // 補打卡：選時間
+    if (pb.data === "action=amend_time" && state.current_flow === "amend_time") {
+      const time = pb.params?.time;
+      if (!time) return replyText(rt, "❌ 請選擇時間");
+      await setUserState(userId, "amend_reason", { ...state.flow_data, amended_time: time });
+      return replyWithQuickReply(rt,
+        "🕐 " + time + "\n請選擇或輸入補打卡原因：",
+        [
+          { type: "action", action: { type: "message", label: "忘記打卡", text: "忘記打卡" } },
+          { type: "action", action: { type: "message", label: "手機沒電", text: "手機沒電" } },
+          { type: "action", action: { type: "message", label: "GPS 失效", text: "GPS 失效" } },
+          { type: "action", action: { type: "message", label: "系統異常", text: "系統異常" } },
+          { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+        ]
+      );
+    }
+
     // 預假日期選擇
     if (pb.data === "action=advance_date" && state.current_flow === "advance_select_date") {
       const date = pb.params?.date;
@@ -652,25 +680,50 @@ async function handleEvent(event) {
   // ✦13 補打卡申請
   if (text === "補打卡") {
     await setUserState(userId, "amend_date", { employee_id: emp.id, store_id: emp.store_id });
-    return replyText(rt, "🔧 補打卡申請\n\n請輸入日期（YYYY-MM-DD）：");
-  }
-  if (state?.current_flow === "amend_date") {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return replyText(rt, "格式錯誤，請輸入 YYYY-MM-DD：");
-    await setUserState(userId, "amend_type", { ...state.flow_data, date: text });
-    return replyWithQuickReply(rt, "📅 " + text + "\n請選擇打卡類型：", [
-      { type: "action", action: { type: "message", label: "上班", text: "補登:clock_in" } },
-      { type: "action", action: { type: "message", label: "下班", text: "補登:clock_out" } },
-    ]);
+    return lineClient.replyMessage({ replyToken: rt, messages: [{
+      type: "text", text: "🔧 補打卡申請\n\n請選擇要補的日期：",
+      quickReply: { items: [
+        { type: "action", action: { type: "datetimepicker", label: "📅 選擇日期", data: "action=amend_date", mode: "date" } },
+        { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+      ]}
+    }]});
   }
   if (text.startsWith("補登:") && state?.current_flow === "amend_type") {
     const amendType = text.replace("補登:", "");
     await setUserState(userId, "amend_time", { ...state.flow_data, type: amendType });
-    return replyText(rt, "請輸入實際" + (amendType === "clock_in" ? "上班" : "下班") + "時間（HH:MM）：");
+    return lineClient.replyMessage({ replyToken: rt, messages: [{
+      type: "text", text: "請選擇實際" + (amendType === "clock_in" ? "上班" : "下班") + "時間：",
+      quickReply: { items: [
+        { type: "action", action: { type: "datetimepicker", label: "🕐 選擇時間", data: "action=amend_time", mode: "time" } },
+        { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+      ]}
+    }]});
   }
-  if (state?.current_flow === "amend_time") {
-    if (!/^\d{2}:\d{2}$/.test(text)) return replyText(rt, "格式錯誤，請輸入 HH:MM：");
-    await setUserState(userId, "amend_reason", { ...state.flow_data, amended_time: text });
-    return replyText(rt, "請輸入補打卡原因：");
+  if (state?.current_flow === "amend_reason") {
+    const d = state.flow_data;
+    await supabase.from("clock_amendments").insert({
+      employee_id: d.employee_id, store_id: d.store_id,
+      date: d.date, type: d.type, amended_time: d.amended_time, reason: text,
+    });
+    await clearUserState(userId);
+    const { data: mgrs } = await supabase.from("employees")
+      .select("line_uid").eq("store_id", d.store_id)
+      .in("role", ["store_manager", "manager", "admin"]).eq("is_active", true);
+    for (const m of mgrs || []) {
+      if (m.line_uid) {
+        await pushText(m.line_uid,
+          "🔧 補打卡申請\n👤 " + emp.name + "\n📅 " + d.date +
+          " " + (d.type === "clock_in" ? "上班" : "下班") + " " + d.amended_time +
+          "\n📝 " + text
+        ).catch(() => {});
+      }
+    }
+    return replyWithQuickReply(rt,
+      "✅ 補打卡申請已送出\n\n📅 " + d.date + " " +
+      (d.type === "clock_in" ? "上班" : "下班") + " " + d.amended_time +
+      "\n📝 " + text + "\n\n⏳ 等待主管核准",
+      getMenu(emp.role)
+    );
   }
   if (state?.current_flow === "amend_reason") {
     const d = state.flow_data;
