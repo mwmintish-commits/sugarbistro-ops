@@ -1522,34 +1522,90 @@ export default function AdminPage() {
         )}
 
         {/* PAYMENTS */}
-        {!ld && tab === "payments" && (
+        {!ld && tab === "payments" && (() => {
+          const typeLabel = t => t==="vendor"?"📦 月結廠商":t==="hq_advance"?"🏢 總部代付":t==="petty_cash"?"💰 零用金":t;
+          const pendingPmts = pmtRecords.filter(p=>p.status==="pending");
+          const paidPmts = pmtRecords.filter(p=>p.status==="paid");
+          // 按提交人分組待撥款（employee_id 為主，無則用 recipient）
+          const groups = {};
+          for (const p of pendingPmts) {
+            const key = p.employee_id || ("vendor:"+(p.recipient||"未知"));
+            const name = p.employees?.name || p.recipient || "未知";
+            if (!groups[key]) groups[key] = { name, isEmployee: !!p.employee_id, items: [], total: 0 };
+            groups[key].items.push(p);
+            groups[key].total += Number(p.amount||0);
+          }
+          const sortedGroups = Object.entries(groups).sort((a,b)=>b[1].total-a[1].total);
+          const markPaid = async pid => { await ap("/api/admin/payments",{action:"mark_paid",payment_id:pid}); load(); };
+          const markGroupPaid = async items => {
+            if (!confirm(`確定將 ${items.length} 筆全部標記為已撥款？`)) return;
+            for (const it of items) await ap("/api/admin/payments",{action:"mark_paid",payment_id:it.id});
+            load();
+          };
+          return (
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💳 "+month+" 撥款"}</h3>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
               <div style={{background:"#fff8e6",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#8a6d00"}}>待撥款</div><div style={{fontSize:18,fontWeight:600,color:"#b91c1c"}}>{fmt(pmtSum.pending)}</div></div>
               <div style={{background:"#e6f9f0",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#0a7c42"}}>已撥款</div><div style={{fontSize:18,fontWeight:600,color:"#0a7c42"}}>{fmt(pmtSum.paid)}</div></div>
             </div>
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["類型","對象","金額","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
-                <tbody>{pmtRecords.map(p=>(
-                  <tr key={p.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                    <td style={{padding:6}}>{p.type}</td>
-                    <td style={{padding:6,fontWeight:500}}>{p.recipient||(p.employees?p.employees.name:"-")}</td>
-                    <td style={{padding:6,fontWeight:600}}>{fmt(p.amount)}</td>
-                    <td style={{padding:6}}><Badge status={p.status} /></td>
-                    <td style={{padding:6}}>
-                      {p.status==="pending" && (
-                        <button onClick={async()=>{await ap("/api/admin/payments",{action:"mark_paid",payment_id:p.id});load();}}
-                          style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer"}}>✅已撥</button>
-                      )}
-                    </td>
-                  </tr>
-                ))}</tbody>
-              </table>
+
+            {/* 待撥款：按提交人分組 */}
+            <div style={{marginBottom:14}}>
+              <h4 style={{fontSize:12,fontWeight:600,marginBottom:6,color:"#b91c1c"}}>📋 待撥款（按收款對象分組）</h4>
+              {sortedGroups.length===0 && <div style={{padding:14,background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",fontSize:11,color:"#888",textAlign:"center"}}>目前沒有待撥款項目</div>}
+              {sortedGroups.map(([key, g])=>(
+                <div key={key} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",marginBottom:6,overflow:"hidden"}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:"#faf8f5"}}>
+                    <div>
+                      <span style={{fontWeight:600,fontSize:13}}>{g.isEmployee?"👤 ":"🏪 "}{g.name}</span>
+                      <span style={{marginLeft:8,fontSize:10,color:"#888"}}>{g.items.length} 筆</span>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontWeight:700,color:"#b91c1c"}}>{fmt(g.total)}</span>
+                      <button onClick={()=>markGroupPaid(g.items)} style={{padding:"3px 8px",borderRadius:4,border:"none",background:"#0a7c42",color:"#fff",fontSize:10,cursor:"pointer"}}>✅ 全部已撥</button>
+                    </div>
+                  </div>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                    <tbody>{g.items.map(p=>(
+                      <tr key={p.id} style={{borderTop:"1px solid #f0eeea"}}>
+                        <td style={{padding:"4px 12px",width:90,color:"#666"}}>{typeLabel(p.type)}</td>
+                        <td style={{padding:"4px 6px"}}>{p.notes||"-"}</td>
+                        <td style={{padding:"4px 6px",fontWeight:600,textAlign:"right"}}>{fmt(p.amount)}</td>
+                        <td style={{padding:"4px 12px",textAlign:"right",width:60}}>
+                          <button onClick={()=>markPaid(p.id)} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #0a7c42",background:"#fff",color:"#0a7c42",fontSize:9,cursor:"pointer"}}>單筆已撥</button>
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+
+            {/* 已撥款 */}
+            <div>
+              <h4 style={{fontSize:12,fontWeight:600,marginBottom:6,color:"#0a7c42"}}>✅ 已撥款（本月）</h4>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                  <thead><tr style={{background:"#faf8f5"}}>{["撥款日","類型","收款對象","明細","金額"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {paidPmts.length===0 && <tr><td colSpan={5} style={{padding:12,textAlign:"center",color:"#888"}}>本月尚無已撥款紀錄</td></tr>}
+                    {paidPmts.map(p=>(
+                      <tr key={p.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                        <td style={{padding:6,color:"#0a7c42",fontWeight:500}}>{p.paid_date||"-"}</td>
+                        <td style={{padding:6,color:"#666"}}>{typeLabel(p.type)}</td>
+                        <td style={{padding:6,fontWeight:500}}>{p.employees?.name||p.recipient||"-"}</td>
+                        <td style={{padding:6,color:"#888"}}>{p.notes||"-"}</td>
+                        <td style={{padding:6,fontWeight:600,textAlign:"right"}}>{fmt(p.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* PNL */}
         {!ld && tab === "pnl" && pnl && (
