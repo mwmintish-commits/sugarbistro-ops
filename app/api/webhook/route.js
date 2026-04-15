@@ -1150,6 +1150,20 @@ async function handleEvent(event) {
     return replyWithQuickReply(rt, `🍯 ${getRoleLabel(emp.role)} ${emp.name}\n🏠 ${emp.stores?.name || "總部"}`, getMenu(emp.role).slice(0, 13));
   }
 
+  // 我的面板 / 面板：推送個人 LIFF 風格面板連結
+  if (text === "面板" || text === "我的面板" || text === "📱 面板") {
+    const panelUrl = `${SITE}/me?eid=${emp.id}`;
+    return lineClient.replyMessage({ replyToken: rt, messages: [{
+      type: "template", altText: "開啟我的面板",
+      template: {
+        type: "buttons",
+        title: `🍯 ${emp.name} 的面板`,
+        text: `${getRoleLabel(emp.role)}｜${emp.stores?.name || "總部"}`,
+        actions: [{ type: "uri", label: "📱 開啟面板", uri: panelUrl }],
+      }
+    }]});
+  }
+
   return replyWithQuickReply(rt, `🍯 ${getRoleLabel(emp.role)} ${emp.name}\n🏠 ${emp.stores?.name || "總部"}`, getMenu(emp.role).slice(0, 13));
 }
 
