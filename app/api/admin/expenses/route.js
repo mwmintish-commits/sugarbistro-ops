@@ -199,6 +199,16 @@ export async function POST(request) {
     return Response.json({ data });
   }
 
+  // 刪除單筆費用（連同對應撥款）
+  if (body.action === "delete") {
+    const { expense_id } = body;
+    if (!expense_id) return Response.json({ error: "missing expense_id" }, { status: 400 });
+    await supabase.from("payments").delete().eq("reference_id", expense_id);
+    const { error } = await supabase.from("expenses").delete().eq("id", expense_id);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ success: true });
+  }
+
   // 刪除全部費用（測試用）
   if (body.action === "delete_all") {
     await supabase.from("payments").delete().neq("id", "00000000-0000-0000-0000-000000000000");

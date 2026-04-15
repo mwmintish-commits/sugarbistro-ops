@@ -1419,15 +1419,15 @@ export default function AdminPage() {
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
               <div style={{background:"#fff8e6",borderRadius:8,padding:"8px 12px"}}>
                 <div style={{fontSize:10,color:"#8a6d00"}}>💰 零用金</div>
-                <div style={{fontSize:15,fontWeight:600}}>{fmt(exps.filter(e=>e.expense_type==="petty_cash").reduce((s,e)=>s+Number(e.amount||0),0))}</div>
+                <div style={{fontSize:15,fontWeight:600}}>{fmt(exps.filter(e=>e.expense_type==="petty_cash"&&e.status!=="draft"&&e.status!=="rejected").reduce((s,e)=>s+Number(e.amount||0),0))}</div>
               </div>
               <div style={{background:"#e6f1fb",borderRadius:8,padding:"8px 12px"}}>
                 <div style={{fontSize:10,color:"#185fa5"}}>📦 月結</div>
-                <div style={{fontSize:15,fontWeight:600}}>{fmt(exps.filter(e=>e.expense_type==="vendor").reduce((s,e)=>s+Number(e.amount||0),0))}</div>
+                <div style={{fontSize:15,fontWeight:600}}>{fmt(exps.filter(e=>e.expense_type==="vendor"&&e.status!=="draft"&&e.status!=="rejected").reduce((s,e)=>s+Number(e.amount||0),0))}</div>
               </div>
               <div style={{background:"#fde8e8",borderRadius:8,padding:"8px 12px"}}>
                 <div style={{fontSize:10,color:"#b91c1c"}}>🏢 總部代付</div>
-                <div style={{fontSize:15,fontWeight:600}}>{fmt(exps.filter(e=>e.expense_type==="hq_advance").reduce((s,e)=>s+Number(e.amount||0),0))}</div>
+                <div style={{fontSize:15,fontWeight:600}}>{fmt(exps.filter(e=>e.expense_type==="hq_advance"&&e.status!=="draft"&&e.status!=="rejected").reduce((s,e)=>s+Number(e.amount||0),0))}</div>
               </div>
             </div>
             {/* ✦10 費用預算進度 */}
@@ -1498,7 +1498,7 @@ export default function AdminPage() {
                         {e.invoice_number && <div style={{fontSize:9,color:"#4361ee"}}>{"🧾"+e.invoice_number}</div>}
                       </td>
                       <td style={{padding:6,fontSize:10}}>{e.category_suggestion?<span style={{background:"#e6f1fb",color:"#185fa5",padding:"1px 4px",borderRadius:3,fontSize:9}}>{e.category_suggestion}</span>:<span style={{color:"#ccc"}}>-</span>}</td>
-                      <td style={{padding:6,fontSize:10}}>{e.submitted_by_name||"-"}</td>
+                      <td style={{padding:6,fontSize:10}}>{e.employees?.name||e.submitted_by_name||"-"}</td>
                       <td style={{padding:6,fontWeight:600}}>{fmt(e.amount)}</td>
                       <td style={{padding:6}}>{e.image_url?<button onClick={()=>setSi(e.image_url)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>📸</button>:<span style={{color:"#ccc"}}>-</span>}</td>
                       <td style={{padding:6}}><Badge status={e.status} /></td>
@@ -1506,8 +1506,11 @@ export default function AdminPage() {
                         {e.status==="pending" && (
                           <span>
                             <button onClick={()=>rvExp(e.id,"approved")} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>✅</button>
-                            <button onClick={()=>rvExp(e.id,"rejected")} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>❌</button>
+                            <button onClick={()=>rvExp(e.id,"rejected")} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>❌</button>
                           </span>
+                        )}
+                        {(e.status==="draft"||e.status==="rejected") && (
+                          <button onClick={async()=>{ if(!confirm("確定刪除此筆？"))return; await ap("/api/admin/expenses",{action:"delete",expense_id:e.id}); setExps(exps.filter(x=>x.id!==e.id)); }} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#666",color:"#fff",fontSize:9,cursor:"pointer"}}>🗑</button>
                         )}
                       </td>
                     </tr>
