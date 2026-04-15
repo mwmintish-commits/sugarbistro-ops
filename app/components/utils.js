@@ -50,6 +50,7 @@ export const LT = {
 
 export function Badge({ status }) {
   const m = {
+    draft: { bg: "#f3f4f6", c: "#6b7280" },
     matched: { bg: "#e6f9f0", c: "#0a7c42" },
     pending: { bg: "#fff8e6", c: "#8a6d00" },
     approved: { bg: "#e6f9f0", c: "#0a7c42" },
