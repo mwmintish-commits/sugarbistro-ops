@@ -345,6 +345,7 @@ export default function AdminPage() {
               style={{padding:"3px 8px",borderRadius:6,border:"1px solid #ddd",fontSize:11}}>
               <option value="">全部門市</option>
               {stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+              <option value="__hq__">🏢 總部均攤</option>
             </select>
           ) : (
             <span style={{padding:"3px 8px",borderRadius:6,background:"#e6f1fb",color:"#185fa5",fontSize:11}}>{storeName}</span>

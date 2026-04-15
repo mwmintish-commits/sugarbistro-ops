@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { replyText, replyWithQuickReply, downloadImageAsBase64, lineConfig, pushText, lineClient } from "@/lib/line";
 import { supabase } from "@/lib/supabase";
-import { analyzeDailySettlement, analyzeDepositSlip, analyzeUberEatsReceipt, analyzeVoucher, analyzeLineCreditReceipt } from "@/lib/anthropic";
+import { analyzeDailySettlement, analyzeDepositSlip, analyzeUberEatsReceipt, analyzeVoucher, analyzeLineCreditReceipt, analyzeExpenseReceipt } from "@/lib/anthropic";
 
 function verifySignature(body, signature) {
   return crypto.createHmac("SHA256", lineConfig.channelSecret).update(body).digest("base64") === signature;
@@ -487,20 +487,60 @@ async function handleEvent(event) {
         const expData = { ...d, image_url: imgUrl, draft_id: draftId, amount: 0, date: today2 };
         await setUserState(uid2, "expense_confirm", expData);
         const reviewUrl = `${SITE}/expense-review?id=${draftId || ""}`;
-        
+
+        // 立即回覆「辨識中」，避免 LINE timeout
         await lineClient.replyMessage({ replyToken: event.replyToken, messages: [{
           type: "text",
-          text: typeLabel + " 📸 照片已儲存 ✅\n🏠 " + (d.store_name || "") + "\n\n選擇操作：",
-          quickReply: { items: [
-            { type: "action", action: { type: "uri", label: "🤖 AI辨識（推薦）", uri: reviewUrl } },
-            { type: "action", action: { type: "message", label: "✏️ 填金額", text: "修改金額" } },
-            { type: "action", action: { type: "message", label: "✏️ 填廠商", text: "修改廠商" } },
-            { type: "action", action: { type: "message", label: "✏️ 填日期", text: "修改日期" } },
-            { type: "action", action: { type: "message", label: "✏️ 選分類", text: "修改分類" } },
-            { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
-            { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
-          ]}
+          text: typeLabel + " 📸 已儲存\n🤖 AI 辨識中（約 5 秒）..."
         }] });
+
+        // 背景跑 AI → 完成後 push 結果
+        (async () => {
+          try {
+            const r = await analyzeExpenseReceipt(b64);
+            if (!r) {
+              await pushText(uid2, "⚠️ AI 辨識失敗，請點此手動填寫：\n" + reviewUrl);
+              return;
+            }
+            const expDate = r?.date || today2;
+            await supabase.from("expenses").update({
+              amount: r?.total_amount || 0, vendor_name: r?.vendor_name || "",
+              description: r?.description || "", category_suggestion: r?.category_suggestion || "其他",
+              invoice_number: r?.invoice_number || null,
+              date: expDate, month_key: expDate.slice(0, 7),
+            }).eq("id", draftId);
+
+            // 發票重複偵測
+            let dupNote = "";
+            if (r?.invoice_number) {
+              const { data: existing } = await supabase.from("expenses")
+                .select("id, date, vendor_name").eq("invoice_number", r.invoice_number)
+                .neq("id", draftId).in("status", ["draft", "pending", "approved"])
+                .limit(1).maybeSingle();
+              if (existing) dupNote = `\n\n⚠️ 此發票已存在（${existing.date} ${existing.vendor_name || ""}），請至網頁確認`;
+            }
+
+            await lineClient.pushMessage({ to: uid2, messages: [{
+              type: "text",
+              text: typeLabel + " ✅ 辨識完成\n" +
+                "🏪 " + (r?.vendor_name || "(未辨識)") + "\n" +
+                "💰 " + fmt(r?.total_amount || 0) + "\n" +
+                "📆 " + expDate + "\n" +
+                (r?.invoice_number ? "🧾 " + r.invoice_number + "\n" : "") +
+                "📋 " + (r?.category_suggestion || "其他") + dupNote,
+              quickReply: { items: [
+                { type: "action", action: { type: "uri", label: "📝 確認送出", uri: reviewUrl } },
+                { type: "action", action: { type: "message", label: "✏️ 修改金額", text: "修改金額" } },
+                { type: "action", action: { type: "message", label: "✏️ 修改廠商", text: "修改廠商" } },
+                { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
+                { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+              ]}
+            }] });
+          } catch (aiErr) {
+            console.error("expense AI bg:", aiErr);
+            try { await pushText(uid2, "⚠️ AI 處理錯誤，請手動填寫：\n" + reviewUrl); } catch {}
+          }
+        })();
       } catch (err) {
         console.error("expense_photo:", err);
         try { await replyText(event.replyToken, "❌ " + (err?.message || "處理失敗")); } catch {}
