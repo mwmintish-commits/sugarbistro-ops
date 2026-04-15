@@ -484,63 +484,61 @@ async function handleEvent(event) {
           else { const { data: dr } = await supabase.from("expenses").insert({ store_id: isHq ? null : d.store_id, expense_type: d.expense_type, date: today2, amount: 0, vendor_name: "", image_url: imgUrl, submitted_by: d.employee_id, month_key: today2.slice(0, 7), status: "draft" }).select("id").single(); draftId = dr?.id; }
         } catch (ie) { console.error("expense insert:", ie); }
 
-        const expData = { ...d, image_url: imgUrl, draft_id: draftId, amount: 0, date: today2 };
-        await setUserState(uid2, "expense_confirm", expData);
         const reviewUrl = `${SITE}/expense-review?id=${draftId || ""}`;
 
-        // 立即回覆「辨識中」，避免 LINE timeout
+        // 同步跑 AI（典型 3-6 秒），完成後一次回覆完整結果
+        let aiData = null;
+        let aiErr = null;
+        try {
+          aiData = await analyzeExpenseReceipt(b64);
+        } catch (e) {
+          aiErr = e?.message || "AI 失敗";
+          console.error("expense AI:", e);
+        }
+
+        let expDate = today2;
+        let dupNote = "";
+        if (aiData) {
+          expDate = aiData?.date || today2;
+          await supabase.from("expenses").update({
+            amount: aiData?.total_amount || 0, vendor_name: aiData?.vendor_name || "",
+            description: aiData?.description || "", category_suggestion: aiData?.category_suggestion || "其他",
+            invoice_number: aiData?.invoice_number || null,
+            date: expDate, month_key: expDate.slice(0, 7),
+          }).eq("id", draftId);
+
+          if (aiData?.invoice_number) {
+            const { data: existing } = await supabase.from("expenses")
+              .select("id, date, vendor_name").eq("invoice_number", aiData.invoice_number)
+              .neq("id", draftId).in("status", ["draft", "pending", "approved"])
+              .limit(1).maybeSingle();
+            if (existing) dupNote = `\n\n⚠️ 此發票已存在（${existing.date} ${existing.vendor_name || ""}），請至網頁確認`;
+          }
+        }
+
+        const expData = { ...d, image_url: imgUrl, draft_id: draftId, amount: aiData?.total_amount || 0, date: expDate, vendor_name: aiData?.vendor_name || "", invoice_number: aiData?.invoice_number || null, category_suggestion: aiData?.category_suggestion || "其他" };
+        await setUserState(uid2, "expense_confirm", expData);
+
+        const replyText2 = aiData
+          ? typeLabel + " ✅ 辨識完成\n" +
+            "🏪 " + (aiData?.vendor_name || "(未辨識)") + "\n" +
+            "💰 " + fmt(aiData?.total_amount || 0) + "\n" +
+            "📆 " + expDate + "\n" +
+            (aiData?.invoice_number ? "🧾 " + aiData.invoice_number + "\n" : "") +
+            "📋 " + (aiData?.category_suggestion || "其他") + dupNote
+          : typeLabel + " 📸 已儲存\n⚠️ AI 辨識失敗" + (aiErr ? "（" + aiErr + "）" : "") + "，請手動填寫";
+
         await lineClient.replyMessage({ replyToken: event.replyToken, messages: [{
           type: "text",
-          text: typeLabel + " 📸 已儲存\n🤖 AI 辨識中（約 5 秒）..."
+          text: replyText2,
+          quickReply: { items: [
+            { type: "action", action: { type: "uri", label: "📝 確認送出", uri: reviewUrl } },
+            { type: "action", action: { type: "message", label: "✏️ 修改金額", text: "修改金額" } },
+            { type: "action", action: { type: "message", label: "✏️ 修改廠商", text: "修改廠商" } },
+            { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
+            { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+          ]}
         }] });
-
-        // 背景跑 AI → 完成後 push 結果
-        (async () => {
-          try {
-            const r = await analyzeExpenseReceipt(b64);
-            if (!r) {
-              await pushText(uid2, "⚠️ AI 辨識失敗，請點此手動填寫：\n" + reviewUrl);
-              return;
-            }
-            const expDate = r?.date || today2;
-            await supabase.from("expenses").update({
-              amount: r?.total_amount || 0, vendor_name: r?.vendor_name || "",
-              description: r?.description || "", category_suggestion: r?.category_suggestion || "其他",
-              invoice_number: r?.invoice_number || null,
-              date: expDate, month_key: expDate.slice(0, 7),
-            }).eq("id", draftId);
-
-            // 發票重複偵測
-            let dupNote = "";
-            if (r?.invoice_number) {
-              const { data: existing } = await supabase.from("expenses")
-                .select("id, date, vendor_name").eq("invoice_number", r.invoice_number)
-                .neq("id", draftId).in("status", ["draft", "pending", "approved"])
-                .limit(1).maybeSingle();
-              if (existing) dupNote = `\n\n⚠️ 此發票已存在（${existing.date} ${existing.vendor_name || ""}），請至網頁確認`;
-            }
-
-            await lineClient.pushMessage({ to: uid2, messages: [{
-              type: "text",
-              text: typeLabel + " ✅ 辨識完成\n" +
-                "🏪 " + (r?.vendor_name || "(未辨識)") + "\n" +
-                "💰 " + fmt(r?.total_amount || 0) + "\n" +
-                "📆 " + expDate + "\n" +
-                (r?.invoice_number ? "🧾 " + r.invoice_number + "\n" : "") +
-                "📋 " + (r?.category_suggestion || "其他") + dupNote,
-              quickReply: { items: [
-                { type: "action", action: { type: "uri", label: "📝 確認送出", uri: reviewUrl } },
-                { type: "action", action: { type: "message", label: "✏️ 修改金額", text: "修改金額" } },
-                { type: "action", action: { type: "message", label: "✏️ 修改廠商", text: "修改廠商" } },
-                { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
-                { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
-              ]}
-            }] });
-          } catch (aiErr) {
-            console.error("expense AI bg:", aiErr);
-            try { await pushText(uid2, "⚠️ AI 處理錯誤，請手動填寫：\n" + reviewUrl); } catch {}
-          }
-        })();
       } catch (err) {
         console.error("expense_photo:", err);
         try { await replyText(event.replyToken, "❌ " + (err?.message || "處理失敗")); } catch {}
