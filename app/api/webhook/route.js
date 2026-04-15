@@ -468,111 +468,96 @@ async function handleEvent(event) {
     if (state?.current_flow?.startsWith("receipt_")) return handleReceiptImg(event, state);
     if (state?.current_flow === "expense_photo") {
       const uid2 = event.source.userId;
-      await replyText(event.replyToken, "📸 AI 辨識單據中...");
+      const d = state.flow_data;
+      const isHq = d.store_id === "__hq__";
+      const today2 = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+      const typeLabel = d.expense_type === "vendor" ? "📦 月結" : d.expense_type === "hq_advance" ? "🏢 代付" : "💰 零用金";
+      await replyText(event.replyToken, "📸 上傳中...");
+      
+      // Step 1: 下載圖片
+      let b64;
+      try { b64 = await downloadImageAsBase64(event.message.id); } catch {}
+      if (!b64) { await pushText(uid2, "❌ 圖片下載失敗，請重新拍照"); return; }
+      
+      // Step 2: 上傳圖片到 Storage（一定留檔）
+      let imgUrl = "";
       try {
-        const b64 = await downloadImageAsBase64(event.message.id);
-        if (!b64) { await pushText(uid2, "❌ 圖片下載失敗，請重新拍照"); return; }
-        let r;
+        imgUrl = await uploadImage(b64, "expenses", `${d.expense_type}_${(d.store_id || "hq").replace(/__/g, "")}_${Date.now()}`);
+      } catch {}
+      
+      // Step 3: AI 辨識（可失敗，失敗也繼續）
+      let r = null;
+      try { r = await analyzeExpenseReceipt(b64); } catch {}
+      const aiOk = r && r.total_amount;
+      
+      // Step 4: 建立或更新草稿（一定留檔）
+      const expDate = r?.date || today2;
+      const insertData = {
+        store_id: isHq ? null : d.store_id,
+        expense_type: d.expense_type,
+        date: expDate,
+        amount: r?.total_amount || 0,
+        vendor_name: r?.vendor_name || "",
+        description: r?.description || r?.items?.map(i => i.name).join("、") || "",
+        category_suggestion: r?.category_suggestion || "其他",
+        invoice_number: r?.invoice_number || null,
+        image_url: imgUrl || null,
+        submitted_by: d.employee_id,
+        month_key: expDate.slice(0, 7),
+        status: "draft",
+      };
+      let draft = null;
+      if (d.draft_id) {
+        // 重拍：更新既有草稿
         try {
-          r = await analyzeExpenseReceipt(b64);
-        } catch (aiErr) {
-          await pushText(uid2, "❌ AI 辨識出錯：" + (aiErr?.message || "請重新拍照"));
-          return;
-        }
-        if (!r) { await pushText(uid2, "❌ 辨識失敗，請重新拍清楚的照片"); return; }
-        const d = state.flow_data;
-        let imgUrl = "";
+          const res = await supabase.from("expenses").update(insertData).eq("id", d.draft_id).select().single();
+          if (!res.error) draft = res.data;
+        } catch {}
+      }
+      if (!draft) {
+        // 新建草稿
         try {
-          imgUrl = await uploadImage(b64, "expenses", `${d.expense_type}_${(d.store_id || "hq").replace(/__/g, "")}_${Date.now()}`);
-        } catch { /* 圖片上傳失敗不擋主流程 */ }
-        const expData = {
-          ...d, amount: r.total_amount || 0, vendor_name: r.vendor_name,
-          date: r.date, description: r.description || r.items?.map(i => i.name).join("、"),
-          category_suggestion: r.category_suggestion || "其他",
-          invoice_number: r.invoice_number || null,
-          image_url: imgUrl, ai_raw_data: r,
-          is_prepaid: r.is_prepaid || false,
-          prepaid_months: r.prepaid_months || 1,
-          prepaid_start: r.prepaid_start || (r.date || "").slice(0, 7)
-        };
-
-        // 檢查發票號碼重複
-        let dupWarning = "";
-        if (r.invoice_number) {
-          const { data: dup } = await supabase.from("expenses")
-            .select("id, date, vendor_name")
-            .eq("invoice_number", r.invoice_number).limit(1).single();
-          if (dup) {
-            dupWarning = "\n\n⚠️ 發票號碼 " + r.invoice_number + " 已存在！\n（" + dup.date + " " + (dup.vendor_name || "") + "）\n可能重複請款，請確認";
-          }
-        }
-
-        await setUserState(uid2, "expense_confirm", expData);
-        const typeLabel = d.expense_type === "vendor" ? "📦 月結單據" : d.expense_type === "hq_advance" ? "🏢 總部代付" : "💰 零用金";
-        let msg = typeLabel + "辨識結果\n━━━━━━━━━━━━━━";
+          const res = await supabase.from("expenses").insert(insertData).select().single();
+          if (!res.error) draft = res.data;
+        } catch {}
+      }
+      
+      // Step 5: 顯示結果
+      const expData = { ...d, amount: r?.total_amount || 0, vendor_name: r?.vendor_name || "", date: expDate, description: insertData.description, category_suggestion: insertData.category_suggestion, invoice_number: r?.invoice_number || null, image_url: imgUrl, draft_id: draft?.id };
+      await setUserState(uid2, "expense_confirm", expData);
+      
+      if (aiOk) {
+        let msg = typeLabel + " 辨識結果\n━━━━━━━━━━━━━━";
         msg += "\n🏠 " + d.store_name;
         msg += "\n🏢 " + (r.vendor_name || "未知");
-        msg += "\n📅 " + (r.date || "今日");
+        msg += "\n📅 " + (r.date || today2);
         msg += "\n💰 " + fmt(r.total_amount);
-        msg += "\n📋 " + r.category_suggestion;
+        msg += "\n📋 " + (r.category_suggestion || "其他");
         if (r.invoice_number) msg += "\n🧾 " + r.invoice_number;
-        if (r.items?.length) msg += "\n" + r.items.map(i => "　▸ " + i.name + " " + fmt(i.amount)).join("\n");
-        if (r.is_prepaid && r.prepaid_months > 1) msg += "\n📆 預付" + r.prepaid_months + "月（每月" + fmt(Math.round(r.total_amount / r.prepaid_months)) + "）";
-        msg += dupWarning;
-
-        await pushText(uid2, msg);
-        // 存為草稿
-        const isHq = d.store_id === "__hq__";
-        const today2 = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
-        const expDate = r.date || today2;
-        // 最小必要欄位（確保不會因為缺欄位而失敗）
-        const insertMin = {
-          store_id: isHq ? null : d.store_id,
-          expense_type: d.expense_type,
-          date: expDate,
-          amount: r.total_amount || 0,
-          vendor_name: r.vendor_name || "",
-          description: expData.description || "",
-          category_suggestion: r.category_suggestion || "其他",
-          invoice_number: r.invoice_number || null,
-          image_url: imgUrl || null,
-          submitted_by: d.employee_id,
-          month_key: expDate.slice(0, 7),
-          status: "draft",
-        };
-        let draft = null;
-        try {
-          // 嘗試完整欄位
-          const res = await supabase.from("expenses").insert({
-            ...insertMin, is_shared: isHq, is_prepaid: r.is_prepaid || false,
-            prepaid_months: r.prepaid_months || 1, submitted_by_name: d.employee_name, ai_raw_data: r
-          }).select().single();
-          if (res.error) throw new Error(res.error.message);
-          draft = res.data;
-        } catch (e1) {
+        if (r.items?.length) msg += "\n" + r.items.slice(0, 5).map(i => "　▸ " + i.name + " " + fmt(i.amount)).join("\n");
+        // 發票重複檢查
+        if (r.invoice_number) {
           try {
-            // fallback 只用基本欄位
-            const res2 = await supabase.from("expenses").insert(insertMin).select().single();
-            if (res2.error) throw new Error(res2.error.message);
-            draft = res2.data;
-          } catch (e2) {
-            await pushText(uid2, "⚠️ 草稿儲存失敗：" + e2.message + "\n但辨識結果已顯示，可截圖手動記錄");
-          }
+            const { data: dup } = await supabase.from("expenses").select("id, date, vendor_name").eq("invoice_number", r.invoice_number).neq("id", draft?.id || "").limit(1).single();
+            if (dup) msg += "\n\n⚠️ 發票 " + r.invoice_number + " 已存在！";
+          } catch {}
         }
-        expData.draft_id = draft?.id;
-        await setUserState(uid2, "expense_confirm", expData);
-        const reviewUrl = `${SITE}/expense-review?id=${draft?.id||""}`;
-        await lineClient.pushMessage({ to: uid2, messages: [{ type: "text", text: "辨識結果如有錯誤，可修改或開網頁完整編輯：", quickReply: { items: [
-          { type: "action", action: { type: "uri", label: "📝 開網頁修改", uri: reviewUrl } },
-          { type: "action", action: { type: "message", label: "✅ 確認送出", text: "確認費用" } },
-          { type: "action", action: { type: "message", label: "✏️ 改金額", text: "修改金額" } },
-          { type: "action", action: { type: "message", label: "✏️ 改廠商", text: "修改廠商" } },
-          { type: "action", action: { type: "message", label: "✏️ 改日期", text: "修改日期" } },
-          { type: "action", action: { type: "message", label: "✏️ 改分類", text: "修改分類" } },
-          { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
-          { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
-        ]}}]});
-      } catch (e) { try { await pushText(uid2, "❌ " + (e?.message || String(e))); } catch {} }
+        await pushText(uid2, msg);
+      } else {
+        await pushText(uid2, typeLabel + " 📸 照片已留檔\n🏠 " + d.store_name + "\n\n⚠️ AI 無法完整辨識此單據\n請手動填寫金額和廠商：");
+      }
+      
+      const reviewUrl = `${SITE}/expense-review?id=${draft?.id || ""}`;
+      await lineClient.pushMessage({ to: uid2, messages: [{ type: "text", text: aiOk ? "確認或修改：" : "請修改資訊：", quickReply: { items: [
+        ...(draft ? [{ type: "action", action: { type: "uri", label: "📝 開網頁修改", uri: reviewUrl } }] : []),
+        ...(aiOk ? [{ type: "action", action: { type: "message", label: "✅ 確認送出", text: "確認費用" } }] : []),
+        { type: "action", action: { type: "message", label: "✏️ 填金額", text: "修改金額" } },
+        { type: "action", action: { type: "message", label: "✏️ 填廠商", text: "修改廠商" } },
+        { type: "action", action: { type: "message", label: "✏️ 填日期", text: "修改日期" } },
+        { type: "action", action: { type: "message", label: "✏️ 選分類", text: "修改分類" } },
+        { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
+        { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+      ]}}]});
       return;
     }
     // 銷售回報照片
@@ -1077,26 +1062,32 @@ async function handleEvent(event) {
       return replyWithQuickReply(rt, `✅ 預付費用已儲存！\n${d.vendor_name || ""} ${fmt(d.amount)}\n📆 分攤${d.prepaid_months}個月（每月${fmt(monthlyAmt)}）`, getMenu(emp.role));
     }
 
-    // Bug 10: 強制上傳單據
+    // 強制上傳單據
     if (!d.image_url) {
       return replyText(rt, "❌ 必須上傳單據照片才能送出費用申請");
     }
 
-    // Bug 10: 重複請款檢查
-    const { data: dup } = await supabase.from("expenses")
-      .select("id, date, amount").eq("store_id", d.store_id).eq("vendor_name", d.vendor_name || "")
-      .eq("amount", d.amount).eq("date", baseDate).limit(1);
-    if (dup && dup.length > 0) {
-      return replyText(rt, "❌ 重複請款！\n\n同門市、同廠商、同金額、同日期\n已有一筆 " + fmt(d.amount) + " 的費用紀錄\n\n如需修正請聯繫主管");
+    // 如果有 draft_id，更新草稿為 pending；否則新增
+    if (d.draft_id) {
+      const isHq2 = d.store_id === "__hq__";
+      await supabase.from("expenses").update({
+        store_id: isHq2 ? null : d.store_id,
+        category_id: cat?.id, expense_type: d.expense_type,
+        date: baseDate, amount: d.amount, vendor_name: d.vendor_name || "",
+        description: d.description || "", image_url: d.image_url,
+        month_key: baseDate.slice(0, 7), category_suggestion: d.category_suggestion,
+        invoice_number: d.invoice_number, status: "pending",
+      }).eq("id", d.draft_id);
+    } else {
+      await supabase.from("expenses").insert({
+        store_id: d.store_id === "__hq__" ? null : d.store_id,
+        category_id: cat?.id, expense_type: d.expense_type,
+        date: baseDate, amount: d.amount, vendor_name: d.vendor_name, description: d.description,
+        image_url: d.image_url, submitted_by: d.employee_id,
+        month_key: baseDate.slice(0, 7), category_suggestion: d.category_suggestion,
+        invoice_number: d.invoice_number, status: "pending",
+      });
     }
-
-    await supabase.from("expenses").insert({
-      store_id: d.store_id, category_id: cat?.id, expense_type: d.expense_type,
-      date: baseDate, amount: d.amount, vendor_name: d.vendor_name, description: d.description,
-      image_url: d.image_url, ai_raw_data: d.ai_raw_data, submitted_by: d.employee_id, submitted_by_name: d.employee_name,
-      month_key: baseDate.slice(0, 7), category_suggestion: d.category_suggestion,
-      invoice_number: d.invoice_number,
-    });
     await clearUserState(userId);
     const { data: admins } = await supabase.from("employees").select("line_uid").eq("role", "admin").eq("is_active", true);
     if (admins) for (const a of admins) if (a.line_uid && a.line_uid !== userId) await pushText(a.line_uid, `📦 ${d.expense_type === "vendor" ? "月結單據" : d.expense_type === "hq_advance" ? "總部代付" : "零用金"}\n${d.store_name}｜${d.employee_name}\n${d.vendor_name || ""} ${fmt(d.amount)}\n📋 ${d.category_suggestion}`).catch(() => {});
