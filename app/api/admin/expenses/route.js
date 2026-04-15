@@ -161,12 +161,12 @@ export async function POST(request) {
       .update(updates).eq("id", expense_id).select("*, stores(name), employees:submitted_by(line_uid, name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
 
-    // 若狀態轉為 pending（網頁送出），推 LINE 確認 + 清除使用者狀態
+    // 若狀態轉為 pending（網頁送出），推 LINE 確認 + 清除使用者狀態 + 推主選單
     if (status === "pending" && data?.employees?.line_uid) {
       const uid = data.employees.line_uid;
       try { await supabase.from("user_states").delete().eq("line_uid", uid); } catch {}
       try {
-        const { pushText } = await import("@/lib/line");
+        const { pushText, lineClient } = await import("@/lib/line");
         const typeLabel = data.expense_type === "vendor" ? "📦 月結"
           : data.expense_type === "hq_advance" ? "🏢 總部代付" : "💰 零用金";
         const storeLabel = data.stores?.name || "🏢 總部均攤";
@@ -179,6 +179,17 @@ export async function POST(request) {
           "📆 " + (data.date || "") +
           (data.invoice_number ? "\n🧾 " + data.invoice_number : "")
         );
+        // 推回主選單
+        await lineClient.pushMessage({ to: uid, messages: [{
+          type: "text",
+          text: "🍯 " + (data.employees.name || "") + "，請選擇下一步：",
+          quickReply: { items: [
+            { type: "action", action: { type: "message", label: "📦 月結單據", text: "月結單據" } },
+            { type: "action", action: { type: "message", label: "💰 零用金", text: "零用金" } },
+            { type: "action", action: { type: "message", label: "🏢 總部代付", text: "總部代付" } },
+            { type: "action", action: { type: "message", label: "📋 選單", text: "選單" } },
+          ]}
+        }]});
       } catch (e) { console.error("notify line:", e); }
     }
     return Response.json({ data });
