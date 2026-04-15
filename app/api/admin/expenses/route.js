@@ -14,6 +14,15 @@ export async function GET(request) {
     return Response.json({ data });
   }
 
+  if (searchParams.get("invoice_check")) {
+    const inv = searchParams.get("invoice_check");
+    const excludeId = searchParams.get("exclude_id");
+    let q = supabase.from("expenses").select("id, date, vendor_name, status").eq("invoice_number", inv).in("status", ["pending", "approved"]);
+    if (excludeId) q = q.neq("id", excludeId);
+    const { data } = await q.limit(1).single();
+    return Response.json({ duplicate: data || null });
+  }
+
   if (searchParams.get("categories")) {
     const { data } = await supabase.from("expense_categories").select("*").eq("is_active", true).order("sort_order");
     return Response.json({ data });

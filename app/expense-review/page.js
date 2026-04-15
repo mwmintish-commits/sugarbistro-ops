@@ -52,6 +52,12 @@ export default function ExpenseReview() {
   };
 
   const submit = async (status) => {
+    if (!form.amount || Number(form.amount) <= 0) { alert("請填寫金額"); return; }
+    // 發票重複檢查
+    if (form.invoice_number) {
+      const dupCheck = await fetch("/api/admin/expenses?invoice_check=" + encodeURIComponent(form.invoice_number) + "&exclude_id=" + id).then(r => r.json());
+      if (dupCheck.duplicate) { alert("⚠️ 發票 " + form.invoice_number + " 已存在！（" + dupCheck.duplicate.date + " " + (dupCheck.duplicate.vendor_name || "") + "）\n\n如確定不是重複，請移除發票號碼後再送出。"); return; }
+    }
     const updates = { status: status || "pending", amount: Number(form.amount || 0), vendor_name: form.vendor_name, date: form.date, description: form.description, category_suggestion: form.category_suggestion, invoice_number: form.invoice_number, month_key: (form.date || "").slice(0, 7) };
     if (reason) { updates.edit_reason = reason; updates.edited_at = new Date().toISOString(); }
     const r = await fetch("/api/admin/expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update", expense_id: id, ...updates }) }).then(r => r.json());

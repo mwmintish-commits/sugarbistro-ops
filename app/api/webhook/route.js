@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { replyText, replyWithQuickReply, downloadImageAsBase64, lineConfig, pushText, lineClient } from "@/lib/line";
 import { supabase } from "@/lib/supabase";
-import { analyzeDailySettlement, analyzeDepositSlip, analyzeUberEatsReceipt, analyzeVoucher, analyzeLineCreditReceipt, analyzeExpenseReceipt } from "@/lib/anthropic";
+import { analyzeDailySettlement, analyzeDepositSlip, analyzeUberEatsReceipt, analyzeVoucher, analyzeLineCreditReceipt } from "@/lib/anthropic";
 
 function verifySignature(body, signature) {
   return crypto.createHmac("SHA256", lineConfig.channelSecret).update(body).digest("base64") === signature;
@@ -474,85 +474,36 @@ async function handleEvent(event) {
       const typeLabel = d.expense_type === "vendor" ? "📦 月結" : d.expense_type === "hq_advance" ? "🏢 代付" : "💰 零用金";
       
       try {
-        // Phase 1: 快速存檔（3秒）
         const b64 = await downloadImageAsBase64(event.message.id);
         let imgUrl = "";
         try { imgUrl = await uploadImage(b64, "expenses", `${d.expense_type}_${Date.now()}`); } catch {}
         
         let draftId = d.draft_id || null;
-        const insertData = { store_id: isHq ? null : d.store_id, expense_type: d.expense_type, date: today2, amount: 0, vendor_name: "", image_url: imgUrl, submitted_by: d.employee_id, month_key: today2.slice(0, 7), status: "draft" };
         try {
           if (draftId) { await supabase.from("expenses").update({ image_url: imgUrl }).eq("id", draftId); }
-          else { const { data: dr } = await supabase.from("expenses").insert(insertData).select("id").single(); draftId = dr?.id; }
+          else { const { data: dr } = await supabase.from("expenses").insert({ store_id: isHq ? null : d.store_id, expense_type: d.expense_type, date: today2, amount: 0, vendor_name: "", image_url: imgUrl, submitted_by: d.employee_id, month_key: today2.slice(0, 7), status: "draft" }).select("id").single(); draftId = dr?.id; }
         } catch (ie) { console.error("expense insert:", ie); }
 
-        // 立即回覆（用戶馬上看到）
+        const expData = { ...d, image_url: imgUrl, draft_id: draftId, amount: 0, date: today2 };
+        await setUserState(uid2, "expense_confirm", expData);
+        const reviewUrl = `${SITE}/expense-review?id=${draftId || ""}`;
+        
         await lineClient.replyMessage({ replyToken: event.replyToken, messages: [{
-          type: "text", text: typeLabel + " 📸 照片已儲存 ✅\n🏠 " + (d.store_name || "") + "\n\n🤖 AI 辨識中，請稍候..."
-        }] });
-
-        // Phase 2: AI 辨識（reply 後做，還有 ~12 秒）
-        let r = null;
-        try { r = await analyzeExpenseReceipt(b64); } catch {}
-        const aiOk = !!(r && r.total_amount);
-
-        // 發票重複檢查
-        let dupWarn = "";
-        if (aiOk && r.invoice_number) {
-          try {
-            const { data: dup } = await supabase.from("expenses").select("id, date, vendor_name").eq("invoice_number", r.invoice_number).neq("id", draftId || "").in("status", ["pending", "approved"]).limit(1).single();
-            if (dup) dupWarn = "\n\n⚠️ 發票 " + r.invoice_number + " 已存在！（" + dup.date + " " + (dup.vendor_name || "") + "）\n可能重複請款！";
-          } catch {}
-        }
-
-        if (aiOk) {
-          // 更新草稿
-          try { await supabase.from("expenses").update({ amount: r.total_amount, vendor_name: r.vendor_name || "", date: r.date || today2, month_key: (r.date || today2).slice(0, 7), category_suggestion: r.category_suggestion || "其他", invoice_number: r.invoice_number || null }).eq("id", draftId); } catch {}
-          
-          // 推送辨識結果 + 確認按鈕
-          const expData = { ...d, image_url: imgUrl, draft_id: draftId, amount: r.total_amount, vendor_name: r.vendor_name, date: r.date || today2, category_suggestion: r.category_suggestion || "其他", invoice_number: r.invoice_number };
-          await setUserState(uid2, "expense_confirm", expData);
-          
-          let msg = typeLabel + " AI 辨識結果\n━━━━━━━━━━━━━━";
-          msg += "\n🏢 " + (r.vendor_name || "未知");
-          msg += "\n📅 " + (r.date || today2);
-          msg += "\n💰 " + fmt(r.total_amount);
-          msg += "\n📋 " + (r.category_suggestion || "其他");
-          if (r.invoice_number) msg += "\n🧾 " + r.invoice_number;
-          if (r.items?.length) msg += "\n" + r.items.slice(0, 5).map(i => "　▸ " + (i.name || "") + " " + fmt(i.amount)).join("\n");
-          msg += dupWarn;
-          
-          const reviewUrl = `${SITE}/expense-review?id=${draftId}`;
-          await lineClient.pushMessage({ to: uid2, messages: [
-            { type: "text", text: msg },
-            { type: "text", text: "確認或修改：", quickReply: { items: [
-              { type: "action", action: { type: "message", label: "✅ 確認送出", text: "確認費用" } },
-              { type: "action", action: { type: "uri", label: "📝 網頁修改", uri: reviewUrl } },
-              { type: "action", action: { type: "message", label: "✏️ 改金額", text: "修改金額" } },
-              { type: "action", action: { type: "message", label: "✏️ 改廠商", text: "修改廠商" } },
-              { type: "action", action: { type: "message", label: "✏️ 改日期", text: "修改日期" } },
-              { type: "action", action: { type: "message", label: "✏️ 改分類", text: "修改分類" } },
-              { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
-              { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
-            ]}}
-          ] });
-        } else {
-          // AI 失敗，提供手動選項
-          const expData = { ...d, image_url: imgUrl, draft_id: draftId, amount: 0, date: today2 };
-          await setUserState(uid2, "expense_confirm", expData);
-          const reviewUrl = `${SITE}/expense-review?id=${draftId}`;
-          await pushText(uid2, "⚠️ AI 無法辨識，請手動填寫或用網頁修改：");
-          await lineClient.pushMessage({ to: uid2, messages: [{ type: "text", text: "選擇操作：", quickReply: { items: [
-            { type: "action", action: { type: "uri", label: "📝 網頁修改", uri: reviewUrl } },
+          type: "text",
+          text: typeLabel + " 📸 照片已儲存 ✅\n🏠 " + (d.store_name || "") + "\n\n選擇操作：",
+          quickReply: { items: [
+            { type: "action", action: { type: "uri", label: "🤖 AI辨識（推薦）", uri: reviewUrl } },
             { type: "action", action: { type: "message", label: "✏️ 填金額", text: "修改金額" } },
             { type: "action", action: { type: "message", label: "✏️ 填廠商", text: "修改廠商" } },
+            { type: "action", action: { type: "message", label: "✏️ 填日期", text: "修改日期" } },
+            { type: "action", action: { type: "message", label: "✏️ 選分類", text: "修改分類" } },
             { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
             { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
-          ]}}] });
-        }
+          ]}
+        }] });
       } catch (err) {
         console.error("expense_photo:", err);
-        try { await pushText(uid2, "❌ " + (err?.message || "處理失敗")); } catch {}
+        try { await replyText(event.replyToken, "❌ " + (err?.message || "處理失敗")); } catch {}
       }
       return;
     }
