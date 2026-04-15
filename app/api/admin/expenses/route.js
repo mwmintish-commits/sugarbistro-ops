@@ -31,7 +31,7 @@ export async function GET(request) {
   let q = supabase.from("expenses").select("*, stores(name), expense_categories(name, type), employees:submitted_by(name)").order("date", { ascending: false });
   if (type && type !== "all") q = q.eq("expense_type", type);
   if (store_id === "__hq__") q = q.is("store_id", null);
-  else if (store_id) q = q.eq("store_id", store_id);
+  else if (store_id) q = q.or(`store_id.eq.${store_id},store_id.is.null`);
   if (month) q = q.eq("month_key", month);
   if (status) q = q.eq("status", status);
   const { data } = await q.limit(200);
@@ -158,8 +158,29 @@ export async function POST(request) {
     if (edited_at !== undefined) updates.edited_at = edited_at;
     if (body.month_key !== undefined) updates.month_key = body.month_key;
     const { data, error } = await supabase.from("expenses")
-      .update(updates).eq("id", expense_id).select().single();
+      .update(updates).eq("id", expense_id).select("*, stores(name), employees:submitted_by(line_uid, name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
+
+    // 若狀態轉為 pending（網頁送出），推 LINE 確認 + 清除使用者狀態
+    if (status === "pending" && data?.employees?.line_uid) {
+      const uid = data.employees.line_uid;
+      try { await supabase.from("user_states").delete().eq("line_uid", uid); } catch {}
+      try {
+        const { pushText } = await import("@/lib/line");
+        const typeLabel = data.expense_type === "vendor" ? "📦 月結"
+          : data.expense_type === "hq_advance" ? "🏢 總部代付" : "💰 零用金";
+        const storeLabel = data.stores?.name || "🏢 總部均攤";
+        const fmt = n => "$" + Number(n || 0).toLocaleString();
+        await pushText(uid,
+          typeLabel + " ✅ 已送出，等待審核\n" +
+          "🏠 " + storeLabel + "\n" +
+          "🏪 " + (data.vendor_name || "(無)") + "\n" +
+          "💰 " + fmt(data.amount) + "\n" +
+          "📆 " + (data.date || "") +
+          (data.invoice_number ? "\n🧾 " + data.invoice_number : "")
+        );
+      } catch (e) { console.error("notify line:", e); }
+    }
     return Response.json({ data });
   }
 

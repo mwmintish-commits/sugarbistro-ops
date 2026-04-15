@@ -62,14 +62,27 @@ export default function ExpenseReview() {
     if (reason) { updates.edit_reason = reason; updates.edited_at = new Date().toISOString(); }
     const r = await fetch("/api/admin/expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update", expense_id: id, ...updates }) }).then(r => r.json());
     if (r.error) alert("❌ " + r.error);
-    else setDone(true);
+    else { setData(r.data || data); setDone(true); }
   };
 
   const typeLabel = data?.expense_type === "vendor" ? "📦 月結" : data?.expense_type === "hq_advance" ? "🏢 代付" : "💰 零用金";
 
   if (loading) return <Box><p style={{ textAlign: "center", color: "#888", padding: 40 }}>載入中...</p></Box>;
   if (err) return <Box><p style={{ textAlign: "center", color: "#b91c1c", padding: 40 }}>{err}</p></Box>;
-  if (done) return <Box><div style={{ padding: 40, textAlign: "center" }}><div style={{ fontSize: 48, marginBottom: 12 }}>✅</div><div style={{ fontSize: 18, fontWeight: 600 }}>費用已送出</div><p style={{ color: "#888", marginTop: 8 }}>可關閉此頁面</p></div></Box>;
+  if (done) return <Box><div style={{ padding: 32, textAlign: "center" }}>
+    <div style={{ fontSize: 48, marginBottom: 8 }}>✅</div>
+    <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>費用已送出，等待審核</div>
+    <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>{data?.stores?.name || "🏢 總部均攤"}</div>
+    <div style={{ background: "#f7f5f0", borderRadius: 8, padding: 16, textAlign: "left", margin: "0 auto", maxWidth: 320 }}>
+      <Row l="廠商" v={form.vendor_name || "(無)"} />
+      <Row l="金額" v={fmt(form.amount)} />
+      <Row l="日期" v={form.date || "-"} />
+      {form.invoice_number && <Row l="發票" v={form.invoice_number} />}
+      <Row l="分類" v={form.category_suggestion || "其他"} />
+      <Row l="狀態" v={<span style={{ color: "#b45309", fontWeight: 600 }}>待審核</span>} />
+    </div>
+    <p style={{ color: "#888", marginTop: 16, fontSize: 12 }}>LINE 也會收到送出通知，可關閉此頁面。</p>
+  </div></Box>;
 
   return (
     <Box>
@@ -131,3 +144,4 @@ function Field({ label, value, onChange, type, big, placeholder }) {
 }
 
 function Box({ children }) { return <div style={{ maxWidth: 420, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif" }}>{children}</div>; }
+function Row({ l, v }) { return <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, borderBottom: "1px solid #e8e6e1" }}><span style={{ color: "#888" }}>{l}</span><span style={{ fontWeight: 500 }}>{v}</span></div>; }
