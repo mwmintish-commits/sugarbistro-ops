@@ -66,8 +66,27 @@ export async function POST(request) {
         const r = await analyzeExpenseReceipt(base64);
         const expDate = r?.date || today;
         const isHq = store_id === "__hq__";
+        const normalizedStore = isHq ? null : store_id;
+
+        // 若發票已存在且仍為 draft/pending/approved，直接重用避免重複
+        if (r?.invoice_number) {
+          const { data: existing } = await supabase.from("expenses")
+            .select("id, status")
+            .eq("invoice_number", r.invoice_number)
+            .in("status", ["draft", "pending", "approved"])
+            .limit(1).maybeSingle();
+          if (existing) {
+            return Response.json({
+              success: true, draft_id: existing.id, reused: true,
+              vendor_name: r?.vendor_name, amount: r?.total_amount,
+              invoice_number: r?.invoice_number, date: expDate,
+              redirect: `${SITE}/expense-review?id=${existing.id}`,
+            });
+          }
+        }
+
         const { data: draft } = await supabase.from("expenses").insert({
-          store_id: isHq ? null : store_id, expense_type: expense_type || "vendor",
+          store_id: normalizedStore, expense_type: expense_type || "vendor",
           date: expDate, amount: r?.total_amount || 0,
           vendor_name: r?.vendor_name || "", description: r?.description || "",
           category_suggestion: r?.category_suggestion || "其他",
