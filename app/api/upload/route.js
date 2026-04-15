@@ -94,9 +94,10 @@ export async function POST(request) {
     const { rows, store_id, employee_id, employee_name, expense_type } = body;
     const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
     const isHq = store_id === "__hq__";
+    const normalizedStore = isHq ? null : store_id;
     let imported = 0;
+    let skipped = 0;
     for (const row of rows || []) {
-      // 自動匹配常見欄位名稱
       const date = row["日期"] || row["date"] || row["Date"] || today;
       const amount = Number(row["金額"] || row["amount"] || row["Amount"] || row["總計"] || row["合計"] || 0);
       const vendor = row["廠商"] || row["vendor"] || row["Vendor"] || row["商家"] || row["供應商"] || "";
@@ -104,9 +105,21 @@ export async function POST(request) {
       const invoice = row["發票號碼"] || row["invoice"] || row["Invoice"] || row["發票"] || null;
       const category = row["分類"] || row["category"] || row["Category"] || "其他";
       if (amount <= 0) continue;
+
+      // 去重：有發票號碼則以發票為主；無則以 (store, date, vendor, amount) 組合檢查
+      let dupQ = supabase.from("expenses").select("id").limit(1);
+      if (invoice) {
+        dupQ = dupQ.eq("invoice_number", invoice).in("status", ["draft", "pending", "approved"]);
+      } else {
+        dupQ = dupQ.eq("date", date).eq("amount", amount).eq("vendor_name", vendor);
+        dupQ = normalizedStore === null ? dupQ.is("store_id", null) : dupQ.eq("store_id", normalizedStore);
+      }
+      const { data: dup } = await dupQ.maybeSingle();
+      if (dup) { skipped++; continue; }
+
       try {
         await supabase.from("expenses").insert({
-          store_id: isHq ? null : store_id, expense_type: expense_type || "vendor",
+          store_id: normalizedStore, expense_type: expense_type || "vendor",
           date, amount, vendor_name: vendor, description: desc,
           category_suggestion: category, invoice_number: invoice || null,
           submitted_by: employee_id, month_key: (date || today).slice(0, 7), status: "draft",
@@ -114,7 +127,7 @@ export async function POST(request) {
         imported++;
       } catch {}
     }
-    return Response.json({ success: true, imported, total: (rows || []).length });
+    return Response.json({ success: true, imported, skipped, total: (rows || []).length });
   }
 
   return Response.json({ error: "Unknown action" }, { status: 400 });
