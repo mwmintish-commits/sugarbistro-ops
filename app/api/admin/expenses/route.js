@@ -28,7 +28,7 @@ export async function GET(request) {
     return Response.json({ data });
   }
 
-  let q = supabase.from("expenses").select("*, stores(name), expense_categories(name, type), employees:submitted_by(name)").order("date", { ascending: false });
+  let q = supabase.from("expenses").select("*, stores(name), employees:submitted_by(name)").order("date", { ascending: false });
   if (type && type !== "all") q = q.eq("expense_type", type);
   if (store_id === "__hq__") q = q.is("store_id", null);
   else if (store_id) q = q.or(`store_id.eq.${store_id},store_id.is.null`);
@@ -44,7 +44,7 @@ export async function GET(request) {
   const total = (data || []).reduce((s, e) => s + Number(e.amount || 0), 0);
   const byCategory = {};
   for (const e of data || []) {
-    const cat = e.expense_categories?.name || "未分類";
+    const cat = e.expense_categories?.name || e.category_suggestion || "未分類";
     byCategory[cat] = (byCategory[cat] || 0) + Number(e.amount || 0);
   }
 
@@ -84,7 +84,7 @@ export async function POST(request) {
     const { data, error } = await supabase.from("expenses").insert({
       store_id: isShared ? null : store_id, category_id, expense_type, date, amount, vendor_name, description,
       image_url, ai_raw_data, submitted_by, month_key: monthKey, is_shared: isShared,
-    }).select("*, expense_categories(name)").single();
+    }).select("*").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
   }
