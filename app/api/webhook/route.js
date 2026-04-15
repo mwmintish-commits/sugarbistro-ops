@@ -471,10 +471,20 @@ async function handleEvent(event) {
       await replyText(event.replyToken, "📸 AI 辨識單據中...");
       try {
         const b64 = await downloadImageAsBase64(event.message.id);
-        const r = await analyzeExpenseReceipt(b64);
-        if (!r) { await pushText(uid2, "❌ 辨識失敗，請重新拍照"); return; }
+        if (!b64) { await pushText(uid2, "❌ 圖片下載失敗，請重新拍照"); return; }
+        let r;
+        try {
+          r = await analyzeExpenseReceipt(b64);
+        } catch (aiErr) {
+          await pushText(uid2, "❌ AI 辨識出錯：" + (aiErr?.message || "請重新拍照"));
+          return;
+        }
+        if (!r) { await pushText(uid2, "❌ 辨識失敗，請重新拍清楚的照片"); return; }
         const d = state.flow_data;
-        const imgUrl = await uploadImage(b64, "expenses", `${d.expense_type}_${d.store_id}_${Date.now()}`);
+        let imgUrl = "";
+        try {
+          imgUrl = await uploadImage(b64, "expenses", `${d.expense_type}_${(d.store_id || "hq").replace(/__/g, "")}_${Date.now()}`);
+        } catch { /* 圖片上傳失敗不擋主流程 */ }
         const expData = {
           ...d, amount: r.total_amount || 0, vendor_name: r.vendor_name,
           date: r.date, description: r.description || r.items?.map(i => i.name).join("、"),
@@ -511,17 +521,44 @@ async function handleEvent(event) {
         msg += dupWarning;
 
         await pushText(uid2, msg);
-        // 存為草稿 + 送網頁確認連結
+        // 存為草稿
         const isHq = d.store_id === "__hq__";
-        const{data:draft}=await supabase.from("expenses").insert({
-          store_id: isHq ? null : d.store_id, expense_type:d.expense_type, date:r.date||new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"}),
-          amount:r.total_amount||0, vendor_name:r.vendor_name, description:expData.description,
-          category_suggestion:r.category_suggestion||"其他", invoice_number:r.invoice_number,
-          image_url:imgUrl, ai_raw_data:r, submitted_by:d.employee_id, submitted_by_name:d.employee_name,
-          month_key:(r.date||"").slice(0,7), status:"draft",
-          is_prepaid:r.is_prepaid||false, prepaid_months:r.prepaid_months||1,
-          is_shared: isHq,
-        }).select().single();
+        const today2 = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+        const expDate = r.date || today2;
+        // 最小必要欄位（確保不會因為缺欄位而失敗）
+        const insertMin = {
+          store_id: isHq ? null : d.store_id,
+          expense_type: d.expense_type,
+          date: expDate,
+          amount: r.total_amount || 0,
+          vendor_name: r.vendor_name || "",
+          description: expData.description || "",
+          category_suggestion: r.category_suggestion || "其他",
+          invoice_number: r.invoice_number || null,
+          image_url: imgUrl || null,
+          submitted_by: d.employee_id,
+          month_key: expDate.slice(0, 7),
+          status: "draft",
+        };
+        let draft = null;
+        try {
+          // 嘗試完整欄位
+          const res = await supabase.from("expenses").insert({
+            ...insertMin, is_shared: isHq, is_prepaid: r.is_prepaid || false,
+            prepaid_months: r.prepaid_months || 1, submitted_by_name: d.employee_name, ai_raw_data: r
+          }).select().single();
+          if (res.error) throw new Error(res.error.message);
+          draft = res.data;
+        } catch (e1) {
+          try {
+            // fallback 只用基本欄位
+            const res2 = await supabase.from("expenses").insert(insertMin).select().single();
+            if (res2.error) throw new Error(res2.error.message);
+            draft = res2.data;
+          } catch (e2) {
+            await pushText(uid2, "⚠️ 草稿儲存失敗：" + e2.message + "\n但辨識結果已顯示，可截圖手動記錄");
+          }
+        }
         expData.draft_id = draft?.id;
         await setUserState(uid2, "expense_confirm", expData);
         const reviewUrl = `${SITE}/expense-review?id=${draft?.id||""}`;
@@ -535,7 +572,7 @@ async function handleEvent(event) {
           { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
           { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
         ]}}]});
-      } catch (e) { await pushText(uid2, "❌ " + e.message); }
+      } catch (e) { try { await pushText(uid2, "❌ " + (e?.message || String(e))); } catch {} }
       return;
     }
     // 銷售回報照片
@@ -556,7 +593,7 @@ async function handleEvent(event) {
         msg += `\n\n銷售數據已用於庫存差異計算`;
         await pushText(uid2, msg);
         await clearUserState(uid2);
-      } catch (e) { await pushText(uid2, "❌ " + e.message); }
+      } catch (e) { try { await pushText(uid2, "❌ " + (e?.message || String(e))); } catch {} }
       return;
     }
     return replyText(event.replyToken, "📷 請先選功能再拍照");
