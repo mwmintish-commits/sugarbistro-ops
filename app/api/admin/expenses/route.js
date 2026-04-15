@@ -34,7 +34,11 @@ export async function GET(request) {
   else if (store_id) q = q.or(`store_id.eq.${store_id},store_id.is.null`);
   if (month) q = q.eq("month_key", month);
   if (status) q = q.eq("status", status);
-  const { data } = await q.limit(200);
+  const { data, error } = await q.limit(200);
+  if (error) {
+    console.error("expenses GET error:", error);
+    return Response.json({ error: error.message, hint: error.hint, code: error.code }, { status: 500 });
+  }
 
   // 小計
   const total = (data || []).reduce((s, e) => s + Number(e.amount || 0), 0);
