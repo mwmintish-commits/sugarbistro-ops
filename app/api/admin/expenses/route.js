@@ -108,8 +108,14 @@ export async function POST(request) {
     if (updateErr) return Response.json({ error: updateErr.message }, { status: 500 });
     await auditLog(reviewed_by, null, "expense_" + status, "expense", expense_id, { amount: data?.amount, vendor: data?.vendor_name });
 
-    // 核准時自動建立撥款紀錄
+    // 核准時自動建立撥款紀錄（若已存在則跳過，避免重複請款）
     if (status === "approved" && data) {
+      const { data: existing } = await supabase.from("payments")
+        .select("id").eq("reference_id", data.id).limit(1).maybeSingle();
+      if (existing) {
+        return Response.json({ data });
+      }
+
       const pmtType = data.expense_type === "vendor" ? "vendor"
         : data.expense_type === "hq_advance" ? "hq_advance" : "petty_cash";
       const recipient = data.expense_type === "vendor"

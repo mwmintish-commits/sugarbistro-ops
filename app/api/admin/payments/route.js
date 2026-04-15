@@ -24,6 +24,13 @@ export async function POST(request) {
 
   if (body.action === "create") {
     const { type, reference_id, store_id, employee_id, amount, recipient, month_key, notes } = body;
+    if (reference_id) {
+      const { data: existing } = await supabase.from("payments")
+        .select("id").eq("reference_id", reference_id).limit(1).maybeSingle();
+      if (existing) {
+        return Response.json({ error: "此費用已有撥款紀錄，請勿重複建立", duplicate_id: existing.id }, { status: 409 });
+      }
+    }
     const { data, error } = await supabase.from("payments").insert({
       type, reference_id, store_id, employee_id, amount, recipient, month_key: month_key || new Date().toISOString().slice(0, 7), notes,
     }).select("*, stores(name), employees(name)").single();
