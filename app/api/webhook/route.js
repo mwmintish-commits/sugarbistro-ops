@@ -468,96 +468,76 @@ async function handleEvent(event) {
     if (state?.current_flow?.startsWith("receipt_")) return handleReceiptImg(event, state);
     if (state?.current_flow === "expense_photo") {
       const uid2 = event.source.userId;
-      const d = state.flow_data;
-      const isHq = d.store_id === "__hq__";
-      const today2 = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
-      const typeLabel = d.expense_type === "vendor" ? "📦 月結" : d.expense_type === "hq_advance" ? "🏢 代付" : "💰 零用金";
       await replyText(event.replyToken, "📸 上傳中...");
-      
-      // Step 1: 下載圖片
-      let b64;
-      try { b64 = await downloadImageAsBase64(event.message.id); } catch {}
-      if (!b64) { await pushText(uid2, "❌ 圖片下載失敗，請重新拍照"); return; }
-      
-      // Step 2: 上傳圖片到 Storage（一定留檔）
-      let imgUrl = "";
       try {
-        imgUrl = await uploadImage(b64, "expenses", `${d.expense_type}_${(d.store_id || "hq").replace(/__/g, "")}_${Date.now()}`);
-      } catch {}
-      
-      // Step 3: AI 辨識（可失敗，失敗也繼續）
-      let r = null;
-      try { r = await analyzeExpenseReceipt(b64); } catch {}
-      const aiOk = r && r.total_amount;
-      
-      // Step 4: 建立或更新草稿（一定留檔）
-      const expDate = r?.date || today2;
-      const insertData = {
-        store_id: isHq ? null : d.store_id,
-        expense_type: d.expense_type,
-        date: expDate,
-        amount: r?.total_amount || 0,
-        vendor_name: r?.vendor_name || "",
-        description: r?.description || r?.items?.map(i => i.name).join("、") || "",
-        category_suggestion: r?.category_suggestion || "其他",
-        invoice_number: r?.invoice_number || null,
-        image_url: imgUrl || null,
-        submitted_by: d.employee_id,
-        month_key: expDate.slice(0, 7),
-        status: "draft",
-      };
-      let draft = null;
-      if (d.draft_id) {
-        // 重拍：更新既有草稿
-        try {
-          const res = await supabase.from("expenses").update(insertData).eq("id", d.draft_id).select().single();
-          if (!res.error) draft = res.data;
-        } catch {}
-      }
-      if (!draft) {
-        // 新建草稿
-        try {
-          const res = await supabase.from("expenses").insert(insertData).select().single();
-          if (!res.error) draft = res.data;
-        } catch {}
-      }
-      
-      // Step 5: 顯示結果
-      const expData = { ...d, amount: r?.total_amount || 0, vendor_name: r?.vendor_name || "", date: expDate, description: insertData.description, category_suggestion: insertData.category_suggestion, invoice_number: r?.invoice_number || null, image_url: imgUrl, draft_id: draft?.id };
-      await setUserState(uid2, "expense_confirm", expData);
-      
-      if (aiOk) {
-        let msg = typeLabel + " 辨識結果\n━━━━━━━━━━━━━━";
-        msg += "\n🏠 " + d.store_name;
-        msg += "\n🏢 " + (r.vendor_name || "未知");
-        msg += "\n📅 " + (r.date || today2);
-        msg += "\n💰 " + fmt(r.total_amount);
-        msg += "\n📋 " + (r.category_suggestion || "其他");
-        if (r.invoice_number) msg += "\n🧾 " + r.invoice_number;
-        if (r.items?.length) msg += "\n" + r.items.slice(0, 5).map(i => "　▸ " + i.name + " " + fmt(i.amount)).join("\n");
-        // 發票重複檢查
-        if (r.invoice_number) {
-          try {
-            const { data: dup } = await supabase.from("expenses").select("id, date, vendor_name").eq("invoice_number", r.invoice_number).neq("id", draft?.id || "").limit(1).single();
-            if (dup) msg += "\n\n⚠️ 發票 " + r.invoice_number + " 已存在！";
-          } catch {}
+        const d = state.flow_data;
+        const isHq = d.store_id === "__hq__";
+        const today2 = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+        const typeLabel = d.expense_type === "vendor" ? "📦 月結" : d.expense_type === "hq_advance" ? "🏢 代付" : "💰 零用金";
+        
+        // Step 1: 下載圖片
+        const b64 = await downloadImageAsBase64(event.message.id);
+        if (!b64) { await pushText(uid2, "❌ 圖片下載失敗，請重新拍照"); return; }
+        
+        // Step 2: 上傳圖片到 Storage
+        let imgUrl = "";
+        try { imgUrl = await uploadImage(b64, "expenses", `${d.expense_type}_${Date.now()}`); } catch (ue) { console.log("upload err:", ue.message); }
+        
+        // Step 3: AI 辨識（可失敗）
+        let r = null;
+        try { r = await analyzeExpenseReceipt(b64); } catch (ae) { console.log("ai err:", ae.message); }
+        const aiOk = !!(r && r.total_amount);
+        
+        // Step 4: 存草稿
+        const expDate = r?.date || today2;
+        const insertData = {
+          store_id: isHq ? null : d.store_id, expense_type: d.expense_type, date: expDate,
+          amount: r?.total_amount || 0, vendor_name: r?.vendor_name || "",
+          image_url: imgUrl || null, submitted_by: d.employee_id,
+          month_key: expDate.slice(0, 7), status: "draft",
+        };
+        let draft = null;
+        if (d.draft_id) {
+          try { const res = await supabase.from("expenses").update(insertData).eq("id", d.draft_id).select().single(); if (!res.error) draft = res.data; } catch {}
         }
-        await pushText(uid2, msg);
-      } else {
-        await pushText(uid2, typeLabel + " 📸 照片已留檔\n🏠 " + d.store_name + "\n\n⚠️ AI 無法完整辨識此單據\n請手動填寫金額和廠商：");
+        if (!draft) {
+          try { const res = await supabase.from("expenses").insert(insertData).select().single(); if (!res.error) draft = res.data; } catch (ie) { console.log("insert err:", ie.message); }
+        }
+        
+        // Step 5: 回傳結果
+        const expData = { ...d, amount: r?.total_amount || 0, vendor_name: r?.vendor_name || "", date: expDate, category_suggestion: r?.category_suggestion || "其他", invoice_number: r?.invoice_number || null, image_url: imgUrl, draft_id: draft?.id || d.draft_id };
+        await setUserState(uid2, "expense_confirm", expData);
+        
+        if (aiOk) {
+          let msg = typeLabel + " 辨識結果\n━━━━━━━━━━━━━━";
+          msg += "\n🏠 " + (d.store_name || "");
+          msg += "\n🏢 " + (r.vendor_name || "未知");
+          msg += "\n📅 " + (r.date || today2);
+          msg += "\n💰 " + fmt(r.total_amount);
+          msg += "\n📋 " + (r.category_suggestion || "其他");
+          if (r.invoice_number) msg += "\n🧾 " + r.invoice_number;
+          if (r.items?.length) msg += "\n" + r.items.slice(0, 5).map(i => "　▸ " + (i.name||"") + " " + fmt(i.amount)).join("\n");
+          await pushText(uid2, msg);
+        } else {
+          await pushText(uid2, typeLabel + " 📸 照片已留檔" + (imgUrl ? "✅" : "") + "\n🏠 " + (d.store_name || "") + "\n\n" + (r ? "AI 辨識不完整" : "AI 無法辨識此單據") + "\n請手動填寫：");
+        }
+        
+        const reviewUrl = `${SITE}/expense-review?id=${draft?.id || ""}`;
+        const qr = [
+          ...(draft ? [{ type: "action", action: { type: "uri", label: "📝 網頁修改", uri: reviewUrl } }] : []),
+          ...(aiOk ? [{ type: "action", action: { type: "message", label: "✅ 確認", text: "確認費用" } }] : []),
+          { type: "action", action: { type: "message", label: "✏️ 金額", text: "修改金額" } },
+          { type: "action", action: { type: "message", label: "✏️ 廠商", text: "修改廠商" } },
+          { type: "action", action: { type: "message", label: "✏️ 日期", text: "修改日期" } },
+          { type: "action", action: { type: "message", label: "✏️ 分類", text: "修改分類" } },
+          { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
+          { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+        ];
+        await lineClient.pushMessage({ to: uid2, messages: [{ type: "text", text: aiOk ? "確認或修改：" : "請填寫資訊：", quickReply: { items: qr } }] });
+      } catch (err) {
+        console.error("expense_photo error:", err);
+        try { await pushText(uid2, "❌ 處理失敗：" + (err?.message || "未知錯誤") + "\n\n請重新拍照或聯繫管理員"); } catch {}
       }
-      
-      const reviewUrl = `${SITE}/expense-review?id=${draft?.id || ""}`;
-      await lineClient.pushMessage({ to: uid2, messages: [{ type: "text", text: aiOk ? "確認或修改：" : "請修改資訊：", quickReply: { items: [
-        ...(draft ? [{ type: "action", action: { type: "uri", label: "📝 開網頁修改", uri: reviewUrl } }] : []),
-        ...(aiOk ? [{ type: "action", action: { type: "message", label: "✅ 確認送出", text: "確認費用" } }] : []),
-        { type: "action", action: { type: "message", label: "✏️ 填金額", text: "修改金額" } },
-        { type: "action", action: { type: "message", label: "✏️ 填廠商", text: "修改廠商" } },
-        { type: "action", action: { type: "message", label: "✏️ 填日期", text: "修改日期" } },
-        { type: "action", action: { type: "message", label: "✏️ 選分類", text: "修改分類" } },
-        { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
-        { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
-      ]}}]});
       return;
     }
     // 銷售回報照片
