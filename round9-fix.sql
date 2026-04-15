@@ -1,0 +1,10 @@
+-- Round 9 修正
+
+-- 確保 stores 有 GPS（如尚未設定）
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS radius_m INTEGER DEFAULT 200;
+
+-- 工作日誌模板加入角色欄位
+ALTER TABLE work_log_templates ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'all';
+ALTER TABLE work_log_templates ADD COLUMN IF NOT EXISTS shift_type TEXT DEFAULT 'opening';
