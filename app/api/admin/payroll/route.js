@@ -91,39 +91,46 @@ export async function POST(request) {
         }
       }
 
-      // 國定假日出勤加班費（雙倍薪 = 加發一日工資）
-      let holidayPay = 0, holidayDays = 0;
-      const { data: holScheds } = await supabase.from("schedules")
-        .select("date, notes").eq("employee_id", emp.id).eq("type", "shift")
-        .gte("date", mk + "-01").lte("date", eom(mk))
-        .like("notes", "%國定假日出勤%");
-      holidayDays = (holScheds || []).length;
-      if (holidayDays > 0) {
-        const dailyRate = emp.monthly_salary ? Number(emp.monthly_salary) / 30
-          : (emp.hourly_rate ? Number(emp.hourly_rate) * 8 : 0);
-        holidayPay = Math.round(dailyRate * holidayDays);
+      // 統一從 schedules.day_type 抓出國定假日 / 休息日出勤
+      const hourlyRate = emp.hourly_rate ? Number(emp.hourly_rate)
+        : (emp.monthly_salary ? Number(emp.monthly_salary) / 30 / 8 : 0);
+      const dailyRate = emp.monthly_salary ? Number(emp.monthly_salary) / 30
+        : (emp.hourly_rate ? Number(emp.hourly_rate) * 8 : 0);
+      const calcShiftHours = (s) => {
+        const st = s?.shifts?.start_time, et = s?.shifts?.end_time;
+        if (!st || !et) return 8;
+        const [sh, sm] = st.split(":").map(Number), [eh, em] = et.split(":").map(Number);
+        return Math.max(0, (eh * 60 + em - sh * 60 - sm) / 60);
+      };
+
+      const { data: dayScheds } = await supabase.from("schedules")
+        .select("date, day_type, is_rest_day, notes, shift_id, shifts(start_time, end_time)")
+        .eq("employee_id", emp.id).eq("type", "shift")
+        .gte("date", mk + "-01").lte("date", eom(mk));
+
+      // 國定假日加班費
+      // 月薪制：國定假日本身有薪（已含於月薪），出勤再加發 1 日工資（雙倍）
+      // 時薪制：原本不工作 = 0，出勤按 ×2 工時計
+      const holScheds = (dayScheds || []).filter(s => s.day_type === "national_holiday" || (s.notes || "").includes("國定假日出勤"));
+      let holidayPay = 0;
+      const holidayDays = holScheds.length;
+      for (const s of holScheds) {
+        const hrs = calcShiftHours(s);
+        if (emp.monthly_salary) holidayPay += Math.round(dailyRate);
+        else holidayPay += Math.round(hourlyRate * hrs * 2);
       }
 
-      // 休息日加班費（前2hr 1.34×、後6hr 1.67×）
-      let restDayPay = 0, restDayCount = 0;
-      const { data: restScheds } = await supabase.from("schedules")
-        .select("date, shift_id, shifts(start_time, end_time)").eq("employee_id", emp.id).eq("type", "shift").eq("is_rest_day", true)
-        .gte("date", mk + "-01").lte("date", eom(mk));
-      restDayCount = (restScheds || []).length;
-      if (restDayCount > 0) {
-        const hourlyRate = emp.hourly_rate ? Number(emp.hourly_rate)
-          : (emp.monthly_salary ? Number(emp.monthly_salary) / 30 / 8 : 0);
-        for (const rs of restScheds || []) {
-          const st = rs.shifts?.start_time, et = rs.shifts?.end_time;
-          let hrs = 8;
-          if (st && et) {
-            const [sh, sm] = st.split(":").map(Number), [eh, em] = et.split(":").map(Number);
-            hrs = Math.max(0, (eh * 60 + em - sh * 60 - sm) / 60);
-          }
-          const first2 = Math.min(hrs, 2), after = Math.max(0, hrs - 2);
-          // 加成部分 = (1.34-1)×前2hr + (1.67-1)×後hr（底薪已含1×）
-          restDayPay += Math.round(hourlyRate * (first2 * 0.34 + after * 0.67));
-        }
+      // 休息日加班費（勞基法 24-1: 1.34/1.67/2.67 階梯，加給部分）
+      const restScheds = (dayScheds || []).filter(s => (s.day_type === "rest_day" || s.is_rest_day) && s.day_type !== "national_holiday");
+      let restDayPay = 0;
+      const restDayCount = restScheds.length;
+      for (const s of restScheds) {
+        const hrs = calcShiftHours(s);
+        const t1 = Math.min(hrs, 2);                 // 前 2 hr
+        const t2 = Math.max(0, Math.min(hrs, 8) - 2); // 2~8 hr
+        const t3 = Math.max(0, Math.min(hrs, 12) - 8); // 8~12 hr
+        // 加給部分：(1.34-1)×t1 + (1.67-1)×t2 + (2.67-1)×t3 + 1×底薪（休息日整天工資）
+        restDayPay += Math.round(hourlyRate * (t1 * 0.34 + t2 * 0.67 + t3 * 1.67) + hourlyRate * hrs);
       }
 
       const net = base + otPay + holidayPay + restDayPay - ls - hs - suppHealth + allow - deduct - leaveDeduct;

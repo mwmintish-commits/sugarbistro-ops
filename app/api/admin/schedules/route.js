@@ -42,6 +42,19 @@ export async function POST(request) {
 
   if (action === "create") {
     const { employee_id, store_id, shift_id, date, type, leave_type, half_day, note, is_rest_day } = body;
+    let { day_type } = body;
+    // 自動推導 day_type：明確指定者優先；否則由 leave_type / is_rest_day 推導
+    if (!day_type) {
+      if (leave_type === "off") day_type = "regular_off";
+      else if (leave_type === "rest" || is_rest_day) day_type = "rest_day";
+      else if (type === "leave") day_type = "paid_leave";
+      else day_type = "work";
+    }
+    // 檢查是否為國定假日（自動帶 day_type）
+    if (day_type === "work" && type !== "leave") {
+      const { data: hol } = await supabase.from("national_holidays").select("id").eq("date", date).limit(1).maybeSingle();
+      if (hol) day_type = "national_holiday";
+    }
 
     // 如果是排班，檢查是否已有假別
     if (type !== "leave") {
@@ -79,13 +92,46 @@ export async function POST(request) {
       // 判斷是否為休息日加班
       const restDayWork = is_rest_day || false;
       const warning = maxConsecutive >= 7 ? "⚠️ 連續工作" + maxConsecutive + "天，違反一例一休" : maxConsecutive === 6 ? "⚠️ 已連續6天" : restDayWork ? "💰 休息日加班，依法加成計薪" : null;
+      // 例假禁止排班（除非是 leave 類型）
+      if (day_type === "regular_off") {
+        return Response.json({ error: "⚠️ 例假日依勞基法不可排班，除非天災事變請改為休息日" }, { status: 400 });
+      }
+      const isRestDay = day_type === "rest_day";
       const { data, error } = await supabase.from("schedules").upsert({
         employee_id, store_id: store_id || null, shift_id: shift_id || null, date,
         type: type || "shift", leave_type, half_day, note, status: "scheduled",
-        is_rest_day: restDayWork,
-      }, { onConflict: "employee_id,date" }).select("*, employees(name), shifts(name, start_time, end_time)").single();
+        is_rest_day: restDayWork || isRestDay, day_type,
+        rest_consent: isRestDay ? "pending" : null,
+      }, { onConflict: "employee_id,date" }).select("*, employees(name, line_uid), shifts(name, start_time, end_time)").single();
       if (error) return Response.json({ error: error.message }, { status: 500 });
-      return Response.json({ data, warning });
+
+      // 休息日加班 → 推送同意書給員工
+      if (isRestDay && data?.employees?.line_uid) {
+        try {
+          const { lineClient } = await import("@/lib/line");
+          const sh = data.shifts;
+          const shiftStr = sh ? `${sh.name || ""} ${(sh.start_time||"").slice(0,5)}~${(sh.end_time||"").slice(0,5)}` : "";
+          const DAYS = ["日","一","二","三","四","五","六"];
+          const dayLabel = DAYS[new Date(date).getDay()];
+          await lineClient.pushMessage({
+            to: data.employees.line_uid,
+            messages: [{
+              type: "template", altText: "休息日加班同意書",
+              template: {
+                type: "buttons",
+                title: "📅 休息日加班同意書",
+                text: `${date}（${dayLabel}）休息日\n${shiftStr}\n\n依勞基法須經您同意才能加班，加班費以階梯計算（前2hr×1.34、2-8hr×1.67、8-12hr×2.67）`,
+                actions: [
+                  { type: "postback", label: "✅ 同意加班", data: `action=rest_consent_accept&schedule_id=${data.id}` },
+                  { type: "postback", label: "❌ 拒絕", data: `action=rest_consent_decline&schedule_id=${data.id}` },
+                ],
+              },
+            }],
+          }).catch(() => {});
+        } catch {}
+      }
+
+      return Response.json({ data, warning: isRestDay ? "💰 已排休息日加班，已推 LINE 同意書給員工" : warning });
     }
 
     // 如果新增休息日，檢查是否已有排班 → 標記為休息日加班
@@ -106,7 +152,7 @@ export async function POST(request) {
 
     const { data, error } = await supabase.from("schedules").upsert({
       employee_id, store_id: store_id || null, shift_id: shift_id || null, date,
-      type: type || "shift", leave_type, half_day, note, status: "scheduled",
+      type: type || "shift", leave_type, half_day, note, status: "scheduled", day_type,
     }, { onConflict: "employee_id,date" }).select("*, employees(name), shifts(name, start_time, end_time)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });

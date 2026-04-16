@@ -572,6 +572,34 @@ async function handleEvent(event) {
   if (event.type === "postback") {
     const pb = event.postback;
     const rt = event.replyToken;
+
+    // 休息日加班同意書（不需要 state）
+    if (pb.data?.startsWith("action=rest_consent_")) {
+      const params = new URLSearchParams(pb.data);
+      const action = params.get("action");
+      const sid = params.get("schedule_id");
+      const accepted = action === "action=rest_consent_accept";
+      const newStatus = accepted ? "agreed" : "declined";
+      const { data: sch } = await supabase.from("schedules")
+        .update({ rest_consent: newStatus, rest_consent_at: new Date().toISOString(),
+                  status: accepted ? "scheduled" : "cancelled" })
+        .eq("id", sid).select("*, employees(name), shifts(start_time, end_time)").single();
+      // 通知主管
+      const { data: mgrs } = await supabase.from("employees").select("line_uid")
+        .in("role", ["store_manager", "manager", "admin"]).eq("is_active", true);
+      const tag = accepted ? "✅ 已同意" : "❌ 已拒絕";
+      const sh = sch?.shifts;
+      const shiftStr = sh ? `${(sh.start_time||"").slice(0,5)}~${(sh.end_time||"").slice(0,5)}` : "";
+      for (const m of mgrs || []) {
+        if (m.line_uid && m.line_uid !== userId) {
+          await pushText(m.line_uid, `${tag} 休息日加班\n👤 ${sch?.employees?.name || ""}\n📅 ${sch?.date || ""} ${shiftStr}` + (accepted ? "" : "\n⚠️ 請重新安排此日排班")).catch(() => {});
+        }
+      }
+      return replyText(rt, accepted
+        ? `✅ 已同意 ${sch?.date || ""} 休息日加班\n依法將以加班費階梯計薪`
+        : `❌ 已拒絕 ${sch?.date || ""} 休息日加班\n排班已取消，主管已收到通知`);
+    }
+
     if (!state) return;
 
     // 補打卡：選日期

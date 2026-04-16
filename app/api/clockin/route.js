@@ -72,12 +72,15 @@ export async function POST(request) {
     earlyLeaveMinutes = diff > threshold ? diff : 0;
   }
 
+  // 寫入打卡（含 work_type 從排班帶過來）
+  const workType = schedule?.day_type || "work";
   await supabase.from("attendances").insert({
     employee_id: t.employee_id, store_id: store?.id, type: t.type,
     timestamp: now.toISOString(), latitude, longitude,
     is_valid: isValid, distance_meters: distance,
     late_minutes: lateMinutes, early_leave_minutes: earlyLeaveMinutes,
     schedule_id: schedule?.id, shift_id: schedule?.shift_id, clock_in_token: token,
+    work_type: workType,
   });
 
   await supabase.from("clockin_tokens").update({ used: true }).eq("token", token);
@@ -100,24 +103,28 @@ export async function POST(request) {
     }).catch(() => {});
   }
 
-  // 下班打卡：自動偵測加班
+  // 下班打卡：自動偵測加班（依 schedule.day_type 區分費率，與 payroll 邏輯一致）
   if (t.type === "clock_out" && schedule?.shifts?.end_time) {
     const [eh, em2] = schedule.shifts.end_time.split(":").map(Number);
     const [ch2, cm2] = currentTime.split(":").map(Number);
     const otMinutes = (ch2 * 60 + cm2) - (eh * 60 + em2);
     const minOt = settings?.overtime_min_minutes || 30;
     if (otMinutes >= minOt) {
-      // 查國定假日
-      const { data: hol } = await supabase.from("national_holidays").select("id").eq("date", today).limit(1).single();
-      const dayOfWeek = now.getDay();
-      const otType = hol ? "holiday" : dayOfWeek === 0 ? "rest_1" : dayOfWeek === 6 ? "rest_1" : otMinutes <= 120 ? "weekday_1" : "weekday_2";
-      const rates = { weekday_1: 1.34, weekday_2: 1.67, rest_1: 1.34, holiday: 2 };
+      const dt = workType;  // schedule.day_type
+      // 統一以 day_type 對應費率（不再混用 dayOfWeek 與 national_holidays 雙來源）
+      let otType, rate;
+      if (dt === "national_holiday") { otType = "holiday"; rate = 2.0; }
+      else if (dt === "rest_day") {
+        // 休息日：前 2hr 1.34、之後 1.67（>8hr 階梯由薪資結算統一處理）
+        otType = "rest_1"; rate = otMinutes <= 120 ? 1.34 : 1.67;
+      }
+      else { otType = otMinutes <= 120 ? "weekday_1" : "weekday_2"; rate = otMinutes <= 120 ? 1.34 : 1.67; }
       const hourlyRate = emp.hourly_rate || (emp.monthly_salary ? Math.round(emp.monthly_salary / 30 / 8) : 190);
-      const otAmount = Math.round(hourlyRate * (otMinutes / 60) * (rates[otType] || 1.34));
+      const otAmount = Math.round(hourlyRate * (otMinutes / 60) * rate);
       await supabase.from("overtime_records").insert({
         employee_id: t.employee_id, store_id: store?.id, date: today,
         scheduled_end: schedule.shifts.end_time, actual_end: currentTime,
-        overtime_minutes: otMinutes, overtime_type: otType, rate: rates[otType] || 1.34, amount: otAmount,
+        overtime_minutes: otMinutes, overtime_type: otType, rate, amount: otAmount,
       }).catch(() => {});
       msg += "\n⏱ 加班 " + otMinutes + " 分鐘（待核准）";
     }
