@@ -3,6 +3,21 @@ import { supabase } from "@/lib/supabase";
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const employee_id = searchParams.get("employee_id");
+
+  // 批次彙總：回傳各員工已上傳的 doc_type 清單（僅型別，不含內容，供「文件完整度」欄顯示）
+  if (searchParams.get("summary")) {
+    const idsParam = searchParams.get("employee_ids");
+    let q = supabase.from("employee_documents").select("employee_id, doc_type, file_url, signature_url");
+    if (idsParam) q = q.in("employee_id", idsParam.split(",").filter(Boolean));
+    const { data } = await q;
+    const map = {};
+    for (const d of data || []) {
+      if (!map[d.employee_id]) map[d.employee_id] = [];
+      if (d.file_url || d.signature_url) map[d.employee_id].push(d.doc_type);
+    }
+    return Response.json({ map });
+  }
+
   if (!employee_id) return Response.json({ error: "需指定員工" }, { status: 400 });
   const { data } = await supabase.from("employee_documents")
     .select("*").eq("employee_id", employee_id).order("created_at");

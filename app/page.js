@@ -61,6 +61,7 @@ export default function AdminPage() {
   const [ld, setLd] = useState(true);
   const [stores, setStores] = useState([]);
   const [emps, setEmps] = useState([]);
+  const [docMap, setDocMap] = useState({});
   const [stl, setStl] = useState([]);
   const [sum, setSum] = useState({});
   const [dep, setDep] = useState([]);
@@ -160,6 +161,11 @@ export default function AdminPage() {
     ]).then(([s,d,e,shs,sc,at2,as3,lr2,ex,pl2,an]) => {
       setStl(s.data||[]); setSum(s.summary||{}); setDep(d.data||[]);
       setEmps(e.data||[]); setShifts(shs.data||[]);
+      // 待審核員工的文件完整度
+      const pendingIds = (e.data||[]).filter(x=>!x.is_active).map(x=>x.id);
+      if (pendingIds.length > 0) {
+        ap("/api/admin/documents?summary=1&employee_ids=" + pendingIds.join(",")).then(r => setDocMap(r.map||{}));
+      } else { setDocMap({}); }
       setScheds(sc.data||[]); setAtt(at2.data||[]);
       setLr(lr2.data||[]); setExps(ex.data||[]);
       setExpSum({total:ex.total,byCategory:ex.byCategory});
@@ -501,21 +507,32 @@ export default function AdminPage() {
                 <h4 style={{fontSize:12,color:"#b45309",marginBottom:4}}>{"⏳ 待審核（"+emps.filter(e=>!e.is_active).length+"）"}</h4>
                 <div style={{background:"#fff8e6",borderRadius:8,border:"1px solid #f0e6c8",overflow:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                    <thead><tr style={{background:"#fef3c7"}}>{["姓名","門市","合約","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#92400e"}}>{h}</th>)}</tr></thead>
-                    <tbody>{emps.filter(e=>!e.is_active).map(e=>(
+                    <thead><tr style={{background:"#fef3c7"}}>{["姓名","門市","合約","文件","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#92400e"}}>{h}</th>)}</tr></thead>
+                    <tbody>{emps.filter(e=>!e.is_active).map(e=>{
+                      const REQ=[["health_check","體檢"],["id_card_front","身證正"],["id_card_back","身證反"]];
+                      const has=docMap[e.id]||[];
+                      const missing=REQ.filter(([k])=>!has.includes(k));
+                      return (
                       <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
                         <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}} onClick={()=>setDetailId(e.id)}>{e.name}</td>
                         <td style={{padding:6}}>{e.stores?e.stores.name:"總部"}</td>
                         <td style={{padding:6}}>{e.onboarding_completed||e.contract_signed?<span style={{color:"#0a7c42"}}>✅已簽</span>:<span style={{color:"#b91c1c"}}>❌未簽</span>}</td>
+                        <td style={{padding:6,fontSize:10}}>{missing.length===0?<span style={{color:"#0a7c42",fontWeight:600}}>✅ 齊全</span>:<span style={{color:"#b45309"}}>⚠️ 缺 {missing.map(m=>m[1]).join("、")}</span>}</td>
                         <td style={{padding:6}}>{e.line_uid?"✅":"❌"}</td>
                         <td style={{padding:6,whiteSpace:"nowrap"}}>
-                          <button onClick={async()=>{if(!confirm("✅ 核准「"+e.name+"」？\n\n將啟用帳號並發送綁定碼通知"))return;const r=await sap("/api/admin/employees",{action:"activate",employee_id:e.id});if(r){alert("✅ 已核准！"+(r.bind_code?"\n綁定碼："+r.bind_code:""));load();}}}
-                            style={{padding:"2px 8px",borderRadius:4,border:"none",background:"#0a7c42",color:"#fff",fontSize:10,cursor:"pointer",marginRight:3}}>✅核准</button>
+                          <button onClick={async()=>{
+                            let msg="✅ 核准「"+e.name+"」？\n\n將啟用帳號並發送綁定碼通知";
+                            if (missing.length>0) msg="⚠️ 此員工文件尚未齊全\n\n缺少：\n"+missing.map(m=>"・"+m[1]).join("\n")+"\n\n仍要核准「"+e.name+"」並啟用帳號嗎？";
+                            if(!confirm(msg))return;
+                            const r=await sap("/api/admin/employees",{action:"activate",employee_id:e.id});
+                            if(r){alert("✅ 已核准！"+(r.bind_code?"\n綁定碼："+r.bind_code:""));load();}
+                          }}
+                            style={{padding:"2px 8px",borderRadius:4,border:"none",background:missing.length>0?"#b45309":"#0a7c42",color:"#fff",fontSize:10,cursor:"pointer",marginRight:3}}>✅核准</button>
                           <button onClick={async()=>{if(!confirm("⚠️ 退回「"+e.name+"」？\n此操作會永久刪除"))return;const r=await sap("/api/admin/employees",{action:"delete",employee_id:e.id});if(r)load();}}
                             style={{padding:"2px 8px",borderRadius:4,border:"none",background:"#b91c1c",color:"#fff",fontSize:10,cursor:"pointer"}}>❌退回</button>
                         </td>
                       </tr>
-                    ))}</tbody>
+                    );})}</tbody>
                   </table>
                 </div>
               </div>
