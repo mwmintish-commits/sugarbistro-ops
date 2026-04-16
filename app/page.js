@@ -423,15 +423,22 @@ export default function AdminPage() {
               </div>
 
               {/* 待辦集中 */}
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10}}>
-                <h4 style={{fontSize:11,fontWeight:600,marginBottom:6}}>📋 待辦事項</h4>
-                {pl.length>0&&<div style={{fontSize:10,padding:"2px 0",color:"#b45309"}}>{"🙋 待審請假 "+pl.length+" 筆"}</div>}
-                {exps.filter(e=>e.status==="pending").length>0&&<div style={{fontSize:10,padding:"2px 0",color:"#b45309"}}>{"📦 待審費用 "+exps.filter(e=>e.status==="pending").length+" 筆"}</div>}
-                {otRecords.filter(r=>r.status==="pending").length>0&&<div style={{fontSize:10,padding:"2px 0",color:"#b45309"}}>{"⏱ 待審加班 "+otRecords.filter(r=>r.status==="pending").length+" 筆"}</div>}
-                {amendments.filter(a=>a.status==="pending").length>0&&<div style={{fontSize:10,padding:"2px 0",color:"#b45309"}}>{"🔧 待審補登 "+amendments.filter(a=>a.status==="pending").length+" 筆"}</div>}
-                {dep.filter(d=>d.status==="anomaly").length>0&&<div style={{fontSize:10,padding:"2px 0",color:"#b91c1c"}}>{"🚨 存款異常 "+dep.filter(d=>d.status==="anomaly").length+" 筆"}</div>}
-                {pl.length===0&&exps.filter(e=>e.status==="pending").length===0&&otRecords.filter(r=>r.status==="pending").length===0&&<div style={{fontSize:10,color:"#ccc",textAlign:"center",padding:8}}>✅ 無待辦</div>}
-              </div>
+              {(() => {
+                const pendingEmps = emps.filter(e=>!e.is_active);
+                const liStyle = {fontSize:10,padding:"2px 0",cursor:"pointer"};
+                return (
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10}}>
+                  <h4 style={{fontSize:11,fontWeight:600,marginBottom:6}}>📋 待辦事項</h4>
+                  {pendingEmps.length>0&&<div onClick={()=>setTab("employees")} style={{...liStyle,color:"#b45309"}}>{"👤 待審核員工 "+pendingEmps.length+" 位（點此前往）"}</div>}
+                  {pl.length>0&&<div onClick={()=>setTab("leaves")} style={{...liStyle,color:"#b45309"}}>{"🙋 待審請假 "+pl.length+" 筆"}</div>}
+                  {exps.filter(e=>e.status==="pending").length>0&&<div onClick={()=>setTab("expenses")} style={{...liStyle,color:"#b45309"}}>{"📦 待審費用 "+exps.filter(e=>e.status==="pending").length+" 筆"}</div>}
+                  {otRecords.filter(r=>r.status==="pending").length>0&&<div onClick={()=>setTab("overtime")} style={{...liStyle,color:"#b45309"}}>{"⏱ 待審加班 "+otRecords.filter(r=>r.status==="pending").length+" 筆"}</div>}
+                  {amendments.filter(a=>a.status==="pending").length>0&&<div style={{...liStyle,color:"#b45309"}}>{"🔧 待審補登 "+amendments.filter(a=>a.status==="pending").length+" 筆"}</div>}
+                  {dep.filter(d=>d.status==="anomaly").length>0&&<div onClick={()=>setTab("deposits")} style={{...liStyle,color:"#b91c1c"}}>{"🚨 存款異常 "+dep.filter(d=>d.status==="anomaly").length+" 筆"}</div>}
+                  {pendingEmps.length===0&&pl.length===0&&exps.filter(e=>e.status==="pending").length===0&&otRecords.filter(r=>r.status==="pending").length===0&&amendments.filter(a=>a.status==="pending").length===0&&dep.filter(d=>d.status==="anomaly").length===0&&<div style={{fontSize:10,color:"#ccc",textAlign:"center",padding:8}}>✅ 無待辦</div>}
+                </div>
+                );
+              })()}
             </div>
 
             {/* 🔔 系統提醒 */}
