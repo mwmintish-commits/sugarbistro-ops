@@ -1,9 +1,9 @@
 import { supabase, eom, auditLog } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
+import { calcHourlyRate, calcDailyRate, calcShiftHours, calcRestDayOTPremium, fmt } from "@/lib/hr-utils";
 
 const LABOR_SELF = [738,758,795,833,870,908,955,1002,1050,1098,1145,1145,1145,1145,1145,1145,1145,1145,1145,1145];
 const HEALTH_SELF = [458,470,493,516,540,563,592,622,651,681,710,748,785,822,859,896,943,990,1036,1083];
-const fmt = n => "$" + Number(n||0).toLocaleString();
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -91,17 +91,8 @@ export async function POST(request) {
         }
       }
 
-      // 統一從 schedules.day_type 抓出國定假日 / 休息日出勤
-      const hourlyRate = emp.hourly_rate ? Number(emp.hourly_rate)
-        : (emp.monthly_salary ? Number(emp.monthly_salary) / 30 / 8 : 0);
-      const dailyRate = emp.monthly_salary ? Number(emp.monthly_salary) / 30
-        : (emp.hourly_rate ? Number(emp.hourly_rate) * 8 : 0);
-      const calcShiftHours = (s) => {
-        const st = s?.shifts?.start_time, et = s?.shifts?.end_time;
-        if (!st || !et) return 8;
-        const [sh, sm] = st.split(":").map(Number), [eh, em] = et.split(":").map(Number);
-        return Math.max(0, (eh * 60 + em - sh * 60 - sm) / 60);
-      };
+      const hourlyRate = calcHourlyRate(emp);
+      const dailyRate = calcDailyRate(emp);
 
       const { data: dayScheds } = await supabase.from("schedules")
         .select("date, day_type, is_rest_day, notes, shift_id, shifts(start_time, end_time)")
@@ -115,7 +106,7 @@ export async function POST(request) {
       let holidayPay = 0;
       const holidayDays = holScheds.length;
       for (const s of holScheds) {
-        const hrs = calcShiftHours(s);
+        const hrs = calcShiftHours(s.shifts);
         if (emp.monthly_salary) holidayPay += Math.round(dailyRate);
         else holidayPay += Math.round(hourlyRate * hrs * 2);
       }
@@ -125,12 +116,8 @@ export async function POST(request) {
       let restDayPay = 0;
       const restDayCount = restScheds.length;
       for (const s of restScheds) {
-        const hrs = calcShiftHours(s);
-        const t1 = Math.min(hrs, 2);                 // 前 2 hr
-        const t2 = Math.max(0, Math.min(hrs, 8) - 2); // 2~8 hr
-        const t3 = Math.max(0, Math.min(hrs, 12) - 8); // 8~12 hr
-        // 加給部分：(1.34-1)×t1 + (1.67-1)×t2 + (2.67-1)×t3 + 1×底薪（休息日整天工資）
-        restDayPay += Math.round(hourlyRate * (t1 * 0.34 + t2 * 0.67 + t3 * 1.67) + hourlyRate * hrs);
+        const hrs = calcShiftHours(s.shifts);
+        restDayPay += Math.round(hourlyRate * calcRestDayOTPremium(hrs) + hourlyRate * hrs);
       }
 
       const net = base + otPay + holidayPay + restDayPay - ls - hs - suppHealth + allow - deduct - leaveDeduct;
@@ -192,7 +179,9 @@ export async function POST(request) {
     const { data: rec } = await supabase.from("payroll_records").select("*").eq("id", payroll_id).single();
     if (!rec) return Response.json({ error: "Not found" }, { status: 404 });
     const net = Number(rec.base_salary||0) + Number(rec.overtime_pay||0)
+      + Number(rec.holiday_pay||0) + Number(rec.rest_day_pay||0)
       - Number(rec.labor_self||0) - Number(rec.health_self||0) - Number(rec.supplementary_health||0)
+      - Number(rec.leave_deduction||0)
       + Number(allowance||0) - Number(other_deduction||0) + Number(bonus_amount||0);
     const { data } = await supabase.from("payroll_records").update({
       allowance: allowance||0, allowance_note,

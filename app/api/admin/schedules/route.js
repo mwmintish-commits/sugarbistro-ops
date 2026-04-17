@@ -100,7 +100,7 @@ export async function POST(request) {
       const { data, error } = await supabase.from("schedules").upsert({
         employee_id, store_id: store_id || null, shift_id: shift_id || null, date,
         type: type || "shift", leave_type, half_day, note, status: "scheduled",
-        is_rest_day: restDayWork || isRestDay, day_type,
+        is_rest_day: isRestDay, day_type,
         rest_consent: isRestDay ? "pending" : null,
       }, { onConflict: "employee_id,date" }).select("*, employees(name, line_uid), shifts(name, start_time, end_time)").single();
       if (error) return Response.json({ error: error.message }, { status: 500 });

@@ -44,7 +44,7 @@ export async function GET(request) {
   if (employee_id) {
     // 單一員工
     const { data: emp } = await supabase.from("employees").select("hire_date").eq("id", employee_id).single();
-    let { data: balance } = await supabase.from("leave_balances").select("*").eq("employee_id", employee_id).eq("year", year).single();
+    let { data: balance } = await supabase.from("leave_balances").select("*").eq("employee_id", employee_id).eq("year", year).maybeSingle();
     
     if (!balance) {
       const annualDays = calcAnnualLeave(emp?.hire_date);
@@ -98,11 +98,10 @@ export async function GET(request) {
 
     // 優先手動設定，否則自動計算
     const { data: balRec } = await supabase.from("leave_balances")
-      .select("*").eq("employee_id", emp.id).eq("year", year).single()
-      .catch(() => ({ data: null }));
+      .select("*").eq("employee_id", emp.id).eq("year", year).maybeSingle();
     const autoAnnual = calcAnnualLeave(emp.hire_date);
     const annualDays = balRec?.annual_total ?? autoAnnual;
-    const isOverridden = balRec?.annual_total !== null && balRec?.annual_total !== undefined && balRec?.annual_total !== autoAnnual;
+    const isOverridden = balRec && balRec.annual_total !== null && balRec.annual_total !== autoAnnual;
     const milestone = nextMilestone(emp.hire_date);
 
     // 已用天數
@@ -118,7 +117,7 @@ export async function GET(request) {
 
     // 加班紀錄（全部）
     const { data: otAll } = await supabase.from("overtime_records")
-      .select("id, date, hours, amount, comp_type, comp_hours, comp_used, comp_converted, comp_expiry_date, status")
+      .select("id, date, overtime_minutes, amount, comp_type, comp_hours, comp_used, comp_converted, comp_expiry_date, status")
       .eq("employee_id", emp.id).eq("status", "approved")
       .gte("date", year + "-01-01").lte("date", year + "-12-31")
       .order("date", { ascending: false });

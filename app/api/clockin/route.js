@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
+import { calcHourlyRate } from "@/lib/hr-utils";
 
 function calcDistance(lat1, lon1, lat2, lon2) {
   const R = 6371000, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
@@ -36,7 +37,8 @@ export async function POST(request) {
   if (t.used) return Response.json({ error: "Already clocked" }, { status: 400 });
   if (new Date(t.expires_at) < new Date()) return Response.json({ error: "Expired" }, { status: 400 });
 
-  const { data: emp } = await supabase.from("employees").select("name, line_uid, store_id, stores(*)").eq("id", t.employee_id).single();
+  const { data: emp } = await supabase.from("employees").select("name, line_uid, store_id, hourly_rate, monthly_salary, stores(*)").eq("id", t.employee_id).single();
+  if (!emp) return Response.json({ error: "找不到員工資料" }, { status: 404 });
   const store = emp?.stores;
 
   const distance = store?.latitude ? Math.round(calcDistance(latitude, longitude, store.latitude, store.longitude)) : null;
@@ -119,7 +121,7 @@ export async function POST(request) {
         otType = "rest_1"; rate = otMinutes <= 120 ? 1.34 : 1.67;
       }
       else { otType = otMinutes <= 120 ? "weekday_1" : "weekday_2"; rate = otMinutes <= 120 ? 1.34 : 1.67; }
-      const hourlyRate = emp.hourly_rate || (emp.monthly_salary ? Math.round(emp.monthly_salary / 30 / 8) : 190);
+      const hourlyRate = calcHourlyRate(emp);
       const otAmount = Math.round(hourlyRate * (otMinutes / 60) * rate);
       await supabase.from("overtime_records").insert({
         employee_id: t.employee_id, store_id: store?.id, date: today,
