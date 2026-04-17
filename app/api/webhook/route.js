@@ -578,7 +578,7 @@ async function handleEvent(event) {
       const params = new URLSearchParams(pb.data);
       const action = params.get("action");
       const sid = params.get("schedule_id");
-      const accepted = action === "action=rest_consent_accept";
+      const accepted = action === "rest_consent_accept";
       const newStatus = accepted ? "agreed" : "declined";
       const { data: sch } = await supabase.from("schedules")
         .update({ rest_consent: newStatus, rest_consent_at: new Date().toISOString(),
