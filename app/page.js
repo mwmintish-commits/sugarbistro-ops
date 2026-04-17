@@ -1197,7 +1197,7 @@ export default function AdminPage() {
                     <tr key={r.id} style={{borderBottom:"1px solid #f0eeea",background:r.bonus_coefficient===0?"#fef9c3":"transparent"}}>
                       <td style={{padding:6,fontWeight:500}}>{r.employees?.name}</td>
                       <td style={{padding:6,fontSize:10}}>{r.stores?.name}</td>
-                      <td style={{padding:6,textAlign:"center"}}>{r.attendance_score}</td>
+                      <td style={{padding:6,textAlign:"center"}} title={r.attendance_detail ? `遲到${r.attendance_detail.late||0}次 早退${r.attendance_detail.early_leave||0}次 缺勤${r.attendance_detail.absent||0}次 排班${r.attendance_detail.scheduled||0}天` : ""}>{r.attendance_score}<div style={{fontSize:7,color:"#888"}}>{r.attendance_detail?`遲${r.attendance_detail.late||0} 退${r.attendance_detail.early_leave||0} 缺${r.attendance_detail.absent||0}`:""}</div></td>
                       <td style={{padding:6,textAlign:"center"}}>{r.performance_score}{r.performance_adjust!==0&&<span style={{fontSize:8,color:r.performance_adjust>0?"#0a7c42":"#b91c1c"}}>{(r.performance_adjust>0?"+":"")+r.performance_adjust}</span>}</td>
                       <td style={{padding:6,textAlign:"center"}}>{r.service_score}{r.service_adjust!==0&&<span style={{fontSize:8,color:r.service_adjust>0?"#0a7c42":"#b91c1c"}}>{(r.service_adjust>0?"+":"")+r.service_adjust}</span>}</td>
                       <td style={{padding:6,textAlign:"center"}}>{r.violation_score}</td>
@@ -1209,7 +1209,7 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
-            <p style={{fontSize:9,color:"#888",marginTop:6}}>出勤/違規=全自動　完成度/服務=主管可±5分調整（API adjust）</p>
+            <p style={{fontSize:9,color:"#888",marginTop:6}}>出勤=自動（遲到-3 早退-3 缺勤-10）　違規=自動　完成度/服務=主管可±5分調整</p>
           </div>
         )}
 

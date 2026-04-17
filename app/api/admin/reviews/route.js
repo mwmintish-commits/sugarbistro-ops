@@ -35,15 +35,22 @@ export async function POST(request) {
     for (const emp of (emps || []).filter(e => e.probation_status !== "in_probation" && e.role !== "admin")) {
 
       // === 出勤紀律 30分 ===
+      // 扣分：遲到×3、早退×3、未打卡(缺勤)×10
       const { data: schedules } = await supabase.from("schedules")
         .select("date, type").eq("employee_id", emp.id).eq("type", "shift")
         .gte("date", startDate).lte("date", endDate);
       const { data: clockIns } = await supabase.from("attendances")
-        .select("date, is_late").eq("employee_id", emp.id).eq("type", "clock_in")
+        .select("date, is_late, late_minutes").eq("employee_id", emp.id).eq("type", "clock_in")
+        .gte("date", startDate).lte("date", endDate);
+      const { data: clockOuts } = await supabase.from("attendances")
+        .select("date, early_leave_minutes").eq("employee_id", emp.id).eq("type", "clock_out")
         .gte("date", startDate).lte("date", endDate);
       const { data: leaves } = await supabase.from("leave_requests")
         .select("start_date, end_date").eq("employee_id", emp.id).eq("status", "approved")
         .gte("start_date", startDate).lte("start_date", endDate);
+      const { data: alerts } = await supabase.from("attendance_alerts")
+        .select("date").eq("employee_id", emp.id).eq("alert_type", "no_clockin")
+        .gte("date", startDate).lte("date", endDate);
 
       const clockDates = new Set((clockIns || []).map(c => c.date));
       const leaveDates = new Set();
@@ -52,13 +59,15 @@ export async function POST(request) {
         while (d <= new Date(l.end_date)) { leaveDates.add(d.toLocaleDateString("sv-SE")); d.setDate(d.getDate() + 1); }
       }
 
-      let lateCount = (clockIns || []).filter(c => c.is_late).length;
+      const lateCount = (clockIns || []).filter(c => c.is_late || (c.late_minutes > 0)).length;
+      const earlyLeaveCount = (clockOuts || []).filter(c => c.early_leave_minutes > 0).length;
+      const noClockInAlerts = (alerts || []).length;
       let absentCount = 0;
       for (const s of schedules || []) {
         if (!clockDates.has(s.date) && !leaveDates.has(s.date)) absentCount++;
       }
-      const attScore = Math.max(0, 30 - (lateCount * 3) - (absentCount * 10));
-      const attDetail = { late: lateCount, absent: absentCount, scheduled: (schedules || []).length };
+      const attScore = Math.max(0, 30 - (lateCount * 3) - (earlyLeaveCount * 3) - (absentCount * 10));
+      const attDetail = { late: lateCount, early_leave: earlyLeaveCount, absent: absentCount, no_clockin_alerts: noClockInAlerts, scheduled: (schedules || []).length };
 
       // === 工作完成度 30分（自動基礎分）===
       const { data: wlItems } = await supabase.from("work_log_items")
