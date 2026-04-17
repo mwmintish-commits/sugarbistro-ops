@@ -57,7 +57,14 @@ export async function POST(request) {
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const expires = new Date(Date.now() + 5 * 60 * 1000);
     await supabase.from("verify_codes").insert({ phone, code, expires_at: expires.toISOString() });
-    await pushText(emp.line_uid, `🔐 後台登入驗證碼\n\n${code}\n\n5 分鐘內有效。`).catch(() => {});
+    try {
+      await pushText(emp.line_uid, `🔐 後台登入驗證碼\n\n${code}\n\n5 分鐘內有效。`);
+    } catch (e) {
+      console.error("LINE push verify code failed:", e);
+      return Response.json({
+        error: "LINE 推送失敗：" + (e?.message || "未知錯誤") + "\n\n可能原因：員工封鎖了官方帳號、line_uid 已失效，或 LINE 通道暫時故障。",
+      }, { status: 500 });
+    }
 
     return Response.json({ success: true, message: "驗證碼已發送至 LINE" });
   }
