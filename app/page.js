@@ -62,6 +62,8 @@ export default function AdminPage() {
   const [stores, setStores] = useState([]);
   const [emps, setEmps] = useState([]);
   const [docMap, setDocMap] = useState({});
+  const [holMode, setHolMode] = useState(null);
+  const [holCompDate, setHolCompDate] = useState("");
   const [stl, setStl] = useState([]);
   const [sum, setSum] = useState({});
   const [dep, setDep] = useState([]);
@@ -2247,8 +2249,7 @@ export default function AdminPage() {
           const popHol = holidays.find(h => h.date === schPop.date);
           const popDow = new Date(schPop.date).getDay();
           const isSun = popDow === 0;
-          const [holMode, setHolMode] = useState(null); // null / "choose" / "transfer" / "work"
-          const [holCompDate, setHolCompDate] = useState("");
+          // holMode / holCompDate 已提升至組件頂層
           const schedOnHol = async (eid, sid, shiftName) => {
             const storeId = schPop.storeId === "__hq__" ? null : schPop.storeId;
             if (popHol && !holMode) {
