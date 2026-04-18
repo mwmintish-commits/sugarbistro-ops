@@ -75,7 +75,7 @@ export async function GET(request) {
 
   // fallback: 查 employees.bind_code（後台產生的報到連結）
   const { data: emp } = await supabase.from("employees")
-    .select("id, name, phone, email, store_id, stores(name), hire_date, bind_code, onboarding_completed, contract_signed")
+    .select("id, name, phone, email, store_id, stores!store_id(name), hire_date, bind_code, onboarding_completed, contract_signed")
     .eq("bind_code", token).single();
   if (emp) return Response.json({ data: { ...emp, store_name: emp.stores?.name || "", token } });
 
@@ -152,19 +152,19 @@ export async function POST(request) {
     let emp = null;
     if (employee_id) {
       const { data } = await supabase.from("employees")
-        .select("id, name, store_id, line_uid, stores(name)")
+        .select("id, name, store_id, line_uid, stores!store_id(name)")
         .eq("id", employee_id).single();
       emp = data;
     }
     if (!emp && token) {
       const { data } = await supabase.from("employees")
-        .select("id, name, store_id, line_uid, stores(name)")
+        .select("id, name, store_id, line_uid, stores!store_id(name)")
         .eq("bind_code", token).single();
       emp = data;
     }
     if (!emp && phone) {
       const { data } = await supabase.from("employees")
-        .select("id, name, store_id, line_uid, stores(name)")
+        .select("id, name, store_id, line_uid, stores!store_id(name)")
         .eq("phone", phone).eq("is_active", true).limit(1).single();
       emp = data;
     }
@@ -185,7 +185,7 @@ export async function POST(request) {
         contract_signed: true, handbook_signed: true, bonus_policy_signed: true,
         onboarding_completed: true, onboarding_step: 5,
         emergency_contact, emergency_phone, bank_name, bank_account,
-      }).select("id, name, store_id, line_uid, stores(name)").single();
+      }).select("id, name, store_id, line_uid, stores!store_id(name)").single();
       if (createErr) return Response.json({ error: "建立員工失敗：" + createErr.message }, { status: 500 });
       emp = newEmp;
       // 更新 onboarding_record 的 auto_employee_id

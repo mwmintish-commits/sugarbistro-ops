@@ -9,7 +9,7 @@ export async function GET(request) {
   if (!token) return Response.json({ error: "No token" }, { status: 401 });
 
   const { data: session } = await supabase.from("admin_sessions")
-    .select("*, employees(name, role, store_id, stores(name))")
+    .select("*, employees(name, role, store_id, stores!store_id(name))")
     .eq("token", token).single();
 
   if (!session) return Response.json({ error: "Invalid session" }, { status: 401 });

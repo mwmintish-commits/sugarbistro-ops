@@ -7,7 +7,7 @@ export async function GET(request) {
   const employee_id = searchParams.get("employee_id");
   const month = searchParams.get("month");
 
-  let query = supabase.from("leave_requests").select("*, employees(name, store_id, line_uid, stores(name))").order("created_at", { ascending: false });
+  let query = supabase.from("leave_requests").select("*, employees(name, store_id, line_uid, stores!store_id(name))").order("created_at", { ascending: false });
   if (status) query = query.eq("status", status);
   if (employee_id) query = query.eq("employee_id", employee_id);
   if (month) query = query.gte("start_date", `${month}-01`).lte("start_date", `${eom(month)}`);
