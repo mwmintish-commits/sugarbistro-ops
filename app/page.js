@@ -2333,8 +2333,31 @@ export default function AdminPage() {
                       style={{ padding: "8px", borderRadius: 6, border: "1px solid #ddd", background: pc+"10", fontSize: 11, cursor: "pointer", textAlign: "left" }}><span style={{color:pc,fontWeight:600}}>{s.role==="all"?"全場":s.role||"全場"}</span><div style={{ fontSize: 9, color: "#888" }}>{(s.start_time || "").slice(0, 5) + "~" + (s.end_time || "").slice(0, 5)}</div></button>
                   );})}
                 </div>
+                {/* 💰 休息日出勤 — 選班別直接建 rest_day 排班 */}
+                <div style={{ marginTop: 8, padding: "6px 0", borderTop: "1px solid #e8e6e1" }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: "#b45309", marginBottom: 4 }}>💰 休息日出勤（選班別 → 自動推同意書）</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                    {shifts.filter(s => schPop.storeId === "__hq__" || s.store_id === schPop.storeId).map(s => {const pc=positions.find(p=>p.name===s.role)?.color||s.color||"#b45309";return(
+                      <button key={"rest-"+s.id} onClick={async () => {
+                        const eid = document.getElementById("pop-emp").value;
+                        if (!eid) { alert("請選員工"); return; }
+                        const r = await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: schPop.storeId === "__hq__" ? null : schPop.storeId, shift_id: s.id, date: schPop.date, day_type: "rest_day" });
+                        if (r.warning) alert(r.warning);
+                        if (r.error) alert(r.error);
+                        else alert("✅ 已排休息日出勤，同意書已推送");
+                        load();
+                      }}
+                        style={{ padding: "6px", borderRadius: 6, border: "1px dashed #b45309", background: "#fff8e6", fontSize: 10, cursor: "pointer", textAlign: "left" }}>
+                        <span style={{color:"#b45309",fontWeight:600}}>💰 {s.role==="all"?"全場":s.role||"全場"}</span>
+                        <div style={{ fontSize: 8, color: "#888" }}>{(s.start_time || "").slice(0, 5) + "~" + (s.end_time || "").slice(0, 5)}</div>
+                      </button>
+                    );})}
+                  </div>
+                </div>
+
+                {/* 假別 */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginTop: 6 }}>
-                  {[["off","⬛ 例假"],["rest","🔲 休息日"],["annual","🏖 特休"],["advance","📌 預假"],["holiday_comp","🔴 國定補假"],["personal","📋 事假"],["sick","🤒 病假"]].map(([k, l]) => (
+                  {[["off","⬛ 例假"],["rest","🔲 休息日(不上班)"],["annual","🏖 特休"],["advance","📌 預假"],["holiday_comp","🔴 國定補假"],["personal","📋 事假"],["sick","🤒 病假"]].map(([k, l]) => (
                     <button key={k} onClick={async () => { const eid = document.getElementById("pop-emp").value; if (!eid) { alert("請選員工"); return; } const r = await ap("/api/admin/schedules", { action: "add_leave", employee_id: eid, date: schPop.date, leave_type: k }); if (r.message) alert(r.message); if (r.error) alert(r.error); load(); }}
                       style={{ padding: "6px", borderRadius: 6, border: "1px solid #ddd", background: "#faf8f5", fontSize: 11, cursor: "pointer" }}>{l}</button>
                   ))}
