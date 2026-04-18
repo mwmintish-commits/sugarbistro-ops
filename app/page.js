@@ -2247,20 +2247,27 @@ export default function AdminPage() {
           const popHol = holidays.find(h => h.date === schPop.date);
           const popDow = new Date(schPop.date).getDay();
           const isSun = popDow === 0;
+          const [holMode, setHolMode] = useState(null); // null / "choose" / "transfer" / "work"
+          const [holCompDate, setHolCompDate] = useState("");
           const schedOnHol = async (eid, sid, shiftName) => {
-            if (popHol) {
-              const choice = confirm("⚠️ " + schPop.date.slice(5) + " 是國定假日（" + popHol.name + "）\n\n按「確定」= 挪移假日（需指定補假日期）\n按「取消」= 國定假日出勤（計雙倍薪）");
-              if (choice) {
-                const compDate = prompt("請輸入補假日期（YYYY-MM-DD）：");
-                if (!compDate || !/^\d{4}-\d{2}-\d{2}$/.test(compDate)) { alert("日期格式錯誤"); return; }
-                await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: schPop.storeId === "__hq__" ? null : schPop.storeId, shift_id: sid, date: schPop.date, notes: "國定假日挪移→" + compDate });
-                await ap("/api/admin/schedules", { action: "add_leave", employee_id: eid, date: compDate, leave_type: "holiday_comp", notes: popHol.name + "補假" });
-              } else {
-                await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: schPop.storeId === "__hq__" ? null : schPop.storeId, shift_id: sid, date: schPop.date, notes: "國定假日出勤(雙倍薪)" });
-              }
-            } else {
-              await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: schPop.storeId === "__hq__" ? null : schPop.storeId, shift_id: sid, date: schPop.date });
+            const storeId = schPop.storeId === "__hq__" ? null : schPop.storeId;
+            if (popHol && !holMode) {
+              setHolMode("choose");
+              return;
             }
+            if (popHol && holMode === "transfer") {
+              if (!holCompDate || !/^\d{4}-\d{2}-\d{2}$/.test(holCompDate)) { alert("請選擇補假日期"); return; }
+              await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: storeId, shift_id: sid, date: schPop.date, day_type: "national_holiday", notes: "國定假日挪移→" + holCompDate });
+              await ap("/api/admin/schedules", { action: "add_leave", employee_id: eid, date: holCompDate, leave_type: "holiday_comp", note: popHol.name + "補假" });
+              alert("✅ 已排班並設定 " + holCompDate + " 為補假日");
+              setHolMode(null); setHolCompDate(""); load(); return;
+            }
+            if (popHol && holMode === "work") {
+              await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: storeId, shift_id: sid, date: schPop.date, day_type: "national_holiday", notes: "國定假日出勤(雙倍薪)" });
+              alert("✅ 已排班，薪資將以雙倍計算");
+              setHolMode(null); load(); return;
+            }
+            await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: storeId, shift_id: sid, date: schPop.date });
             load();
           };
           return (
@@ -2271,7 +2278,38 @@ export default function AdminPage() {
                 <button onClick={() => setSchPop(null)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer" }}>✕</button>
               </div>
               {/* 假日提醒 */}
-              {popHol && <div style={{ background: "#fde8e8", borderRadius: 6, padding: "6px 10px", marginBottom: 8, fontSize: 11, color: "#b91c1c", fontWeight: 500 }}>{"🔴 國定假日：" + popHol.name + "（排班將詢問挪移或雙倍薪）"}</div>}
+              {popHol && <div style={{ background: "#fde8e8", borderRadius: 6, padding: "6px 10px", marginBottom: 8, fontSize: 11, color: "#b91c1c", fontWeight: 500 }}>{"🔴 國定假日：" + popHol.name}</div>}
+              {popHol && holMode === "choose" && (
+                <div style={{ background: "#fff8e6", borderRadius: 8, border: "1px solid #f0e6c8", padding: 10, marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>🔴 {popHol.name} 處理方式</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                    <button onClick={() => setHolMode("transfer")} style={{ padding: 10, borderRadius: 6, border: "1px solid #4361ee", background: "#e6f1fb", cursor: "pointer", fontSize: 11 }}>
+                      <div style={{ fontWeight: 600, color: "#185fa5" }}>📅 挪移假日</div>
+                      <div style={{ fontSize: 9, color: "#888", marginTop: 2 }}>上班 + 擇日補假</div>
+                    </button>
+                    <button onClick={() => setHolMode("work")} style={{ padding: 10, borderRadius: 6, border: "1px solid #b91c1c", background: "#fde8e8", cursor: "pointer", fontSize: 11 }}>
+                      <div style={{ fontWeight: 600, color: "#b91c1c" }}>💰 出勤加班</div>
+                      <div style={{ fontSize: 9, color: "#888", marginTop: 2 }}>雙倍薪，不補假</div>
+                    </button>
+                  </div>
+                </div>
+              )}
+              {popHol && holMode === "transfer" && (
+                <div style={{ background: "#e6f1fb", borderRadius: 8, border: "1px solid #a3c9f1", padding: 10, marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#185fa5", marginBottom: 6 }}>📅 挪移假日 — 選擇補假日期</div>
+                  <input type="date" value={holCompDate} onChange={e => setHolCompDate(e.target.value)}
+                    style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, marginBottom: 6 }} />
+                  <div style={{ fontSize: 9, color: "#888", marginBottom: 6 }}>員工在 {schPop.date} 上班，{holCompDate || "___"} 補假一天</div>
+                  <button onClick={() => setHolMode("choose")} style={{ fontSize: 10, color: "#888", background: "none", border: "none", cursor: "pointer" }}>← 返回選擇</button>
+                </div>
+              )}
+              {popHol && holMode === "work" && (
+                <div style={{ background: "#fde8e8", borderRadius: 8, border: "1px solid #f5c6c6", padding: 10, marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#b91c1c", marginBottom: 4 }}>💰 國定假日出勤</div>
+                  <div style={{ fontSize: 10, color: "#666" }}>薪資以雙倍計算（月薪制加發 1 日工資），請選擇下方班別確認排班。</div>
+                  <button onClick={() => setHolMode("choose")} style={{ fontSize: 10, color: "#888", background: "none", border: "none", cursor: "pointer", marginTop: 4 }}>← 返回選擇</button>
+                </div>
+              )}
               {/* 已有排班 */}
               {scheds.filter(s => s.date === schPop.date && (schPop.storeId === "__hq__" ? !emps.find(e => e.id === s.employee_id)?.store_id : emps.find(e => e.id === s.employee_id)?.store_id === schPop.storeId)).map(s => (
                 <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", marginBottom: 4, borderRadius: 6, background: s.type === "leave" ? (LT[s.leave_type] || LT.off).bg : s.published ? "#e6f9f0" : "#fff8e6", border: s.published ? "1px solid #0a7c42" : "1px dashed #d4a017" }}>
