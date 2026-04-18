@@ -188,8 +188,52 @@ export async function POST(request) {
 
   if (action === "add_leave") {
     const { employee_id, date, leave_type, half_day, note } = body;
+
+    // 檢查是否已有排班
+    const { data: existing } = await supabase.from("schedules")
+      .select("id, type, shift_id").eq("employee_id", employee_id).eq("date", date).eq("type", "shift").limit(1);
+
+    if (existing?.length) {
+      if (leave_type === "rest") {
+        // 已有排班 + 標休息日 → 標記為「休息日加班」（保留原班 + 推同意書）
+        const { data, error } = await supabase.from("schedules").update({
+          is_rest_day: true, day_type: "rest_day", rest_consent: "pending",
+        }).eq("id", existing[0].id).select("*, employees(name, line_uid), shifts(name, start_time, end_time)").single();
+        if (error) return Response.json({ error: error.message }, { status: 500 });
+
+        // 推 LINE 同意書
+        if (data?.employees?.line_uid) {
+          try {
+            const { lineClient } = await import("@/lib/line");
+            const DAYS = ["日","一","二","三","四","五","六"];
+            const sh = data.shifts;
+            const shiftStr = sh ? `${sh.name||""} ${(sh.start_time||"").slice(0,5)}~${(sh.end_time||"").slice(0,5)}` : "";
+            await lineClient.pushMessage({ to: data.employees.line_uid, messages: [{
+              type: "template", altText: "休息日加班同意書",
+              template: { type: "buttons", title: "📅 休息日加班同意書",
+                text: `${date}（${DAYS[new Date(date).getDay()]}）休息日\n${shiftStr}\n\n依勞基法須經您同意`,
+                actions: [
+                  { type: "postback", label: "✅ 同意加班", data: `action=rest_consent_accept&schedule_id=${data.id}` },
+                  { type: "postback", label: "❌ 拒絕", data: `action=rest_consent_decline&schedule_id=${data.id}` },
+                ]
+              }
+            }]}).catch(() => {});
+          } catch {}
+        }
+        return Response.json({ data, message: "💰 已標記為休息日加班，同意書已推送" });
+      }
+      if (leave_type === "off") {
+        return Response.json({ error: "⚠️ 此日已有排班，例假日不可工作。請先刪除排班再標記例假。" });
+      }
+      // 其他假別（特休/病假等）→ 刪除原排班，改為請假
+      await supabase.from("schedules").delete().eq("id", existing[0].id);
+    }
+
+    // 無排班或已刪除原排班 → 新增假別
+    const dayType = leave_type === "off" ? "regular_off" : leave_type === "rest" ? "rest_day" : "paid_leave";
     const { data, error } = await supabase.from("schedules").upsert({
-      employee_id, date, type: "leave", leave_type, half_day, note, status: "confirmed",
+      employee_id, date, type: "leave", leave_type, half_day, note,
+      status: "confirmed", day_type: dayType,
     }, { onConflict: "employee_id,date" }).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
