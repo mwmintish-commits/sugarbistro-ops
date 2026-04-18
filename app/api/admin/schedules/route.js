@@ -105,33 +105,8 @@ export async function POST(request) {
       }, { onConflict: "employee_id,date" }).select("*, employees(name, line_uid), shifts(name, start_time, end_time)").single();
       if (error) return Response.json({ error: error.message }, { status: 500 });
 
-      // 休息日加班 → 推送同意書給員工
-      if (isRestDay && data?.employees?.line_uid) {
-        try {
-          const { lineClient } = await import("@/lib/line");
-          const sh = data.shifts;
-          const shiftStr = sh ? `${sh.name || ""} ${(sh.start_time||"").slice(0,5)}~${(sh.end_time||"").slice(0,5)}` : "";
-          const DAYS = ["日","一","二","三","四","五","六"];
-          const dayLabel = DAYS[new Date(date).getDay()];
-          await lineClient.pushMessage({
-            to: data.employees.line_uid,
-            messages: [{
-              type: "template", altText: "休息日加班同意書",
-              template: {
-                type: "buttons",
-                title: "📅 休息日加班同意書",
-                text: `${date}（${dayLabel}）休息日\n${shiftStr}\n\n依勞基法須經您同意才能加班，加班費以階梯計算（前2hr×1.34、2-8hr×1.67、8-12hr×2.67）`,
-                actions: [
-                  { type: "postback", label: "✅ 同意加班", data: `action=rest_consent_accept&schedule_id=${data.id}` },
-                  { type: "postback", label: "❌ 拒絕", data: `action=rest_consent_decline&schedule_id=${data.id}` },
-                ],
-              },
-            }],
-          }).catch(() => {});
-        } catch {}
-      }
-
-      return Response.json({ data, warning: isRestDay ? "💰 已排休息日加班，已推 LINE 同意書給員工" : warning });
+      // 休息日同意書在「發布班表」時才推送，此處只標記 rest_consent=pending
+      return Response.json({ data, warning: isRestDay ? "💰 已排休息日加班（發布班表後會推同意書）" : warning });
     }
 
     // 如果新增休息日，檢查是否已有排班 → 標記為休息日加班
@@ -201,26 +176,7 @@ export async function POST(request) {
         }).eq("id", existing[0].id).select("*, employees(name, line_uid), shifts(name, start_time, end_time)").single();
         if (error) return Response.json({ error: error.message }, { status: 500 });
 
-        // 推 LINE 同意書
-        if (data?.employees?.line_uid) {
-          try {
-            const { lineClient } = await import("@/lib/line");
-            const DAYS = ["日","一","二","三","四","五","六"];
-            const sh = data.shifts;
-            const shiftStr = sh ? `${sh.name||""} ${(sh.start_time||"").slice(0,5)}~${(sh.end_time||"").slice(0,5)}` : "";
-            await lineClient.pushMessage({ to: data.employees.line_uid, messages: [{
-              type: "template", altText: "休息日加班同意書",
-              template: { type: "buttons", title: "📅 休息日加班同意書",
-                text: `${date}（${DAYS[new Date(date).getDay()]}）休息日\n${shiftStr}\n\n依勞基法須經您同意`,
-                actions: [
-                  { type: "postback", label: "✅ 同意加班", data: `action=rest_consent_accept&schedule_id=${data.id}` },
-                  { type: "postback", label: "❌ 拒絕", data: `action=rest_consent_decline&schedule_id=${data.id}` },
-                ]
-              }
-            }]}).catch(() => {});
-          } catch {}
-        }
-        return Response.json({ data, message: "💰 已標記為休息日加班，同意書已推送" });
+        return Response.json({ data, message: "💰 已標記為休息日加班（發布後推同意書）" });
       }
       if (leave_type === "off") {
         return Response.json({ error: "⚠️ 此日已有排班，例假日不可工作。請先刪除排班再標記例假。" });
@@ -266,8 +222,35 @@ export async function POST(request) {
       notified++;
     }
     await supabase.from("schedules").update({ published: true }).in("id", schedules.map(s => s.id));
-    await auditLog(null, null, "schedule_publish", "schedule", null, { week_start, week_end, store_id, count: schedules.length, notified });
-    return Response.json({ published: schedules.length, notified });
+
+    // 發布時推送休息日加班同意書（rest_consent=pending 的排班）
+    let consentSent = 0;
+    const restDayScheds = schedules.filter(s => s.day_type === "rest_day" && s.rest_consent === "pending" && s.type === "shift");
+    if (restDayScheds.length > 0) {
+      const { lineClient } = await import("@/lib/line");
+      for (const s of restDayScheds) {
+        if (!s.employees?.line_uid) continue;
+        const day = DAYS[new Date(s.date).getDay()];
+        const sh = s.shifts;
+        const shiftStr = sh ? `${sh.name||""} ${(sh.start_time||"").slice(0,5)}~${(sh.end_time||"").slice(0,5)}` : "";
+        try {
+          await lineClient.pushMessage({ to: s.employees.line_uid, messages: [{
+            type: "template", altText: "休息日加班同意書",
+            template: { type: "buttons", title: "📅 休息日加班同意書",
+              text: `${s.date}（${day}）休息日\n${shiftStr}\n\n依勞基法須經您同意才能加班`,
+              actions: [
+                { type: "postback", label: "✅ 同意加班", data: `action=rest_consent_accept&schedule_id=${s.id}` },
+                { type: "postback", label: "❌ 拒絕", data: `action=rest_consent_decline&schedule_id=${s.id}` },
+              ]
+            }
+          }]});
+          consentSent++;
+        } catch {}
+      }
+    }
+
+    await auditLog(null, null, "schedule_publish", "schedule", null, { week_start, week_end, store_id, count: schedules.length, notified, consentSent });
+    return Response.json({ published: schedules.length, notified, consentSent, message: consentSent > 0 ? `已推送 ${consentSent} 份休息日加班同意書` : undefined });
   }
 
   if (action === "delete") {
