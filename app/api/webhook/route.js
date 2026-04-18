@@ -31,10 +31,10 @@ async function getUserState(uid) {
 }
 async function setUserState(uid, flow, flowData = {}) { await supabase.from("user_states").upsert({ line_uid: uid, current_flow: flow, flow_data: flowData, updated_at: new Date().toISOString() }, { onConflict: "line_uid" }); }
 async function clearUserState(uid) { await supabase.from("user_states").delete().eq("line_uid", uid); }
-async function getEmployee(uid) { const { data } = await supabase.from("employees").select("*, stores(*)").eq("line_uid", uid).eq("is_active", true).single(); return data; }
+async function getEmployee(uid) { const { data } = await supabase.from("employees").select("*, stores!store_id(*)").eq("line_uid", uid).eq("is_active", true).single(); return data; }
 
 async function handleBinding(rt, userId, code) {
-  const { data: emp } = await supabase.from("employees").select("*, stores(name)").eq("bind_code", code).eq("is_active", true).single();
+  const { data: emp } = await supabase.from("employees").select("*, stores!store_id(name)").eq("bind_code", code).eq("is_active", true).single();
   if (!emp) return replyText(rt, "❌ 綁定碼無效。格式：綁定 123456");
   if (emp.bind_code_expires && new Date(emp.bind_code_expires) < new Date()) return replyText(rt, "❌ 已過期。");
   await supabase.from("employees").update({ line_uid: userId, bind_code: null, bind_code_expires: null }).eq("id", emp.id);
@@ -60,7 +60,7 @@ async function querySchedule(rt, emp) {
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
   const end = new Date(Date.now() + 14 * 86400000).toLocaleDateString("sv-SE");
   // 員工只能看已發布的班表 + 預假
-  const { data } = await supabase.from("schedules").select("*, shifts(name, start_time, end_time), stores(name)").eq("employee_id", emp.id).gte("date", today).lte("date", end).or("published.eq.true,leave_type.eq.advance").order("date");
+  const { data } = await supabase.from("schedules").select("*, shifts(name, start_time, end_time), stores!store_id(name)").eq("employee_id", emp.id).gte("date", today).lte("date", end).or("published.eq.true,leave_type.eq.advance").order("date");
   const { data: hols } = await supabase.from("holidays").select("date, name").eq("is_active", true).gte("date", today).lte("date", end);
   const holMap = {};
   for (const h of hols || []) holMap[h.date] = h.name;
@@ -304,7 +304,7 @@ async function uploadImage(b64, folder, fn) {
 }
 async function checkDuplicateSerials(sns, vt) {
   if (!sns?.length) return { duplicates: [], newSerials: sns || [] };
-  const { data: ex } = await supabase.from("voucher_serials").select("serial_number, date, stores(name)").eq("voucher_type", vt).in("serial_number", sns);
+  const { data: ex } = await supabase.from("voucher_serials").select("serial_number, date, stores!store_id(name)").eq("voucher_type", vt).in("serial_number", sns);
   const dups = ex || []; const dupNums = dups.map(d => d.serial_number);
   return { duplicates: dups, newSerials: sns.filter(s => !dupNums.includes(s)) };
 }
@@ -455,7 +455,7 @@ async function confirmDeposit(rt,uid,state,emp){
   return replyWithQuickReply(rt,`✅ 存款已登記\n\n🏠 ${d.store_name}\n💰 ${fmt(amt)} vs 應存 ${fmt(exp)}\n📅 ${d.period_start} ~ ${d.period_end}\n${em} ${tx}`,getMenu(emp?.role||"staff"));
 }
 
-async function queryRevenue(rt){const today=new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});const{data}=await supabase.from("daily_settlements").select("*, stores(name)").eq("date",today);if(!data?.length)return replyText(rt,`📊 ${today} 無日結`);let msg=`📊 ${today}\n`,tot=0;for(const s of data){msg+=`🔹${s.stores?.name} ${fmt(s.net_sales)}\n`;tot+=Number(s.net_sales||0);}msg+=`💰 合計${fmt(tot)}`;return replyText(rt,msg);}
+async function queryRevenue(rt){const today=new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});const{data}=await supabase.from("daily_settlements").select("*, stores!store_id(name)").eq("date",today);if(!data?.length)return replyText(rt,`📊 ${today} 無日結`);let msg=`📊 ${today}\n`,tot=0;for(const s of data){msg+=`🔹${s.stores?.name} ${fmt(s.net_sales)}\n`;tot+=Number(s.net_sales||0);}msg+=`💰 合計${fmt(tot)}`;return replyText(rt,msg);}
 
 // ===== 主事件 =====
 async function handleEvent(event) {

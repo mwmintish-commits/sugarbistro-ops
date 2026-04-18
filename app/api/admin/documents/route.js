@@ -30,7 +30,7 @@ export async function POST(request) {
   // 重寄合約 Email
   if (body.action === "resend_email") {
     const { employee_id } = body;
-    const { data: emp } = await supabase.from("employees").select("*, stores(name)").eq("id", employee_id).single();
+    const { data: emp } = await supabase.from("employees").select("*, stores!store_id(name)").eq("id", employee_id).single();
     if (!emp) return Response.json({ error: "找不到員工" }, { status: 404 });
     if (!emp.email) return Response.json({ error: "此員工沒有設定 Email" }, { status: 400 });
 

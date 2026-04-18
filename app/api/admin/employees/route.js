@@ -31,7 +31,7 @@ export async function GET(request) {
 
   // 單一員工詳情
   if (id) {
-    const { data: emp } = await supabase.from("employees").select("*, stores(name)").eq("id", id).single();
+    const { data: emp } = await supabase.from("employees").select("*, stores!store_id(name)").eq("id", id).single();
     if (!emp) return Response.json({ error: "Not found" }, { status: 404 });
 
     const months = calcServiceMonths(emp.hire_date);
@@ -62,7 +62,7 @@ export async function GET(request) {
   }
 
   // 員工列表
-  let query = supabase.from("employees").select("*, stores(name)").order("created_at", { ascending: false });
+  let query = supabase.from("employees").select("*, stores!store_id(name)").order("created_at", { ascending: false });
   if (store_id) query = query.eq("store_id", store_id);
   if (!include_inactive) query = query.or("is_active.eq.true,is_active.eq.false"); // show all for admin
 
@@ -96,14 +96,14 @@ export async function POST(request) {
     const { employee_id } = body;
     const updates = { is_active: true };
     // 查看是否已有 LINE 綁定
-    const { data: check } = await supabase.from("employees").select("line_uid, name, stores(name)").eq("id", employee_id).single();
+    const { data: check } = await supabase.from("employees").select("line_uid, name, stores!store_id(name)").eq("id", employee_id).single();
     let bindCode = null;
     if (!check?.line_uid) {
       bindCode = generateBindCode();
       updates.bind_code = bindCode;
       updates.bind_code_expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     }
-    const { data, error } = await supabase.from("employees").update(updates).eq("id", employee_id).select("*, stores(name)").single();
+    const { data, error } = await supabase.from("employees").update(updates).eq("id", employee_id).select("*, stores!store_id(name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
 
     // 通知員工帳號已啟用
@@ -192,7 +192,7 @@ export async function POST(request) {
       probation_status: "in_probation",
       bind_code: bindCode,
       bind_code_expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    }).select("*, stores(name)").single();
+    }).select("*, stores!store_id(name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data, bind_code: bindCode });
   }
@@ -201,7 +201,7 @@ export async function POST(request) {
   if (body.action === "update") {
     const { employee_id, ...updates } = body;
     delete updates.action;
-    const { data, error } = await supabase.from("employees").update(updates).eq("id", employee_id).select("*, stores(name)").single();
+    const { data, error } = await supabase.from("employees").update(updates).eq("id", employee_id).select("*, stores!store_id(name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     await auditLog(null, null, "employee_update", "employee", employee_id, updates);
     return Response.json({ data });

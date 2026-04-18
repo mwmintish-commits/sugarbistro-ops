@@ -17,7 +17,7 @@ export async function GET(request) {
   if (t.used) return Response.json({ error: "Token already used" }, { status: 400 });
   if (new Date(t.expires_at) < new Date()) return Response.json({ error: "Token expired" }, { status: 400 });
 
-  const { data: emp } = await supabase.from("employees").select("name, store_id, stores(*)").eq("id", t.employee_id).single();
+  const { data: emp } = await supabase.from("employees").select("name, store_id, stores!store_id(*)").eq("id", t.employee_id).single();
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
   const { data: schedule } = await supabase.from("schedules").select("*, shifts(*)").eq("employee_id", t.employee_id).eq("date", today).single();
 
@@ -37,7 +37,7 @@ export async function POST(request) {
   if (t.used) return Response.json({ error: "Already clocked" }, { status: 400 });
   if (new Date(t.expires_at) < new Date()) return Response.json({ error: "Expired" }, { status: 400 });
 
-  const { data: emp } = await supabase.from("employees").select("name, line_uid, store_id, hourly_rate, monthly_salary, stores(*)").eq("id", t.employee_id).single();
+  const { data: emp } = await supabase.from("employees").select("name, line_uid, store_id, hourly_rate, monthly_salary, stores!store_id(*)").eq("id", t.employee_id).single();
   if (!emp) return Response.json({ error: "找不到員工資料" }, { status: 404 });
   const store = emp?.stores;
 
