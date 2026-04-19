@@ -81,7 +81,7 @@ export default function AdminPage() {
   const [pnl, setPnl] = useState(null);
   const [anns, setAnns] = useState([]);
   const [detailId, setDetailId] = useState(null);
-  const [sv, setSv] = useState("month");
+  const [sv, setSv] = useState("week");
   const [ws, setWs] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - d.getDay());
@@ -650,7 +650,7 @@ export default function AdminPage() {
               const wd=Array.from({length:7},(_,i)=>new Date(new Date(ws).getTime()+i*86400000).toLocaleDateString("sv-SE"));
               const schedEmps=ae.filter(e=>e.role!=="admin");
               const displayStores=sf?stores.filter(s=>s.id===sf):stores;
-              const addSch=async(eid,sid,date)=>{const s=shifts.find(x=>x.id===sid);const r=await ap("/api/admin/schedules",{action:"create",employee_id:eid,store_id:s?s.store_id:sf,shift_id:sid,date});if(r.warning)alert(r.warning);load();};
+              const addSch=async(eid,sid,date,dayType)=>{const s=shifts.find(x=>x.id===sid);const r=await ap("/api/admin/schedules",{action:"create",employee_id:eid,store_id:s?s.store_id:sf,shift_id:sid,date,day_type:dayType||undefined});if(r.warning)alert(r.warning);if(r.error)alert(r.error);load();};
               const addLv=async(eid,date,lt)=>{await ap("/api/admin/schedules",{action:"add_leave",employee_id:eid,date,leave_type:lt});load();};
               const delSch=async(id)=>{await ap("/api/admin/schedules",{action:"delete",schedule_id:id});load();};
               return displayStores.map(store=>{
@@ -672,10 +672,12 @@ export default function AdminPage() {
                             <td style={{padding:5,fontWeight:500,fontSize:11,position:"sticky",left:0,background:"#fff",zIndex:1}}>{emp.name}<br/><RB role={emp.role}/></td>
                             {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);return(
                               <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top"}}>
-                                {sc?(<div style={{background:sc.type==="leave"?(LT[sc.leave_type]||LT.off).bg:sc.published?"#e6f9f0":"#fff8e6",border:sc.published?"1.5px solid #0a7c42":"1.5px dashed #d4a017",borderRadius:4,padding:"2px 3px",fontSize:9}}>
-                                  {sc.type==="leave"?<div style={{color:(LT[sc.leave_type]||LT.off).c,fontWeight:500}}>{(LT[sc.leave_type]||LT.off).l}</div>:<div><div style={{fontWeight:500,color:sc.shifts?.color||"#0a7c42"}}>{sc.shifts?.role&&sc.shifts.role!=="all"?sc.shifts.role:"全場"}</div><div style={{color:"#888"}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></div>}
-                                  <div style={{textAlign:"right",marginTop:1}}><button onClick={(ev)=>{ev.stopPropagation();delSch(sc.id);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c",padding:"2px 4px"}}>✕刪</button></div>
-                                </div>):(<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else addSch(emp.id,v,date);}} style={{width:"100%",padding:1,borderRadius:3,border:"1px dashed #ddd",fontSize:9,color:"#ccc",background:"transparent",cursor:"pointer"}}><option value="">+</option><optgroup label="崗位">{storeShifts.map(s=><option key={s.id} value={s.id}>{(s.role==="all"?"全場":s.role||"全場")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}</optgroup><optgroup label="休假">{Object.entries(LT).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select>)}
+                                {sc?(() => {const isLeave=sc.type==="leave";const lt=isLeave?(LT[sc.leave_type]||LT.off):null;const isRest=sc.day_type==="rest_day";const isHol=sc.day_type==="national_holiday";const pc=positions.find(p=>p.name===sc.shifts?.role)?.color||sc.shifts?.color||"#0a7c42";return(
+                                <div style={{background:isLeave?lt.bg:isRest?"#fff8e6":isHol?"#fde8e8":sc.published?pc+"12":"#fff8e6",border:`1.5px ${sc.published||isLeave?"solid":"dashed"} ${isLeave?lt.c:isRest?"#b45309":isHol?"#b91c1c":pc}`,borderRadius:4,padding:"2px 3px",fontSize:9,position:"relative"}}>
+                                  {isLeave?<div style={{color:lt.c,fontWeight:600}}>{lt.l}</div>:<><div style={{fontWeight:600,color:isRest?"#b45309":isHol?"#b91c1c":pc}}>{isRest?"💰 ":isHol?"🎉 ":""}{sc.shifts?.role&&sc.shifts.role!=="all"?sc.shifts.role:"全場"}</div><div style={{color:"#888",fontSize:8}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></>}
+                                  {Number(sc.leave_hours)>0&&<div style={{fontSize:7,color:"#b45309"}}>請假{sc.leave_hours}hr</div>}
+                                  <button onClick={(ev)=>{ev.stopPropagation();delSch(sc.id);}} style={{position:"absolute",top:0,right:1,background:"none",border:"none",cursor:"pointer",fontSize:8,color:"#ccc",padding:0}}>✕</button>
+                                </div>);})():(<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else if(v.startsWith("rest:"))addSch(emp.id,v.split(":")[1],date,"rest_day");else addSch(emp.id,v,date);}} style={{width:"100%",padding:2,borderRadius:4,border:"1px dashed #ccc",fontSize:9,color:"#999",background:"#fafafa",cursor:"pointer",height:36}}><option value="">＋排班</option><optgroup label="📋 班別">{storeShifts.map(s=><option key={s.id} value={s.id}>{(s.role==="all"?"全場":s.role||"全場")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}</optgroup><optgroup label="💰 休息日出勤">{storeShifts.map(s=><option key={"r"+s.id} value={"rest:"+s.id}>💰{(s.role==="all"?"全場":s.role||"")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}</optgroup><optgroup label="📅 休假">{[["off","⬛ 例假"],["rest","🔲 休息日"],["annual","🏖 特休"],["personal","📋 事假"],["sick","🤒 病假"],["comp_time","🔄 補休"],["holiday_comp","🔴 國定補假"]].map(([k,l])=><option key={k} value={"leave:"+k}>{l}</option>)}</optgroup></select>)}
                               </td>);})}
                           </tr>))}</tbody>
                       </table>
