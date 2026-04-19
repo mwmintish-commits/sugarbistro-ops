@@ -38,7 +38,7 @@ export default function MySchedule() {
   const daysInMonth = new Date(y, m, 0).getDate();
   const firstDow = new Date(y, m - 1, 1).getDay();
 
-  const wrap = { maxWidth: 480, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "#f7f5f0", minHeight: "100vh" };
+  const wrap = { maxWidth: 480, margin: "0 auto", padding: 8, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "#f7f5f0", minHeight: "100vh", boxSizing: "border-box" };
 
   if (!eid) return <div style={wrap}><p style={{ textAlign: "center", color: "#b91c1c", padding: 40 }}>缺少員工識別碼</p></div>;
 
@@ -59,11 +59,11 @@ export default function MySchedule() {
       </div>
 
       {loading ? <p style={{ textAlign: "center", color: "#888", padding: 30 }}>載入中...</p> : (
-        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", background: "#faf8f5" }}>
-            {DAYS.map(d => <div key={d} style={{ padding: "6px 0", textAlign: "center", fontSize: 11, fontWeight: 600, color: d === "日" ? "#b91c1c" : d === "六" ? "#b45309" : "#666" }}>{d}</div>)}
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "hidden", width: "100%", tableLayout: "fixed" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", background: "#faf8f5" }}>
+            {DAYS.map(d => <div key={d} style={{ padding: "4px 0", textAlign: "center", fontSize: 10, fontWeight: 600, color: d === "日" ? "#b91c1c" : d === "六" ? "#b45309" : "#666" }}>{d}</div>)}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
             {Array.from({ length: firstDow }).map((_, i) => <div key={"e" + i} style={{ minHeight: 56, borderTop: "1px solid #f0eeea" }} />)}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const d = i + 1;
@@ -84,7 +84,7 @@ export default function MySchedule() {
                   <div key={sc.id} style={{
                     background: isLeave ? lt.bg : isRestDay ? "#fff8e6" : isHoliday ? "#fde8e8" : isMine ? "#e6f9f0" : "#f5f5f5",
                     border: `${isMine ? 2 : 1}px ${isMine ? "solid" : "solid"} ${isLeave ? lt.c : isRestDay ? "#b45309" : isHoliday ? "#b91c1c" : isMine ? "#0a7c42" : "#ddd"}`,
-                    borderRadius: 4, padding: "2px 3px", fontSize: 8, lineHeight: 1.3, marginBottom: 1,
+                    borderRadius: 3, padding: "1px 2px", fontSize: 7, lineHeight: 1.2, marginBottom: 1, overflow: "hidden", wordBreak: "break-all",
                     opacity: isMine ? 1 : 0.7,
                   }}>
                     <div style={{ fontWeight: isMine ? 700 : 400, color: isLeave ? lt.c : isRestDay ? "#b45309" : isHoliday ? "#b91c1c" : isMine ? "#0a7c42" : "#888" }}>
@@ -101,8 +101,8 @@ export default function MySchedule() {
                     {d}{isToday && <span style={{ fontSize: 6, color: "#4361ee", marginLeft: 1 }}>●</span>}
                   </div>
                   {myScheds.map(s => renderSched(s, true))}
-                  {otherScheds.slice(0, 3).map(s => renderSched(s, false))}
-                  {otherScheds.length > 3 && <div style={{ fontSize: 7, color: "#888", textAlign: "center" }}>+{otherScheds.length - 3}</div>}
+                  {otherScheds.slice(0, 2).map(s => renderSched(s, false))}
+                  {otherScheds.length > 2 && <div style={{ fontSize: 6, color: "#888", textAlign: "center" }}>+{otherScheds.length - 2}</div>}
                   {dayScheds.length === 0 && <div style={{ fontSize: 7, color: "#ddd", textAlign: "center", marginTop: 6 }}>-</div>}
                 </div>
               );
