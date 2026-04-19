@@ -106,9 +106,18 @@ export async function POST(request) {
     const { data, error } = await supabase.from("employees").update(updates).eq("id", employee_id).select("*, stores!store_id(name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
 
-    // 通知員工帳號已啟用
+    // 通知員工帳號已啟用 + 推面板連結
     if (data.line_uid) {
+      const SITE = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
+      const panelUrl = `${SITE}/me?eid=${employee_id}`;
+      const { lineClient } = await import("@/lib/line");
       await pushText(data.line_uid, `✅ 帳號已啟用！\n\n👤 ${data.name}\n🏠 ${data.stores?.name || "總部"}\n\n你已經可以使用打卡、請假等功能了！`).catch(() => {});
+      await lineClient.pushMessage({ to: data.line_uid, messages: [{
+        type: "template", altText: "開啟員工面板",
+        template: { type: "buttons", title: "🍯 小食糖員工面板", text: "所有功能都在這裡：打卡、班表、請假、薪資查詢",
+          actions: [{ type: "uri", label: "📱 開啟面板", uri: panelUrl }]
+        }
+      }]}).catch(() => {});
     }
 
     return Response.json({ data, bind_code: bindCode });
