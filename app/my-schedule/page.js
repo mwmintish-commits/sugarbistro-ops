@@ -18,7 +18,7 @@ export default function MySchedule() {
   }, [eid]);
 
   useEffect(() => {
-    if (!eid || !month) return;
+    if (!eid || !month || !emp) return;
     setLoading(true);
     const [y, m] = month.split("-").map(Number);
     const start = new Date(y, m - 1, 1);
@@ -27,11 +27,12 @@ export default function MySchedule() {
     end.setDate(end.getDate() + (6 - end.getDay()));
     const ws = start.toLocaleDateString("sv-SE");
     const we = end.toLocaleDateString("sv-SE");
-    fetch(`/api/admin/schedules?week_start=${ws}&week_end=${we}`).then(r => r.json()).then(r => {
-      setScheds((r.data || []).filter(s => s.employee_id === eid));
+    const storeParam = emp.store_id ? `&store_id=${emp.store_id}` : "";
+    fetch(`/api/admin/schedules?week_start=${ws}&week_end=${we}${storeParam}`).then(r => r.json()).then(r => {
+      setScheds(r.data || []);
       setLoading(false);
     });
-  }, [eid, month]);
+  }, [eid, month, emp]);
 
   const [y, m] = month.split("-").map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -68,33 +69,41 @@ export default function MySchedule() {
               const d = i + 1;
               const date = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
               const dow = new Date(date).getDay();
-              const sc = scheds.find(s => s.date === date);
-              const isLeave = sc?.type === "leave";
-              const lt = isLeave ? (LT[sc.leave_type] || LT.off) : null;
+              const dayScheds = scheds.filter(s => s.date === date);
+              const myScheds = dayScheds.filter(s => s.employee_id === eid);
+              const otherScheds = dayScheds.filter(s => s.employee_id !== eid);
               const isToday = date === new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
-              const isRestDay = sc?.day_type === "rest_day" || sc?.is_rest_day;
-              const isHoliday = sc?.day_type === "national_holiday";
+
+              const renderSched = (sc, isMine) => {
+                const isLeave = sc.type === "leave";
+                const lt = isLeave ? (LT[sc.leave_type] || LT.off) : null;
+                const isRestDay = sc.day_type === "rest_day" || sc.is_rest_day;
+                const isHoliday = sc.day_type === "national_holiday";
+                const name = sc.employees?.name || "";
+                return (
+                  <div key={sc.id} style={{
+                    background: isLeave ? lt.bg : isRestDay ? "#fff8e6" : isHoliday ? "#fde8e8" : isMine ? "#e6f9f0" : "#f5f5f5",
+                    border: `${isMine ? 2 : 1}px ${isMine ? "solid" : "solid"} ${isLeave ? lt.c : isRestDay ? "#b45309" : isHoliday ? "#b91c1c" : isMine ? "#0a7c42" : "#ddd"}`,
+                    borderRadius: 4, padding: "2px 3px", fontSize: 8, lineHeight: 1.3, marginBottom: 1,
+                    opacity: isMine ? 1 : 0.7,
+                  }}>
+                    <div style={{ fontWeight: isMine ? 700 : 400, color: isLeave ? lt.c : isRestDay ? "#b45309" : isHoliday ? "#b91c1c" : isMine ? "#0a7c42" : "#888" }}>
+                      {isMine ? "⭐ " : ""}{name} {isLeave ? lt.l : isRestDay ? "💰" : isHoliday ? "🎉" : ""}
+                    </div>
+                    {!isLeave && <div style={{ color: "#888" }}>{sc.shifts ? `${(sc.shifts.start_time || "").slice(0, 5)}~${(sc.shifts.end_time || "").slice(0, 5)}` : ""}</div>}
+                  </div>
+                );
+              };
 
               return (
-                <div key={date} style={{ minHeight: 56, borderTop: "1px solid #f0eeea", padding: 3, background: isToday ? "#e6f1fb" : dow === 0 ? "#fef2f2" : "transparent" }}>
-                  <div style={{ fontSize: 10, fontWeight: isToday ? 700 : 400, color: dow === 0 ? "#b91c1c" : dow === 6 ? "#b45309" : "#666", marginBottom: 2 }}>
-                    {d}{isToday && <span style={{ fontSize: 7, color: "#4361ee", marginLeft: 2 }}>today</span>}
+                <div key={date} style={{ minHeight: 56, borderTop: "1px solid #f0eeea", padding: 2, background: isToday ? "#e6f1fb" : dow === 0 ? "#fef2f2" : "transparent" }}>
+                  <div style={{ fontSize: 10, fontWeight: isToday ? 700 : 400, color: dow === 0 ? "#b91c1c" : dow === 6 ? "#b45309" : "#666", marginBottom: 1 }}>
+                    {d}{isToday && <span style={{ fontSize: 6, color: "#4361ee", marginLeft: 1 }}>●</span>}
                   </div>
-                  {sc && (
-                    <div style={{ background: isLeave ? lt.bg : isRestDay ? "#fff8e6" : isHoliday ? "#fde8e8" : "#e6f9f0", border: `1px solid ${isLeave ? lt.c : isRestDay ? "#b45309" : isHoliday ? "#b91c1c" : "#0a7c42"}`, borderRadius: 4, padding: "2px 3px", fontSize: 8, lineHeight: 1.3 }}>
-                      {isLeave ? (
-                        <div style={{ color: lt.c, fontWeight: 600 }}>{lt.l}</div>
-                      ) : (
-                        <>
-                          <div style={{ fontWeight: 600, color: isRestDay ? "#b45309" : isHoliday ? "#b91c1c" : "#0a7c42" }}>
-                            {isRestDay ? "💰 " : isHoliday ? "🎉 " : ""}{sc.shifts?.name || "班"}
-                          </div>
-                          <div style={{ color: "#888" }}>{sc.shifts ? `${(sc.shifts.start_time || "").slice(0, 5)}~${(sc.shifts.end_time || "").slice(0, 5)}` : ""}</div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {!sc && <div style={{ fontSize: 8, color: "#ddd", textAlign: "center", marginTop: 8 }}>-</div>}
+                  {myScheds.map(s => renderSched(s, true))}
+                  {otherScheds.slice(0, 3).map(s => renderSched(s, false))}
+                  {otherScheds.length > 3 && <div style={{ fontSize: 7, color: "#888", textAlign: "center" }}>+{otherScheds.length - 3}</div>}
+                  {dayScheds.length === 0 && <div style={{ fontSize: 7, color: "#ddd", textAlign: "center", marginTop: 6 }}>-</div>}
                 </div>
               );
             })}
@@ -104,8 +113,9 @@ export default function MySchedule() {
 
       {/* 本月統計 */}
       {!loading && (() => {
-        const shifts = scheds.filter(s => s.type === "shift" && s.date >= month + "-01" && s.date <= month + "-31");
-        const leaves = scheds.filter(s => s.type === "leave" && s.date >= month + "-01" && s.date <= month + "-31");
+        const myAll = scheds.filter(s => s.employee_id === eid && s.date >= month + "-01" && s.date <= month + "-31");
+        const shifts = myAll.filter(s => s.type === "shift");
+        const leaves = myAll.filter(s => s.type === "leave");
         const restDays = shifts.filter(s => s.day_type === "rest_day" || s.is_rest_day);
         return (
           <div style={{ marginTop: 12, background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: 12 }}>
