@@ -585,19 +585,21 @@ export default function AdminPage() {
         {!ld && tab === "schedules" && (
           <div>
             <div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
-              <button onClick={()=>setSv("week")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="week"?"#1a1a1a":"#fff",color:sv==="week"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>週檢視</button>
-              <button onClick={()=>setSv("month")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="month"?"#1a1a1a":"#fff",color:sv==="month"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>月檢視</button>
-              {sv==="week" && (
+              <button onClick={()=>setSv("week")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="week"?"#1a1a1a":"#fff",color:sv==="week"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>週（7天）</button>
+              <button onClick={()=>setSv("biweek")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="biweek"?"#1a1a1a":"#fff",color:sv==="biweek"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>雙週（14天）</button>
+              <button onClick={()=>setSv("month")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="month"?"#1a1a1a":"#fff",color:sv==="month"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>月曆</button>
+              {(sv==="week"||sv==="biweek") && (
                 <>
-                  <button onClick={()=>setWs(new Date(new Date(ws).getTime()-7*86400000).toLocaleDateString("sv-SE"))} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>◀</button>
-                  <span style={{fontSize:12,fontWeight:500}}>{ws+" ~ "+new Date(new Date(ws).getTime()+6*86400000).toLocaleDateString("sv-SE")}</span>
-                  <button onClick={()=>setWs(new Date(new Date(ws).getTime()+7*86400000).toLocaleDateString("sv-SE"))} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>▶</button>
+                  <button onClick={()=>{const d=sv==="biweek"?14:7;setWs(new Date(new Date(ws).getTime()-d*86400000).toLocaleDateString("sv-SE"));}} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>◀</button>
+                  <span style={{fontSize:12,fontWeight:500}}>{ws+" ~ "+new Date(new Date(ws).getTime()+(sv==="biweek"?13:6)*86400000).toLocaleDateString("sv-SE")}</span>
+                  <button onClick={()=>{const d=sv==="biweek"?14:7;setWs(new Date(new Date(ws).getTime()+d*86400000).toLocaleDateString("sv-SE"));}} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>▶</button>
                 </>
               )}
               <button onClick={async()=>{
                 let start, end, label;
-                if (sv === "week") {
-                  start = ws; end = new Date(new Date(ws).getTime()+6*86400000).toLocaleDateString("sv-SE");
+                if (sv === "week" || sv === "biweek") {
+                  const days = sv === "biweek" ? 13 : 6;
+                  start = ws; end = new Date(new Date(ws).getTime()+days*86400000).toLocaleDateString("sv-SE");
                   label = start+" ~ "+end;
                 } else {
                   const [y,m] = month.split("-").map(Number);
@@ -646,8 +648,9 @@ export default function AdminPage() {
               </button>
             </div>
 
-            {sv==="week" && (() => {
-              const wd=Array.from({length:7},(_,i)=>new Date(new Date(ws).getTime()+i*86400000).toLocaleDateString("sv-SE"));
+            {(sv==="week"||sv==="biweek") && (() => {
+              const numDays=sv==="biweek"?14:7;
+              const wd=Array.from({length:numDays},(_,i)=>new Date(new Date(ws).getTime()+i*86400000).toLocaleDateString("sv-SE"));
               const schedEmps=ae.filter(e=>e.role!=="admin");
               const displayStores=sf?stores.filter(s=>s.id===sf):stores;
               const addSch=async(eid,sid,date,dayType)=>{const s=shifts.find(x=>x.id===sid);const r=await ap("/api/admin/schedules",{action:"create",employee_id:eid,store_id:s?s.store_id:sf,shift_id:sid,date,day_type:dayType||undefined});if(r.warning)alert(r.warning);if(r.error)alert(r.error);load();};
@@ -661,11 +664,11 @@ export default function AdminPage() {
                   <div key={store.id} style={{marginBottom:10}}>
                     <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
                     <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:650}}>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:sv==="biweek"?9:10,minWidth:sv==="biweek"?900:650}}>
                         <thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>
-                          <th style={{padding:"7px 5px",textAlign:"left",fontWeight:500,color:"#666",minWidth:70,position:"sticky",left:0,background:"#faf8f5",zIndex:1}}>員工</th>
-                          {wd.map((d,i)=>{const day=DAYS[new Date(d).getDay()];const hol=holidays.find(h=>h.date===d);const isWe=new Date(d).getDay()===0||new Date(d).getDay()===6;
-                            return <th key={d} style={{padding:"7px 3px",textAlign:"center",fontWeight:500,color:hol?"#b91c1c":isWe?"#b45309":"#666",minWidth:85,background:hol?"#fef2f2":"transparent"}}>{d.slice(5)+"("+day+")"}{hol&&<div style={{fontSize:7,color:"#b91c1c"}}>{hol.name}</div>}</th>;})}
+                          <th style={{padding:"5px 3px",textAlign:"left",fontWeight:500,color:"#666",minWidth:60,position:"sticky",left:0,background:"#faf8f5",zIndex:1}}>員工</th>
+                          {wd.map((d,i)=>{const day=DAYS[new Date(d).getDay()];const hol=holidays.find(h=>h.date===d);const isWe=new Date(d).getDay()===0||new Date(d).getDay()===6;const isSun=new Date(d).getDay()===0;
+                            return <th key={d} style={{padding:sv==="biweek"?"4px 1px":"7px 3px",textAlign:"center",fontWeight:isSun?700:500,color:hol?"#b91c1c":isWe?"#b45309":"#666",minWidth:sv==="biweek"?55:85,background:hol?"#fef2f2":isSun?"#f9f0f0":"transparent",borderLeft:i>0&&new Date(d).getDay()===0?"2px solid #e0d0d0":"none"}}>{d.slice(5)}<div style={{fontSize:sv==="biweek"?7:8,color:hol?"#b91c1c":"#999"}}>{day}{hol?" "+hol.name:""}</div></th>;})}
                         </tr></thead>
                         <tbody>{storeEmps.map(emp=>(
                           <tr key={emp.id} style={{borderBottom:"1px solid #f0eeea"}}>
