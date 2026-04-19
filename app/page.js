@@ -2332,18 +2332,6 @@ export default function AdminPage() {
                     <button key={s.id} onClick={() => { const eid = document.getElementById("pop-emp").value; if (!eid) { alert("請選員工"); return; } schedOnHol(eid, s.id, s.name); }}
                       style={{ padding: "8px", borderRadius: 6, border: "1px solid #ddd", background: pc+"10", fontSize: 11, cursor: "pointer", textAlign: "left" }}><span style={{color:pc,fontWeight:600}}>{s.role==="all"?"全場":s.role||"全場"}</span><div style={{ fontSize: 9, color: "#888" }}>{(s.start_time || "").slice(0, 5) + "~" + (s.end_time || "").slice(0, 5)}</div></button>
                   );})}
-                  <button onClick={() => {
-                    const name = prompt("崗位名稱（例如：前場、後場、吧台）：");
-                    if (!name) return;
-                    const start = prompt("上班時間（HH:MM）：", "09:00");
-                    if (!start) return;
-                    const end = prompt("下班時間（HH:MM）：", "18:00");
-                    if (!end) return;
-                    ap("/api/admin/shifts", { action: "create", store_id: schPop.storeId === "__hq__" ? null : schPop.storeId, name: name + "班", start_time: start, end_time: end, role: name }).then(r => {
-                      if (r.error) alert("❌ " + r.error);
-                      else { alert("✅ 已新增「" + name + "班」"); load(); }
-                    });
-                  }} style={{ padding: "8px", borderRadius: 6, border: "2px dashed #4361ee", background: "#fff", fontSize: 11, cursor: "pointer", color: "#4361ee", fontWeight: 600, gridColumn: "span 2", textAlign: "center" }}>＋ 新增崗位</button>
                 </div>
                 {/* 💰 休息日出勤 — 選班別直接建 rest_day 排班 */}
                 <div style={{ marginTop: 8, padding: "6px 0", borderTop: "1px solid #e8e6e1" }}>
