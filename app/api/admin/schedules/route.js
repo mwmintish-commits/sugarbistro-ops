@@ -41,7 +41,7 @@ export async function POST(request) {
   const { action } = body;
 
   if (action === "create") {
-    const { employee_id, store_id, shift_id, date, type, leave_type, half_day, note, is_rest_day } = body;
+    const { employee_id, store_id, shift_id, date, type, leave_type, half_day, note, is_rest_day, leave_hours } = body;
     let { day_type } = body;
     // 自動推導 day_type：明確指定者優先；否則由 leave_type / is_rest_day 推導
     if (!day_type) {
@@ -99,8 +99,8 @@ export async function POST(request) {
       const isRestDay = day_type === "rest_day";
       const { data, error } = await supabase.from("schedules").upsert({
         employee_id, store_id: store_id || null, shift_id: shift_id || null, date,
-        type: type || "shift", leave_type, half_day, note, status: "scheduled",
-        day_type,
+        type: type || "shift", leave_type: leave_type || null, half_day, note, status: "scheduled",
+        day_type, leave_hours: Number(leave_hours || 0),
         rest_consent: isRestDay ? "pending" : null,
       }, { onConflict: "employee_id,date" }).select("*, employees(name, line_uid), shifts(name, start_time, end_time)").single();
       if (error) return Response.json({ error: error.message }, { status: 500 });
