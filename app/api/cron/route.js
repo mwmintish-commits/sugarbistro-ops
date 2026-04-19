@@ -22,7 +22,7 @@ export async function GET(request) {
       const diff = (new Date(e.contract_end_date) - new Date(today)) / 86400000;
       if (diff >= 0 && diff <= 14) reminders.push("📋 " + e.name + " 合約 " + e.contract_end_date + " 到期");
     }
-    if (e.birthday && today.slice(5) === e.birthday.slice(5)) reminders.push("🎂 今天是 " + e.name + " 的生日！");
+    // 生日提醒改為後台顯示，不透過 LINE 推送
   }
 
   // 補休即將到期
