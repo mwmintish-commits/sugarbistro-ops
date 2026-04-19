@@ -4,16 +4,19 @@ import { useEffect, useState } from "react";
 const LINE_ID = "@766urtjk";
 const oaUrl = (text) => `https://line.me/R/oaMessage/${LINE_ID}/?${encodeURIComponent(text)}`;
 
-const ITEMS = [
-  { icon: "🟢", label: "上班打卡", desc: "GPS 定位", href: t => oaUrl("上班打卡"), bg: "#e6f9f0", color: "#0a7c42" },
-  { icon: "🔴", label: "下班打卡", desc: "GPS 定位", href: t => oaUrl("下班打卡"), bg: "#fde8e8", color: "#b91c1c" },
-  { icon: "🕐", label: "補打卡", desc: "申請補登", href: t => oaUrl("補打卡"), bg: "#fff8e6", color: "#8a6d00" },
-  { icon: "🏖", label: "我要請假", desc: "事假/特休...", href: t => oaUrl("請假"), bg: "#e6f1fb", color: "#185fa5" },
-  { icon: "📅", label: "我的班表", desc: "近期排班", href: t => oaUrl("我的班表"), bg: "#f3e8ff", color: "#6b21a8" },
-  { icon: "📊", label: "我的假勤", desc: "出勤統計", href: t => oaUrl("我的假勤"), bg: "#fef3c7", color: "#92400e" },
-  { icon: "📦", label: "月結單據", desc: "拍照上傳", href: t => oaUrl("月結單據"), bg: "#dbeafe", color: "#1d4ed8" },
-  { icon: "💰", label: "零用金", desc: "拍照上傳", href: t => oaUrl("零用金"), bg: "#fef3c7", color: "#a16207" },
-  { icon: "🏢", label: "總部代付", desc: "拍照上傳", href: t => oaUrl("總部代付"), bg: "#fce7f3", color: "#be185d" },
+// eid 動態帶入各頁面 URL
+const webUrl = (path, eid) => `${path}?eid=${eid}`;
+
+const ITEMS = (eid) => [
+  { icon: "🟢", label: "上班打卡", desc: "GPS 定位", href: oaUrl("上班打卡"), bg: "#e6f9f0", color: "#0a7c42" },
+  { icon: "🔴", label: "下班打卡", desc: "GPS 定位", href: oaUrl("下班打卡"), bg: "#fde8e8", color: "#b91c1c" },
+  { icon: "🕐", label: "補打卡", desc: "申請補登", href: webUrl("/amendment", eid), bg: "#fff8e6", color: "#8a6d00" },
+  { icon: "🏖", label: "我要請假", desc: "事假/特休...", href: webUrl("/leave-apply", eid), bg: "#e6f1fb", color: "#185fa5" },
+  { icon: "📅", label: "我的班表", desc: "近期排班", href: webUrl("/my-schedule", eid), bg: "#f3e8ff", color: "#6b21a8" },
+  { icon: "📊", label: "我的假勤", desc: "出勤統計", href: webUrl("/my-attendance", eid), bg: "#fef3c7", color: "#92400e" },
+  { icon: "💰", label: "我的薪資", desc: "薪資明細", href: webUrl("/my-salary", eid), bg: "#fef3c7", color: "#a16207" },
+  { icon: "📦", label: "月結單據", desc: "拍照上傳", href: oaUrl("月結單據"), bg: "#dbeafe", color: "#1d4ed8" },
+  { icon: "🏢", label: "總部代付", desc: "拍照上傳", href: oaUrl("總部代付"), bg: "#fce7f3", color: "#be185d" },
 ];
 
 export default function MePanel() {
@@ -21,8 +24,10 @@ export default function MePanel() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
+  const eid = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("eid") : null;
+  const items = ITEMS(eid || "");
+
   useEffect(() => {
-    const eid = new URLSearchParams(window.location.search).get("eid");
     if (!eid) { setErr("缺少員工識別碼"); setLoading(false); return; }
     fetch("/api/admin/employees?id=" + eid)
       .then(r => r.json())
@@ -51,8 +56,8 @@ export default function MePanel() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-        {ITEMS.map((it, i) => (
-          <a key={i} href={it.href()} style={{
+        {items.map((it, i) => (
+          <a key={i} href={it.href} style={{
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
             background: "#fff", borderRadius: 14, padding: "16px 6px", textDecoration: "none",
             border: "1px solid #e8e6e1", boxShadow: "0 1px 2px rgba(0,0,0,0.04)",

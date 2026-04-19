@@ -5,12 +5,12 @@ export async function POST(request) {
 
   if (body.action === "setup") {
     const items = body.items || [
-      { label: "上班打卡", text: "上班打卡" },
-      { label: "下班打卡", text: "下班打卡" },
-      { label: "我的班表", text: "我的班表" },
-      { label: "日結回報", text: "日結回報" },
-      { label: "存款回報", text: "存款回報" },
-      { label: "選單", text: "選單" },
+      { label: "📱 開啟面板", text: "面板" },
+      { label: "🟢 上班打卡", text: "上班打卡" },
+      { label: "🔴 下班打卡", text: "下班打卡" },
+      { label: "📅 日結回報", text: "日結回報" },
+      { label: "🏦 存款回報", text: "存款回報" },
+      { label: "📋 選單", text: "選單" },
     ];
 
     const headers = { Authorization: "Bearer " + lineConfig.channelAccessToken, "Content-Type": "application/json" };
