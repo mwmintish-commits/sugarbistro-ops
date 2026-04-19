@@ -2117,7 +2117,7 @@ export default function AdminPage() {
 
             {/* 崗位排班 — 按門市分組，行內編輯 */}
             {stores.filter(s=>!sf||s.id===sf).map(store=>{
-              const ss = shifts.filter(s=>s.store_id===store.id);
+              const ss = shifts.filter(s=>s.store_id===store.id).sort((a,b) => (a.role||"").localeCompare(b.role||"") || (a.start_time||"").localeCompare(b.start_time||""));
               return (
                 <div key={store.id} style={{marginBottom:10}}>
                   <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>
