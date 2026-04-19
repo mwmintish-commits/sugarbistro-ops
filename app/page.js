@@ -144,8 +144,9 @@ export default function AdminPage() {
     const p = new URLSearchParams();
     if (month) p.set("month", month);
     if (sf) p.set("store_id", sf);
-    const we2 = new Date(new Date(ws).getTime() + 6*86400000).toLocaleDateString("sv-SE");
-    const sp = sv === "week"
+    const viewDays = sv === "biweek" ? 13 : 6;
+    const we2 = new Date(new Date(ws).getTime() + viewDays*86400000).toLocaleDateString("sv-SE");
+    const sp = (sv === "week" || sv === "biweek")
       ? "week_start=" + ws + "&week_end=" + we2 + (sf ? "&store_id=" + sf : "")
       : "month=" + month + (sf ? "&store_id=" + sf : "");
 
@@ -703,7 +704,7 @@ export default function AdminPage() {
                             </td>
                             {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);const hol=holidays.find(h=>h.date===date);return(
                               <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top",borderLeft:new Date(date).getDay()===0?"2px solid #e0d0d0":"none"}}>
-                                {sc?(() => {const isLeave=sc.type==="leave"&&!sc.shift_id;const lt=isLeave?(LT[sc.leave_type]||LT.off):null;const isRest=sc.day_type==="rest_day";const isHol=sc.day_type==="national_holiday";const pc=positions.find(p=>p.name===sc.shifts?.role)?.color||sc.shifts?.color||"#0a7c42";const hasPartialLeave=Number(sc.leave_hours)>0&&sc.shift_id;return(
+                                {sc?(() => {const isLeave=sc.type==="leave";const lt=isLeave?(LT[sc.leave_type]||LT.off):null;const isRest=sc.day_type==="rest_day";const isHol=sc.day_type==="national_holiday";const pc=positions.find(p=>p.name===sc.shifts?.role)?.color||sc.shifts?.color||"#0a7c42";const hasPartialLeave=Number(sc.leave_hours)>0&&sc.type!=="leave";return(
                                 <div style={{background:isLeave?lt.bg:isRest?"#fff8e6":isHol?"#fde8e8":sc.published?pc+"12":"#fff8e6",border:`1.5px ${sc.published||isLeave?"solid":"dashed"} ${isLeave?lt.c:isRest?"#b45309":isHol?"#b91c1c":pc}`,borderRadius:4,padding:"2px 3px",fontSize:9,position:"relative"}}>
                                   {isLeave?<div style={{color:lt.c,fontWeight:600}}>{lt.l}</div>:<><div style={{fontWeight:600,color:isRest?"#b45309":isHol?"#b91c1c":pc}}>{isRest?"💰 ":isHol?"🎉 ":""}{sc.shifts?.role&&sc.shifts.role!=="all"?sc.shifts.role:"全場"}</div><div style={{color:"#888",fontSize:8}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></>}
                                   {hasPartialLeave&&<div style={{fontSize:7,color:"#b91c1c",background:"#fef2f2",borderRadius:2,padding:"0 2px",marginTop:1}}>{(LT[sc.leave_type]||{l:"假"}).l}{sc.leave_hours}hr</div>}
