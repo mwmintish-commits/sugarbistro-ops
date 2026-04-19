@@ -16,7 +16,7 @@ const TYPES = [
 export default function LeaveApply() {
   const [emp, setEmp] = useState(null);
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ type: "", startDate: "", endDate: "", halfDay: "" });
+  const [form, setForm] = useState({ type: "", startDate: "", endDate: "", halfDay: "", mode: "full", hours: "" });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState("");
@@ -33,6 +33,8 @@ export default function LeaveApply() {
   const submit = async () => {
     if (!form.type || !form.startDate) { setErr("請選假別和日期"); return; }
     setSubmitting(true); setErr("");
+    const leaveHours = form.mode === "hours" ? Number(form.hours || 0)
+      : form.mode === "half" ? 4 : 0;
     const r = await fetch("/api/admin/leaves", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -41,7 +43,8 @@ export default function LeaveApply() {
         leave_type: form.type,
         start_date: form.startDate,
         end_date: form.endDate || form.startDate,
-        half_day: form.halfDay || null,
+        half_day: form.mode === "half" ? form.halfDay : null,
+        leave_hours: leaveHours,
         request_type: "leave",
       }),
     }).then(r => r.json());
@@ -136,13 +139,28 @@ export default function LeaveApply() {
           </div>
 
           <div style={{ marginBottom: 10 }}>
-            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>整天或半天</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
-              {[["", "整天"], ["am", "上午半天"], ["pm", "下午半天"]].map(([v, l]) => (
-                <button key={v} onClick={() => setForm({ ...form, halfDay: v })}
-                  style={{ padding: "8px", borderRadius: 6, border: form.halfDay === v ? "2px solid #4361ee" : "1px solid #ddd", background: form.halfDay === v ? "#e6f1fb" : "#fff", cursor: "pointer", fontSize: 11, fontWeight: 500 }}>{l}</button>
+            <label style={{ fontSize: 11, color: "#666", display: "block", marginBottom: 4 }}>請假方式</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 6 }}>
+              {[["full", "整天"], ["half", "半天"], ["hours", "按小時"]].map(([v, l]) => (
+                <button key={v} onClick={() => setForm({ ...form, mode: v, halfDay: v === "half" ? "am" : "", hours: "" })}
+                  style={{ padding: "8px", borderRadius: 6, border: form.mode === v ? "2px solid #4361ee" : "1px solid #ddd", background: form.mode === v ? "#e6f1fb" : "#fff", cursor: "pointer", fontSize: 11, fontWeight: 500 }}>{l}</button>
               ))}
             </div>
+            {form.mode === "half" && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                {[["am", "上午"], ["pm", "下午"]].map(([v, l]) => (
+                  <button key={v} onClick={() => setForm({ ...form, halfDay: v })}
+                    style={{ padding: "6px", borderRadius: 6, border: form.halfDay === v ? "2px solid #4361ee" : "1px solid #ddd", background: form.halfDay === v ? "#e6f1fb" : "#fff", cursor: "pointer", fontSize: 11 }}>{l}</button>
+                ))}
+              </div>
+            )}
+            {form.mode === "hours" && (
+              <div>
+                <input type="number" min="1" max="7" value={form.hours} onChange={e => setForm({ ...form, hours: e.target.value })} placeholder="請假時數（1~7）"
+                  style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13 }} />
+                <div style={{ fontSize: 9, color: "#888", marginTop: 2 }}>當天仍需上班，僅扣請假時數的薪資</div>
+              </div>
+            )}
           </div>
 
           {err && <div style={{ color: "#b91c1c", fontSize: 11, marginBottom: 6 }}>❌ {err}</div>}

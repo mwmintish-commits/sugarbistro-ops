@@ -90,7 +90,7 @@ export async function POST(request) {
         if (workDates.has(dd)) { curr++; maxConsecutive = Math.max(maxConsecutive, curr); } else { curr = 0; }
       }
       // 判斷是否為休息日加班
-      const restDayWork = is_rest_day || false;
+      const restDayWork = day_type === "rest_day";
       const warning = maxConsecutive >= 7 ? "⚠️ 連續工作" + maxConsecutive + "天，違反一例一休" : maxConsecutive === 6 ? "⚠️ 已連續6天" : restDayWork ? "💰 休息日加班，依法加成計薪" : null;
       // 例假禁止排班（除非是 leave 類型）
       if (day_type === "regular_off") {
@@ -100,7 +100,7 @@ export async function POST(request) {
       const { data, error } = await supabase.from("schedules").upsert({
         employee_id, store_id: store_id || null, shift_id: shift_id || null, date,
         type: type || "shift", leave_type, half_day, note, status: "scheduled",
-        is_rest_day: isRestDay, day_type,
+        day_type,
         rest_consent: isRestDay ? "pending" : null,
       }, { onConflict: "employee_id,date" }).select("*, employees(name, line_uid), shifts(name, start_time, end_time)").single();
       if (error) return Response.json({ error: error.message }, { status: 500 });
@@ -115,7 +115,7 @@ export async function POST(request) {
         .select("id, type, shift_id").eq("employee_id", employee_id).eq("date", date).eq("type", "shift").limit(1);
       if (existing?.length && leave_type === "rest") {
         // 已有排班 → 標記為休息日加班
-        const { data, error } = await supabase.from("schedules").update({ is_rest_day: true })
+        const { data, error } = await supabase.from("schedules").update({ day_type: "rest_day" })
           .eq("id", existing[0].id).select("*, employees(name), shifts(name, start_time, end_time)").single();
         if (error) return Response.json({ error: error.message }, { status: 500 });
         return Response.json({ data, message: "💰 已標記為休息日加班" });
@@ -172,7 +172,7 @@ export async function POST(request) {
       if (leave_type === "rest") {
         // 已有排班 + 標休息日 → 標記為「休息日加班」（保留原班 + 推同意書）
         const { data, error } = await supabase.from("schedules").update({
-          is_rest_day: true, day_type: "rest_day", rest_consent: "pending",
+          day_type: "rest_day", rest_consent: "pending",
         }).eq("id", existing[0].id).select("*, employees(name, line_uid), shifts(name, start_time, end_time)").single();
         if (error) return Response.json({ error: error.message }, { status: 500 });
 

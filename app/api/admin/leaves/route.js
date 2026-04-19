@@ -55,15 +55,32 @@ export async function POST(request) {
     }
 
     if (status === "approved") {
+      // day_type 依假別決定
+      const UNPAID = ["personal", "family_care"];
+      const HALF_PAY = ["sick", "menstrual"];
+      const dayType = UNPAID.includes(data.leave_type) ? "unpaid_leave"
+        : HALF_PAY.includes(data.leave_type) ? "half_pay_leave" : "paid_leave";
+      const leaveHrs = Number(data.leave_hours || 0);
+      const isPartial = leaveHrs > 0 && leaveHrs < 8;
+
       let current = new Date(data.start_date);
       const end = new Date(data.end_date);
       while (current <= end) {
         const dateStr = current.toLocaleDateString("sv-SE");
-        await supabase.from("schedules").upsert({
-          employee_id: data.employee_id, date: dateStr, type: "leave",
-          leave_type: data.leave_type, half_day: data.half_day, note: data.reason,
-          status: "confirmed",
-        }, { onConflict: "employee_id,date" }).catch(() => {});
+        if (isPartial) {
+          // 部分請假：保留原排班 day_type=work，只記 leave_hours + leave_type
+          await supabase.from("schedules").update({
+            leave_hours: leaveHrs, leave_type: data.leave_type,
+          }).eq("employee_id", data.employee_id).eq("date", dateStr).catch(() => {});
+        } else {
+          // 整天或半天請假：覆蓋排班
+          await supabase.from("schedules").upsert({
+            employee_id: data.employee_id, date: dateStr, type: "leave",
+            leave_type: data.leave_type, half_day: data.half_day, note: data.reason,
+            leave_hours: data.half_day ? 4 : 8,
+            status: "confirmed", day_type: dayType,
+          }, { onConflict: "employee_id,date" }).catch(() => {});
+        }
         current.setDate(current.getDate() + 1);
       }
 

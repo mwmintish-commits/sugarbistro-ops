@@ -77,7 +77,7 @@ export default function MySchedule() {
               const renderSched = (sc, isMine) => {
                 const isLeave = sc.type === "leave";
                 const lt = isLeave ? (LT[sc.leave_type] || LT.off) : null;
-                const isRestDay = sc.day_type === "rest_day" || sc.is_rest_day;
+                const isRestDay = sc.day_type === "rest_day";
                 const isHoliday = sc.day_type === "national_holiday";
                 const name = sc.employees?.name || "";
                 return (
@@ -116,7 +116,7 @@ export default function MySchedule() {
         const myAll = scheds.filter(s => s.employee_id === eid && s.date >= month + "-01" && s.date <= month + "-31");
         const shifts = myAll.filter(s => s.type === "shift");
         const leaves = myAll.filter(s => s.type === "leave");
-        const restDays = shifts.filter(s => s.day_type === "rest_day" || s.is_rest_day);
+        const restDays = shifts.filter(s => s.day_type === "rest_day");
         return (
           <div style={{ marginTop: 12, background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: 12 }}>
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>📊 本月統計</div>

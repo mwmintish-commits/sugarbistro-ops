@@ -36,17 +36,24 @@ export async function POST(request) {
 
     const results = [];
     for (const emp of emps || []) {
-      // 出勤天數
-      const { data: records } = await supabase.from("attendances")
-        .select("type").eq("employee_id", emp.id).eq("type", "clock_in")
-        .gte("timestamp", mk + "-01T00:00:00").lte("timestamp", eom(mk) + "T23:59:59");
-      const workDays = (records || []).length;
+      const hourlyRate = calcHourlyRate(emp);
+      const dailyRate = calcDailyRate(emp);
+
+      // ===== 單一來源：只讀 schedules =====
+      const { data: allScheds } = await supabase.from("schedules")
+        .select("date, day_type, leave_type, leave_hours, shift_id, shifts(start_time, end_time)")
+        .eq("employee_id", emp.id)
+        .gte("date", mk + "-01").lte("date", eom(mk));
+
+      // 出勤天數（有排班且不是整天請假）
+      const workScheds = (allScheds || []).filter(s => ["work","rest_day","national_holiday"].includes(s.day_type));
+      const workDays = workScheds.length;
 
       // 底薪
       const base = emp.monthly_salary ? Number(emp.monthly_salary)
         : (emp.hourly_rate ? Number(emp.hourly_rate) * workDays * 8 : 0);
 
-      // 加班費（只算選加班費的）
+      // 加班費（overtime_records 仍用，因為是打卡自動產生的超時紀錄）
       const { data: ot } = await supabase.from("overtime_records")
         .select("amount, comp_type, comp_hours, comp_converted")
         .eq("employee_id", emp.id).eq("status", "approved")
@@ -59,66 +66,64 @@ export async function POST(request) {
       // 勞健保
       const ls = emp.labor_tier ? LABOR_SELF[emp.labor_tier - 1] || 0 : 0;
       const hs = emp.health_tier ? HEALTH_SELF[emp.health_tier - 1] || 0 : 0;
+      const suppHealth = emp.employment_type === "parttime" && base > 29500 ? Math.round(base * 0.0211) : 0;
 
-      // 二代健保（兼職單次>基本工資29500）
-      const suppHealth = emp.employment_type === "parttime" && base > 29500
-        ? Math.round(base * 0.0211) : 0;
-
-      // 加扣項（從員工預設帶入）
+      // 加扣項
       const allow = Number(emp.default_allowance || 0);
       const deduct = Number(emp.default_deduction || 0);
 
-      // 請假扣款（月薪制才需要；時薪制已反映在出勤天數）
-      let leaveDeduct = 0, leaveHours = 0, leaveDetail = "";
-      if (emp.monthly_salary) {
-        const { data: leaves } = await supabase.from("leave_requests")
-          .select("leave_type, start_date, end_date, half_day, status")
-          .eq("employee_id", emp.id).eq("status", "approved")
-          .gte("start_date", mk + "-01").lte("start_date", eom(mk));
-        const dailyRate = Number(emp.monthly_salary) / 30;
-        const deductRates = { sick: 0.5, personal: 1, menstrual: 0.5, family_care: 1 };
-        // 特休/補休/婚假/喪假/陪產假/公假/公傷假 = 有薪，不扣
-        for (const l of leaves || []) {
-          const days = l.half_day ? 0.5 : (Math.ceil((new Date(l.end_date) - new Date(l.start_date)) / 86400000) + 1);
-          const hrs = days * 8;
-          leaveHours += hrs;
-          const rate = deductRates[l.leave_type] || 0;
-          if (rate > 0) {
-            const amt = Math.round(dailyRate * days * rate);
-            leaveDeduct += amt;
-            leaveDetail += (leaveDetail ? "、" : "") + ({ sick:"病假", personal:"事假", menstrual:"生理假", family_care:"家庭照顧" }[l.leave_type] || l.leave_type) + days + "天";
-          }
-        }
-      }
-
-      const hourlyRate = calcHourlyRate(emp);
-      const dailyRate = calcDailyRate(emp);
-
-      const { data: dayScheds } = await supabase.from("schedules")
-        .select("date, day_type, is_rest_day, notes, shift_id, shifts(start_time, end_time)")
-        .eq("employee_id", emp.id).eq("type", "shift")
-        .gte("date", mk + "-01").lte("date", eom(mk));
-
-      // 國定假日加班費
-      // 月薪制：國定假日本身有薪（已含於月薪），出勤再加發 1 日工資（雙倍）
-      // 時薪制：原本不工作 = 0，出勤按 ×2 工時計
-      const holScheds = (dayScheds || []).filter(s => s.day_type === "national_holiday" || (s.notes || "").includes("國定假日出勤"));
+      // ===== 國定假日加班費（day_type=national_holiday）=====
+      const holScheds = workScheds.filter(s => s.day_type === "national_holiday");
       let holidayPay = 0;
-      const holidayDays = holScheds.length;
       for (const s of holScheds) {
         const hrs = calcShiftHours(s.shifts);
-        if (emp.monthly_salary) holidayPay += Math.round(dailyRate);
-        else holidayPay += Math.round(hourlyRate * hrs * 2);
+        holidayPay += emp.monthly_salary ? Math.round(dailyRate) : Math.round(hourlyRate * hrs * 2);
       }
 
-      // 休息日加班費（勞基法 24-1: 1.34/1.67/2.67 階梯，加給部分）
-      const restScheds = (dayScheds || []).filter(s => (s.day_type === "rest_day" || s.is_rest_day) && s.day_type !== "national_holiday");
+      // ===== 休息日加班費（day_type=rest_day）=====
+      const restScheds = workScheds.filter(s => s.day_type === "rest_day");
       let restDayPay = 0;
-      const restDayCount = restScheds.length;
       for (const s of restScheds) {
         const hrs = calcShiftHours(s.shifts);
         restDayPay += Math.round(hourlyRate * calcRestDayOTPremium(hrs) + hourlyRate * hrs);
       }
+
+      // ===== 請假扣款（統一從 schedules 讀，不再讀 leave_requests）=====
+      let leaveDeduct = 0, leaveHours = 0, leaveDetail = "";
+      const LEAVE_LABELS = { sick:"病假", personal:"事假", menstrual:"生理假", family_care:"家庭照顧" };
+      if (emp.monthly_salary) {
+        for (const s of allScheds || []) {
+          if (s.day_type === "unpaid_leave") {
+            // 整天無薪假（事假/家庭照顧）
+            const hrs = Number(s.leave_hours) || 8;
+            leaveHours += hrs;
+            leaveDeduct += Math.round(hourlyRate * hrs);
+            leaveDetail += (leaveDetail ? "、" : "") + (LEAVE_LABELS[s.leave_type] || "事假") + (hrs < 8 ? hrs + "hr" : "1天");
+          } else if (s.day_type === "half_pay_leave") {
+            // 半薪假（病假/生理假）
+            const hrs = Number(s.leave_hours) || 8;
+            leaveHours += hrs;
+            leaveDeduct += Math.round(hourlyRate * hrs * 0.5);
+            leaveDetail += (leaveDetail ? "、" : "") + (LEAVE_LABELS[s.leave_type] || "病假") + (hrs < 8 ? hrs + "hr" : "1天");
+          } else if (s.day_type === "work" && Number(s.leave_hours) > 0) {
+            // 部分請假（上班但請了 N 小時）
+            const hrs = Number(s.leave_hours);
+            const rate = ["personal","family_care"].includes(s.leave_type) ? 1 : ["sick","menstrual"].includes(s.leave_type) ? 0.5 : 0;
+            if (rate > 0) {
+              leaveHours += hrs;
+              leaveDeduct += Math.round(hourlyRate * hrs * rate);
+              leaveDetail += (leaveDetail ? "、" : "") + (LEAVE_LABELS[s.leave_type] || s.leave_type) + hrs + "hr";
+            }
+          }
+        }
+      }
+
+      // ===== 對帳：排班天 vs 打卡天 =====
+      const { data: clockIns } = await supabase.from("attendances")
+        .select("id").eq("employee_id", emp.id).eq("type", "clock_in")
+        .gte("timestamp", mk + "-01T00:00:00").lte("timestamp", eom(mk) + "T23:59:59");
+      const actualClockDays = (clockIns || []).length;
+      const discrepancy = Math.abs(workDays - actualClockDays);
 
       const net = base + otPay + holidayPay + restDayPay - ls - hs - suppHealth + allow - deduct - leaveDeduct;
 
@@ -127,8 +132,8 @@ export async function POST(request) {
         year, month, base_salary: base, work_days: workDays,
         hourly_rate: emp.hourly_rate || 0,
         overtime_pay: otPay, comp_hours: compH,
-        holiday_pay: holidayPay, holiday_days: holidayDays,
-        rest_day_pay: restDayPay, rest_day_count: restDayCount,
+        holiday_pay: holidayPay, holiday_days: holScheds.length,
+        rest_day_pay: restDayPay, rest_day_count: restScheds.length,
         labor_self: ls, health_self: hs,
         supplementary_health: suppHealth,
         allowance: allow, allowance_note: emp.default_allowance_note || "",
@@ -137,7 +142,7 @@ export async function POST(request) {
         net_salary: net,
       }, { onConflict: "employee_id,year,month" });
 
-      results.push({ name: emp.name, base, otPay, holidayPay, restDayPay, ls, hs, suppHealth, allow, deduct, net, workDays });
+      results.push({ name: emp.name, base, otPay, holidayPay, restDayPay, ls, hs, suppHealth, allow, deduct, leaveDeduct, net, workDays, actualClockDays, discrepancy });
     }
     await auditLog(null, null, "payroll_generate", "payroll", null, { year, month, store_id, count: results.length });
     return Response.json({ success: true, data: results });
