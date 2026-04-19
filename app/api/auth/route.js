@@ -93,7 +93,7 @@ export async function POST(request) {
     await supabase.from("verify_codes").update({ used: true }).eq("phone", phone).eq("code", code);
 
     const { data: emp } = await supabase.from("employees")
-      .select("id, name, role, store_id, stores(name)")
+      .select("id, name, role, store_id, stores!store_id(name)")
       .eq("phone", phone).eq("is_active", true).single();
     if (!emp) return Response.json({ error: "帳號錯誤" }, { status: 404 });
 
