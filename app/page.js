@@ -670,19 +670,33 @@ export default function AdminPage() {
                           {wd.map((d,i)=>{const day=DAYS[new Date(d).getDay()];const hol=holidays.find(h=>h.date===d);const isWe=new Date(d).getDay()===0||new Date(d).getDay()===6;const isSun=new Date(d).getDay()===0;
                             return <th key={d} style={{padding:sv==="biweek"?"4px 1px":"7px 3px",textAlign:"center",fontWeight:isSun?700:500,color:hol?"#b91c1c":isWe?"#b45309":"#666",minWidth:sv==="biweek"?55:85,background:hol?"#fef2f2":isSun?"#f9f0f0":"transparent",borderLeft:i>0&&new Date(d).getDay()===0?"2px solid #e0d0d0":"none"}}>{d.slice(5)}<div style={{fontSize:sv==="biweek"?7:8,color:hol?"#b91c1c":"#999"}}>{day}{hol?" "+hol.name:""}</div></th>;})}
                         </tr></thead>
-                        <tbody>{storeEmps.map(emp=>(
+                        <tbody>{storeEmps.map(emp=>{
+                          const empScheds=scheds.filter(s=>s.employee_id===emp.id&&wd.includes(s.date));
+                          const workDays=empScheds.filter(s=>s.type==="shift").length;
+                          const workHrs=empScheds.filter(s=>s.type==="shift").reduce((sum,s)=>{
+                            if(!s.shifts?.start_time||!s.shifts?.end_time)return sum+8;
+                            const[sh,sm]=s.shifts.start_time.split(":").map(Number);
+                            const[eh,em]=s.shifts.end_time.split(":").map(Number);
+                            return sum+Math.max(0,(eh*60+em-sh*60-sm)/60);
+                          },0);
+                          const leaveDays=empScheds.filter(s=>s.type==="leave").length;
+                          const isFullTime=emp.employment_type!=="parttime";
+                          return(
                           <tr key={emp.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                            <td style={{padding:5,fontWeight:500,fontSize:11,position:"sticky",left:0,background:"#fff",zIndex:1}}>{emp.name}<br/><RB role={emp.role}/></td>
-                            {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);return(
-                              <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top"}}>
+                            <td style={{padding:"4px 3px",fontWeight:500,fontSize:10,position:"sticky",left:0,background:"#fff",zIndex:1,minWidth:60}}>
+                              {emp.name}
+                              <div style={{fontSize:7,color:"#888",marginTop:1}}>{workDays}天{Math.round(workHrs)}hr{leaveDays>0?" 假"+leaveDays:""}</div>
+                            </td>
+                            {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);const hol=holidays.find(h=>h.date===date);return(
+                              <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top",borderLeft:new Date(date).getDay()===0?"2px solid #e0d0d0":"none"}}>
                                 {sc?(() => {const isLeave=sc.type==="leave";const lt=isLeave?(LT[sc.leave_type]||LT.off):null;const isRest=sc.day_type==="rest_day";const isHol=sc.day_type==="national_holiday";const pc=positions.find(p=>p.name===sc.shifts?.role)?.color||sc.shifts?.color||"#0a7c42";return(
                                 <div style={{background:isLeave?lt.bg:isRest?"#fff8e6":isHol?"#fde8e8":sc.published?pc+"12":"#fff8e6",border:`1.5px ${sc.published||isLeave?"solid":"dashed"} ${isLeave?lt.c:isRest?"#b45309":isHol?"#b91c1c":pc}`,borderRadius:4,padding:"2px 3px",fontSize:9,position:"relative"}}>
                                   {isLeave?<div style={{color:lt.c,fontWeight:600}}>{lt.l}</div>:<><div style={{fontWeight:600,color:isRest?"#b45309":isHol?"#b91c1c":pc}}>{isRest?"💰 ":isHol?"🎉 ":""}{sc.shifts?.role&&sc.shifts.role!=="all"?sc.shifts.role:"全場"}</div><div style={{color:"#888",fontSize:8}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></>}
                                   {Number(sc.leave_hours)>0&&<div style={{fontSize:7,color:"#b45309"}}>請假{sc.leave_hours}hr</div>}
                                   <button onClick={(ev)=>{ev.stopPropagation();delSch(sc.id);}} style={{position:"absolute",top:0,right:1,background:"none",border:"none",cursor:"pointer",fontSize:8,color:"#ccc",padding:0}}>✕</button>
-                                </div>);})():(<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else if(v.startsWith("rest:"))addSch(emp.id,v.split(":")[1],date,"rest_day");else addSch(emp.id,v,date);}} style={{width:"100%",padding:2,borderRadius:4,border:"1px dashed #ccc",fontSize:9,color:"#999",background:"#fafafa",cursor:"pointer",height:36}}><option value="">＋排班</option><optgroup label="📋 班別">{storeShifts.map(s=><option key={s.id} value={s.id}>{(s.role==="all"?"全場":s.role||"全場")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}</optgroup><optgroup label="💰 休息日出勤">{storeShifts.map(s=><option key={"r"+s.id} value={"rest:"+s.id}>💰{(s.role==="all"?"全場":s.role||"")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}</optgroup><optgroup label="📅 休假">{[["off","⬛ 例假"],["rest","🔲 休息日"],["annual","🏖 特休"],["personal","📋 事假"],["sick","🤒 病假"],["comp_time","🔄 補休"],["holiday_comp","🔴 國定補假"]].map(([k,l])=><option key={k} value={"leave:"+k}>{l}</option>)}</optgroup></select>)}
+                                </div>);})():(<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else if(v.startsWith("rest:"))addSch(emp.id,v.split(":")[1],date,"rest_day");else addSch(emp.id,v,date);}} style={{width:"100%",padding:2,borderRadius:4,border:"1px dashed #ccc",fontSize:9,color:"#999",background:"#fafafa",cursor:"pointer",height:36}}><option value="">＋</option><optgroup label="📋 班別">{storeShifts.map(s=><option key={s.id} value={s.id}>{(s.role==="all"?"全場":s.role||"全場")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}</optgroup>{isFullTime&&<optgroup label="💰 休息日出勤">{storeShifts.map(s=><option key={"r"+s.id} value={"rest:"+s.id}>💰{(s.role==="all"?"全場":s.role||"")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}</optgroup>}<optgroup label="📅 休假">{[["off","⬛ 例假"],["rest","🔲 休息日"],["annual","🏖 特休"],["personal","📋 事假"],["sick","🤒 病假"],["comp_time","🔄 補休"],["holiday_comp","🔴 國定補假"]].map(([k,l])=><option key={k} value={"leave:"+k}>{l}</option>)}</optgroup></select>)}
                               </td>);})}
-                          </tr>))}</tbody>
+                          </tr>);})}</tbody>
                       </table>
                     </div>
                   </div>);
