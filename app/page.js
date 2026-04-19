@@ -560,7 +560,7 @@ export default function AdminPage() {
                       <thead><tr style={{background:"#faf8f5"}}>{["姓名","角色","年資","特休","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                       <tbody>{storeEmps.map(e=>(
                         <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                          <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}} onClick={()=>setDetailId(e.id)}>{e.name}</td>
+                          <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}} onClick={()=>setDetailId(e.id)}>{e.name}<span style={{fontSize:9,color:e.employment_type==="parttime"?"#b45309":"#888",marginLeft:4,fontWeight:400}}>{e.employment_type==="parttime"?"兼職":"正職"}</span></td>
                           <td style={{padding:6}}><RB role={e.role} /></td>
                           <td style={{padding:6}}>{(e.service_months||0)+"月"}</td>
                           <td style={{padding:6}}>{(e.annual_leave_days||0)+"hr"}</td>
