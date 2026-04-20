@@ -82,6 +82,8 @@ export default function AdminPage() {
   const [anns, setAnns] = useState([]);
   const [detailId, setDetailId] = useState(null);
   const [sv, setSv] = useState("week");
+  const [avReports, setAvReports] = useState([]);
+  const [avView, setAvView] = useState("employee"); // "employee"|"day"
   const [ws, setWs] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - d.getDay());
@@ -589,6 +591,7 @@ export default function AdminPage() {
               <button onClick={()=>setSv("week")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="week"?"#1a1a1a":"#fff",color:sv==="week"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>週（7天）</button>
               <button onClick={()=>setSv("biweek")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="biweek"?"#1a1a1a":"#fff",color:sv==="biweek"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>雙週（14天）</button>
               <button onClick={()=>setSv("month")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="month"?"#1a1a1a":"#fff",color:sv==="month"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>月曆</button>
+              <button onClick={()=>{setSv("availability");const nm=new Date(new Date().getFullYear(),new Date().getMonth()+1,1).toLocaleDateString("sv-SE").slice(0,7);ap("/api/availability?month="+nm+(sf?"&store_id="+sf:"")).then(r=>setAvReports(r.data||[]));}} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #3f51b5",background:sv==="availability"?"#3f51b5":"#fff",color:sv==="availability"?"#fff":"#3f51b5",fontSize:11,cursor:"pointer",fontWeight:600}}>👥 可用時段</button>
               {(sv==="week"||sv==="biweek") && (
                 <>
                   <button onClick={()=>{const d=sv==="biweek"?14:7;setWs(new Date(new Date(ws).getTime()-d*86400000).toLocaleDateString("sv-SE"));}} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>◀</button>
@@ -809,6 +812,58 @@ export default function AdminPage() {
               </div>
               </div>
             )}
+            {sv==="availability"&&(()=>{
+              const avMonth=new Date(new Date().getFullYear(),new Date().getMonth()+1,1).toLocaleDateString("sv-SE").slice(0,7);
+              const [avy,avm]=avMonth.split("-").map(Number);
+              const avDays=new Date(avy,avm,0).getDate();
+              const storeEmpsAv=ae.filter(e=>e.is_active&&e.role!=="admin"&&(!sf||e.store_id===sf));
+              const byEmp={};for(const r of avReports){if(!byEmp[r.employee_id])byEmp[r.employee_id]=[];byEmp[r.employee_id].push(r);}
+              const byDate={};for(const r of avReports){if(!byDate[r.start_date])byDate[r.start_date]=[];byDate[r.start_date].push(r);}
+              const fmtHd=(hd)=>hd?`可${hd}`:"整天✕";
+              const partTimers=storeEmpsAv.filter(e=>e.employment_type==="part_time");
+              const notReported=partTimers.filter(e=>!byEmp[e.id]);
+              return(
+                <div>
+                  <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
+                    <span style={{fontSize:13,fontWeight:600,color:"#3f51b5"}}>{avy}年{avm}月 員工可用時段</span>
+                    <button onClick={()=>setAvView("employee")} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:avView==="employee"?"#3f51b5":"#fff",color:avView==="employee"?"#fff":"#555",fontSize:11,cursor:"pointer"}}>員工視角</button>
+                    <button onClick={()=>setAvView("day")} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:avView==="day"?"#3f51b5":"#fff",color:avView==="day"?"#fff":"#555",fontSize:11,cursor:"pointer"}}>日期視角</button>
+                    <button onClick={()=>ap("/api/availability?month="+avMonth+(sf?"&store_id="+sf:"")).then(r=>setAvReports(r.data||[]))} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>🔄</button>
+                  </div>
+                  {notReported.length>0&&<div style={{background:"#fff8e6",border:"1px solid #fbc02d",borderRadius:6,padding:"6px 10px",marginBottom:8,fontSize:11,color:"#b45309"}}>⚠️ 尚未回報：{notReported.map(e=>e.name).join("、")}</div>}
+                  {avView==="employee"&&storeEmpsAv.map(emp=>{
+                    const recs=byEmp[emp.id]||[];
+                    const isPT=emp.employment_type==="part_time";
+                    return(
+                      <div key={emp.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px",marginBottom:6}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:recs.length?4:0}}>
+                          <span style={{fontSize:12,fontWeight:600}}>{emp.name}<span style={{fontSize:9,color:"#aaa",marginLeft:4}}>{isPT?"兼職":"正職"}</span></span>
+                          <span style={{fontSize:10,color:recs.length?"#b91c1c":isPT?"#fb8c00":"#aaa",fontWeight:600}}>{recs.length?`❌ 限制 ${recs.length} 天`:isPT?"⚠️ 未回報":"✓ 正職"}</span>
+                        </div>
+                        {recs.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:3}}>{recs.sort((a,b)=>a.start_date.localeCompare(b.start_date)).map(r=><span key={r.id} style={{fontSize:10,background:r.half_day?"#fff8e6":"#fde8e8",color:r.half_day?"#b45309":"#b91c1c",borderRadius:3,padding:"1px 5px"}}>{r.start_date.slice(5)} {fmtHd(r.half_day)}</span>)}</div>}
+                        {recs[0]?.reason&&<div style={{fontSize:10,color:"#888",marginTop:3}}>💬 {recs[0].reason}</div>}
+                      </div>
+                    );
+                  })}
+                  {avView==="day"&&Array.from({length:avDays},(_,i)=>{
+                    const d=i+1;
+                    const dateStr=`${avy}-${String(avm).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+                    const dow=new Date(dateStr).getDay();
+                    const recs=byDate[dateStr]||[];
+                    const availNames=storeEmpsAv.filter(e=>!recs.find(r=>r.employee_id===e.id)).map(e=>e.name);
+                    return(
+                      <div key={dateStr} style={{background:"#fff",borderRadius:6,border:"1px solid #e8e6e1",padding:"6px 10px",marginBottom:4,display:"flex",gap:8,alignItems:"flex-start"}}>
+                        <div style={{minWidth:52,fontWeight:600,fontSize:12,color:dow===0?"#b91c1c":dow===6?"#b45309":"#333"}}>{avm}/{d}（{["日","一","二","三","四","五","六"][dow]}）</div>
+                        <div style={{flex:1,fontSize:11}}>
+                          {recs.length>0&&<div style={{color:"#b91c1c",marginBottom:2}}>❌ {recs.map(r=>`${r.employees?.name}(${fmtHd(r.half_day)})`).join("、")}</div>}
+                          {availNames.length>0&&<div style={{color:"#0a7c42"}}>✓ 可排：{availNames.join("、")}</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
