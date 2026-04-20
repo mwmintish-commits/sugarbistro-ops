@@ -1,22 +1,42 @@
 "use client";
 import { useEffect, useState } from "react";
 
-const LINE_ID = "@766urtjk";
-const oaUrl = (text) => `https://line.me/R/oaMessage/${LINE_ID}/?${encodeURIComponent(text)}`;
 const webUrl = (path, eid) => `${path}?eid=${eid}`;
 
-const ITEMS = (eid) => [
-  { icon: "🟢", label: "上班打卡", desc: "GPS 定位", action: "clockin", type: "clock_in", bg: "#e6f9f0", color: "#0a7c42" },
-  { icon: "🔴", label: "下班打卡", desc: "GPS 定位", action: "clockin", type: "clock_out", bg: "#fde8e8", color: "#b91c1c" },
-  { icon: "🕐", label: "補打卡", desc: "申請補登", href: webUrl("/amendment", eid), bg: "#fff8e6", color: "#8a6d00" },
-  { icon: "🏖", label: "我要請假", desc: "事假/特休...", href: webUrl("/leave-apply", eid), bg: "#e6f1fb", color: "#185fa5" },
-  { icon: "📋", label: "預排假", desc: "不可出勤回報", href: webUrl("/pre-leave", eid), bg: "#e8eaf6", color: "#1a237e" },
-  { icon: "📅", label: "我的班表", desc: "近期排班", href: webUrl("/my-schedule", eid), bg: "#f3e8ff", color: "#6b21a8" },
-  { icon: "📊", label: "我的假勤", desc: "出勤統計", href: webUrl("/my-attendance", eid), bg: "#fef3c7", color: "#92400e" },
-  { icon: "💰", label: "我的薪資", desc: "薪資明細", href: webUrl("/my-salary", eid), bg: "#fef3c7", color: "#a16207" },
-  { icon: "📝", label: "我的考核", desc: "績效分數", href: webUrl("/my-review", eid), bg: "#e8f5e9", color: "#1b5e20" },
-  { icon: "📋", label: "員工守則", desc: "規範查閱", href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
-];
+const uploadUrl = (expenseType, emp, eid) => {
+  const params = new URLSearchParams({
+    type: "expense",
+    expense_type: expenseType,
+    store_id: emp?.store_id || "",
+    store_name: emp?.stores?.name || "",
+    employee_id: eid || "",
+    employee_name: emp?.name || "",
+  });
+  return `/upload?${params.toString()}`;
+};
+
+const ITEMS = (eid, emp) => {
+  const isManager = ["admin", "manager", "store_manager"].includes(emp?.role);
+  const base = [
+    { icon: "🟢", label: "上班打卡", desc: "GPS 定位", action: "clockin", type: "clock_in", bg: "#e6f9f0", color: "#0a7c42" },
+    { icon: "🔴", label: "下班打卡", desc: "GPS 定位", action: "clockin", type: "clock_out", bg: "#fde8e8", color: "#b91c1c" },
+    { icon: "🕐", label: "補打卡",   desc: "申請補登",    href: webUrl("/amendment", eid),      bg: "#fff8e6", color: "#8a6d00" },
+    { icon: "🏖", label: "我要請假", desc: "事假/特休...", href: webUrl("/leave-apply", eid),    bg: "#e6f1fb", color: "#185fa5" },
+    { icon: "📋", label: "預排假",   desc: "不可出勤回報", href: webUrl("/pre-leave", eid),      bg: "#e8eaf6", color: "#1a237e" },
+    { icon: "📅", label: "我的班表", desc: "近期排班",    href: webUrl("/my-schedule", eid),    bg: "#f3e8ff", color: "#6b21a8" },
+    { icon: "📊", label: "我的假勤", desc: "出勤統計",    href: webUrl("/my-attendance", eid),  bg: "#fef3c7", color: "#92400e" },
+    { icon: "💰", label: "我的薪資", desc: "薪資明細",    href: webUrl("/my-salary", eid),      bg: "#fef3c7", color: "#a16207" },
+    { icon: "📝", label: "我的考核", desc: "績效分數",    href: webUrl("/my-review", eid),      bg: "#e8f5e9", color: "#1b5e20" },
+    { icon: "📖", label: "員工守則", desc: "規範查閱",    href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
+  ];
+  if (isManager) {
+    base.push(
+      { icon: "📦", label: "月結單據", desc: "廠商單據上傳", href: uploadUrl("vendor", emp, eid),      bg: "#dbeafe", color: "#1d4ed8" },
+      { icon: "🪙", label: "零用金",   desc: "費用收據上傳", href: uploadUrl("petty_cash", emp, eid),  bg: "#fef9c3", color: "#854d0e" },
+    );
+  }
+  return base;
+};
 
 export default function MePanel() {
   const [emp, setEmp] = useState(null);
@@ -25,7 +45,6 @@ export default function MePanel() {
   const [clockinLoading, setClockinLoading] = useState("");
 
   const eid = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("eid") : null;
-  const items = ITEMS(eid || "");
 
   useEffect(() => {
     if (!eid) { setErr("缺少員工識別碼"); setLoading(false); return; }
@@ -55,8 +74,9 @@ export default function MePanel() {
   const wrap = { maxWidth: 480, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "#f7f5f0", minHeight: "100vh" };
 
   if (loading) return <div style={wrap}><p style={{ textAlign: "center", color: "#888", padding: 60 }}>載入中...</p></div>;
-  if (err) return <div style={wrap}><p style={{ textAlign: "center", color: "#b91c1c", padding: 60 }}>{err}</p></div>;
+  if (err)     return <div style={wrap}><p style={{ textAlign: "center", color: "#b91c1c", padding: 60 }}>{err}</p></div>;
 
+  const items = ITEMS(eid || "", emp);
   const roleLabel = { admin: "總部管理員", manager: "區經理", store_manager: "店長", staff: "員工" }[emp?.role] || emp?.role;
   const now = new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Taipei" });
 

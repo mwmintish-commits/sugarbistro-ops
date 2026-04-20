@@ -25,8 +25,11 @@ export default function UploadPage() {
     setEmpName(decodeURIComponent(p.get("employee_name") || ""));
   }, []);
 
-  const typeLabels = { settlement: "📊 日結單", deposit: "🏦 存款單", expense: "📦 費用單據" };
   const expenseType = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("expense_type") || "vendor";
+  const typeLabels = {
+    settlement: "📊 日結單", deposit: "🏦 存款單",
+    expense: expenseType === "petty_cash" ? "🪙 零用金收據" : "📦 月結單據",
+  };
 
   const addPhotos = (files) => {
     const newP = [...photos];
