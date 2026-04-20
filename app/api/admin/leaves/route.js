@@ -28,26 +28,47 @@ export async function POST(request) {
 
   if (body.action === "create") {
     const { employee_id, leave_type, start_date, end_date, half_day, reason, request_type } = body;
-    const isPreArranged = request_type === "pre_arranged";
     const { data, error } = await supabase.from("leave_requests").insert({
       employee_id, leave_type, start_date, end_date: end_date || start_date,
       half_day: half_day || null, reason,
       request_type: request_type || "leave",
-      status: isPreArranged ? "approved" : "pending",
-      ...(isPreArranged ? { reviewed_at: new Date().toISOString() } : {}),
+      status: "pending",
     }).select("*, employees(name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
 
-    if (!isPreArranged) {
-      const { data: admins } = await supabase.from("employees").select("line_uid").in("role", ["admin", "manager"]).eq("is_active", true);
-      if (admins) {
-        const typeMap = { annual: "特休", sick: "病假", personal: "事假", menstrual: "生理假", official: "公假" };
-        for (const a of admins) {
-          if (a.line_uid) await pushText(a.line_uid, `🙋 預休假申請\n👤 ${data.employees?.name}\n📋 ${typeMap[leave_type] || leave_type}\n📅 ${start_date}${end_date && end_date !== start_date ? ` ~ ${end_date}` : ""}${half_day ? `（${half_day === "am" ? "上午" : "下午"}半天）` : ""}\n💬 ${reason || "無"}\n\n請到後台審核`).catch(() => {});
-        }
+    const { data: admins } = await supabase.from("employees").select("line_uid").in("role", ["admin", "manager", "store_manager"]).eq("is_active", true);
+    if (admins) {
+      const typeMap = { annual: "特休", sick: "病假", personal: "事假", menstrual: "生理假", official: "公假", off: "例假", rest: "休息日", comp_time: "補休" };
+      const label = request_type === "pre_arranged" ? "📆 預排假申請" : "🙋 請假申請";
+      for (const a of admins) {
+        if (a.line_uid) await pushText(a.line_uid, `${label}\n👤 ${data.employees?.name}\n📋 ${typeMap[leave_type] || leave_type}\n📅 ${start_date}${end_date && end_date !== start_date ? ` ~ ${end_date}` : ""}${half_day ? `（${half_day === "am" ? "上午" : "下午"}半天）` : ""}\n💬 ${reason || "無"}\n\n請到後台審核`).catch(() => {});
       }
     }
     return Response.json({ data });
+  }
+
+  if (body.action === "batch_create") {
+    const { employee_id, dates, leave_type, half_day, reason } = body;
+    const results = [];
+    for (const date of (dates || [])) {
+      const { data, error } = await supabase.from("leave_requests").insert({
+        employee_id, leave_type, start_date: date, end_date: date,
+        half_day: half_day || null, reason: reason || "預排假申請",
+        request_type: "pre_arranged", status: "pending",
+      }).select("id").single();
+      if (!error && data) results.push(data);
+    }
+    const { data: emp } = await supabase.from("employees").select("name").eq("id", employee_id).single();
+    const { data: admins } = await supabase.from("employees").select("line_uid").in("role", ["admin", "manager", "store_manager"]).eq("is_active", true);
+    if (admins && emp) {
+      const typeMap = { annual: "特休", sick: "病假", personal: "事假", off: "例假", rest: "休息日", comp_time: "補休" };
+      const sorted = [...(dates || [])].sort();
+      const dateList = sorted.length <= 5 ? sorted.join("、") : sorted.slice(0, 5).join("、") + ` 等 ${sorted.length} 天`;
+      for (const a of admins) {
+        if (a.line_uid) await pushText(a.line_uid, `📆 預排假申請\n👤 ${emp.name}\n📋 ${typeMap[leave_type] || leave_type}\n📅 ${dateList}\n💬 ${reason || "無"}\n\n請到後台審核`).catch(() => {});
+      }
+    }
+    return Response.json({ data: results });
   }
 
   if (body.action === "review") {

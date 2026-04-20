@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const SECTIONS = [
   {
@@ -75,7 +75,10 @@ const SECTIONS = [
 
 export default function EmployeeHandbook() {
   const [open, setOpen] = useState(null);
-  const eid = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("eid") : null;
+  const [eid, setEid] = useState("");
+  useEffect(() => {
+    setEid(new URLSearchParams(window.location.search).get("eid") || "");
+  }, []);
   const wrap = { maxWidth: 480, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "#f7f5f0", minHeight: "100vh" };
 
   return (
