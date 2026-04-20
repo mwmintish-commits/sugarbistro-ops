@@ -53,6 +53,28 @@ export default function PreLeavePage() {
   }, [eid, month]);
 
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+  const todayDay = Number(today.slice(8, 10));
+  const todayMonthStr = today.slice(0, 7);
+  const [todayY, todayM] = todayMonthStr.split("-").map(Number);
+  const nextMonthStr = new Date(todayY, todayM, 1).toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }).slice(0, 7);
+
+  // 每月25日後鎖定下個月預排
+  const isNextMonthLocked = todayDay > 25;
+  const isViewingNextMonth = month === nextMonthStr;
+  const isViewingBeyond = month > nextMonthStr;
+  const isLocked = isViewingBeyond || (isViewingNextMonth && isNextMonthLocked);
+
+  const prevMonth = () => {
+    const d = new Date(y, m - 2, 1);
+    const nm = d.toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }).slice(0, 7);
+    if (nm >= todayMonthStr) setMonth(nm);
+  };
+  const nextMonth = () => {
+    const d = new Date(y, m, 1);
+    const nm = d.toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }).slice(0, 7);
+    if (nm <= nextMonthStr) setMonth(nm);
+  };
+
   const [y, m] = month.split("-").map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
   const firstDow = new Date(y, m - 1, 1).getDay();
@@ -63,6 +85,7 @@ export default function PreLeavePage() {
   }
 
   const toggleDate = (dateStr) => {
+    if (isLocked) return;
     if (dateStr <= today) return;
     if (existingByDate[dateStr]) return;
     setSelected(prev => {
@@ -70,15 +93,6 @@ export default function PreLeavePage() {
       if (next.has(dateStr)) next.delete(dateStr); else next.add(dateStr);
       return next;
     });
-  };
-
-  const prevMonth = () => {
-    const d = new Date(y, m - 2, 1);
-    setMonth(d.toLocaleDateString("sv-SE").slice(0, 7));
-  };
-  const nextMonth = () => {
-    const d = new Date(y, m, 1);
-    setMonth(d.toLocaleDateString("sv-SE").slice(0, 7));
   };
 
   const submit = async () => {
@@ -167,8 +181,27 @@ export default function PreLeavePage() {
         <button onClick={nextMonth} style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 13 }}>▶</button>
       </div>
 
+      {/* 鎖定提示 */}
+      {isLocked ? (
+        <div style={{ background: "#fff3e0", border: "1px solid #fb8c00", borderRadius: 8, padding: "10px 12px", marginBottom: 8, fontSize: 12, color: "#e65100", display: "flex", alignItems: "flex-start", gap: 6 }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>🔒</span>
+          <div>
+            <div style={{ fontWeight: 700, marginBottom: 2 }}>預排假申請已截止</div>
+            <div style={{ lineHeight: 1.5 }}>每月 25 日後無法再申請下個月排休，請於下個月 1–25 日重新申請。</div>
+          </div>
+        </div>
+      ) : isViewingNextMonth ? (
+        <div style={{ background: "#e8f5e9", border: "1px solid #66bb6a", borderRadius: 8, padding: "10px 12px", marginBottom: 8, fontSize: 12, color: "#2e7d32", display: "flex", alignItems: "flex-start", gap: 6 }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>📌</span>
+          <div>
+            <div style={{ fontWeight: 700, marginBottom: 2 }}>下個月預排開放中</div>
+            <div style={{ lineHeight: 1.5 }}>申請截止：本月 25 日（{todayMonthStr}-25）。逾期後本月無法再修改。</div>
+          </div>
+        </div>
+      ) : null}
+
       {/* 月曆 */}
-      <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "hidden", marginBottom: 8 }}>
+      <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "hidden", marginBottom: 8, opacity: isLocked ? 0.6 : 1 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", background: "#faf8f5" }}>
           {DAYS.map(d => (
             <div key={d} style={{ padding: "5px 0", textAlign: "center", fontSize: 11, fontWeight: 600, color: d === "日" ? "#b91c1c" : d === "六" ? "#b45309" : "#666" }}>{d}</div>
@@ -205,7 +238,7 @@ export default function PreLeavePage() {
               border = `2px solid ${lt.c}`;
             }
 
-            const canClick = !isPast && !existRec;
+            const canClick = !isLocked && !isPast && !existRec;
 
             return (
               <div key={dateStr} onClick={() => canClick && toggleDate(dateStr)}
