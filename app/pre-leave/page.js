@@ -2,30 +2,28 @@
 import { useState, useEffect } from "react";
 
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
-const LEAVE_TYPES = [
-  { k: "off",       l: "⬛ 例假",  c: "#666",    bg: "#f0f0f0" },
-  { k: "annual",    l: "🏖 特休",  c: "#4361ee", bg: "#e6f1fb" },
-  { k: "personal",  l: "📋 事假",  c: "#8a6d00", bg: "#fef9c3" },
-  { k: "comp_time", l: "🔄 補休",  c: "#185fa5", bg: "#e6f1fb" },
-  { k: "sick",      l: "🤒 病假",  c: "#b45309", bg: "#fff8e6" },
-  { k: "rest",      l: "🔲 休息",  c: "#888",    bg: "#f5f5f5" },
-];
-const LT = Object.fromEntries(LEAVE_TYPES.map(t => [t.k, t]));
+const HALF_LABELS = { "": "整天", am: "上午", pm: "下午" };
+const HALF_COLORS = { "": "#b91c1c", am: "#1565c0", pm: "#6a1b9a" };
 
 export default function PreLeavePage() {
   const [eid, setEid] = useState("");
   const [emp, setEmp] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [month, setMonth] = useState(() => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }).slice(0, 7));
-  const [existing, setExisting] = useState([]);
-  const [selected, setSelected] = useState(new Set());
-  const [leaveType, setLeaveType] = useState("off");
-  const [halfDay, setHalfDay] = useState("");
+
+  // 預設下個月
+  const [month, setMonth] = useState(() => {
+    const now = new Date(new Date().toLocaleString("sv-SE", { timeZone: "Asia/Taipei" }));
+    return new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      .toLocaleDateString("sv-SE").slice(0, 7);
+  });
+
+  // selections: Map<dateStr, half_day>  ("" | "am" | "pm")
+  const [selections, setSelections] = useState(new Map());
+  const [mode, setMode] = useState(""); // 當前點擊模式
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
-  const [doneCount, setDoneCount] = useState(0);
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("eid") || "";
@@ -38,85 +36,75 @@ export default function PreLeavePage() {
     }).catch(() => { setErr("載入失敗"); setLoading(false); });
   }, []);
 
-  const loadExisting = (empId, mo) => {
-    const [y, m] = mo.split("-").map(Number);
-    const start = `${mo}-01`;
-    const end = new Date(y, m, 0).toLocaleDateString("sv-SE");
-    fetch(`/api/admin/leaves?employee_id=${empId}&request_type=pre_arranged`).then(r => r.json()).then(r => {
-      setExisting((r.data || []).filter(l => l.start_date >= start && l.start_date <= end));
-    });
-  };
-
   useEffect(() => {
-    if (eid) loadExisting(eid, month);
-    setSelected(new Set());
+    if (!eid || !month) return;
+    fetch(`/api/availability?employee_id=${eid}&month=${month}`)
+      .then(r => r.json()).then(r => {
+        const map = new Map();
+        for (const rec of (r.data || [])) {
+          map.set(rec.start_date, rec.half_day || "");
+        }
+        setSelections(map);
+      });
   }, [eid, month]);
 
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
   const todayDay = Number(today.slice(8, 10));
   const todayMonthStr = today.slice(0, 7);
   const [todayY, todayM] = todayMonthStr.split("-").map(Number);
-  const nextMonthStr = new Date(todayY, todayM, 1).toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }).slice(0, 7);
-
-  // 每月25日後鎖定下個月預排
-  const isNextMonthLocked = todayDay > 25;
-  const isViewingNextMonth = month === nextMonthStr;
-  const isViewingBeyond = month > nextMonthStr;
-  const isLocked = isViewingBeyond || (isViewingNextMonth && isNextMonthLocked);
-
-  const prevMonth = () => {
-    const d = new Date(y, m - 2, 1);
-    const nm = d.toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }).slice(0, 7);
-    if (nm >= todayMonthStr) setMonth(nm);
-  };
-  const nextMonth = () => {
-    const d = new Date(y, m, 1);
-    const nm = d.toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }).slice(0, 7);
-    if (nm <= nextMonthStr) setMonth(nm);
-  };
+  const nextMonthStr = new Date(todayY, todayM, 1).toLocaleDateString("sv-SE").slice(0, 7);
+  const isLocked = todayDay > 25 && month === nextMonthStr;
 
   const [y, m] = month.split("-").map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
   const firstDow = new Date(y, m - 1, 1).getDay();
 
-  const existingByDate = {};
-  for (const l of existing) {
-    existingByDate[l.start_date] = l;
-  }
+  const prevMonth = () => {
+    const d = new Date(y, m - 2, 1);
+    const nm = d.toLocaleDateString("sv-SE").slice(0, 7);
+    if (nm >= todayMonthStr) setMonth(nm);
+  };
+  const nextMonth = () => {
+    const d = new Date(y, m, 1);
+    const nm = d.toLocaleDateString("sv-SE").slice(0, 7);
+    if (nm <= nextMonthStr) setMonth(nm);
+  };
 
   const toggleDate = (dateStr) => {
-    if (isLocked) return;
-    if (dateStr <= today) return;
-    if (existingByDate[dateStr]) return;
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(dateStr)) next.delete(dateStr); else next.add(dateStr);
+    if (isLocked || dateStr <= today) return;
+    setSelections(prev => {
+      const next = new Map(prev);
+      if (next.has(dateStr)) {
+        // 若已選且 mode 相同 → 移除；若 mode 不同 → 更新時段
+        if (next.get(dateStr) === mode) next.delete(dateStr);
+        else next.set(dateStr, mode);
+      } else {
+        next.set(dateStr, mode);
+      }
       return next;
     });
   };
 
   const submit = async () => {
-    if (selected.size === 0) return;
+    if (submitting) return;
     setSubmitting(true);
-    const dates = [...selected].sort();
-    const r = await fetch("/api/admin/leaves", {
+    const slots = [...selections.entries()].map(([date, half_day]) => ({ date, half_day }));
+    const r = await fetch("/api/availability", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "batch_create",
-        employee_id: eid,
-        dates,
-        leave_type: leaveType,
-        half_day: halfDay || null,
-        reason: notes || "預排假申請",
-      }),
+      body: JSON.stringify({ action: "save", employee_id: eid, month, slots, notes }),
     }).then(r => r.json());
     setSubmitting(false);
     if (r.error) { alert("❌ " + r.error); return; }
-    setDoneCount(dates.length);
     setDone(true);
   };
 
-  const wrap = { maxWidth: 480, margin: "0 auto", padding: 8, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "#f7f5f0", minHeight: "100vh", boxSizing: "border-box" };
+  const IS_MANAGER = ["admin", "manager", "store_manager"].includes(emp?.role);
+
+  const wrap = {
+    maxWidth: 480, margin: "0 auto", padding: 8,
+    fontFamily: "system-ui, 'Noto Sans TC', sans-serif",
+    background: "#f7f5f0", minHeight: "100vh", boxSizing: "border-box",
+  };
 
   if (loading) return <div style={wrap}><p style={{ textAlign: "center", color: "#888", padding: 60 }}>載入中...</p></div>;
   if (err) return <div style={wrap}><p style={{ textAlign: "center", color: "#b91c1c", padding: 60 }}>{err}</p></div>;
@@ -125,49 +113,60 @@ export default function PreLeavePage() {
     <div style={wrap}>
       <div style={{ background: "#fff", borderRadius: 14, padding: 32, textAlign: "center", marginTop: 40 }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
-        <div style={{ fontSize: 18, fontWeight: 700 }}>預排假已送出</div>
-        <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>共 {doneCount} 天，等待主管審核</div>
-        <button onClick={() => { setDone(false); setSelected(new Set()); loadExisting(eid, month); }}
+        <div style={{ fontSize: 18, fontWeight: 700 }}>回報已送出</div>
+        <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
+          {selections.size > 0 ? `共回報 ${selections.size} 個不可出勤日，主管已收到通知` : "已清除本月回報"}
+        </div>
+        <button onClick={() => setDone(false)}
           style={{ marginTop: 20, padding: "10px 24px", borderRadius: 8, border: "none", background: "#3f51b5", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", marginRight: 10 }}>
-          繼續選擇
+          繼續修改
         </button>
-        <a href={`/me?eid=${eid}`} style={{ display: "inline-block", marginTop: 20, padding: "10px 24px", borderRadius: 8, background: "#f0ede8", color: "#333", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+        <a href={`/me?eid=${eid}`}
+          style={{ display: "inline-block", marginTop: 20, padding: "10px 24px", borderRadius: 8, background: "#f0ede8", color: "#333", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
           回面板
         </a>
       </div>
     </div>
   );
 
-  const lt = LT[leaveType] || LEAVE_TYPES[0];
-
   return (
     <div style={wrap}>
+      {/* Header */}
       <div style={{ background: "linear-gradient(135deg, #3f51b5, #1a237e)", borderRadius: 14, padding: "14px 16px", marginBottom: 10, color: "#fff" }}>
-        <div style={{ fontSize: 11, opacity: 0.85 }}>📆 預排假申請</div>
+        <div style={{ fontSize: 11, opacity: 0.85 }}>📋 不可出勤回報</div>
         <div style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>{emp?.name}</div>
         <div style={{ fontSize: 11, marginTop: 2, opacity: 0.85 }}>{emp?.stores?.name || "🏢 總部"}</div>
       </div>
 
-      {/* 假別選擇 */}
-      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: "10px 10px 8px", marginBottom: 8 }}>
-        <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>假別</div>
-        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-          {LEAVE_TYPES.map(t => (
-            <button key={t.k} onClick={() => setLeaveType(t.k)}
-              style={{ padding: "6px 10px", borderRadius: 6, border: leaveType === t.k ? `2px solid ${t.c}` : "1px solid #ddd", background: leaveType === t.k ? t.bg : "#fff", cursor: "pointer", fontSize: 12, fontWeight: leaveType === t.k ? 700 : 400, color: leaveType === t.k ? t.c : "#555" }}>
-              {t.l}
-            </button>
-          ))}
-        </div>
+      {/* 說明 */}
+      <div style={{ background: "#e8eaf6", borderRadius: 8, padding: "9px 12px", marginBottom: 8, fontSize: 12, color: "#283593", lineHeight: 1.6 }}>
+        📌 請點選下個月<strong>無法配合出勤</strong>的日期，幫助主管安排排班。<br />
+        每月 25 日截止，逾期無法修改。
       </div>
 
-      {/* 時間選擇 */}
-      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: "10px 10px 8px", marginBottom: 8 }}>
-        <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>時間</div>
+      {/* 鎖定警告 */}
+      {isLocked && (
+        <div style={{ background: "#fff3e0", border: "1px solid #fb8c00", borderRadius: 8, padding: "10px 12px", marginBottom: 8, fontSize: 12, color: "#e65100" }}>
+          🔒 本月 25 日後已截止，下個月 1 日起可重新回報。
+        </div>
+      )}
+
+      {/* 主管快捷入口 */}
+      {IS_MANAGER && (
+        <a href={`/availability-overview?eid=${eid}`}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", border: "1px solid #c5cae9", borderRadius: 8, padding: "10px 12px", marginBottom: 8, textDecoration: "none" }}>
+          <span style={{ fontSize: 13, color: "#3f51b5", fontWeight: 600 }}>👥 查看所有員工可用時段總覽</span>
+          <span style={{ color: "#9e9e9e" }}>▶</span>
+        </a>
+      )}
+
+      {/* 時段模式選擇 */}
+      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: "10px", marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>點日期時套用的時段</div>
         <div style={{ display: "flex", gap: 6 }}>
-          {[["", "整天"], ["am", "上午"], ["pm", "下午"]].map(([v, l]) => (
-            <button key={v} onClick={() => setHalfDay(v)}
-              style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: halfDay === v ? "2px solid #3f51b5" : "1px solid #ddd", background: halfDay === v ? "#e8eaf6" : "#fff", cursor: "pointer", fontSize: 12, fontWeight: halfDay === v ? 700 : 400, color: halfDay === v ? "#3f51b5" : "#555" }}>
+          {[["", "❌ 整天"], ["am", "🌅 上午"], ["pm", "🌆 下午"]].map(([v, l]) => (
+            <button key={v} onClick={() => setMode(v)}
+              style={{ flex: 1, padding: "8px 0", borderRadius: 6, border: mode === v ? `2px solid ${HALF_COLORS[v]}` : "1px solid #ddd", background: mode === v ? "#f3f4fb" : "#fff", cursor: "pointer", fontSize: 12, fontWeight: mode === v ? 700 : 400, color: mode === v ? HALF_COLORS[v] : "#555" }}>
               {l}
             </button>
           ))}
@@ -181,27 +180,8 @@ export default function PreLeavePage() {
         <button onClick={nextMonth} style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 13 }}>▶</button>
       </div>
 
-      {/* 鎖定提示 */}
-      {isLocked ? (
-        <div style={{ background: "#fff3e0", border: "1px solid #fb8c00", borderRadius: 8, padding: "10px 12px", marginBottom: 8, fontSize: 12, color: "#e65100", display: "flex", alignItems: "flex-start", gap: 6 }}>
-          <span style={{ fontSize: 16, flexShrink: 0 }}>🔒</span>
-          <div>
-            <div style={{ fontWeight: 700, marginBottom: 2 }}>預排假申請已截止</div>
-            <div style={{ lineHeight: 1.5 }}>每月 25 日後無法再申請下個月排休，請於下個月 1–25 日重新申請。</div>
-          </div>
-        </div>
-      ) : isViewingNextMonth ? (
-        <div style={{ background: "#e8f5e9", border: "1px solid #66bb6a", borderRadius: 8, padding: "10px 12px", marginBottom: 8, fontSize: 12, color: "#2e7d32", display: "flex", alignItems: "flex-start", gap: 6 }}>
-          <span style={{ fontSize: 16, flexShrink: 0 }}>📌</span>
-          <div>
-            <div style={{ fontWeight: 700, marginBottom: 2 }}>下個月預排開放中</div>
-            <div style={{ lineHeight: 1.5 }}>申請截止：本月 25 日（{todayMonthStr}-25）。逾期後本月無法再修改。</div>
-          </div>
-        </div>
-      ) : null}
-
       {/* 月曆 */}
-      <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "hidden", marginBottom: 8, opacity: isLocked ? 0.6 : 1 }}>
+      <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "hidden", marginBottom: 8, opacity: isLocked ? 0.55 : 1 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", background: "#faf8f5" }}>
           {DAYS.map(d => (
             <div key={d} style={{ padding: "5px 0", textAlign: "center", fontSize: 11, fontWeight: 600, color: d === "日" ? "#b91c1c" : d === "六" ? "#b45309" : "#666" }}>{d}</div>
@@ -217,44 +197,28 @@ export default function PreLeavePage() {
             const dow = new Date(dateStr).getDay();
             const isPast = dateStr <= today;
             const isToday = dateStr === today;
-            const existRec = existingByDate[dateStr];
-            const isSel = selected.has(dateStr);
+            const hd = selections.get(dateStr); // undefined = not selected
+            const isSel = selections.has(dateStr);
+            const canClick = !isLocked && !isPast;
 
-            let cellBg = "transparent";
-            let numColor = dow === 0 ? "#b91c1c" : dow === 6 ? "#b45309" : "#444";
-            let tag = null;
-            let border = "none";
-
-            if (isToday) { border = "2px solid #3f51b5"; numColor = "#3f51b5"; }
-            if (isPast) { numColor = "#ccc"; }
-            if (existRec) {
-              const status = existRec.status;
-              const elt = LT[existRec.leave_type] || LT.off;
-              cellBg = status === "approved" ? "#e8f5e9" : "#fff8e6";
-              border = `2px solid ${status === "approved" ? "#0a7c42" : "#b45309"}`;
-              tag = { label: status === "approved" ? "已排" : "待審", color: status === "approved" ? "#0a7c42" : "#b45309", lt: elt };
-            } else if (isSel) {
-              cellBg = lt.bg;
-              border = `2px solid ${lt.c}`;
-            }
-
-            const canClick = !isLocked && !isPast && !existRec;
+            const cellColor = isSel ? HALF_COLORS[hd] : null;
 
             return (
               <div key={dateStr} onClick={() => canClick && toggleDate(dateStr)}
-                style={{ minHeight: 52, borderTop: "1px solid #f0eeea", padding: 3, background: cellBg, border, boxSizing: "border-box", cursor: canClick ? "pointer" : "default", position: "relative" }}>
-                <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: numColor, marginBottom: 2 }}>{d}</div>
-                {existRec && tag && (
-                  <div style={{ fontSize: 8, color: tag.color, fontWeight: 600, lineHeight: 1.2 }}>
-                    <div>{tag.lt.l}</div>
-                    <div>{tag.label}</div>
+                style={{
+                  minHeight: 52, borderTop: "1px solid #f0eeea", padding: 3, boxSizing: "border-box",
+                  background: isSel ? "#fde8e8" : isToday ? "#e8eaf6" : "transparent",
+                  border: isSel ? `2px solid ${cellColor}` : isToday ? "2px solid #3f51b5" : "none",
+                  cursor: canClick ? "pointer" : "default",
+                }}>
+                <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isPast ? "#ccc" : dow === 0 ? "#b91c1c" : dow === 6 ? "#b45309" : "#444", marginBottom: 2 }}>{d}</div>
+                {isSel && (
+                  <div style={{ fontSize: 9, color: cellColor, fontWeight: 700, lineHeight: 1.3 }}>
+                    ✕ {HALF_LABELS[hd] || "整天"}
                   </div>
                 )}
-                {isSel && !existRec && (
-                  <div style={{ fontSize: 8, color: lt.c, fontWeight: 700 }}>✓ {lt.l.split(" ")[1]}</div>
-                )}
-                {!existRec && !isSel && isPast && (
-                  <div style={{ fontSize: 7, color: "#ddd", textAlign: "center" }}>-</div>
+                {!isSel && !isPast && (
+                  <div style={{ fontSize: 7, color: "#ddd", textAlign: "center" }}>○</div>
                 )}
               </div>
             );
@@ -262,43 +226,39 @@ export default function PreLeavePage() {
         </div>
       </div>
 
-      {/* 圖例 */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 8, padding: "0 2px", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#888" }}>
-          <div style={{ width: 10, height: 10, background: lt.bg, border: `1px solid ${lt.c}`, borderRadius: 2 }} />
-          選取
+      {/* 已標記摘要 */}
+      {selections.size > 0 && (
+        <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: "10px 12px", marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#b91c1c", marginBottom: 6 }}>❌ 已標記不可出勤（{selections.size} 天）</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {[...selections.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, hd]) => (
+              <span key={date} style={{ fontSize: 11, background: "#fde8e8", color: "#b91c1c", borderRadius: 4, padding: "2px 6px" }}>
+                {date.slice(5)}{hd ? `(${HALF_LABELS[hd]})` : ""}
+              </span>
+            ))}
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#888" }}>
-          <div style={{ width: 10, height: 10, background: "#fff8e6", border: "1px solid #b45309", borderRadius: 2 }} />
-          待審
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#888" }}>
-          <div style={{ width: 10, height: 10, background: "#e8f5e9", border: "1px solid #0a7c42", borderRadius: 2 }} />
-          已排
-        </div>
-      </div>
+      )}
 
       {/* 備註 */}
       <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: "10px", marginBottom: 12 }}>
         <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>備註（選填）</div>
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="例：家庭因素、個人事務..." rows={2}
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="例：學校課程、固定有事..." rows={2}
           style={{ width: "100%", padding: 6, borderRadius: 6, border: "1px solid #ddd", fontSize: 13, resize: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
       </div>
 
-      {/* 已選取提示 + 送出 */}
-      <div style={{ position: "sticky", bottom: 0, background: "#f7f5f0", paddingBottom: 12 }}>
-        {selected.size > 0 && (
-          <div style={{ fontSize: 12, color: "#3f51b5", textAlign: "center", marginBottom: 6, fontWeight: 600 }}>
-            已選 {selected.size} 天：{[...selected].sort().join("、")}
-          </div>
-        )}
-        <button onClick={submit} disabled={submitting || selected.size === 0}
-          style={{ width: "100%", padding: "13px", borderRadius: 10, border: "none", background: selected.size === 0 ? "#ccc" : "#3f51b5", color: "#fff", fontSize: 15, fontWeight: 700, cursor: selected.size === 0 ? "default" : "pointer" }}>
-          {submitting ? "送出中..." : selected.size === 0 ? "請點選日期" : `📤 送出申請（${selected.size} 天）`}
-        </button>
-      </div>
+      {/* 送出 */}
+      {!isLocked && (
+        <div style={{ position: "sticky", bottom: 0, background: "#f7f5f0", paddingBottom: 12 }}>
+          <button onClick={submit} disabled={submitting}
+            style={{ width: "100%", padding: "13px", borderRadius: 10, border: "none", background: submitting ? "#ccc" : "#3f51b5", color: "#fff", fontSize: 15, fontWeight: 700, cursor: submitting ? "default" : "pointer" }}>
+            {submitting ? "送出中..." : selections.size === 0 ? "📤 送出（清除本月回報）" : `📤 送出回報（不可出勤 ${selections.size} 天）`}
+          </button>
+          <div style={{ fontSize: 10, color: "#aaa", textAlign: "center", marginTop: 4 }}>送出後主管會收到 LINE 通知</div>
+        </div>
+      )}
 
-      <div style={{ textAlign: "center", paddingTop: 4, paddingBottom: 8 }}>
+      <div style={{ textAlign: "center", paddingTop: 4, paddingBottom: 16 }}>
         <a href={`/me?eid=${eid}`} style={{ fontSize: 12, color: "#3f51b5" }}>← 回面板</a>
       </div>
     </div>

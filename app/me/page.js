@@ -10,7 +10,7 @@ const ITEMS = (eid) => [
   { icon: "🔴", label: "下班打卡", desc: "GPS 定位", action: "clockin", type: "clock_out", bg: "#fde8e8", color: "#b91c1c" },
   { icon: "🕐", label: "補打卡", desc: "申請補登", href: webUrl("/amendment", eid), bg: "#fff8e6", color: "#8a6d00" },
   { icon: "🏖", label: "我要請假", desc: "事假/特休...", href: webUrl("/leave-apply", eid), bg: "#e6f1fb", color: "#185fa5" },
-  { icon: "📆", label: "預排假", desc: "申請排休", href: webUrl("/pre-leave", eid), bg: "#e8eaf6", color: "#1a237e" },
+  { icon: "📋", label: "預排假", desc: "不可出勤回報", href: webUrl("/pre-leave", eid), bg: "#e8eaf6", color: "#1a237e" },
   { icon: "📅", label: "我的班表", desc: "近期排班", href: webUrl("/my-schedule", eid), bg: "#f3e8ff", color: "#6b21a8" },
   { icon: "📊", label: "我的假勤", desc: "出勤統計", href: webUrl("/my-attendance", eid), bg: "#fef3c7", color: "#92400e" },
   { icon: "💰", label: "我的薪資", desc: "薪資明細", href: webUrl("/my-salary", eid), bg: "#fef3c7", color: "#a16207" },

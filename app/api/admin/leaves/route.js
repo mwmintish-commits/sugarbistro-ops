@@ -13,7 +13,9 @@ export async function GET(request) {
   if (status) query = query.eq("status", status);
   if (employee_id) query = query.eq("employee_id", employee_id);
   if (month) query = query.gte("start_date", `${month}-01`).lte("start_date", `${eom(month)}`);
+  // 預設排除 unavailable 回報（availability reporting 走獨立 API）
   if (request_type) query = query.eq("request_type", request_type);
+  else query = query.neq("request_type", "unavailable");
 
   const { data, error } = await query.limit(100);
   if (error) return Response.json({ error: error.message }, { status: 500 });
