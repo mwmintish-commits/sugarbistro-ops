@@ -1,7 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const HALF_LABELS = { "": "整天", am: "上午", pm: "下午" };
+const fmtHd = (hd) => {
+  if (!hd) return "整天✕";
+  const [f, t] = hd.split("~");
+  return `可${f}~${t}`;
+};
 
 export default function AvailabilityOverviewPage() {
   const [eid, setEid] = useState("");
@@ -124,8 +128,8 @@ export default function AvailabilityOverviewPage() {
                 {reported && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                     {recs.sort((a, b) => a.start_date.localeCompare(b.start_date)).map(r => (
-                      <span key={r.id} style={{ fontSize: 11, background: "#fde8e8", color: "#b91c1c", borderRadius: 4, padding: "2px 6px" }}>
-                        {r.start_date.slice(5)}{r.half_day ? `(${HALF_LABELS[r.half_day]})` : ""}
+                      <span key={r.id} style={{ fontSize: 11, background: r.half_day ? "#fff8e6" : "#fde8e8", color: r.half_day ? "#b45309" : "#b91c1c", borderRadius: 4, padding: "2px 6px" }}>
+                        {r.start_date.slice(5)} {fmtHd(r.half_day)}
                       </span>
                     ))}
                   </div>
@@ -164,7 +168,7 @@ export default function AvailabilityOverviewPage() {
                 </div>
                 {recs.length > 0 && (
                   <div style={{ marginTop: 4, fontSize: 11 }}>
-                    <span style={{ color: "#b91c1c" }}>不可：{unavailNames.join("、")}</span>
+                    <span style={{ color: "#b91c1c" }}>限制：{recs.map(r => `${r.employees?.name}(${fmtHd(r.half_day)})`).join("、")}</span>
                   </div>
                 )}
                 {recs.length > 0 && availNames.length > 0 && (

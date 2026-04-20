@@ -2,8 +2,24 @@
 import { useState, useEffect } from "react";
 
 const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
-const HALF_LABELS = { "": "整天", am: "上午", pm: "下午" };
-const HALF_COLORS = { "": "#b91c1c", am: "#1565c0", pm: "#6a1b9a" };
+const HOURS = Array.from({ length: 17 }, (_, i) => `${String(i + 7).padStart(2, "0")}:00`);
+// ["07:00" ... "23:00"]
+
+const fmtHd = (hd) => {
+  if (!hd) return "整天✕";
+  const [f, t] = hd.split("~");
+  return `可${f}~${t}`;
+};
+const hdColor = (hd) => hd ? "#b45309" : "#b91c1c";
+const hdBg   = (hd) => hd ? "#fff8e6" : "#fde8e8";
+const hdBorder = (hd) => hd ? "#fbc02d" : "#b91c1c";
+
+const fmtDate = (dateStr) => {
+  if (!dateStr) return "";
+  const [, m, d] = dateStr.split("-");
+  const dow = ["日","一","二","三","四","五","六"][new Date(dateStr).getDay()];
+  return `${Number(m)}月${Number(d)}日（${dow}）`;
+};
 
 export default function PreLeavePage() {
   const [eid, setEid] = useState("");
@@ -11,16 +27,23 @@ export default function PreLeavePage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // 預設下個月
   const [month, setMonth] = useState(() => {
     const now = new Date(new Date().toLocaleString("sv-SE", { timeZone: "Asia/Taipei" }));
     return new Date(now.getFullYear(), now.getMonth() + 1, 1)
       .toLocaleDateString("sv-SE").slice(0, 7);
   });
 
-  // selections: Map<dateStr, half_day>  ("" | "am" | "pm")
+  // selections: Map<dateStr, null | "HH:MM~HH:MM">
+  //   null  → 整天不可
+  //   "HH:MM~HH:MM" → 可出勤時段
   const [selections, setSelections] = useState(new Map());
-  const [mode, setMode] = useState(""); // 當前點擊模式
+
+  // 編輯面板狀態
+  const [activeDate, setActiveDate] = useState(null);
+  const [panelMode, setPanelMode] = useState("full"); // "full" | "range"
+  const [panelFrom, setPanelFrom] = useState("09:00");
+  const [panelTo,   setPanelTo]   = useState("17:00");
+
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -31,8 +54,7 @@ export default function PreLeavePage() {
     if (!id) { setErr("缺少員工識別碼"); setLoading(false); return; }
     fetch("/api/admin/employees?id=" + id).then(r => r.json()).then(r => {
       if (!r.data) { setErr("找不到員工資料"); setLoading(false); return; }
-      setEmp(r.data);
-      setLoading(false);
+      setEmp(r.data); setLoading(false);
     }).catch(() => { setErr("載入失敗"); setLoading(false); });
   }, []);
 
@@ -41,10 +63,9 @@ export default function PreLeavePage() {
     fetch(`/api/availability?employee_id=${eid}&month=${month}`)
       .then(r => r.json()).then(r => {
         const map = new Map();
-        for (const rec of (r.data || [])) {
-          map.set(rec.start_date, rec.half_day || "");
-        }
+        for (const rec of (r.data || [])) map.set(rec.start_date, rec.half_day || null);
         setSelections(map);
+        setActiveDate(null);
       });
   }, [eid, month]);
 
@@ -59,36 +80,45 @@ export default function PreLeavePage() {
   const daysInMonth = new Date(y, m, 0).getDate();
   const firstDow = new Date(y, m - 1, 1).getDay();
 
+  const openPanel = (dateStr) => {
+    if (isLocked || dateStr <= today) return;
+    const existing = selections.get(dateStr);
+    if (existing !== undefined) {
+      // 已有設定：帶入現有值
+      if (existing === null) { setPanelMode("full"); }
+      else { setPanelMode("range"); const [f, t] = existing.split("~"); setPanelFrom(f); setPanelTo(t); }
+    } else {
+      setPanelMode("full"); setPanelFrom("09:00"); setPanelTo("17:00");
+    }
+    setActiveDate(dateStr);
+  };
+
+  const confirmDate = () => {
+    const val = panelMode === "full" ? null : `${panelFrom}~${panelTo}`;
+    setSelections(prev => { const next = new Map(prev); next.set(activeDate, val); return next; });
+    setActiveDate(null);
+  };
+
+  const removeDate = () => {
+    setSelections(prev => { const next = new Map(prev); next.delete(activeDate); return next; });
+    setActiveDate(null);
+  };
+
   const prevMonth = () => {
     const d = new Date(y, m - 2, 1);
     const nm = d.toLocaleDateString("sv-SE").slice(0, 7);
-    if (nm >= todayMonthStr) setMonth(nm);
+    if (nm >= todayMonthStr) { setMonth(nm); setActiveDate(null); }
   };
   const nextMonth = () => {
     const d = new Date(y, m, 1);
     const nm = d.toLocaleDateString("sv-SE").slice(0, 7);
-    if (nm <= nextMonthStr) setMonth(nm);
-  };
-
-  const toggleDate = (dateStr) => {
-    if (isLocked || dateStr <= today) return;
-    setSelections(prev => {
-      const next = new Map(prev);
-      if (next.has(dateStr)) {
-        // 若已選且 mode 相同 → 移除；若 mode 不同 → 更新時段
-        if (next.get(dateStr) === mode) next.delete(dateStr);
-        else next.set(dateStr, mode);
-      } else {
-        next.set(dateStr, mode);
-      }
-      return next;
-    });
+    if (nm <= nextMonthStr) { setMonth(nm); setActiveDate(null); }
   };
 
   const submit = async () => {
     if (submitting) return;
     setSubmitting(true);
-    const slots = [...selections.entries()].map(([date, half_day]) => ({ date, half_day }));
+    const slots = [...selections.entries()].map(([date, hd]) => ({ date, half_day: hd }));
     const r = await fetch("/api/availability", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "save", employee_id: eid, month, slots, notes }),
@@ -99,15 +129,10 @@ export default function PreLeavePage() {
   };
 
   const IS_MANAGER = ["admin", "manager", "store_manager"].includes(emp?.role);
-
-  const wrap = {
-    maxWidth: 480, margin: "0 auto", padding: 8,
-    fontFamily: "system-ui, 'Noto Sans TC', sans-serif",
-    background: "#f7f5f0", minHeight: "100vh", boxSizing: "border-box",
-  };
+  const wrap = { maxWidth: 480, margin: "0 auto", padding: 8, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "#f7f5f0", minHeight: "100vh", boxSizing: "border-box" };
 
   if (loading) return <div style={wrap}><p style={{ textAlign: "center", color: "#888", padding: 60 }}>載入中...</p></div>;
-  if (err) return <div style={wrap}><p style={{ textAlign: "center", color: "#b91c1c", padding: 60 }}>{err}</p></div>;
+  if (err)     return <div style={wrap}><p style={{ textAlign: "center", color: "#b91c1c", padding: 60 }}>{err}</p></div>;
 
   if (done) return (
     <div style={wrap}>
@@ -115,14 +140,13 @@ export default function PreLeavePage() {
         <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
         <div style={{ fontSize: 18, fontWeight: 700 }}>回報已送出</div>
         <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>
-          {selections.size > 0 ? `共回報 ${selections.size} 個不可出勤日，主管已收到通知` : "已清除本月回報"}
+          {selections.size > 0 ? `共回報 ${selections.size} 個限制日，主管已收到通知` : "已清除本月回報"}
         </div>
         <button onClick={() => setDone(false)}
           style={{ marginTop: 20, padding: "10px 24px", borderRadius: 8, border: "none", background: "#3f51b5", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", marginRight: 10 }}>
           繼續修改
         </button>
-        <a href={`/me?eid=${eid}`}
-          style={{ display: "inline-block", marginTop: 20, padding: "10px 24px", borderRadius: 8, background: "#f0ede8", color: "#333", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+        <a href={`/me?eid=${eid}`} style={{ display: "inline-block", marginTop: 20, padding: "10px 24px", borderRadius: 8, background: "#f0ede8", color: "#333", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
           回面板
         </a>
       </div>
@@ -131,27 +155,22 @@ export default function PreLeavePage() {
 
   return (
     <div style={wrap}>
-      {/* Header */}
       <div style={{ background: "linear-gradient(135deg, #3f51b5, #1a237e)", borderRadius: 14, padding: "14px 16px", marginBottom: 10, color: "#fff" }}>
         <div style={{ fontSize: 11, opacity: 0.85 }}>📋 不可出勤回報</div>
         <div style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>{emp?.name}</div>
         <div style={{ fontSize: 11, marginTop: 2, opacity: 0.85 }}>{emp?.stores?.name || "🏢 總部"}</div>
       </div>
 
-      {/* 說明 */}
       <div style={{ background: "#e8eaf6", borderRadius: 8, padding: "9px 12px", marginBottom: 8, fontSize: 12, color: "#283593", lineHeight: 1.6 }}>
-        📌 請點選下個月<strong>無法配合出勤</strong>的日期，幫助主管安排排班。<br />
-        每月 25 日截止，逾期無法修改。
+        📌 點選日期標記<strong>無法出勤或可出勤時段</strong>，幫助主管排班。每月 25 日截止。
       </div>
 
-      {/* 鎖定警告 */}
       {isLocked && (
         <div style={{ background: "#fff3e0", border: "1px solid #fb8c00", borderRadius: 8, padding: "10px 12px", marginBottom: 8, fontSize: 12, color: "#e65100" }}>
           🔒 本月 25 日後已截止，下個月 1 日起可重新回報。
         </div>
       )}
 
-      {/* 主管快捷入口 */}
       {IS_MANAGER && (
         <a href={`/availability-overview?eid=${eid}`}
           style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", border: "1px solid #c5cae9", borderRadius: 8, padding: "10px 12px", marginBottom: 8, textDecoration: "none" }}>
@@ -159,19 +178,6 @@ export default function PreLeavePage() {
           <span style={{ color: "#9e9e9e" }}>▶</span>
         </a>
       )}
-
-      {/* 時段模式選擇 */}
-      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: "10px", marginBottom: 8 }}>
-        <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>點日期時套用的時段</div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {[["", "❌ 整天"], ["am", "🌅 上午"], ["pm", "🌆 下午"]].map(([v, l]) => (
-            <button key={v} onClick={() => setMode(v)}
-              style={{ flex: 1, padding: "8px 0", borderRadius: 6, border: mode === v ? `2px solid ${HALF_COLORS[v]}` : "1px solid #ddd", background: mode === v ? "#f3f4fb" : "#fff", cursor: "pointer", fontSize: 12, fontWeight: mode === v ? 700 : 400, color: mode === v ? HALF_COLORS[v] : "#555" }}>
-              {l}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* 月份導航 */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}>
@@ -197,28 +203,27 @@ export default function PreLeavePage() {
             const dow = new Date(dateStr).getDay();
             const isPast = dateStr <= today;
             const isToday = dateStr === today;
-            const hd = selections.get(dateStr); // undefined = not selected
             const isSel = selections.has(dateStr);
-            const canClick = !isLocked && !isPast;
-
-            const cellColor = isSel ? HALF_COLORS[hd] : null;
+            const hd = selections.get(dateStr);
+            const isActive = activeDate === dateStr;
 
             return (
-              <div key={dateStr} onClick={() => canClick && toggleDate(dateStr)}
+              <div key={dateStr} onClick={() => !isLocked && !isPast && openPanel(dateStr)}
                 style={{
-                  minHeight: 52, borderTop: "1px solid #f0eeea", padding: 3, boxSizing: "border-box",
-                  background: isSel ? "#fde8e8" : isToday ? "#e8eaf6" : "transparent",
-                  border: isSel ? `2px solid ${cellColor}` : isToday ? "2px solid #3f51b5" : "none",
-                  cursor: canClick ? "pointer" : "default",
+                  minHeight: 52, borderTop: "1px solid #f0eeea", padding: "3px 2px", boxSizing: "border-box",
+                  background: isActive ? "#e8eaf6" : isSel ? hdBg(hd) : isToday ? "#f3f4fb" : "transparent",
+                  outline: isActive ? "2px solid #3f51b5" : isSel ? `2px solid ${hdBorder(hd)}` : isToday ? "1px solid #9fa8da" : "none",
+                  outlineOffset: -2,
+                  cursor: !isLocked && !isPast ? "pointer" : "default",
                 }}>
-                <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isPast ? "#ccc" : dow === 0 ? "#b91c1c" : dow === 6 ? "#b45309" : "#444", marginBottom: 2 }}>{d}</div>
+                <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isPast ? "#ccc" : dow === 0 ? "#b91c1c" : dow === 6 ? "#b45309" : "#444" }}>{d}</div>
                 {isSel && (
-                  <div style={{ fontSize: 9, color: cellColor, fontWeight: 700, lineHeight: 1.3 }}>
-                    ✕ {HALF_LABELS[hd] || "整天"}
+                  <div style={{ fontSize: 8, color: hdColor(hd), fontWeight: 700, lineHeight: 1.25, marginTop: 1, wordBreak: "break-all" }}>
+                    {fmtHd(hd)}
                   </div>
                 )}
                 {!isSel && !isPast && (
-                  <div style={{ fontSize: 7, color: "#ddd", textAlign: "center" }}>○</div>
+                  <div style={{ fontSize: 8, color: "#ddd", textAlign: "center", marginTop: 2 }}>＋</div>
                 )}
               </div>
             );
@@ -226,15 +231,73 @@ export default function PreLeavePage() {
         </div>
       </div>
 
+      {/* 日期設定面板 */}
+      {activeDate && (
+        <div style={{ background: "#fff", borderRadius: 12, border: "2px solid #3f51b5", padding: 14, marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#1a237e" }}>{fmtDate(activeDate)}</span>
+            <button onClick={() => setActiveDate(null)} style={{ background: "none", border: "none", fontSize: 16, color: "#999", cursor: "pointer", padding: "0 4px" }}>✕</button>
+          </div>
+
+          {/* 模式切換 */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+            <button onClick={() => setPanelMode("full")}
+              style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: panelMode === "full" ? "2px solid #b91c1c" : "1px solid #ddd", background: panelMode === "full" ? "#fde8e8" : "#fff", cursor: "pointer", fontSize: 13, fontWeight: panelMode === "full" ? 700 : 400, color: panelMode === "full" ? "#b91c1c" : "#555" }}>
+              ✕ 整天不可
+            </button>
+            <button onClick={() => setPanelMode("range")}
+              style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: panelMode === "range" ? "2px solid #b45309" : "1px solid #ddd", background: panelMode === "range" ? "#fff8e6" : "#fff", cursor: "pointer", fontSize: 13, fontWeight: panelMode === "range" ? 700 : 400, color: panelMode === "range" ? "#b45309" : "#555" }}>
+              ⏰ 指定時段
+            </button>
+          </div>
+
+          {/* 可出勤時段選擇 */}
+          {panelMode === "range" && (
+            <div style={{ background: "#fafafa", borderRadius: 8, padding: "10px 12px", marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>可出勤時段</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <select value={panelFrom} onChange={e => { setPanelFrom(e.target.value); if (e.target.value >= panelTo) setPanelTo(HOURS[Math.min(HOURS.indexOf(e.target.value) + 1, HOURS.length - 1)]); }}
+                  style={{ flex: 1, padding: "8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 14, textAlign: "center" }}>
+                  {HOURS.slice(0, -1).map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
+                <span style={{ fontSize: 14, color: "#888", flexShrink: 0 }}>～</span>
+                <select value={panelTo} onChange={e => setPanelTo(e.target.value)}
+                  style={{ flex: 1, padding: "8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 14, textAlign: "center" }}>
+                  {HOURS.filter(h => h > panelFrom).map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </div>
+              <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>
+                例：14:00 ～ 22:00 表示這天只有下午兩點後可排班
+              </div>
+            </div>
+          )}
+
+          {/* 確認 / 移除 */}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={confirmDate}
+              style={{ flex: 2, padding: "10px 0", borderRadius: 8, border: "none", background: "#3f51b5", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              ✓ 確認
+            </button>
+            {selections.has(activeDate) && (
+              <button onClick={removeDate}
+                style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "1px solid #ddd", background: "#fff", color: "#888", fontSize: 13, cursor: "pointer" }}>
+                移除
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 已標記摘要 */}
       {selections.size > 0 && (
         <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: "10px 12px", marginBottom: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#b91c1c", marginBottom: 6 }}>❌ 已標記不可出勤（{selections.size} 天）</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#333", marginBottom: 6 }}>本月回報（{selections.size} 天）</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {[...selections.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, hd]) => (
-              <span key={date} style={{ fontSize: 11, background: "#fde8e8", color: "#b91c1c", borderRadius: 4, padding: "2px 6px" }}>
-                {date.slice(5)}{hd ? `(${HALF_LABELS[hd]})` : ""}
-              </span>
+              <button key={date} onClick={() => openPanel(date)}
+                style={{ fontSize: 11, background: hdBg(hd), color: hdColor(hd), border: `1px solid ${hdBorder(hd)}`, borderRadius: 4, padding: "3px 7px", cursor: "pointer" }}>
+                {date.slice(5)} {fmtHd(hd)}
+              </button>
             ))}
           </div>
         </div>
@@ -247,12 +310,11 @@ export default function PreLeavePage() {
           style={{ width: "100%", padding: 6, borderRadius: 6, border: "1px solid #ddd", fontSize: 13, resize: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
       </div>
 
-      {/* 送出 */}
       {!isLocked && (
         <div style={{ position: "sticky", bottom: 0, background: "#f7f5f0", paddingBottom: 12 }}>
           <button onClick={submit} disabled={submitting}
             style={{ width: "100%", padding: "13px", borderRadius: 10, border: "none", background: submitting ? "#ccc" : "#3f51b5", color: "#fff", fontSize: 15, fontWeight: 700, cursor: submitting ? "default" : "pointer" }}>
-            {submitting ? "送出中..." : selections.size === 0 ? "📤 送出（清除本月回報）" : `📤 送出回報（不可出勤 ${selections.size} 天）`}
+            {submitting ? "送出中..." : selections.size === 0 ? "📤 送出（清除本月回報）" : `📤 送出回報（${selections.size} 天）`}
           </button>
           <div style={{ fontSize: 10, color: "#aaa", textAlign: "center", marginTop: 4 }}>送出後主管會收到 LINE 通知</div>
         </div>

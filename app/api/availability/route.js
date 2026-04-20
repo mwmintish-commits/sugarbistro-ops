@@ -66,11 +66,11 @@ export async function POST(request) {
       .eq("is_active", true);
 
     if (emp && managers && (slots || []).length > 0) {
-      const halfMap = { am: "上午", pm: "下午" };
       const sorted = [...slots].sort((a, b) => a.date.localeCompare(b.date));
+      const fmtHd = (hd) => hd ? `可${hd}` : "整天✕";
       const preview = sorted.slice(0, 5).map(s => {
-        const d = s.date.slice(5); // MM-DD
-        return s.half_day ? `${d}(${halfMap[s.half_day]})` : d;
+        const d = s.date.slice(5);
+        return `${d}(${fmtHd(s.half_day)})`;
       }).join("、");
       const suffix = sorted.length > 5 ? ` 等共 ${sorted.length} 天` : "";
       for (const mgr of managers) {
