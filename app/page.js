@@ -84,6 +84,7 @@ export default function AdminPage() {
   const [sv, setSv] = useState("week");
   const [avReports, setAvReports] = useState([]);
   const [avView, setAvView] = useState("employee"); // "employee"|"day"
+  const [showAvail, setShowAvail] = useState(false);
   const [ws, setWs] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - d.getDay());
@@ -597,6 +598,7 @@ export default function AdminPage() {
                   <button onClick={()=>{const d=sv==="biweek"?14:7;setWs(new Date(new Date(ws).getTime()-d*86400000).toLocaleDateString("sv-SE"));}} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>◀</button>
                   <span style={{fontSize:12,fontWeight:500}}>{ws+" ~ "+new Date(new Date(ws).getTime()+(sv==="biweek"?13:6)*86400000).toLocaleDateString("sv-SE")}</span>
                   <button onClick={()=>{const d=sv==="biweek"?14:7;setWs(new Date(new Date(ws).getTime()+d*86400000).toLocaleDateString("sv-SE"));}} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>▶</button>
+                  <button onClick={()=>{const next=!showAvail;setShowAvail(next);if(next){const months=new Set();const days=sv==="biweek"?14:7;for(let i=0;i<days;i++){const d=new Date(new Date(ws).getTime()+i*86400000).toLocaleDateString("sv-SE");months.add(d.slice(0,7));}Promise.all([...months].map(mo=>ap("/api/availability?month="+mo+(sf?"&store_id="+sf:"")))).then(rs=>{const all=rs.flatMap(r=>r.data||[]);setAvReports(all);});}}} style={{padding:"3px 8px",borderRadius:5,border:showAvail?"1px solid #854d0e":"1px solid #ddd",background:showAvail?"#fef9c3":"#fff",color:showAvail?"#854d0e":"#888",cursor:"pointer",fontSize:11,fontWeight:showAvail?600:400}}>📋 預排假</button>
                 </>
               )}
               <button onClick={async()=>{
@@ -705,8 +707,9 @@ export default function AdminPage() {
                               {emp.name}
                               <div style={{fontSize:7,color:"#888",marginTop:1}}>{mWorkDays}天 / {Math.round(mWorkHrs)}hr{mLeaveDays>0?" / 假"+mLeaveDays+"天":""}</div>
                             </td>
-                            {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);const hol=holidays.find(h=>h.date===date);return(
+                            {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);const hol=holidays.find(h=>h.date===date);const avRec=showAvail?avReports.find(r=>r.employee_id===emp.id&&r.start_date===date):null;return(
                               <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top",borderLeft:new Date(date).getDay()===0?"2px solid #e0d0d0":"none"}}>
+                                {avRec&&<div style={{fontSize:7,color:avRec.half_day?"#854d0e":"#b91c1c",background:avRec.half_day?"#fef9c3":"#fde8e8",borderRadius:2,padding:"0 2px",marginBottom:1,lineHeight:1.4,textAlign:"center"}}>{avRec.half_day?`可${avRec.half_day}`:"整天✕"}</div>}
                                 {sc?(() => {const isLeave=sc.type==="leave";const lt=isLeave?(LT[sc.leave_type]||LT.off):null;const isRest=sc.day_type==="rest_day";const isHol=sc.day_type==="national_holiday";const pc=positions.find(p=>p.name===sc.shifts?.role)?.color||sc.shifts?.color||"#0a7c42";const hasPartialLeave=Number(sc.leave_hours)>0&&sc.type!=="leave";return(
                                 <div style={{background:isLeave?lt.bg:isRest?"#fff8e6":isHol?"#fde8e8":sc.published?pc+"12":"#fff8e6",border:`1.5px ${sc.published||isLeave?"solid":"dashed"} ${isLeave?lt.c:isRest?"#b45309":isHol?"#b91c1c":pc}`,borderRadius:4,padding:"2px 3px",fontSize:9,position:"relative"}}>
                                   {isLeave?<div style={{color:lt.c,fontWeight:600}}>{lt.l}</div>:<><div style={{fontWeight:600,color:isRest?"#b45309":isHol?"#b91c1c":pc}}>{isRest?"💰 ":isHol?"🎉 ":""}{sc.shifts?.role&&sc.shifts.role!=="all"?sc.shifts.role:"全場"}</div><div style={{color:"#888",fontSize:8}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></>}
