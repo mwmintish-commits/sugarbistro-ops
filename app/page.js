@@ -1,10 +1,14 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, LABOR_SELF, HEALTH_SELF } from "./components/utils";
-import EmpDetail from "./components/EmpDetail";
-import SettingsMgr, { BonusFormulaEditor, WorklogSettings } from "./components/SettingsMgr";
-import WorklogMgr from "./components/WorklogMgr";
-import LeavesMgr from "./components/LeavesMgr";
+
+const EmpDetail = dynamic(() => import("./components/EmpDetail"), { ssr: false });
+const SettingsMgr = dynamic(() => import("./components/SettingsMgr"), { ssr: false });
+const BonusFormulaEditor = dynamic(() => import("./components/SettingsMgr").then(m => ({ default: m.BonusFormulaEditor })), { ssr: false });
+const WorklogSettings = dynamic(() => import("./components/SettingsMgr").then(m => ({ default: m.WorklogSettings })), { ssr: false });
+const WorklogMgr = dynamic(() => import("./components/WorklogMgr"), { ssr: false });
+const LeavesMgr = dynamic(() => import("./components/LeavesMgr"), { ssr: false });
 
 const ROLE_TABS = {
   admin: ["dashboard","employees","schedules","leaves","attendance","overtime","payroll",

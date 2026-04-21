@@ -281,18 +281,6 @@ export default function SettingsMgr({ stores, load, month }) {
         )}
       </div>
 
-      {/* LINE 選單 */}
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
-        <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📱 LINE 選單設定</h4>
-        <p style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>員工在 LINE 輸入「選單」時，依據角色顯示不同功能按鈕。</p>
-        <div style={{ fontSize: 11, lineHeight: 2 }}>
-          <div><b>👤 員工：</b>打卡、班表、請假、假勤、日結、存款</div>
-          <div><b>🏪 門店主管：</b>以上 + 月結、零用金、🔗後台</div>
-          <div><b>🏠 管理：</b>以上 + 總部代付、營收、🔗後台</div>
-          <div><b>👑 總部：</b>🔗管理後台、營收、費用（不顯示打卡）</div>
-        </div>
-      </div>
-
       {/* 工作合約編輯器 */}
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📝 工作合約編輯器</h4>
