@@ -17,43 +17,51 @@ export async function GET(request) {
   // 協作日誌：取得某門市某日的所有項目狀態
   if (type === "collab") {
     const freq = searchParams.get("frequency") || "daily";
-    let { data: items } = await supabase.from("work_log_items").select("*").eq("store_id", store_id).eq("date", date).eq("frequency", freq).order("created_at");
-    
+    const selectCols = "*, work_log_templates(requires_value, value_label, value_min, value_max)";
+    let { data: items } = await supabase.from("work_log_items").select(selectCols).eq("store_id", store_id).eq("date", date).eq("frequency", freq).order("created_at");
+
     // 如果當日還沒初始化，從模板建立
     if (!items || items.length === 0) {
       let tq = supabase.from("work_log_templates").select("*").eq("store_id", store_id).eq("is_active", true).order("sort_order");
-      
+
       if (freq === "daily") {
         tq = tq.eq("frequency", "daily");
       } else if (freq === "weekly") {
         const dow = new Date(date).getDay();
-        tq = tq.eq("frequency", "weekly").eq("weekday", dow);
+        tq = tq.eq("frequency", "weekly").or(`weekday.eq.${dow},weekday.is.null`);
       } else if (freq === "monthly") {
         const dom = new Date(date).getDate();
-        tq = tq.eq("frequency", "monthly");
+        tq = tq.eq("frequency", "monthly").or(`month_day.eq.${dom},month_day.is.null`);
       }
 
       const { data: templates } = await tq;
       if (templates && templates.length > 0) {
-        const newItems = templates.map(t => ({
-          store_id, date, template_id: t.id, item_name: t.item, category: t.category, 
+        const cleanItems = templates.map(t => ({
+          store_id, date, template_id: t.id, item_name: t.item, category: t.category,
           shift_type: t.shift_type || "opening", frequency: freq,
-          requires_value: t.requires_value, value_label: t.value_label, value_min: t.value_min, value_max: t.value_max,
         }));
-        // work_log_items may not have these columns yet, filter nulls
-        const cleanItems = newItems.map(i => {
-          const o = { store_id: i.store_id, date: i.date, template_id: i.template_id, item_name: i.item_name, category: i.category, shift_type: i.shift_type, frequency: i.frequency };
-          return o;
-        });
-        const { data: created } = await supabase.from("work_log_items").insert(cleanItems).select();
+        const { data: created } = await supabase.from("work_log_items").insert(cleanItems).select(selectCols);
         items = created || [];
       }
     }
 
-    const total = (items || []).length;
-    const done = (items || []).filter(i => i.completed).length;
-    const abnormal = (items || []).filter(i => i.is_abnormal).length;
-    return Response.json({ data: items, summary: { total, done, abnormal, percent: total > 0 ? Math.round(done / total * 100) : 0 } });
+    // 展平 template 的 meta 欄位（requires_value 等），讓前端能正確渲染輸入框
+    const flat = (items || []).map(i => {
+      const t = i.work_log_templates || {};
+      return {
+        ...i,
+        requires_value: t.requires_value || false,
+        value_label: t.value_label || null,
+        value_min: t.value_min ?? null,
+        value_max: t.value_max ?? null,
+        work_log_templates: undefined,
+      };
+    });
+
+    const total = flat.length;
+    const done = flat.filter(i => i.completed).length;
+    const abnormal = flat.filter(i => i.is_abnormal).length;
+    return Response.json({ data: flat, summary: { total, done, abnormal, percent: total > 0 ? Math.round(done / total * 100) : 0 } });
   }
 
   if (type === "log") {
