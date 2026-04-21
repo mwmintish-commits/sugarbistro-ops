@@ -69,14 +69,25 @@ export async function GET(request) {
     });
   }
 
-  // 員工列表（按自訂排序，未設者以姓名排）
-  let query = supabase.from("employees").select("*, stores!store_id(name)")
-    .order("sort_order", { ascending: true, nullsFirst: false })
-    .order("name", { ascending: true });
-  if (store_id) query = query.eq("store_id", store_id);
-  if (!include_inactive) query = query.or("is_active.eq.true,is_active.eq.false"); // show all for admin
+  // 員工列表（按自訂排序，未設者以姓名排；migration 未跑時 fallback）
+  const buildQuery = (useSortOrder) => {
+    let q = supabase.from("employees").select("*, stores!store_id(name)");
+    if (useSortOrder) {
+      q = q.order("sort_order", { ascending: true, nullsFirst: false })
+           .order("name", { ascending: true });
+    } else {
+      q = q.order("created_at", { ascending: false });
+    }
+    if (store_id) q = q.eq("store_id", store_id);
+    if (!include_inactive) q = q.or("is_active.eq.true,is_active.eq.false");
+    return q;
+  };
 
-  const { data, error } = await query;
+  let { data, error } = await buildQuery(true);
+  if (error) {
+    // sort_order 欄位不存在 → migration 未跑，退回 created_at 排序
+    ({ data, error } = await buildQuery(false));
+  }
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
   // 附加年資和特休（檢查 leave_balances 有無手動覆蓋）
