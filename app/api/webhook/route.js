@@ -14,12 +14,11 @@ const DAYS = ["日","一","二","三","四","五","六"];
 const MI = (label, text) => ({ type: "action", action: { type: "message", label, text } });
 const MU = (label, url) => ({ type: "action", action: { type: "uri", label, uri: url } });
 const SITE = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
-const PNL = MI("📱 面板", "面板");
-const MENU_BASE = [PNL, MI("📍 上班打卡", "上班打卡"), MI("📍 下班打卡", "下班打卡"), MI("📋 工作日誌", "工作日誌"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報")];
-const MENU_SM = [PNL, MI("📍 上班打卡", "上班打卡"), MI("📍 下班打卡", "下班打卡"), MI("📋 工作日誌", "工作日誌"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報"), MI("📦 月結單據", "月結單據"), MI("💰 零用金", "零用金"), MU("🔗 後台", SITE)];
-const MENU_MGR = [...MENU_SM, MI("🏢 總部代付", "總部代付"), MI("📊 今日營收", "今日營收")];
-const MENU_ADMIN = [PNL, MU("🔗 管理後台", SITE), MI("📊 今日營收", "今日營收"), MI("💰 日結回報", "日結回報"), MI("🏦 存款回報", "存款回報"), MI("📦 月結單據", "月結單據"), MI("💰 零用金", "零用金"), MI("🏢 總部代付", "總部代付")];
-function getMenu(role) { if (role === "admin") return MENU_ADMIN; if (role === "manager") return MENU_MGR; if (role === "store_manager") return MENU_SM; return MENU_BASE; }
+const MENU_BASE = [];
+const MENU_SM = [];
+const MENU_MGR = [];
+const MENU_ADMIN = [];
+function getMenu(role) { return []; }
 function getRoleLabel(role) { return role === "admin" ? "👑 總部" : role === "manager" ? "🏠 管理" : role === "store_manager" ? "🏪 主管" : "👤 員工"; }
 
 async function getUserState(uid) { 
