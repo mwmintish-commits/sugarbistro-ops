@@ -7,7 +7,16 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(git push *)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(git merge *)",
+      "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops/.claude/worktrees/pensive-edison-38e288 status)",
+      "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops/.claude/worktrees/pensive-edison-38e288 add app/api/webhook/route.js)",
+      "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops/.claude/worktrees/pensive-edison-38e288 commit -m ' *)",
+      "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops merge claude/pensive-edison-38e288 --no-ff -m \"Merge: LINE Bot 只保留報到流程\")",
+      "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops push origin main)",
+      "Bash(command -v pandoc)",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --no-pdf-header-footer --print-to-pdf=\"/Users/maxwang/Desktop/預排假操作說明書.pdf\" \"file:///Users/maxwang/Desktop/預排假操作說明書.html\")",
+      "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops merge claude/pensive-edison-38e288 --no-ff -m \"Merge: 後台效能優化 + 清理舊選單設定\")"
     ]
   }
 }
