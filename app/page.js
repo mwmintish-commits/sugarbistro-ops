@@ -153,78 +153,102 @@ export default function AdminPage() {
       ? "week_start=" + ws + "&week_end=" + we2 + (sf ? "&store_id=" + sf : "")
       : "month=" + month + (sf ? "&store_id=" + sf : "");
 
+    // 以目前 tab 決定要抓哪些資料（未開啟的 tab 不抓）
+    const T = tab || "";
+    const need = (list) => list.includes(T);
+    const needSettle = need(["dashboard","settlements","pnl","bonus"]) && myTabs.includes("settlements");
+    const needDep    = need(["dashboard","deposits"]) && myTabs.includes("deposits");
+    const needSched  = need(["dashboard","schedules","payroll","reviews","bonus"]);
+    const needAtt    = need(["dashboard","attendance","payroll","reviews"]);
+    const needLv     = need(["dashboard","leaves","payroll","reviews","schedules","attendance","employees","store_staff"]);
+    const needExp    = need(["dashboard","expenses","pnl"]);
+    const needPnl    = T === "pnl" && myTabs.includes("pnl");
+    const needAnn    = need(["dashboard","announcements","store_staff"]);
+
     Promise.all([
-      myTabs.includes("settlements") ? ap("/api/admin/settlements?" + p) : Promise.resolve({data:[],summary:{}}),
-      myTabs.includes("deposits") ? ap("/api/admin/deposits?" + p) : Promise.resolve({data:[]}),
+      needSettle ? ap("/api/admin/settlements?" + p) : Promise.resolve({data:[],summary:{}}),
+      needDep    ? ap("/api/admin/deposits?"    + p) : Promise.resolve({data:[]}),
       ap("/api/admin/employees" + (sf ? "?store_id=" + sf : "")),
       ap("/api/admin/shifts" + (sf ? "?store_id=" + sf : "")),
-      ap("/api/admin/schedules?" + sp),
-      ap("/api/admin/attendance?" + p),
-      ap("/api/admin/attendance?summary=true&" + p),
-      ap("/api/admin/leaves?" + p),
-      ap("/api/admin/expenses?" + p + "&type=" + expType),
-      myTabs.includes("pnl") ? ap("/api/admin/pnl?month=" + month + "&compare=stores" + (sf ? "&store_id=" + sf : "")) : Promise.resolve(null),
-      ap("/api/admin/announcements"),
+      needSched  ? ap("/api/admin/schedules?" + sp) : Promise.resolve({data:[]}),
+      needAtt    ? ap("/api/admin/attendance?" + p) : Promise.resolve({data:[]}),
+      needAtt    ? ap("/api/admin/attendance?summary=true&" + p) : Promise.resolve({}),
+      needLv     ? ap("/api/admin/leaves?" + p) : Promise.resolve({data:[]}),
+      needExp    ? ap("/api/admin/expenses?" + p + "&type=" + expType) : Promise.resolve({data:[]}),
+      needPnl    ? ap("/api/admin/pnl?month=" + month + "&compare=stores" + (sf ? "&store_id=" + sf : "")) : Promise.resolve(null),
+      needAnn    ? ap("/api/admin/announcements") : Promise.resolve({data:[]}),
     ]).then(([s,d,e,shs,sc,at2,as3,lr2,ex,pl2,an]) => {
-      setStl(s.data||[]); setSum(s.summary||{}); setDep(d.data||[]);
+      if (needSettle) { setStl(s.data||[]); setSum(s.summary||{}); }
+      if (needDep) setDep(d.data||[]);
       setEmps(e.data||[]); setShifts(shs.data||[]);
       // 待審核員工的文件完整度
       const pendingIds = (e.data||[]).filter(x=>!x.is_active).map(x=>x.id);
-      if (pendingIds.length > 0) {
+      if (pendingIds.length > 0 && (T === "employees" || T === "dashboard" || T === "store_staff")) {
         ap("/api/admin/documents?summary=1&employee_ids=" + pendingIds.join(",")).then(r => setDocMap(r.map||{}));
       } else { setDocMap({}); }
-      setScheds(sc.data||[]); setAtt(at2.data||[]);
-      setLr(lr2.data||[]); setExps(ex.data||[]);
-      setExpSum({total:ex.total,byCategory:ex.byCategory});
-      setPnl(pl2); setAnns(an.data||[]);
+      if (needSched) setScheds(sc.data||[]);
+      if (needAtt) setAtt(at2.data||[]);
+      if (needLv) setLr(lr2.data||[]);
+      if (needExp) { setExps(ex.data||[]); setExpSum({total:ex.total,byCategory:ex.byCategory}); }
+      if (needPnl) setPnl(pl2);
+      if (needAnn) setAnns(an.data||[]);
       setLd(false);
     });
 
-    if (myTabs.includes("overtime")) {
+    if (need(["dashboard","overtime","payroll","reviews"]) && myTabs.includes("overtime")) {
       ap("/api/admin/overtime?month=" + month + (sf ? "&store_id=" + sf : ""))
         .then(r => { setOtRecords(r.data||[]); setOtSum(r.summary||{}); });
-      // 年度加班（補休累積用）
-      ap("/api/admin/overtime?year=" + month.slice(0,4) + (sf ? "&store_id=" + sf : ""))
-        .then(r => setOtYearly(r.data||[])).catch(() => {});
+      if (T === "overtime" || T === "payroll") {
+        ap("/api/admin/overtime?year=" + month.slice(0,4) + (sf ? "&store_id=" + sf : ""))
+          .then(r => setOtYearly(r.data||[])).catch(() => {});
+      }
     }
-    if (myTabs.includes("payments")) {
+    if (need(["dashboard","payments"]) && myTabs.includes("payments")) {
       ap("/api/admin/payments")
         .then(r => { setPmtRecords(r.data||[]); setPmtSum(r.summary||{}); });
     }
-    ap("/api/admin/holidays?month=" + month)
-      .then(r => setHolidays(r.data||[])).catch(() => {});
-    ap("/api/admin/system?key=positions")
-      .then(r => setPositions(r.data?.value || [{ name: "全場", color: "#0a7c42" }, { name: "外場", color: "#4361ee" }, { name: "內場", color: "#b45309" }, { name: "吧台", color: "#7c3aed" }, { name: "烘焙", color: "#be185d" }])).catch(() => {});
-    ap("/api/admin/system?key=role_tabs")
-      .then(r => { if (r.data?.value) setCustomRoleTabs(r.data.value); }).catch(() => {});
-    if (myTabs.includes("attendance")) {
+    if (need(["schedules","attendance","leaves","dashboard"])) {
+      ap("/api/admin/holidays?month=" + month)
+        .then(r => setHolidays(r.data||[])).catch(() => {});
+    }
+    if (need(["schedules","dashboard"])) {
+      ap("/api/admin/system?key=positions")
+        .then(r => setPositions(r.data?.value || [{ name: "全場", color: "#0a7c42" }, { name: "外場", color: "#4361ee" }, { name: "內場", color: "#b45309" }, { name: "吧台", color: "#7c3aed" }, { name: "烘焙", color: "#be185d" }])).catch(() => {});
+    }
+    if (T === "settings") {
+      ap("/api/admin/system?key=role_tabs")
+        .then(r => { if (r.data?.value) setCustomRoleTabs(r.data.value); }).catch(() => {});
+    }
+    if (need(["attendance","dashboard"]) && myTabs.includes("attendance")) {
       ap("/api/admin/attendance?type=amendments&month=" + month + (sf ? "&store_id=" + sf : ""))
         .then(r => setAmendments(r.data||[])).catch(() => {});
-      ap("/api/admin/attendance?type=monthly_report&month=" + month + (sf ? "&store_id=" + sf : ""))
-        .then(r => setMonthlyReport(r.data||[])).catch(() => {});
+      if (T === "attendance" || T === "payroll") {
+        ap("/api/admin/attendance?type=monthly_report&month=" + month + (sf ? "&store_id=" + sf : ""))
+          .then(r => setMonthlyReport(r.data||[])).catch(() => {});
+      }
     }
-    if (myTabs.includes("inventory")) {
+    if (need(["inventory","stock"]) && myTabs.includes("inventory")) {
       ap("/api/admin/inventory").then(r => { setInvItems(r.data||[]); setInvSum(r.summary||{}); });
     }
-    if (myTabs.includes("recipes")) {
+    if (need(["recipes","production"]) && myTabs.includes("recipes")) {
       ap("/api/admin/recipes").then(r => setRecipeList(r.data||[]));
     }
-    if (myTabs.includes("clients")) {
+    if (need(["clients","orders"]) && myTabs.includes("clients")) {
       ap("/api/admin/clients").then(r => setClientList(r.data||[]));
       ap("/api/admin/products").then(r => setProductList(r.data||[])).catch(()=>{});
     }
-    if (myTabs.includes("orders")) {
+    if (need(["dashboard","orders"]) && myTabs.includes("orders")) {
       ap("/api/admin/orders").then(r => { setOrderList(r.data||[]); setOrderSum(r.summary||{}); });
     }
-    if (myTabs.includes("production")) {
+    if (T === "production" && myTabs.includes("production")) {
       ap("/api/admin/production?month=" + month)
         .then(r => { setProdList(r.data||[]); setProdSum(r.summary||{}); });
     }
     // 系統提醒
-    if (myTabs.includes("dashboard")) {
+    if (T === "dashboard" && myTabs.includes("dashboard")) {
       ap("/api/admin/reminders").then(r => setReminders(r.data||[])).catch(() => {});
     }
-  }, [month, sf, sv, ws, myTabs.join(","), expType]);
+  }, [month, sf, sv, ws, myTabs.join(","), expType, tab]);
 
   useEffect(() => { if (auth) load(); }, [auth, load]);
 
@@ -561,9 +585,15 @@ export default function AdminPage() {
                   <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
                   <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                      <thead><tr style={{background:"#faf8f5"}}>{["姓名","角色","年資","特休","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
-                      <tbody>{storeEmps.map(e=>(
+                      <thead><tr style={{background:"#faf8f5"}}>{["順序","姓名","角色","年資","特休","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                      <tbody>{storeEmps.map((e,idx)=>(
                         <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                          <td style={{padding:4,whiteSpace:"nowrap"}}>
+                            <button disabled={idx===0} onClick={async()=>{await ap("/api/admin/employees",{action:"reorder",employee_id:e.id,direction:"up"});load();}}
+                              style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:idx===0?"default":"pointer",opacity:idx===0?0.3:1,marginRight:2}}>↑</button>
+                            <button disabled={idx===storeEmps.length-1} onClick={async()=>{await ap("/api/admin/employees",{action:"reorder",employee_id:e.id,direction:"down"});load();}}
+                              style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:idx===storeEmps.length-1?"default":"pointer",opacity:idx===storeEmps.length-1?0.3:1}}>↓</button>
+                          </td>
                           <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}} onClick={()=>setDetailId(e.id)}>{e.name}<span style={{fontSize:9,color:e.employment_type==="parttime"?"#b45309":"#888",marginLeft:4,fontWeight:400}}>{e.employment_type==="parttime"?"兼職":"正職"}</span></td>
                           <td style={{padding:6}}><RB role={e.role} /></td>
                           <td style={{padding:6}}>{(e.service_months||0)+"月"}</td>
