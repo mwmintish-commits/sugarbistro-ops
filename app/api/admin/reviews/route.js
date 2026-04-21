@@ -31,67 +31,82 @@ export async function POST(request) {
       .select("id, name, role, store_id, employment_type, probation_status")
       .eq("is_active", true);
 
+    const targets = (emps || []).filter(e => e.probation_status !== "in_probation" && e.role !== "admin");
+    const empIds = targets.map(e => e.id);
+    const storeIds = [...new Set(targets.map(e => e.store_id).filter(Boolean))];
+    const qk = year + "-Q" + quarter;
+
+    // ===== 批次預載：所有員工 & 所有門市的相關資料 =====
+    const [schedsAll, clockInsAll, clockOutsAll, leavesAll, alertsAll, wlItemsAll, incidentsAll, violsAll] =
+      empIds.length === 0 ? [[],[],[],[],[],[],[],[]] : await Promise.all([
+        supabase.from("schedules").select("employee_id, date, type")
+          .in("employee_id", empIds).eq("type", "shift").gte("date", startDate).lte("date", endDate).then(r => r.data || []),
+        supabase.from("attendances").select("employee_id, date, late_minutes")
+          .in("employee_id", empIds).eq("type", "clock_in").gte("date", startDate).lte("date", endDate).then(r => r.data || []),
+        supabase.from("attendances").select("employee_id, date, early_leave_minutes")
+          .in("employee_id", empIds).eq("type", "clock_out").gte("date", startDate).lte("date", endDate).then(r => r.data || []),
+        supabase.from("leave_requests").select("employee_id, start_date, end_date")
+          .in("employee_id", empIds).eq("status", "approved").lte("start_date", endDate).gte("end_date", startDate).then(r => r.data || []),
+        supabase.from("attendance_alerts").select("employee_id, date")
+          .in("employee_id", empIds).eq("alert_type", "no_clockin").gte("date", startDate).lte("date", endDate).then(r => r.data || []),
+        storeIds.length === 0 ? Promise.resolve([]) : supabase.from("work_log_items").select("store_id, completed")
+          .in("store_id", storeIds).gte("date", startDate).lte("date", endDate).then(r => r.data || []),
+        storeIds.length === 0 ? Promise.resolve([]) : supabase.from("incident_reports").select("store_id, type")
+          .in("store_id", storeIds).gte("created_at", startDate).lte("created_at", endDate + "T23:59:59").then(r => r.data || []),
+        supabase.from("violations").select("employee_id, level")
+          .in("employee_id", empIds).eq("quarter_key", qk).then(r => r.data || []),
+      ]);
+
+    const byEmp = (arr) => arr.reduce((m, r) => { (m[r.employee_id] ||= []).push(r); return m; }, {});
+    const byStore = (arr) => arr.reduce((m, r) => { (m[r.store_id] ||= []).push(r); return m; }, {});
+    const schedMap = byEmp(schedsAll), ciMap = byEmp(clockInsAll), coMap = byEmp(clockOutsAll);
+    const lvMap = byEmp(leavesAll), alertMap = byEmp(alertsAll), violMap = byEmp(violsAll);
+    const wlMap = byStore(wlItemsAll), incMap = byStore(incidentsAll);
+
     const results = [];
-    for (const emp of (emps || []).filter(e => e.probation_status !== "in_probation" && e.role !== "admin")) {
-
+    const upserts = [];
+    for (const emp of targets) {
       // === 出勤紀律 30分 ===
-      // 扣分：遲到×3、早退×3、未打卡(缺勤)×10
-      const { data: schedules } = await supabase.from("schedules")
-        .select("date, type").eq("employee_id", emp.id).eq("type", "shift")
-        .gte("date", startDate).lte("date", endDate);
-      const { data: clockIns } = await supabase.from("attendances")
-        .select("date, late_minutes").eq("employee_id", emp.id).eq("type", "clock_in")
-        .gte("date", startDate).lte("date", endDate);
-      const { data: clockOuts } = await supabase.from("attendances")
-        .select("date, early_leave_minutes").eq("employee_id", emp.id).eq("type", "clock_out")
-        .gte("date", startDate).lte("date", endDate);
-      const { data: leaves } = await supabase.from("leave_requests")
-        .select("start_date, end_date").eq("employee_id", emp.id).eq("status", "approved")
-        .lte("start_date", endDate).gte("end_date", startDate);
-      const { data: alerts } = await supabase.from("attendance_alerts")
-        .select("date").eq("employee_id", emp.id).eq("alert_type", "no_clockin")
-        .gte("date", startDate).lte("date", endDate);
+      const schedules = schedMap[emp.id] || [];
+      const clockIns = ciMap[emp.id] || [];
+      const clockOuts = coMap[emp.id] || [];
+      const leaves = lvMap[emp.id] || [];
+      const alerts = alertMap[emp.id] || [];
 
-      const clockDates = new Set((clockIns || []).map(c => c.date));
+      const clockDates = new Set(clockIns.map(c => c.date));
       const leaveDates = new Set();
-      for (const l of leaves || []) {
+      for (const l of leaves) {
         let d = new Date(l.start_date);
         while (d <= new Date(l.end_date)) { leaveDates.add(d.toLocaleDateString("sv-SE")); d.setDate(d.getDate() + 1); }
       }
 
-      const lateCount = (clockIns || []).filter(c => c.late_minutes > 0).length;
-      const earlyLeaveCount = (clockOuts || []).filter(c => c.early_leave_minutes > 0).length;
-      const noClockInAlerts = (alerts || []).length;
+      const lateCount = clockIns.filter(c => c.late_minutes > 0).length;
+      const earlyLeaveCount = clockOuts.filter(c => c.early_leave_minutes > 0).length;
+      const noClockInAlerts = alerts.length;
       let absentCount = 0;
-      for (const s of schedules || []) {
+      for (const s of schedules) {
         if (!clockDates.has(s.date) && !leaveDates.has(s.date)) absentCount++;
       }
       const attScore = Math.max(0, 30 - (lateCount * 3) - (earlyLeaveCount * 3) - (absentCount * 10));
-      const attDetail = { late: lateCount, early_leave: earlyLeaveCount, absent: absentCount, no_clockin_alerts: noClockInAlerts, scheduled: (schedules || []).length };
+      const attDetail = { late: lateCount, early_leave: earlyLeaveCount, absent: absentCount, no_clockin_alerts: noClockInAlerts, scheduled: schedules.length };
 
-      // === 工作完成度 30分（自動基礎分）===
-      const { data: wlItems } = await supabase.from("work_log_items")
-        .select("completed, completed_by_name").eq("store_id", emp.store_id)
-        .gte("date", startDate).lte("date", endDate);
-      const totalWl = (wlItems || []).length;
-      const doneWl = (wlItems || []).filter(w => w.completed).length;
+      // === 工作完成度 30分 ===
+      const wlItems = wlMap[emp.store_id] || [];
+      const totalWl = wlItems.length;
+      const doneWl = wlItems.filter(w => w.completed).length;
       const wlRate = totalWl > 0 ? Math.round(doneWl / totalWl * 100) : 100;
       let perfAuto = wlRate >= 95 ? 25 : wlRate >= 80 ? 20 : wlRate >= 60 ? 15 : 10;
 
       // === 服務態度 20分 ===
-      const { data: incidents } = await supabase.from("incident_reports")
-        .select("type, description").eq("store_id", emp.store_id)
-        .gte("created_at", startDate).lte("created_at", endDate + "T23:59:59");
-      const complaints = (incidents || []).filter(i => i.type === "customer_complaint").length;
+      const incidents = incMap[emp.store_id] || [];
+      const complaints = incidents.filter(i => i.type === "customer_complaint").length;
       let svcAuto = Math.max(0, 20 - (complaints * 5));
 
       // === 違規紀錄 20分 ===
-      const qk = year + "-Q" + quarter;
-      const { data: viols } = await supabase.from("violations")
-        .select("level").eq("employee_id", emp.id).eq("quarter_key", qk);
+      const viols = violMap[emp.id] || [];
       let violScore = 20;
       let disqualified = false;
-      for (const v of viols || []) {
+      for (const v of viols) {
         if (v.level === "zero_tolerance") { disqualified = true; violScore = 0; break; }
         if (v.level === "serious") { violScore = 0; break; }
         if (v.level === "moderate") violScore -= 5;
@@ -102,16 +117,20 @@ export async function POST(request) {
       const total = attScore + perfAuto + svcAuto + violScore;
       const coeff = disqualified ? 0 : total >= 80 ? 1.0 : total >= 70 ? 0.5 : 0;
 
-      await supabase.from("performance_reviews").upsert({
+      upserts.push({
         employee_id: emp.id, store_id: emp.store_id, year, quarter,
         attendance_score: attScore, attendance_detail: attDetail,
         performance_score: perfAuto, performance_auto: perfAuto, performance_adjust: 0,
         service_score: svcAuto, service_auto: svcAuto, service_adjust: 0,
-        violation_score: violScore, violation_detail: { count: (viols || []).length, disqualified },
+        violation_score: violScore, violation_detail: { count: viols.length, disqualified },
         total_score: total, bonus_coefficient: coeff, status: "draft"
-      }, { onConflict: "employee_id,year,quarter" });
+      });
 
       results.push({ name: emp.name, total, coeff });
+    }
+
+    if (upserts.length > 0) {
+      await supabase.from("performance_reviews").upsert(upserts, { onConflict: "employee_id,year,quarter" });
     }
     return Response.json({ success: true, generated: results.length, data: results });
   }
