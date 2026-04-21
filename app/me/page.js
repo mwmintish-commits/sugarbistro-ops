@@ -15,6 +15,15 @@ const uploadUrl = (expenseType, emp, eid) => {
   return `/upload?${params.toString()}`;
 };
 
+const worklogUrl = (emp, eid) => {
+  const params = new URLSearchParams({
+    eid: eid || "",
+    sid: emp?.store_id || "",
+    name: emp?.name || "",
+  });
+  return `/worklog?${params.toString()}`;
+};
+
 const ITEMS = (eid, emp) => {
   const isManager = ["admin", "manager", "store_manager"].includes(emp?.role);
   const base = [
@@ -27,12 +36,14 @@ const ITEMS = (eid, emp) => {
     { icon: "📊", label: "我的假勤", desc: "出勤統計",    href: webUrl("/my-attendance", eid),  bg: "#fef3c7", color: "#92400e" },
     { icon: "💰", label: "我的薪資", desc: "薪資明細",    href: webUrl("/my-salary", eid),      bg: "#fef3c7", color: "#a16207" },
     { icon: "📝", label: "我的考核", desc: "績效分數",    href: webUrl("/my-review", eid),      bg: "#e8f5e9", color: "#1b5e20" },
+    { icon: "📋", label: "工作日誌", desc: "每日任務回報", href: worklogUrl(emp, eid),          bg: "#e0f2fe", color: "#075985" },
     { icon: "📖", label: "員工守則", desc: "規範查閱",    href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
   ];
   if (isManager) {
     base.push(
       { icon: "📦", label: "月結單據", desc: "廠商單據上傳", href: uploadUrl("vendor", emp, eid),      bg: "#dbeafe", color: "#1d4ed8" },
       { icon: "🪙", label: "零用金",   desc: "費用收據上傳", href: uploadUrl("petty_cash", emp, eid),  bg: "#fef9c3", color: "#854d0e" },
+      { icon: "🖥", label: "後台",     desc: "管理系統",     href: "/",                                bg: "#f3e8ff", color: "#6b21a8" },
     );
   }
   return base;
