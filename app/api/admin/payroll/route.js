@@ -33,20 +33,38 @@ export async function POST(request) {
       .eq("is_active", true);
     if (store_id) empQ = empQ.eq("store_id", store_id);
     const { data: emps } = await empQ;
+    const empIds = (emps || []).map(e => e.id);
+
+    // ===== 批次預載：一次抓完所有員工的 schedules/overtime/attendances =====
+    const dateFrom = mk + "-01", dateTo = eom(mk);
+    const [schedsAll, otAll, clockInsAll] = empIds.length === 0 ? [[],[],[]] : await Promise.all([
+      supabase.from("schedules")
+        .select("employee_id, date, day_type, leave_type, leave_hours, shift_id, shifts(start_time, end_time)")
+        .in("employee_id", empIds).gte("date", dateFrom).lte("date", dateTo)
+        .then(r => r.data || []),
+      supabase.from("overtime_records")
+        .select("employee_id, amount, comp_type, comp_hours, comp_converted, comp_used")
+        .in("employee_id", empIds).eq("status", "approved")
+        .gte("date", dateFrom).lte("date", dateTo)
+        .then(r => r.data || []),
+      supabase.from("attendances")
+        .select("employee_id").in("employee_id", empIds).eq("type", "clock_in")
+        .gte("timestamp", dateFrom + "T00:00:00").lte("timestamp", dateTo + "T23:59:59")
+        .then(r => r.data || []),
+    ]);
+    const byEmp = (arr) => arr.reduce((m, r) => { (m[r.employee_id] ||= []).push(r); return m; }, {});
+    const schedMap = byEmp(schedsAll), otMap = byEmp(otAll), clockMap = byEmp(clockInsAll);
 
     const results = [];
+    const upserts = [];
     for (const emp of emps || []) {
       const hourlyRate = calcHourlyRate(emp);
       const dailyRate = calcDailyRate(emp);
 
-      // ===== 單一來源：只讀 schedules =====
-      const { data: allScheds } = await supabase.from("schedules")
-        .select("date, day_type, leave_type, leave_hours, shift_id, shifts(start_time, end_time)")
-        .eq("employee_id", emp.id)
-        .gte("date", mk + "-01").lte("date", eom(mk));
+      const allScheds = schedMap[emp.id] || [];
 
       // 出勤天數（有排班且不是整天請假）
-      const workScheds = (allScheds || []).filter(s => ["work","rest_day","national_holiday"].includes(s.day_type));
+      const workScheds = allScheds.filter(s => ["work","rest_day","national_holiday"].includes(s.day_type));
       const workDays = workScheds.length;
 
       // 底薪
@@ -54,13 +72,10 @@ export async function POST(request) {
         : (emp.hourly_rate ? Number(emp.hourly_rate) * workDays * 8 : 0);
 
       // 加班費（overtime_records 仍用，因為是打卡自動產生的超時紀錄）
-      const { data: ot } = await supabase.from("overtime_records")
-        .select("amount, comp_type, comp_hours, comp_converted")
-        .eq("employee_id", emp.id).eq("status", "approved")
-        .gte("date", mk + "-01").lte("date", eom(mk));
-      const otPay = (ot || []).filter(r => r.comp_type === "pay" || r.comp_converted)
+      const ot = otMap[emp.id] || [];
+      const otPay = ot.filter(r => r.comp_type === "pay" || r.comp_converted)
         .reduce((s, r) => s + Number(r.amount || 0), 0);
-      const compH = (ot || []).filter(r => r.comp_type === "comp" && !r.comp_used && !r.comp_converted)
+      const compH = ot.filter(r => r.comp_type === "comp" && !r.comp_used && !r.comp_converted)
         .reduce((s, r) => s + Number(r.comp_hours || 0), 0);
 
       // 勞健保
@@ -92,7 +107,7 @@ export async function POST(request) {
       let leaveDeduct = 0, leaveHours = 0, leaveDetail = "";
       const LEAVE_LABELS = { sick:"病假", personal:"事假", menstrual:"生理假", family_care:"家庭照顧" };
       if (emp.monthly_salary) {
-        for (const s of allScheds || []) {
+        for (const s of allScheds) {
           if (s.day_type === "unpaid_leave") {
             // 整天無薪假（事假/家庭照顧）
             const hrs = Number(s.leave_hours) || 8;
@@ -118,16 +133,13 @@ export async function POST(request) {
         }
       }
 
-      // ===== 對帳：排班天 vs 打卡天 =====
-      const { data: clockIns } = await supabase.from("attendances")
-        .select("id").eq("employee_id", emp.id).eq("type", "clock_in")
-        .gte("timestamp", mk + "-01T00:00:00").lte("timestamp", eom(mk) + "T23:59:59");
-      const actualClockDays = (clockIns || []).length;
+      // ===== 對帳：排班天 vs 打卡天（用預載 clockMap）=====
+      const actualClockDays = (clockMap[emp.id] || []).length;
       const discrepancy = Math.abs(workDays - actualClockDays);
 
       const net = base + otPay + holidayPay + restDayPay - ls - hs - suppHealth + allow - deduct - leaveDeduct;
 
-      await supabase.from("payroll_records").upsert({
+      upserts.push({
         employee_id: emp.id, store_id: emp.store_id,
         year, month, base_salary: base, work_days: workDays,
         hourly_rate: emp.hourly_rate || 0,
@@ -140,9 +152,14 @@ export async function POST(request) {
         other_deduction: deduct, deduction_note: emp.default_deduction_note || "",
         leave_deduction: leaveDeduct, leave_hours: leaveHours, leave_detail: leaveDetail,
         net_salary: net,
-      }, { onConflict: "employee_id,year,month" });
+      });
 
       results.push({ name: emp.name, base, otPay, holidayPay, restDayPay, ls, hs, suppHealth, allow, deduct, leaveDeduct, net, workDays, actualClockDays, discrepancy });
+    }
+
+    // 批次 upsert 所有薪資紀錄（單次往返）
+    if (upserts.length > 0) {
+      await supabase.from("payroll_records").upsert(upserts, { onConflict: "employee_id,year,month" });
     }
     await auditLog(null, null, "payroll_generate", "payroll", null, { year, month, store_id, count: results.length });
     return Response.json({ success: true, data: results });
