@@ -462,6 +462,7 @@ async function handleEvent(event) {
   const userId = event.source.userId, emp = await getEmployee(userId), state = await getUserState(userId);
 
   if (event.type === "message" && event.message.type === "image") {
+    return;
     if (!emp) return replyText(event.replyToken, "❌ 請先綁定");
     if (state?.current_flow === "settlement_photo") return handleSettlementImg(event, emp, state);
     if (state?.current_flow === "deposit_photo") return handleDepImg(event, emp, state);
@@ -570,6 +571,7 @@ async function handleEvent(event) {
   }
   // Postback 事件（LINE 日期選擇器回傳）
   if (event.type === "postback") {
+    return;
     const pb = event.postback;
     const rt = event.replyToken;
 
@@ -699,6 +701,7 @@ async function handleEvent(event) {
   }
 
   if (!emp) return replyText(rt, "🍯 歡迎！\n\n新員工請輸入「新人報到」\n已有帳號請輸入「綁定 你的6位數綁定碼」");
+  return;
   if (text === "取消" || text === "選單" || text === "主選單" || text === "menu") { await clearUserState(userId); return replyWithQuickReply(rt, "🍯 " + getRoleLabel(emp.role) + " " + emp.name, getMenu(emp.role).slice(0, 13)); }
 
   // 打卡
