@@ -61,8 +61,10 @@ export async function GET(request) {
     });
   }
 
-  // 員工列表
-  let query = supabase.from("employees").select("*, stores!store_id(name)").order("created_at", { ascending: false });
+  // 員工列表（按自訂排序，未設者以姓名排）
+  let query = supabase.from("employees").select("*, stores!store_id(name)")
+    .order("sort_order", { ascending: true, nullsFirst: false })
+    .order("name", { ascending: true });
   if (store_id) query = query.eq("store_id", store_id);
   if (!include_inactive) query = query.or("is_active.eq.true,is_active.eq.false"); // show all for admin
 
@@ -204,6 +206,25 @@ export async function POST(request) {
     }).select("*, stores!store_id(name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data, bind_code: bindCode });
+  }
+
+  // 調整排序（與相鄰員工交換 sort_order）
+  if (body.action === "reorder") {
+    const { employee_id, direction } = body; // direction: "up" | "down"
+    const { data: me } = await supabase.from("employees").select("id, store_id, sort_order").eq("id", employee_id).single();
+    if (!me) return Response.json({ error: "Not found" }, { status: 404 });
+    const cmp = direction === "up" ? "lt" : "gt";
+    const ord = direction === "up" ? false : true;
+    let q = supabase.from("employees").select("id, sort_order")
+      .eq("is_active", true)[cmp]("sort_order", me.sort_order || 0)
+      .order("sort_order", { ascending: ord }).limit(1);
+    q = me.store_id ? q.eq("store_id", me.store_id) : q.is("store_id", null);
+    const { data: neighbors } = await q;
+    const neighbor = neighbors?.[0];
+    if (!neighbor) return Response.json({ ok: true, noop: true });
+    await supabase.from("employees").update({ sort_order: neighbor.sort_order }).eq("id", me.id);
+    await supabase.from("employees").update({ sort_order: me.sort_order || 0 }).eq("id", neighbor.id);
+    return Response.json({ ok: true });
   }
 
   // 更新員工（保險、薪資設定等）
