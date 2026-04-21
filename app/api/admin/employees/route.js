@@ -26,8 +26,16 @@ function calcAnnualLeave(serviceMonths, type) {
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
+  const line_uid = searchParams.get("line_uid");
   const store_id = searchParams.get("store_id");
   const include_inactive = searchParams.get("include_inactive");
+
+  // 依 LINE UID 查 eid（Rich Menu 面板入口使用）
+  if (line_uid) {
+    const { data } = await supabase.from("employees")
+      .select("id, name").eq("line_uid", line_uid).eq("is_active", true).maybeSingle();
+    return Response.json({ data });
+  }
 
   // 單一員工詳情
   if (id) {
