@@ -81,7 +81,7 @@ export async function POST(request) {
     }
     // 檢查是否為國定假日（自動帶 day_type）
     if (day_type === "work" && type !== "leave") {
-      const { data: hol } = await supabase.from("national_holidays").select("id").eq("date", date).limit(1).maybeSingle();
+      const { data: hol } = await supabase.from("national_holidays").select("id").eq("date", date).eq("is_active", true).limit(1).maybeSingle();
       if (hol) day_type = "national_holiday";
     }
 

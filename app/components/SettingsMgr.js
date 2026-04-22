@@ -225,10 +225,11 @@ export default function SettingsMgr({ stores, load, month }) {
         </h4>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           {hols.map(h => (
-            <button key={h.id} onClick={() => {
+            <button key={h.id} onClick={async () => {
               const next = h.is_active === false ? true : false;
-              ap("/api/admin/holidays", { action: "toggle", holiday_id: h.id, is_active: next }).catch(() => {});
               setHols(hols.map(x => x.id === h.id ? { ...x, is_active: next } : x));
+              const r = await ap("/api/admin/holidays", { action: "toggle", holiday_id: h.id, is_active: next }).catch(() => null);
+              if (r?.synced > 0) alert(`已同步 ${r.synced} 筆班表：${next ? "加倍薪計算已啟用" : "已改為一般工作日"}`);
             }} style={{
               padding: "3px 8px", borderRadius: 4, cursor: "pointer",
               background: h.is_active === false ? "#f0f0f0" : "#fde8e8",
