@@ -36,10 +36,17 @@ export async function GET(request) {
 
       const { data: templates } = await tq;
       if (templates && templates.length > 0) {
-        const cleanItems = templates.map(t => ({
-          store_id, date, template_id: t.id, item_name: t.item, category: t.category,
-          shift_type: t.shift_type || "opening", frequency: freq,
-        }));
+        // 每個 checkpoint 建一筆 item（雙班店兩班各自打勾）
+        const cleanItems = [];
+        for (const t of templates) {
+          const cps = (Array.isArray(t.checkpoints) && t.checkpoints.length > 0) ? t.checkpoints : [t.shift_type || "opening"];
+          for (const cp of cps) {
+            cleanItems.push({
+              store_id, date, template_id: t.id, item_name: t.item, category: t.category,
+              shift_type: cp, frequency: freq, role: t.role || "all",
+            });
+          }
+        }
         const { data: created } = await supabase.from("work_log_items").insert(cleanItems).select(selectCols);
         items = created || [];
       }
@@ -180,8 +187,36 @@ export async function POST(request) {
   }
 
   if (body.action === "add_template") {
-    const { store_id, category, item, sort_order, role, shift_type, frequency, weekday, month_day, requires_value, value_label, value_min, value_max } = body;
-    const { data } = await supabase.from("work_log_templates").insert({ store_id, category, item, sort_order: sort_order || 0, role: role || "all", shift_type: shift_type || "opening", frequency: frequency || "daily", weekday, month_day, requires_value: requires_value || false, value_label, value_min, value_max }).select().single();
+    const { store_id, category, item, sort_order, role, shift_type, frequency, weekday, month_day, requires_value, value_label, value_min, value_max, checkpoints } = body;
+    const cps = Array.isArray(checkpoints) && checkpoints.length > 0 ? checkpoints : null;
+    const firstCp = cps ? cps[0] : (shift_type || "opening");
+    const { data, error } = await supabase.from("work_log_templates").insert({
+      store_id, category, item, sort_order: sort_order || 0, role: role || "all",
+      shift_type: firstCp, frequency: frequency || "daily",
+      checkpoints: cps, weekday, month_day,
+      requires_value: requires_value || false, value_label, value_min, value_max,
+    }).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ data });
+  }
+
+  if (body.action === "update_template") {
+    const { template_id, category, item, role, frequency, weekday, month_day, checkpoints, requires_value, value_label, value_min, value_max, sort_order } = body;
+    const patch = {};
+    if (category !== undefined) patch.category = category;
+    if (item !== undefined) patch.item = item;
+    if (role !== undefined) patch.role = role;
+    if (frequency !== undefined) patch.frequency = frequency;
+    if (weekday !== undefined) patch.weekday = weekday;
+    if (month_day !== undefined) patch.month_day = month_day;
+    if (sort_order !== undefined) patch.sort_order = sort_order;
+    if (requires_value !== undefined) patch.requires_value = requires_value;
+    if (value_label !== undefined) patch.value_label = value_label;
+    if (value_min !== undefined) patch.value_min = value_min;
+    if (value_max !== undefined) patch.value_max = value_max;
+    if (Array.isArray(checkpoints)) { patch.checkpoints = checkpoints.length > 0 ? checkpoints : null; if (checkpoints[0]) patch.shift_type = checkpoints[0]; }
+    const { data, error } = await supabase.from("work_log_templates").update(patch).eq("id", template_id).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
   }
 
@@ -211,7 +246,7 @@ export async function POST(request) {
     const { from_store_id, to_store_id } = body;
     const { data: templates } = await supabase.from("work_log_templates").select("*").eq("store_id", from_store_id).eq("is_active", true);
     if (!templates || templates.length === 0) return Response.json({ error: "來源門市無模板" }, { status: 400 });
-    const copies = templates.map(t => ({ store_id: to_store_id, category: t.category, item: t.item, sort_order: t.sort_order, role: t.role, shift_type: t.shift_type }));
+    const copies = templates.map(t => ({ store_id: to_store_id, category: t.category, item: t.item, sort_order: t.sort_order, role: t.role, shift_type: t.shift_type, frequency: t.frequency, checkpoints: t.checkpoints, weekday: t.weekday, month_day: t.month_day, requires_value: t.requires_value, value_label: t.value_label, value_min: t.value_min, value_max: t.value_max }));
     const { data, error } = await supabase.from("work_log_templates").insert(copies).select();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data, count: copies.length });

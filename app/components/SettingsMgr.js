@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { ap, fmt } from "./utils";
 
 const DEFAULT_HB = [
@@ -499,69 +499,131 @@ export function WorklogSettings({ stores }) {
   const [wlStore, setWlStore] = useState("");
   const [wlTemplates, setWlTemplates] = useState([]);
   const [wlCopyTarget, setWlCopyTarget] = useState("");
-  const [wlNew, setWlNew] = useState({ category: "清潔", item: "", role: "all", shift_type: "opening", frequency: "daily", weekday: "", requires_value: false, value_label: "" });
+  const [wlNew, setWlNew] = useState({ category: "清潔", item: "", role: "all", checkpoints: [], frequency: "daily", weekday: "", requires_value: false, value_label: "" });
   const loadT = () => { if (!wlStore) return; ap("/api/admin/worklogs?type=templates&store_id=" + wlStore).then(r => setWlTemplates(r.data || [])); };
   useEffect(() => { loadT(); }, [wlStore]);
 
-  const WL_CATS = ["清潔", "食材管理", "溫度記錄", "設備維護", "環境整潔", "服務品質", "其他"];
+  const WL_CATS = ["清潔", "食材管理", "溫度記錄", "設備維護", "服務品質", "結算", "回報", "其他"];
+  const store = stores.find(s => s.id === wlStore);
+  const isDouble = store?.shift_mode === "double";
+  const CPS = isDouble
+    ? [{ id: "morning_start", l: "🌅早上" }, { id: "morning_end", l: "🌤早下" }, { id: "evening_start", l: "🌇晚上" }, { id: "evening_end", l: "🌙晚下" }]
+    : [{ id: "opening", l: "☀️開店" }, { id: "during", l: "🔥營業" }, { id: "closing", l: "🌙閉店" }];
+
+  const getCps = (t) => (Array.isArray(t.checkpoints) && t.checkpoints.length > 0) ? t.checkpoints : (t.shift_type ? [t.shift_type] : []);
+  const toggleTplCp = async (t, cp) => {
+    const cur = new Set(getCps(t));
+    if (cur.has(cp)) cur.delete(cp); else cur.add(cp);
+    const arr = [...cur];
+    await ap("/api/admin/worklogs", { action: "update_template", template_id: t.id, checkpoints: arr });
+    loadT();
+  };
+  const addNew = async () => {
+    if (!wlNew.item) return;
+    const payload = { action: "add_template", store_id: wlStore, ...wlNew };
+    if (wlNew.frequency !== "daily") payload.checkpoints = null;
+    else if (wlNew.checkpoints.length === 0) { alert("請至少勾選一個時段"); return; }
+    const r = await ap("/api/admin/worklogs", payload);
+    if (r.error) { alert("新增失敗：" + r.error); return; }
+    setWlNew({ ...wlNew, item: "", requires_value: false, value_label: "" });
+    loadT();
+  };
+
+  const dailyTpls = wlTemplates.filter(t => t.frequency === "daily").sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  const deepTpls = wlTemplates.filter(t => t.frequency === "weekly" || t.frequency === "monthly");
+  const byCat = {};
+  for (const t of dailyTpls) { const c = t.category || "其他"; (byCat[c] ||= []).push(t); }
 
   return (
     <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
-      <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📋 工作日誌模板設定</h4>
+      <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📋 工作日誌模板設定（矩陣編輯器）</h4>
       <select value={wlStore} onChange={e => setWlStore(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, marginBottom: 10, width: "100%" }}>
         <option value="">選擇門市</option>
-        {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        {stores.map(s => <option key={s.id} value={s.id}>{s.name + (s.shift_mode === "double" ? "（雙班）" : "")}</option>)}
       </select>
       {wlStore && <div>
-        {[
-          { type: "opening", label: "☀️ 開店" },
-          { type: "during", label: "🔥 營業中" },
-          { type: "closing", label: "🌙 閉店" },
-        ].map(sec => {
-          const si = wlTemplates.filter(t => t.shift_type === sec.type && t.frequency === "daily");
-          return <div key={sec.type} style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#444", padding: "4px 8px", background: "#faf8f5", borderRadius: 4, marginBottom: 4 }}>{sec.label + "（" + si.length + "）"}</div>
-            {si.map(t => <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderBottom: "1px solid #f0eeea", fontSize: 11 }}>
-              <span style={{ fontSize: 9, color: "#888", minWidth: 40 }}>{t.category}</span>
+        <div style={{ fontSize: 10, color: "#888", marginBottom: 6 }}>
+          {isDouble ? "雙班模式：早班/晚班各自打勾，矩陣中打勾的時段該班需做" : "單班模式：勾選該項目出現在開店/營業/閉店哪個時段"}
+        </div>
+
+        {/* 矩陣表格 */}
+        <div style={{ overflowX: "auto", marginBottom: 10 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+            <thead>
+              <tr style={{ background: "#faf8f5" }}>
+                <th style={{ padding: "6px 4px", textAlign: "left", borderBottom: "2px solid #e8e6e1", minWidth: 180 }}>工作項目</th>
+                {CPS.map(c => <th key={c.id} style={{ padding: "6px 4px", textAlign: "center", borderBottom: "2px solid #e8e6e1", minWidth: 56 }}>{c.l}</th>)}
+                <th style={{ padding: "6px 4px", borderBottom: "2px solid #e8e6e1", width: 30 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(byCat).map(([cat, list]) => (
+                <React.Fragment key={cat}>
+                  <tr><td colSpan={CPS.length + 2} style={{ padding: "6px 4px", fontSize: 10, fontWeight: 600, color: "#888", background: "#f5f1eb" }}>{cat}</td></tr>
+                  {list.map(t => {
+                    const cps = new Set(getCps(t));
+                    return (<tr key={t.id} style={{ borderBottom: "1px solid #f0eeea" }}>
+                      <td style={{ padding: "4px" }}>
+                        <div style={{ fontSize: 12 }}>{t.item}</div>
+                        {t.requires_value && <span style={{ fontSize: 8, background: "#e6f9f0", color: "#0a7c42", padding: "0 4px", borderRadius: 3, marginRight: 4 }}>{"📊" + (t.value_label || "")}</span>}
+                        {t.role !== "all" && <span style={{ fontSize: 8, background: "#fef9c3", color: "#8a6d00", padding: "0 4px", borderRadius: 3 }}>{t.role}</span>}
+                      </td>
+                      {CPS.map(c => (
+                        <td key={c.id} style={{ padding: "4px", textAlign: "center" }}>
+                          <button onClick={() => toggleTplCp(t, c.id)} style={{ width: 26, height: 26, borderRadius: 6, border: cps.has(c.id) ? "none" : "1px solid #ddd", background: cps.has(c.id) ? "#0a7c42" : "#fff", color: cps.has(c.id) ? "#fff" : "#ccc", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>{cps.has(c.id) ? "✓" : ""}</button>
+                        </td>
+                      ))}
+                      <td style={{ textAlign: "center" }}><button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 12, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button></td>
+                    </tr>);
+                  })}
+                </React.Fragment>
+              ))}
+              {dailyTpls.length === 0 && <tr><td colSpan={CPS.length + 2} style={{ padding: 16, textAlign: "center", color: "#ccc" }}>尚無工作項目</td></tr>}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 細部清潔（週/月） */}
+        {deepTpls.length > 0 && <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#444", marginBottom: 4 }}>{"🧹 細部清潔（" + deepTpls.length + "）"}</div>
+          <div style={{ background: "#faf8f5", borderRadius: 6 }}>
+            {deepTpls.map(t => <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 8px", borderBottom: "1px solid #f0eeea", fontSize: 11 }}>
+              <span style={{ fontSize: 9, padding: "0 4px", borderRadius: 3, background: t.frequency === "weekly" ? "#e6f1fb" : "#fde8e8", color: t.frequency === "weekly" ? "#185fa5" : "#b91c1c" }}>{t.frequency === "weekly" ? "週" : "月"}</span>
               <span style={{ flex: 1, fontWeight: 500 }}>{t.item}</span>
-              {t.requires_value && <span style={{ fontSize: 8, background: "#e6f9f0", color: "#0a7c42", padding: "0 4px", borderRadius: 3 }}>{"📊" + (t.value_label || "")}</span>}
-              {t.role !== "all" && <span style={{ fontSize: 8, background: "#fef9c3", color: "#8a6d00", padding: "0 4px", borderRadius: 3 }}>{t.role}</span>}
-              <button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 10, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+              <span style={{ fontSize: 9, color: "#888" }}>{t.category}</span>
+              <button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 12, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button>
             </div>)}
-          </div>;
-        })}
-        {(() => { const di = wlTemplates.filter(t => t.frequency === "weekly" || t.frequency === "monthly"); return di.length > 0 ? <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#444", padding: "4px 8px", background: "#faf8f5", borderRadius: 4, marginBottom: 4 }}>{"🧹 細部清潔（" + di.length + "）"}</div>
-          {di.map(t => <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderBottom: "1px solid #f0eeea", fontSize: 11 }}>
-            <span style={{ fontSize: 9, padding: "0 4px", borderRadius: 3, background: t.frequency === "weekly" ? "#e6f1fb" : "#fde8e8", color: t.frequency === "weekly" ? "#185fa5" : "#b91c1c" }}>{t.frequency === "weekly" ? "週" : "月"}</span>
-            <span style={{ flex: 1, fontWeight: 500 }}>{t.item}</span>
-            <span style={{ fontSize: 9, color: "#888" }}>{t.category}</span>
-            <button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 10, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button>
-          </div>)}
-        </div> : null; })()}
+          </div>
+        </div>}
+
+        {/* 新增區塊 */}
         <div style={{ background: "#faf8f5", borderRadius: 8, padding: 10, marginTop: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>＋ 新增工作項目</div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
-            <select value={wlNew.shift_type + (wlNew.frequency !== "daily" ? "_deep" : "")} onChange={e => {
-              const v = e.target.value; const isDeep = v.includes("_deep");
-              setWlNew({ ...wlNew, shift_type: isDeep ? "opening" : v, frequency: isDeep ? "weekly" : "daily", category: "清潔" });
-            }} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
-              <option value="opening">☀️ 開店</option><option value="during">🔥 營業</option><option value="closing">🌙 閉店</option><option value="opening_deep">🧹 清潔</option>
+            <select value={wlNew.frequency} onChange={e => setWlNew({ ...wlNew, frequency: e.target.value, checkpoints: [] })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
+              <option value="daily">每日</option><option value="weekly">每週（細部）</option><option value="monthly">每月（細部）</option>
             </select>
-            {wlNew.frequency !== "daily" && <select value={wlNew.frequency} onChange={e => setWlNew({ ...wlNew, frequency: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="weekly">每週</option><option value="monthly">每月</option></select>}
-            {wlNew.frequency === "weekly" && <select value={wlNew.weekday} onChange={e => setWlNew({ ...wlNew, weekday: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="">不指定</option>{["日","一","二","三","四","五","六"].map((d,i) => <option key={i} value={i}>{d}</option>)}</select>}
+            {wlNew.frequency === "weekly" && <select value={wlNew.weekday} onChange={e => setWlNew({ ...wlNew, weekday: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="">不指定週幾</option>{["日","一","二","三","四","五","六"].map((d,i) => <option key={i} value={i}>{"週" + d}</option>)}</select>}
             <select value={wlNew.category} onChange={e => setWlNew({ ...wlNew, category: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
               {WL_CATS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <select value={wlNew.role} onChange={e => setWlNew({ ...wlNew, role: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="all">全員</option><option value="外場">外場</option><option value="內場">內場</option><option value="吧台">吧台</option><option value="烘焙">烘焙</option></select>
           </div>
+          {wlNew.frequency === "daily" && <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 10, color: "#666", alignSelf: "center", marginRight: 4 }}>時段：</span>
+            {CPS.map(c => {
+              const on = wlNew.checkpoints.includes(c.id);
+              return <button key={c.id} onClick={() => setWlNew({ ...wlNew, checkpoints: on ? wlNew.checkpoints.filter(x => x !== c.id) : [...wlNew.checkpoints, c.id] })}
+                style={{ padding: "3px 8px", borderRadius: 6, border: on ? "none" : "1px solid #ddd", background: on ? "#0a7c42" : "#fff", color: on ? "#fff" : "#666", fontSize: 11, cursor: "pointer" }}>{c.l}</button>;
+            })}
+          </div>}
           <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
-            <input value={wlNew.item} onChange={e => setWlNew({ ...wlNew, item: e.target.value })} placeholder="工作項目名稱" onKeyDown={e => { if (e.key === "Enter" && wlNew.item) { ap("/api/admin/worklogs", { action: "add_template", store_id: wlStore, ...wlNew }); setWlNew({ ...wlNew, item: "" }); setTimeout(loadT, 300); } }} style={{ flex: 1, padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12 }} />
-            <button onClick={async () => { if (!wlNew.item) return; await ap("/api/admin/worklogs", { action: "add_template", store_id: wlStore, ...wlNew }); setWlNew({ ...wlNew, item: "" }); loadT(); }} disabled={!wlNew.item} style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: wlNew.item ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 12, cursor: "pointer" }}>新增</button>
+            <input value={wlNew.item} onChange={e => setWlNew({ ...wlNew, item: e.target.value })} placeholder="工作項目名稱" onKeyDown={e => { if (e.key === "Enter") addNew(); }} style={{ flex: 1, padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12 }} />
+            <button onClick={addNew} disabled={!wlNew.item} style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: wlNew.item ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 12, cursor: "pointer" }}>新增</button>
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, cursor: "pointer" }}>
             <input type="checkbox" checked={wlNew.requires_value} onChange={e => setWlNew({ ...wlNew, requires_value: e.target.checked })} />需輸入數值
-            {wlNew.requires_value && <input value={wlNew.value_label} onChange={e => setWlNew({ ...wlNew, value_label: e.target.value })} placeholder="單位" style={{ width: 40, padding: 2, borderRadius: 3, border: "1px solid #ddd", fontSize: 10, marginLeft: 4 }} />}
+            {wlNew.requires_value && <input value={wlNew.value_label} onChange={e => setWlNew({ ...wlNew, value_label: e.target.value })} placeholder="單位" style={{ width: 60, padding: 2, borderRadius: 3, border: "1px solid #ddd", fontSize: 10, marginLeft: 4 }} />}
           </label>
         </div>
         {wlTemplates.length > 0 && <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
