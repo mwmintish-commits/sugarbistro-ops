@@ -84,6 +84,8 @@ export default function AdminPage() {
   const [expSum, setExpSum] = useState({});
   const [pnl, setPnl] = useState(null);
   const [anns, setAnns] = useState([]);
+  const [annForm, setAnnForm] = useState(null); // null=關閉, {id?, title, content, tag, store_id, priority, starts_at, expires_at, push_line}
+  const [annTagFilter, setAnnTagFilter] = useState("");
   const [detailId, setDetailId] = useState(null);
   const [sv, setSv] = useState("week");
   const [avReports, setAvReports] = useState([]);
@@ -2333,38 +2335,124 @@ export default function AdminPage() {
         )}
 
         {/* ANNOUNCEMENTS */}
-        {!ld && tab === "announcements" && (
+        {!ld && tab === "announcements" && (() => {
+          const TAGS = ["行銷","人事公告","百貨活動","訂位","取貨","其他"];
+          const TAG_COLORS = {"行銷":"#f59e0b","人事公告":"#2563eb","百貨活動":"#db2777","訂位":"#059669","取貨":"#7c3aed","其他":"#6b7280"};
+          const today = new Date().toLocaleDateString("sv-SE");
+          const filtered = annTagFilter ? anns.filter(a=>a.tag===annTagFilter) : anns;
+          const isActive = (a) => (!a.starts_at||a.starts_at<=today) && (!a.expires_at||a.expires_at>=today);
+          return (
           <div>
-            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📢 公告</h3>
-            {auth.role !== "store_manager" && (
-              <button onClick={async()=>{
-                const title = prompt("公告標題："); if(!title) return;
-                const content = prompt("公告內容："); if(!content) return;
-                const priority = confirm("是否為急件？") ? "urgent" : "normal";
-                const push_line = confirm("同步推送到員工LINE？");
-                const r = await ap("/api/admin/announcements",{action:"create",title,content,priority,push_line,created_by:auth.employee_id});
-                if (r.line_sent) alert("公告已建立，LINE推送 " + r.line_sent + " 位");
-                else alert("公告已建立");
-                load();
-              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
-                ＋新增公告
-              </button>
-            )}
-            {anns.map(a=>(
-              <div key={a.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{fontWeight:600,fontSize:13}}>{a.priority==="urgent"?"🔴 ":""}{a.title}</div>
-                  {auth.role !== "store_manager" && (
-                    <button onClick={async()=>{if(!confirm("確定刪除公告？"))return;await ap("/api/admin/announcements",{action:"delete",announcement_id:a.id});load();}}
-                      style={{fontSize:10,color:"#b91c1c",background:"none",border:"none",cursor:"pointer"}}>🗑</button>
-                  )}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
+              <h3 style={{fontSize:14,fontWeight:600,margin:0}}>📢 公告</h3>
+              {auth.role !== "store_manager" && (
+                <button onClick={()=>setAnnForm({title:"",content:"",tag:"",store_id:sf||"",priority:"normal",starts_at:today,expires_at:"",push_line:false})}
+                  style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增公告</button>
+              )}
+            </div>
+            <div style={{display:"flex",gap:4,marginBottom:10,flexWrap:"wrap"}}>
+              <button onClick={()=>setAnnTagFilter("")} style={{padding:"3px 8px",borderRadius:12,border:"1px solid #ddd",background:annTagFilter===""?"#1a1a1a":"#fff",color:annTagFilter===""?"#fff":"#666",fontSize:10,cursor:"pointer"}}>全部</button>
+              {TAGS.map(t=>(
+                <button key={t} onClick={()=>setAnnTagFilter(t)} style={{padding:"3px 8px",borderRadius:12,border:"1px solid #ddd",background:annTagFilter===t?TAG_COLORS[t]:"#fff",color:annTagFilter===t?"#fff":"#666",fontSize:10,cursor:"pointer"}}>{t}</button>
+              ))}
+            </div>
+            {filtered.length===0 && <div style={{background:"#fff",borderRadius:8,padding:30,textAlign:"center",color:"#ccc"}}>無公告</div>}
+            {filtered.map(a=>{
+              const active = isActive(a);
+              const tagColor = TAG_COLORS[a.tag] || "#6b7280";
+              return (
+                <div key={a.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8,opacity:active?1:0.5}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      {a.tag && <span style={{background:tagColor,color:"#fff",padding:"2px 6px",borderRadius:4,fontSize:9,fontWeight:600}}>{a.tag}</span>}
+                      <div style={{fontWeight:600,fontSize:13}}>{a.priority==="urgent"?"🔴 ":""}{a.title}</div>
+                      {!active && <span style={{background:"#f0f0f0",color:"#999",padding:"1px 5px",borderRadius:3,fontSize:9}}>{a.expires_at&&a.expires_at<today?"已過期":"未開始"}</span>}
+                    </div>
+                    {auth.role !== "store_manager" && (
+                      <div style={{display:"flex",gap:4}}>
+                        <button onClick={()=>setAnnForm({id:a.id,title:a.title,content:a.content,tag:a.tag||"",store_id:a.store_id||"",priority:a.priority||"normal",starts_at:a.starts_at||"",expires_at:a.expires_at||"",push_line:false})}
+                          style={{fontSize:10,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️</button>
+                        <button onClick={async()=>{if(!confirm("確定刪除公告？"))return;await ap("/api/admin/announcements",{action:"delete",announcement_id:a.id});load();}}
+                          style={{fontSize:10,color:"#b91c1c",background:"none",border:"none",cursor:"pointer"}}>🗑</button>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{fontSize:12,color:"#666",marginTop:6,whiteSpace:"pre-wrap"}}>{a.content}</div>
+                  <div style={{fontSize:10,color:"#aaa",marginTop:6,display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <span>{a.created_at?new Date(a.created_at).toLocaleDateString():""}</span>
+                    {(a.starts_at||a.expires_at) && <span>📅 {a.starts_at||"—"} ~ {a.expires_at||"長期"}</span>}
+                    {a.store_id && <span>🏠 {stores.find(s=>s.id===a.store_id)?.name||""}</span>}
+                    {!a.store_id && <span>🌐 全體</span>}
+                  </div>
                 </div>
-                <div style={{fontSize:12,color:"#666",marginTop:4}}>{a.content}</div>
-                <div style={{fontSize:10,color:"#aaa",marginTop:4}}>{a.created_at?new Date(a.created_at).toLocaleDateString():""}</div>
+              );
+            })}
+
+            {/* 新增/編輯表單 */}
+            {annForm && (
+              <div onClick={()=>setAnnForm(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+                <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:10,padding:20,maxWidth:500,width:"100%",maxHeight:"90vh",overflow:"auto"}}>
+                  <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600}}>{annForm.id?"編輯公告":"新增公告"}</h3>
+                  <div style={{display:"grid",gap:10}}>
+                    <label style={{fontSize:11,color:"#666"}}>標題 *
+                      <input value={annForm.title} onChange={e=>setAnnForm({...annForm,title:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}/>
+                    </label>
+                    <label style={{fontSize:11,color:"#666"}}>內容 *
+                      <textarea value={annForm.content} onChange={e=>setAnnForm({...annForm,content:e.target.value})} rows={4} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4,resize:"vertical",fontFamily:"inherit"}}/>
+                    </label>
+                    <label style={{fontSize:11,color:"#666"}}>標籤
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
+                        {TAGS.map(t=>(
+                          <button key={t} type="button" onClick={()=>setAnnForm({...annForm,tag:annForm.tag===t?"":t})}
+                            style={{padding:"3px 10px",borderRadius:12,border:"1px solid #ddd",background:annForm.tag===t?TAG_COLORS[t]:"#fff",color:annForm.tag===t?"#fff":"#666",fontSize:11,cursor:"pointer"}}>{t}</button>
+                        ))}
+                      </div>
+                    </label>
+                    <label style={{fontSize:11,color:"#666"}}>適用門市
+                      <select value={annForm.store_id} onChange={e=>setAnnForm({...annForm,store_id:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}>
+                        <option value="">全體（所有門市）</option>
+                        {stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </label>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      <label style={{fontSize:11,color:"#666"}}>開始日期
+                        <input type="date" value={annForm.starts_at} onChange={e=>setAnnForm({...annForm,starts_at:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}/>
+                      </label>
+                      <label style={{fontSize:11,color:"#666"}}>結束日期
+                        <input type="date" value={annForm.expires_at} onChange={e=>setAnnForm({...annForm,expires_at:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}/>
+                      </label>
+                    </div>
+                    <label style={{fontSize:11,color:"#666",display:"flex",alignItems:"center",gap:6}}>
+                      <input type="checkbox" checked={annForm.priority==="urgent"} onChange={e=>setAnnForm({...annForm,priority:e.target.checked?"urgent":"normal"})}/>
+                      🔴 設為急件
+                    </label>
+                    {!annForm.id && (
+                      <label style={{fontSize:11,color:"#666",display:"flex",alignItems:"center",gap:6}}>
+                        <input type="checkbox" checked={annForm.push_line} onChange={e=>setAnnForm({...annForm,push_line:e.target.checked})}/>
+                        📱 同步推送到員工 LINE
+                      </label>
+                    )}
+                  </div>
+                  <div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:16}}>
+                    <button onClick={()=>setAnnForm(null)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>取消</button>
+                    <button onClick={async()=>{
+                      if(!annForm.title||!annForm.content){alert("請填寫標題與內容");return;}
+                      if(annForm.starts_at&&annForm.expires_at&&annForm.starts_at>annForm.expires_at){alert("開始日期不可晚於結束日期");return;}
+                      const payload = annForm.id
+                        ? {action:"update",announcement_id:annForm.id,title:annForm.title,content:annForm.content,tag:annForm.tag,store_id:annForm.store_id,priority:annForm.priority,starts_at:annForm.starts_at,expires_at:annForm.expires_at}
+                        : {action:"create",title:annForm.title,content:annForm.content,tag:annForm.tag,store_id:annForm.store_id,priority:annForm.priority,starts_at:annForm.starts_at,expires_at:annForm.expires_at,push_line:annForm.push_line,created_by:auth.employee_id};
+                      const r = await ap("/api/admin/announcements",payload);
+                      if(r.error){alert("錯誤："+r.error);return;}
+                      if(r.line_sent)alert("已建立，LINE 推送 "+r.line_sent+" 位");
+                      setAnnForm(null); load();
+                    }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>{annForm.id?"儲存":"建立"}</button>
+                  </div>
+                </div>
               </div>
-            ))}
+            )}
           </div>
-        )}
+          );
+        })()}
 
         {/* SETTINGS */}
 
