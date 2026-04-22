@@ -1,30 +1,60 @@
 import { supabase } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
-export async function GET() {
-  const { data } = await supabase.from("announcements").select("*, employees:created_by(name)").eq("is_active", true).order("created_at", { ascending: false }).limit(20);
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const tag = searchParams.get("tag");
+  let q = supabase.from("announcements").select("*, employees:created_by(name)").eq("is_active", true).order("created_at", { ascending: false }).limit(50);
+  if (tag) q = q.eq("tag", tag);
+  if (searchParams.get("active_only") === "1") {
+    const today = new Date().toLocaleDateString("sv-SE");
+    q = q.or(`starts_at.is.null,starts_at.lte.${today}`).or(`expires_at.is.null,expires_at.gte.${today}`);
+  }
+  const { data } = await q;
   return Response.json({ data });
 }
 
 export async function POST(request) {
   const body = await request.json();
   if (body.action === "create") {
-    const { title, content, store_id, priority, created_by, expires_at, push_line } = body;
-    const { data } = await supabase.from("announcements").insert({ title, content, store_id, priority: priority || "normal", created_by, expires_at }).select().single();
+    const { title, content, store_id, priority, created_by, starts_at, expires_at, tag, push_line } = body;
+    const { data } = await supabase.from("announcements").insert({
+      title, content,
+      store_id: store_id || null,
+      priority: priority || "normal",
+      created_by,
+      starts_at: starts_at || null,
+      expires_at: expires_at || null,
+      tag: tag || null,
+    }).select().single();
 
-    // ✦31 LINE推播
     if (push_line) {
       let eq = supabase.from("employees").select("line_uid").eq("is_active", true).not("line_uid", "is", null);
       if (store_id) eq = eq.eq("store_id", store_id);
       const { data: targets } = await eq;
       const emoji = priority === "urgent" ? "🔴" : "📢";
-      const msg = emoji + " 公告：" + title + "\n━━━━━━━━━━\n" + content;
+      const tagStr = tag ? `[${tag}] ` : "";
+      const msg = emoji + " 公告：" + tagStr + title + "\n━━━━━━━━━━\n" + content;
       let sent = 0;
       for (const t of targets || []) {
         if (t.line_uid) { await pushText(t.line_uid, msg).catch(() => {}); sent++; }
       }
       return Response.json({ data, line_sent: sent });
     }
+    return Response.json({ data });
+  }
+  if (body.action === "update") {
+    const { announcement_id, title, content, store_id, priority, starts_at, expires_at, tag } = body;
+    const patch = {};
+    if (title !== undefined) patch.title = title;
+    if (content !== undefined) patch.content = content;
+    if (store_id !== undefined) patch.store_id = store_id || null;
+    if (priority !== undefined) patch.priority = priority;
+    if (starts_at !== undefined) patch.starts_at = starts_at || null;
+    if (expires_at !== undefined) patch.expires_at = expires_at || null;
+    if (tag !== undefined) patch.tag = tag || null;
+    const { data, error } = await supabase.from("announcements").update(patch).eq("id", announcement_id).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
   }
   if (body.action === "delete") {
