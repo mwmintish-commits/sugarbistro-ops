@@ -16,8 +16,8 @@ WHERE checkpoints IS NULL AND shift_type IS NOT NULL AND frequency = 'daily';
 -- 設定雙班門市
 UPDATE stores SET shift_mode = 'double' WHERE name LIKE '%SKM%' OR name LIKE '%新光左營%' OR name LIKE '%左營%';
 -- SKM 每日工作矩陣種子資料
-DO $$ DECLARE skm_id UUID; BEGIN
-  SELECT id INTO skm_id FROM stores WHERE name LIKE '%SKM%' LIMIT 1;
+DO $$ DECLARE skm_id TEXT; BEGIN
+  SELECT id::TEXT INTO skm_id FROM stores WHERE name LIKE '%SKM%' LIMIT 1;
   IF skm_id IS NOT NULL THEN
     DELETE FROM work_log_templates WHERE store_id = skm_id AND frequency = 'daily';
     INSERT INTO work_log_templates (store_id, category, item, sort_order, role, shift_type, frequency, checkpoints, is_active) VALUES (skm_id, '其他', '出勤打卡', 1, 'all', 'opening', 'daily', '{morning_start,morning_end,evening_start,evening_end}', TRUE);

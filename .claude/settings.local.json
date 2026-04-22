@@ -18,7 +18,8 @@
       "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --no-pdf-header-footer --print-to-pdf=\"/Users/maxwang/Desktop/預排假操作說明書.pdf\" \"file:///Users/maxwang/Desktop/預排假操作說明書.html\")",
       "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops merge claude/pensive-edison-38e288 --no-ff -m \"Merge: 後台效能優化 + 清理舊選單設定\")",
       "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops merge claude/pensive-edison-38e288 --no-ff -m \"Merge: 薪資/考核 N+1 優化\")",
-      "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops merge claude/pensive-edison-38e288 --no-ff -m \"Merge: 工作日誌 bug 修正\")"
+      "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops merge claude/pensive-edison-38e288 --no-ff -m \"Merge: 工作日誌 bug 修正\")",
+      "Bash(npm install *)"
     ]
   }
 }
