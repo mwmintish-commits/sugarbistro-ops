@@ -121,49 +121,91 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
             <div style={{ background: "#fff", borderRadius: 8, padding: 30, textAlign: "center", color: "#ccc" }}>請選擇門市</div>
           ) : detailItems.length === 0 ? (
             <div style={{ background: "#fff", borderRadius: 8, padding: 30, textAlign: "center", color: "#ccc" }}>當日無日誌項目</div>
-          ) : (
-            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                <thead><tr style={{ background: "#faf8f5" }}>{["", "項目", "分類", "完成人", "時間", ...(canEdit ? ["操作"] : [])].map((h, i) =>
-                  <th key={i} style={{ padding: 5, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>
-                )}</tr></thead>
-                <tbody>{detailItems.map(item => (
-                  <tr key={item.id} style={{ borderBottom: "1px solid #f0eeea", background: item.is_abnormal ? "#fef9c3" : "transparent" }}>
-                    <td style={{ padding: 5, textAlign: "center", width: 24 }}>
-                      {canEdit ? (
-                        <input type="checkbox" checked={!!item.completed} onChange={async () => {
-                          await ap("/api/admin/worklogs", {
-                            action: "toggle_item", item_id: item.id,
-                            completed: !item.completed,
-                            employee_id: auth?.id, employee_name: auth?.name,
-                          });
-                          loadDetail(detailStore, detailDate);
-                        }} style={{ width: 16, height: 16, cursor: "pointer" }} />
-                      ) : (
-                        <span>{item.completed ? "✅" : "⬜"}</span>
-                      )}
-                    </td>
-                    <td style={{ padding: 5, fontWeight: 500, textDecoration: item.completed ? "line-through" : "none", color: item.completed ? "#aaa" : "#333" }}>{item.item_name}</td>
-                    <td style={{ padding: 5, fontSize: 10 }}><span style={{ background: "#faf8f5", padding: "1px 4px", borderRadius: 3 }}>{item.category || ""}</span></td>
-                    <td style={{ padding: 5, fontSize: 10 }}>{item.completed_by_name || "-"}</td>
-                    <td style={{ padding: 5, fontSize: 9, color: "#888" }}>{item.completed_at ? new Date(item.completed_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" }) : "-"}</td>
-                    {canEdit && (
-                      <td style={{ padding: 5 }}>
-                        <button onClick={async () => {
-                          const note = prompt("備註：", item.notes || "");
-                          if (note === null) return;
-                          await ap("/api/admin/worklogs", { action: "add_note", item_id: item.id, notes: note });
-                          loadDetail(detailStore, detailDate);
-                        }} style={{ fontSize: 9, color: "#4361ee", background: "none", border: "none", cursor: "pointer" }}>
-                          {item.notes ? "📝" : "✏️"}
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
+          ) : (() => {
+            const SHIFT_LABEL = {
+              morning_start: { l: "早上", c: "#f59e0b", bg: "#fef3c7" },
+              morning_end:   { l: "早下", c: "#ea580c", bg: "#ffedd5" },
+              evening_start: { l: "晚上", c: "#4f46e5", bg: "#e0e7ff" },
+              evening_end:   { l: "晚下", c: "#7c3aed", bg: "#ede9fe" },
+              opening:       { l: "開店", c: "#0a7c42", bg: "#e6f9f0" },
+              during:        { l: "營業中", c: "#185fa5", bg: "#e6f1fb" },
+              closing:       { l: "閉店", c: "#b91c1c", bg: "#fde8e8" },
+            };
+            const CAT_ORDER = ["開店前準備", "營業中交接", "閉店後清潔"];
+            const CAT_ICON = { "開店前準備": "🌅", "營業中交接": "☀️", "閉店後清潔": "🌙" };
+            const grouped = {};
+            for (const it of detailItems) {
+              const k = it.category || "其他";
+              if (!grouped[k]) grouped[k] = [];
+              grouped[k].push(it);
+            }
+            const orderedCats = [...CAT_ORDER.filter(c => grouped[c]), ...Object.keys(grouped).filter(c => !CAT_ORDER.includes(c))];
+
+            return orderedCats.map(cat => {
+              const items = grouped[cat];
+              const done = items.filter(i => i.completed).length;
+              return (
+                <div key={cat} style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "#faf8f5", borderRadius: "8px 8px 0 0", border: "1px solid #e8e6e1", borderBottom: "none" }}>
+                    <span style={{ fontSize: 14 }}>{CAT_ICON[cat] || "📋"}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#333" }}>{cat}</span>
+                    <span style={{ fontSize: 10, color: "#888", marginLeft: "auto" }}>{done}/{items.length}</span>
+                  </div>
+                  <div style={{ background: "#fff", border: "1px solid #e8e6e1", borderRadius: "0 0 8px 8px", overflow: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                      <thead><tr style={{ background: "#fcfbf9" }}>
+                        <th style={{ padding: 5, width: 30 }}></th>
+                        <th style={{ padding: 5, textAlign: "left", fontWeight: 500, color: "#666" }}>項目</th>
+                        <th style={{ padding: 5, textAlign: "left", fontWeight: 500, color: "#666", width: 70 }}>時段</th>
+                        <th style={{ padding: 5, textAlign: "left", fontWeight: 500, color: "#666" }}>完成人</th>
+                        <th style={{ padding: 5, textAlign: "left", fontWeight: 500, color: "#666", width: 50 }}>時間</th>
+                        {canEdit && <th style={{ padding: 5, textAlign: "left", fontWeight: 500, color: "#666", width: 40 }}>操作</th>}
+                      </tr></thead>
+                      <tbody>{items.map(item => {
+                        const sh = SHIFT_LABEL[item.shift_type] || { l: item.shift_type || "-", c: "#888", bg: "#f0f0f0" };
+                        return (
+                          <tr key={item.id} style={{ borderTop: "1px solid #f0eeea", background: item.is_abnormal ? "#fef9c3" : "transparent" }}>
+                            <td style={{ padding: 5, textAlign: "center" }}>
+                              {canEdit ? (
+                                <input type="checkbox" checked={!!item.completed} onChange={async () => {
+                                  await ap("/api/admin/worklogs", {
+                                    action: "toggle_item", item_id: item.id,
+                                    completed: !item.completed,
+                                    employee_id: auth?.id, employee_name: auth?.name,
+                                  });
+                                  loadDetail(detailStore, detailDate);
+                                }} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                              ) : (
+                                <span>{item.completed ? "✅" : "⬜"}</span>
+                              )}
+                            </td>
+                            <td style={{ padding: 5, fontWeight: 500, textDecoration: item.completed ? "line-through" : "none", color: item.completed ? "#aaa" : "#333" }}>{item.item_name}</td>
+                            <td style={{ padding: 5 }}>
+                              <span style={{ background: sh.bg, color: sh.c, padding: "1px 6px", borderRadius: 10, fontSize: 9, fontWeight: 600 }}>{sh.l}</span>
+                            </td>
+                            <td style={{ padding: 5, fontSize: 10 }}>{item.completed_by_name || "-"}</td>
+                            <td style={{ padding: 5, fontSize: 9, color: "#888" }}>{item.completed_at ? new Date(item.completed_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" }) : "-"}</td>
+                            {canEdit && (
+                              <td style={{ padding: 5 }}>
+                                <button onClick={async () => {
+                                  const note = prompt("備註：", item.notes || "");
+                                  if (note === null) return;
+                                  await ap("/api/admin/worklogs", { action: "add_note", item_id: item.id, notes: note });
+                                  loadDetail(detailStore, detailDate);
+                                }} style={{ fontSize: 9, color: "#4361ee", background: "none", border: "none", cursor: "pointer" }}>
+                                  {item.notes ? "📝" : "✏️"}
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}</tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </div>
       )}
 
