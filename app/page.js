@@ -256,6 +256,20 @@ export default function AdminPage() {
 
   useEffect(() => { if (auth) load(); }, [auth, load]);
 
+  // 排班頁進入 週/雙週 視圖時自動載入不可出勤回報（顯示於對應日期格）
+  useEffect(() => {
+    if (!auth || tab !== "schedules" || (sv !== "week" && sv !== "biweek")) return;
+    const months = new Set();
+    const days = sv === "biweek" ? 14 : 7;
+    for (let i = 0; i < days; i++) {
+      const d = new Date(new Date(ws).getTime() + i * 86400000).toLocaleDateString("sv-SE");
+      months.add(d.slice(0, 7));
+    }
+    Promise.all([...months].map(mo =>
+      ap("/api/availability?month=" + mo + (sf ? "&store_id=" + sf : ""))
+    )).then(rs => setAvReports(rs.flatMap(r => r.data || [])));
+  }, [auth, tab, sv, ws, sf]);
+
   const login = async () => {
     setErr("");
     if (step === 1) {
@@ -751,9 +765,9 @@ export default function AdminPage() {
                               {emp.name}
                               <div style={{fontSize:7,color:"#888",marginTop:1}}>{mWorkDays}天 / {Math.round(mWorkHrs)}hr{mLeaveDays>0?" / 假"+mLeaveDays+"天":""}</div>
                             </td>
-                            {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);const hol=holidays.find(h=>h.date===date);const avRec=showAvail?avReports.find(r=>r.employee_id===emp.id&&r.start_date===date):null;return(
-                              <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top",borderLeft:new Date(date).getDay()===0?"2px solid #e0d0d0":"none"}}>
-                                {avRec&&<div style={{fontSize:7,color:avRec.half_day?"#854d0e":"#b91c1c",background:avRec.half_day?"#fef9c3":"#fde8e8",borderRadius:2,padding:"0 2px",marginBottom:1,lineHeight:1.4,textAlign:"center"}}>{avRec.half_day?`可${avRec.half_day}`:"整天✕"}</div>}
+                            {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);const hol=holidays.find(h=>h.date===date);const avRec=avReports.find(r=>r.employee_id===emp.id&&r.start_date===date);return(
+                              <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top",borderLeft:new Date(date).getDay()===0?"2px solid #e0d0d0":"none",background:avRec?(avRec.half_day?"rgba(251,191,36,0.18)":"rgba(239,68,68,0.18)"):"transparent",position:"relative"}}>
+                                {avRec&&<div title={avRec.reason||"無備註"} style={{fontSize:7,color:avRec.half_day?"#854d0e":"#b91c1c",background:avRec.half_day?"rgba(254,249,195,0.9)":"rgba(254,226,226,0.9)",borderRadius:2,padding:"0 2px",marginBottom:1,lineHeight:1.4,textAlign:"center",fontWeight:600}}>{avRec.half_day?`可${avRec.half_day}`:"❌整天不可"}</div>}
                                 {sc?(() => {const isLeave=sc.type==="leave";const lt=isLeave?(LT[sc.leave_type]||LT.off):null;const isRest=sc.day_type==="rest_day";const isHol=sc.day_type==="national_holiday";const pc=positions.find(p=>p.name===sc.shifts?.role)?.color||sc.shifts?.color||"#0a7c42";const hasPartialLeave=Number(sc.leave_hours)>0&&sc.type!=="leave";return(
                                 <div style={{background:isLeave?lt.bg:isRest?"#fff8e6":isHol?"#fde8e8":sc.published?pc+"12":"#fff8e6",border:`1.5px ${sc.published||isLeave?"solid":"dashed"} ${isLeave?lt.c:isRest?"#b45309":isHol?"#b91c1c":pc}`,borderRadius:4,padding:"2px 3px",fontSize:9,position:"relative"}}>
                                   {isLeave?<div style={{color:lt.c,fontWeight:600}}>{lt.l}</div>:<><div style={{fontWeight:600,color:isRest?"#b45309":isHol?"#b91c1c":pc}}>{isRest?"💰 ":isHol?"🎉 ":""}{sc.shifts?.role&&sc.shifts.role!=="all"?sc.shifts.role:"全場"}</div><div style={{color:"#888",fontSize:8}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></>}
