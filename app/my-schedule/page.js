@@ -9,6 +9,13 @@ export default function MySchedule() {
   const [emp, setEmp] = useState(null);
   const [month, setMonth] = useState(() => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }).slice(0, 7));
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState("month"); // "month" | "week"
+  const [weekStart, setWeekStart] = useState(() => {
+    const t = new Date();
+    t.setDate(t.getDate() - t.getDay());
+    return t.toLocaleDateString("sv-SE");
+  });
+  const [selectedDate, setSelectedDate] = useState(null);
 
   const eid = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("eid") : null;
 
@@ -18,29 +25,79 @@ export default function MySchedule() {
   }, [eid]);
 
   useEffect(() => {
-    if (!eid || !month || !emp) return;
+    if (!eid || !emp) return;
     setLoading(true);
-    const [y, m] = month.split("-").map(Number);
-    const start = new Date(y, m - 1, 1);
-    start.setDate(start.getDate() - start.getDay());
-    const end = new Date(y, m, 0);
-    end.setDate(end.getDate() + (6 - end.getDay()));
-    const ws = start.toLocaleDateString("sv-SE");
-    const we = end.toLocaleDateString("sv-SE");
+    let ws, we;
+    if (view === "month") {
+      const [y, m] = month.split("-").map(Number);
+      const start = new Date(y, m - 1, 1);
+      start.setDate(start.getDate() - start.getDay());
+      const end = new Date(y, m, 0);
+      end.setDate(end.getDate() + (6 - end.getDay()));
+      ws = start.toLocaleDateString("sv-SE");
+      we = end.toLocaleDateString("sv-SE");
+    } else {
+      ws = weekStart;
+      const we2 = new Date(weekStart);
+      we2.setDate(we2.getDate() + 6);
+      we = we2.toLocaleDateString("sv-SE");
+    }
     const storeParam = emp.store_id ? `&store_id=${emp.store_id}` : "";
     fetch(`/api/admin/schedules?week_start=${ws}&week_end=${we}${storeParam}`).then(r => r.json()).then(r => {
       setScheds(r.data || []);
       setLoading(false);
     });
-  }, [eid, month, emp]);
+  }, [eid, month, emp, view, weekStart]);
 
   const [y, m] = month.split("-").map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
   const firstDow = new Date(y, m - 1, 1).getDay();
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
 
   const wrap = { maxWidth: 480, margin: "0 auto", padding: 8, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "#f7f5f0", minHeight: "100vh", boxSizing: "border-box" };
 
   if (!eid) return <div style={wrap}><p style={{ textAlign: "center", color: "#b91c1c", padding: 40 }}>缺少員工識別碼</p></div>;
+
+  // 某天的所有班表（依時間排序，我排第一）
+  const getDaySchedules = (date) => {
+    const list = scheds.filter(s => s.date === date);
+    return list.sort((a, b) => {
+      if (a.employee_id === eid && b.employee_id !== eid) return -1;
+      if (b.employee_id === eid && a.employee_id !== eid) return 1;
+      const at = a.shifts?.start_time || "99:99";
+      const bt = b.shifts?.start_time || "99:99";
+      return at.localeCompare(bt);
+    });
+  };
+
+  // 單筆班表列渲染（詳細列表用，較大字體）
+  const renderSchedRow = (sc, isMine) => {
+    const isLeave = sc.type === "leave";
+    const lt = isLeave ? (LT[sc.leave_type] || LT.off) : null;
+    const isRestDay = sc.day_type === "rest_day";
+    const isHoliday = sc.day_type === "national_holiday";
+    const name = sc.employees?.name || "";
+    const timeStr = sc.shifts ? `${(sc.shifts.start_time || "").slice(0, 5)}～${(sc.shifts.end_time || "").slice(0, 5)}` : "";
+    return (
+      <div key={sc.id} style={{
+        display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
+        background: isMine ? "#e6f9f0" : "#fff",
+        border: `1px solid ${isMine ? "#0a7c42" : "#e8e6e1"}`,
+        borderRadius: 8, marginBottom: 5,
+      }}>
+        <div style={{ fontSize: 16, width: 20, textAlign: "center" }}>
+          {isMine ? "⭐" : isLeave ? "🌿" : isRestDay ? "💰" : isHoliday ? "🎉" : "👤"}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: isMine ? 700 : 500, color: isMine ? "#0a7c42" : "#333" }}>{name}</div>
+          {!isLeave && timeStr && <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>🕐 {timeStr}</div>}
+          {isLeave && <div style={{ fontSize: 11, color: lt.c, marginTop: 2 }}>{lt.l}</div>}
+          {isRestDay && <div style={{ fontSize: 10, color: "#b45309", marginTop: 2 }}>休息日出勤</div>}
+          {isHoliday && <div style={{ fontSize: 10, color: "#b91c1c", marginTop: 2 }}>國定假日</div>}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div style={wrap}>
@@ -50,16 +107,43 @@ export default function MySchedule() {
         <div style={{ fontSize: 11, marginTop: 2, opacity: 0.85 }}>{emp?.stores?.name || ""}</div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
-        <button onClick={() => { const d = new Date(y, m - 2, 1); setMonth(d.toLocaleDateString("sv-SE").slice(0, 7)); }}
-          style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>◀</button>
-        <span style={{ fontSize: 15, fontWeight: 600 }}>{y} 年 {m} 月</span>
-        <button onClick={() => { const d = new Date(y, m, 1); setMonth(d.toLocaleDateString("sv-SE").slice(0, 7)); }}
-          style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>▶</button>
+      {/* 月/週切換 */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 10, background: "#fff", padding: 3, borderRadius: 8, border: "1px solid #e8e6e1" }}>
+        {[{ k: "month", l: "📅 月檢視" }, { k: "week", l: "📋 週清單" }].map(t => (
+          <button key={t.k} onClick={() => setView(t.k)} style={{
+            flex: 1, padding: "6px 0", border: "none", borderRadius: 6,
+            background: view === t.k ? "#1a1a1a" : "transparent",
+            color: view === t.k ? "#fff" : "#666", fontSize: 12, fontWeight: 600, cursor: "pointer",
+          }}>{t.l}</button>
+        ))}
       </div>
 
-      {loading ? <p style={{ textAlign: "center", color: "#888", padding: 30 }}>載入中...</p> : (
-        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "hidden", width: "100%", tableLayout: "fixed" }}>
+      {/* 導覽列 */}
+      {view === "month" ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
+          <button onClick={() => { const d = new Date(y, m - 2, 1); setMonth(d.toLocaleDateString("sv-SE").slice(0, 7)); }}
+            style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>◀</button>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>{y} 年 {m} 月</span>
+          <button onClick={() => { const d = new Date(y, m, 1); setMonth(d.toLocaleDateString("sv-SE").slice(0, 7)); }}
+            style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>▶</button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
+          <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d.toLocaleDateString("sv-SE")); }}
+            style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>◀</button>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>
+            {weekStart.slice(5)} ～ {(() => { const d = new Date(weekStart); d.setDate(d.getDate() + 6); return d.toLocaleDateString("sv-SE").slice(5); })()}
+          </span>
+          <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d.toLocaleDateString("sv-SE")); }}
+            style={{ background: "#fff", border: "1px solid #ddd", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>▶</button>
+          <button onClick={() => { const t = new Date(); t.setDate(t.getDate() - t.getDay()); setWeekStart(t.toLocaleDateString("sv-SE")); }}
+            style={{ background: "#4361ee", border: "none", color: "#fff", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 11 }}>本週</button>
+        </div>
+      )}
+
+      {loading ? <p style={{ textAlign: "center", color: "#888", padding: 30 }}>載入中...</p> : view === "month" ? (
+        /* ===== 月檢視 ===== */
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", background: "#faf8f5" }}>
             {DAYS.map(d => <div key={d} style={{ padding: "4px 0", textAlign: "center", fontSize: 10, fontWeight: 600, color: d === "日" ? "#b91c1c" : d === "六" ? "#b45309" : "#666" }}>{d}</div>)}
           </div>
@@ -69,50 +153,71 @@ export default function MySchedule() {
               const d = i + 1;
               const date = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
               const dow = new Date(date).getDay();
-              const dayScheds = scheds.filter(s => s.date === date);
-              const myScheds = dayScheds.filter(s => s.employee_id === eid);
-              const otherScheds = dayScheds.filter(s => s.employee_id !== eid);
-              const isToday = date === new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
-
-              const renderSched = (sc, isMine) => {
-                const isLeave = sc.type === "leave";
-                const lt = isLeave ? (LT[sc.leave_type] || LT.off) : null;
-                const isRestDay = sc.day_type === "rest_day";
-                const isHoliday = sc.day_type === "national_holiday";
-                const name = sc.employees?.name || "";
-                return (
-                  <div key={sc.id} style={{
-                    background: isLeave ? lt.bg : isRestDay ? "#fff8e6" : isHoliday ? "#fde8e8" : isMine ? "#e6f9f0" : "#f5f5f5",
-                    border: `${isMine ? 2 : 1}px ${isMine ? "solid" : "solid"} ${isLeave ? lt.c : isRestDay ? "#b45309" : isHoliday ? "#b91c1c" : isMine ? "#0a7c42" : "#ddd"}`,
-                    borderRadius: 3, padding: "1px 2px", fontSize: 7, lineHeight: 1.2, marginBottom: 1, overflow: "hidden", wordBreak: "break-all",
-                    opacity: isMine ? 1 : 0.7,
-                  }}>
-                    <div style={{ fontWeight: isMine ? 700 : 400, color: isLeave ? lt.c : isRestDay ? "#b45309" : isHoliday ? "#b91c1c" : isMine ? "#0a7c42" : "#888" }}>
-                      {isMine ? "⭐ " : ""}{name} {isLeave ? lt.l : isRestDay ? "💰" : isHoliday ? "🎉" : ""}
-                    </div>
-                    {!isLeave && <div style={{ color: "#888" }}>{sc.shifts ? `${(sc.shifts.start_time || "").slice(0, 5)}~${(sc.shifts.end_time || "").slice(0, 5)}` : ""}</div>}
-                  </div>
-                );
-              };
+              const list = getDaySchedules(date);
+              const mine = list.find(s => s.employee_id === eid);
+              const isToday = date === today;
+              const total = list.length;
+              const hasLeave = mine && mine.type === "leave";
 
               return (
-                <div key={date} style={{ minHeight: 56, borderTop: "1px solid #f0eeea", padding: 2, background: isToday ? "#e6f1fb" : dow === 0 ? "#fef2f2" : "transparent" }}>
-                  <div style={{ fontSize: 10, fontWeight: isToday ? 700 : 400, color: dow === 0 ? "#b91c1c" : dow === 6 ? "#b45309" : "#666", marginBottom: 1 }}>
-                    {d}{isToday && <span style={{ fontSize: 6, color: "#4361ee", marginLeft: 1 }}>●</span>}
+                <div key={date} onClick={() => total > 0 && setSelectedDate(date)}
+                  style={{
+                    minHeight: 56, borderTop: "1px solid #f0eeea", padding: 3,
+                    background: isToday ? "#e6f1fb" : dow === 0 ? "#fef2f2" : "transparent",
+                    cursor: total > 0 ? "pointer" : "default",
+                  }}>
+                  <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 500, color: dow === 0 ? "#b91c1c" : dow === 6 ? "#b45309" : "#666", marginBottom: 2 }}>
+                    {d}{isToday && <span style={{ fontSize: 7, color: "#4361ee", marginLeft: 2 }}>●</span>}
                   </div>
-                  {myScheds.map(s => renderSched(s, true))}
-                  {otherScheds.slice(0, 2).map(s => renderSched(s, false))}
-                  {otherScheds.length > 2 && <div style={{ fontSize: 6, color: "#888", textAlign: "center" }}>+{otherScheds.length - 2}</div>}
-                  {dayScheds.length === 0 && <div style={{ fontSize: 7, color: "#ddd", textAlign: "center", marginTop: 6 }}>-</div>}
+                  {/* 我的班（加粗強調） */}
+                  {mine && !hasLeave && mine.shifts && (
+                    <div style={{ background: "#0a7c42", color: "#fff", borderRadius: 3, padding: "1px 2px", fontSize: 8, fontWeight: 700, marginBottom: 1, lineHeight: 1.2 }}>
+                      ⭐{(mine.shifts.start_time || "").slice(0, 5)}
+                    </div>
+                  )}
+                  {hasLeave && (
+                    <div style={{ background: (LT[mine.leave_type]||LT.off).bg, color: (LT[mine.leave_type]||LT.off).c, borderRadius: 3, padding: "1px 2px", fontSize: 8, fontWeight: 700, marginBottom: 1 }}>
+                      🌿{(LT[mine.leave_type]||LT.off).l}
+                    </div>
+                  )}
+                  {/* 其他人計數 */}
+                  {total > 0 && (
+                    <div style={{ fontSize: 9, color: "#888", textAlign: "center", marginTop: 2 }}>
+                      👥 {total} 人
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
+      ) : (
+        /* ===== 週清單檢視 ===== */
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", overflow: "hidden" }}>
+          {Array.from({ length: 7 }).map((_, i) => {
+            const d = new Date(weekStart);
+            d.setDate(d.getDate() + i);
+            const date = d.toLocaleDateString("sv-SE");
+            const dow = d.getDay();
+            const list = getDaySchedules(date);
+            const isToday = date === today;
+            return (
+              <div key={date} style={{ borderBottom: i < 6 ? "1px solid #f0eeea" : "none", background: isToday ? "#e6f1fb" : "#fff" }}>
+                <div style={{ padding: "8px 12px", background: isToday ? "#e6f1fb" : "#faf8f5", fontSize: 12, fontWeight: 600, color: dow === 0 ? "#b91c1c" : dow === 6 ? "#b45309" : "#333", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>{date.slice(5)} （{DAYS[dow]}）{isToday && <span style={{ color: "#4361ee", marginLeft: 6, fontSize: 10 }}>● 今天</span>}</span>
+                  <span style={{ fontSize: 10, color: "#888" }}>{list.length > 0 ? `${list.length} 人` : "休息"}</span>
+                </div>
+                <div style={{ padding: list.length > 0 ? "6px 8px" : 0 }}>
+                  {list.length === 0 ? null : list.map(sc => renderSchedRow(sc, sc.employee_id === eid))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
-      {/* 本月統計 */}
-      {!loading && (() => {
+      {/* 本月統計（月檢視下顯示） */}
+      {!loading && view === "month" && (() => {
         const myAll = scheds.filter(s => s.employee_id === eid && s.date >= month + "-01" && s.date <= month + "-31");
         const shifts = myAll.filter(s => s.type === "shift");
         const leaves = myAll.filter(s => s.type === "leave");
@@ -141,6 +246,35 @@ export default function MySchedule() {
       <div style={{ marginTop: 14, textAlign: "center" }}>
         <a href={`/me?eid=${eid}`} style={{ fontSize: 12, color: "#4361ee" }}>← 回面板</a>
       </div>
+
+      {/* 日期詳細抽屜 */}
+      {selectedDate && (() => {
+        const list = getDaySchedules(selectedDate);
+        const d = new Date(selectedDate);
+        const dow = d.getDay();
+        return (
+          <div onClick={() => setSelectedDate(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 999, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#fff", width: "100%", maxWidth: 480, maxHeight: "80vh", borderRadius: "14px 14px 0 0", overflow: "auto", animation: "slideUp 0.2s" }}>
+              <div style={{ position: "sticky", top: 0, background: "#fff", borderBottom: "1px solid #e8e6e1", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>{selectedDate.slice(5)} （{DAYS[dow]}）</div>
+                  <div style={{ fontSize: 10, color: "#888", marginTop: 2 }}>{list.length} 人排班</div>
+                </div>
+                <button onClick={() => setSelectedDate(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#888" }}>✕</button>
+              </div>
+              <div style={{ padding: 12 }}>
+                {list.length === 0 ? (
+                  <div style={{ textAlign: "center", color: "#ccc", padding: 30 }}>當日無排班</div>
+                ) : list.map(sc => renderSchedRow(sc, sc.employee_id === eid))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      <style jsx>{`
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+      `}</style>
     </div>
   );
 }
