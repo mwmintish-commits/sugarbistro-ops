@@ -124,8 +124,8 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
           ) : (
             <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                <thead><tr style={{ background: "#faf8f5" }}>{["", "項目", "分類", "完成人", "時間", canEdit ? "操作" : ""].filter(Boolean).map(h =>
-                  <th key={h} style={{ padding: 5, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>
+                <thead><tr style={{ background: "#faf8f5" }}>{["", "項目", "分類", "完成人", "時間", ...(canEdit ? ["操作"] : [])].map((h, i) =>
+                  <th key={i} style={{ padding: 5, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>
                 )}</tr></thead>
                 <tbody>{detailItems.map(item => (
                   <tr key={item.id} style={{ borderBottom: "1px solid #f0eeea", background: item.is_abnormal ? "#fef9c3" : "transparent" }}>
