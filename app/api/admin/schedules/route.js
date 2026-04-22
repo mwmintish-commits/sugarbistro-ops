@@ -1,6 +1,35 @@
 import { supabase, auditLog } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
+// 依最新班表重新計算該班 attendances 的遲到/早退分鐘
+async function recalcAttendance(scheduleId) {
+  if (!scheduleId) return;
+  const { data: sch } = await supabase.from("schedules")
+    .select("id, shifts(start_time, end_time)").eq("id", scheduleId).single();
+  if (!sch) return;
+  const { data: settings } = await supabase.from("attendance_settings").select("*").limit(1).single();
+  const graceIn = settings?.late_grace_minutes ?? 5;
+  const graceOut = settings?.early_leave_minutes ?? 5;
+  const { data: atts } = await supabase.from("attendances")
+    .select("id, type, timestamp").eq("schedule_id", scheduleId);
+  for (const a of atts || []) {
+    const tp = new Date(a.timestamp).toLocaleTimeString("sv-SE",
+      { timeZone: "Asia/Taipei", hour12: false }).slice(0, 5);
+    const [ch, cm] = tp.split(":").map(Number);
+    if (a.type === "clock_in" && sch.shifts?.start_time) {
+      const [sh, sm] = sch.shifts.start_time.split(":").map(Number);
+      const diff = (ch * 60 + cm) - (sh * 60 + sm);
+      await supabase.from("attendances")
+        .update({ late_minutes: diff > graceIn ? diff : 0 }).eq("id", a.id);
+    } else if (a.type === "clock_out" && sch.shifts?.end_time) {
+      const [eh, em] = sch.shifts.end_time.split(":").map(Number);
+      const diff = (eh * 60 + em) - (ch * 60 + cm);
+      await supabase.from("attendances")
+        .update({ early_leave_minutes: diff > graceOut ? diff : 0 }).eq("id", a.id);
+    }
+  }
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const store_id = searchParams.get("store_id");
@@ -104,6 +133,7 @@ export async function POST(request) {
         rest_consent: isRestDay ? "pending" : null,
       }, { onConflict: "employee_id,date" }).select("*, employees(name, line_uid), shifts(name, start_time, end_time)").single();
       if (error) return Response.json({ error: error.message }, { status: 500 });
+      await recalcAttendance(data?.id);
 
       // 休息日同意書在「發布班表」時才推送，此處只標記 rest_consent=pending
       return Response.json({ data, warning: isRestDay ? "💰 已排休息日加班（發布班表後會推同意書）" : warning });
@@ -130,6 +160,7 @@ export async function POST(request) {
       type: type || "shift", leave_type, half_day, note, status: "scheduled", day_type,
     }, { onConflict: "employee_id,date" }).select("*, employees(name), shifts(name, start_time, end_time)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
+    await recalcAttendance(data?.id);
     return Response.json({ data });
   }
 
@@ -254,9 +285,22 @@ export async function POST(request) {
   }
 
   if (action === "delete") {
-    await auditLog(null, null, "schedule_delete", "schedule", body.schedule_id, {});
-    await supabase.from("attendances").update({ schedule_id: null }).eq("schedule_id", body.schedule_id);
-    const { error } = await supabase.from("schedules").delete().eq("id", body.schedule_id);
+    const { schedule_id, attendance_mode } = body;
+    const { count: attCount } = await supabase.from("attendances")
+      .select("id", { count: "exact", head: true }).eq("schedule_id", schedule_id);
+    // 有出勤紀錄且未指定處理方式 → 要求前端詢問後重送
+    if ((attCount || 0) > 0 && !attendance_mode) {
+      return Response.json({ needs_decision: true, attendance_count: attCount });
+    }
+    if (attendance_mode === "delete") {
+      await supabase.from("attendances").delete().eq("schedule_id", schedule_id);
+    } else {
+      // keep（預設）：解除綁定保留打卡紀錄
+      await supabase.from("attendances").update({ schedule_id: null }).eq("schedule_id", schedule_id);
+    }
+    await auditLog(null, null, "schedule_delete", "schedule", schedule_id,
+      { attendance_mode: attendance_mode || "none", attendance_count: attCount || 0 });
+    const { error } = await supabase.from("schedules").delete().eq("id", schedule_id);
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ success: true });
   }

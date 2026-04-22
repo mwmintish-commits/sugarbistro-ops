@@ -710,7 +710,15 @@ export default function AdminPage() {
                 }
                 await ap("/api/admin/schedules",{action:"add_leave",employee_id:eid,date,leave_type:lt});load();
               };
-              const delSch=async(id)=>{await ap("/api/admin/schedules",{action:"delete",schedule_id:id});load();};
+              const delSch=async(id)=>{
+                let r=await ap("/api/admin/schedules",{action:"delete",schedule_id:id});
+                if(r?.needs_decision){
+                  const c=prompt("⚠️ 此班有 "+r.attendance_count+" 筆打卡紀錄：\n\n1 = 保存（薪資考核仍計算）\n2 = 一併刪除\n\n輸入數字後確定；取消則不刪除","1");
+                  if(c!=="1"&&c!=="2")return;
+                  r=await ap("/api/admin/schedules",{action:"delete",schedule_id:id,attendance_mode:c==="1"?"keep":"delete"});
+                }
+                load();
+              };
               return displayStores.map(store=>{
                 const storeEmps=schedEmps.filter(e=>e.store_id===store.id);
                 const storeShifts=shifts.filter(s=>s.store_id===store.id);
@@ -2467,7 +2475,15 @@ export default function AdminPage() {
                     <span style={{ fontSize: 11 }}>{(s.employees?.name || "") + " " + (s.type === "leave" ? (LT[s.leave_type] || LT.off).l : (s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role:"全場") + " " + (s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):"") + (s.day_type === "rest_day" ? " 💰休息日" : ""))}</span>
                     {s.notes && <div style={{ fontSize: 8, color: "#888" }}>{s.notes}</div>}
                   </div>
-                  <button onClick={async () => { await ap("/api/admin/schedules", { action: "delete", schedule_id: s.id }); load(); }} style={{ background: "none", border: "none", color: "#b91c1c", cursor: "pointer", fontSize: 11 }}>✕刪</button>
+                  <button onClick={async () => {
+                    let r = await ap("/api/admin/schedules", { action: "delete", schedule_id: s.id });
+                    if (r?.needs_decision) {
+                      const c = prompt("⚠️ 此班有 " + r.attendance_count + " 筆打卡紀錄：\n\n1 = 保存（薪資考核仍計算）\n2 = 一併刪除\n\n輸入數字後確定；取消則不刪除", "1");
+                      if (c !== "1" && c !== "2") return;
+                      await ap("/api/admin/schedules", { action: "delete", schedule_id: s.id, attendance_mode: c === "1" ? "keep" : "delete" });
+                    }
+                    load();
+                  }} style={{ background: "none", border: "none", color: "#b91c1c", cursor: "pointer", fontSize: 11 }}>✕刪</button>
                 </div>
               ))}
               <div style={{ borderTop: "1px solid #eee", marginTop: 8, paddingTop: 8 }}>
