@@ -21,7 +21,25 @@ export async function POST(request) {
     const { data, error } = await supabase.from("national_holidays")
       .update({ is_active }).eq("id", holiday_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
-    return Response.json({ data });
+
+    // 同步更新該日既有班表的 day_type（僅針對排班，不動休假）
+    let synced = 0;
+    if (data?.date) {
+      if (is_active) {
+        // 啟用：work → national_holiday
+        const { data: upd } = await supabase.from("schedules")
+          .update({ day_type: "national_holiday" })
+          .eq("date", data.date).eq("type", "shift").eq("day_type", "work").select("id");
+        synced = (upd || []).length;
+      } else {
+        // 停用：national_holiday → work
+        const { data: upd } = await supabase.from("schedules")
+          .update({ day_type: "work" })
+          .eq("date", data.date).eq("type", "shift").eq("day_type", "national_holiday").select("id");
+        synced = (upd || []).length;
+      }
+    }
+    return Response.json({ data, synced });
   }
 
   return Response.json({ error: "Unknown action" }, { status: 400 });
