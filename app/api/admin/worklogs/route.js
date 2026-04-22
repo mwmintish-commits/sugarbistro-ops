@@ -247,6 +247,12 @@ export async function POST(request) {
 
   if (body.action === "delete_template") {
     await supabase.from("work_log_templates").update({ is_active: false }).eq("id", body.template_id);
+    // 同步刪除今日（及未來）尚未完成的既有項目，避免畫面殘留
+    const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+    await supabase.from("work_log_items").delete()
+      .eq("template_id", body.template_id)
+      .eq("completed", false)
+      .gte("date", today);
     return Response.json({ success: true });
   }
 
