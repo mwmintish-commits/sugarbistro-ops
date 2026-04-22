@@ -43,7 +43,7 @@ export async function GET(request) {
           for (const cp of cps) {
             cleanItems.push({
               store_id, date, template_id: t.id, item_name: t.item, category: t.category,
-              shift_type: cp, frequency: freq, role: t.role || "all",
+              shift_type: cp, frequency: freq,
             });
           }
         }
