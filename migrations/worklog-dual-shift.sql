@@ -19,7 +19,7 @@ UPDATE stores SET shift_mode = 'double' WHERE name LIKE '%SKM%' OR name LIKE '%�
 DO $$ DECLARE skm_id TEXT; BEGIN
   SELECT id::TEXT INTO skm_id FROM stores WHERE name LIKE '%SKM%' LIMIT 1;
   IF skm_id IS NOT NULL THEN
-    DELETE FROM work_log_templates WHERE store_id::TEXT = skm_id AND frequency = 'daily';
+    UPDATE work_log_templates SET is_active=FALSE WHERE store_id::TEXT = skm_id AND frequency = 'daily';
     INSERT INTO work_log_templates (store_id, category, item, sort_order, role, shift_type, frequency, checkpoints, is_active) VALUES (skm_id::UUID, '其他', '出勤打卡', 1, 'all', 'opening', 'daily', '{morning_start,morning_end,evening_start,evening_end}', TRUE);
     INSERT INTO work_log_templates (store_id, category, item, sort_order, role, shift_type, frequency, checkpoints, is_active) VALUES (skm_id::UUID, '回報', '早群組（SKM 美食現場回報群 ）報到', 2, 'all', 'opening', 'daily', '{morning_start}', TRUE);
     INSERT INTO work_log_templates (store_id, category, item, sort_order, role, shift_type, frequency, checkpoints, is_active) VALUES (skm_id::UUID, '設備維護', 'LG閨蜜機開機、網頁展示', 3, 'all', 'opening', 'daily', '{morning_start}', TRUE);
