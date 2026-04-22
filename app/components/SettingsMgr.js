@@ -499,11 +499,11 @@ export function WorklogSettings({ stores }) {
   const [wlStore, setWlStore] = useState("");
   const [wlTemplates, setWlTemplates] = useState([]);
   const [wlCopyTarget, setWlCopyTarget] = useState("");
-  const [wlNew, setWlNew] = useState({ category: "清潔", item: "", role: "all", checkpoints: [], frequency: "daily", weekday: "", requires_value: false, value_label: "" });
+  const [wlNew, setWlNew] = useState({ category: "開店前準備", item: "", role: "all", checkpoints: [], frequency: "daily", weekday: "", requires_value: false, value_label: "" });
   const loadT = () => { if (!wlStore) return; ap("/api/admin/worklogs?type=templates&store_id=" + wlStore).then(r => setWlTemplates(r.data || [])); };
   useEffect(() => { loadT(); }, [wlStore]);
 
-  const WL_CATS = ["清潔", "食材管理", "溫度記錄", "設備維護", "服務品質", "結算", "回報", "其他"];
+  const WL_CATS = ["開店前準備", "營業中交接", "閉店後清潔"];
   const store = stores.find(s => s.id === wlStore);
   const isDouble = store?.shift_mode === "double";
   const CPS = isDouble

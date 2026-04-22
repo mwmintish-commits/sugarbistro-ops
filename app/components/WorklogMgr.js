@@ -12,7 +12,6 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
   const [detailDate, setDetailDate] = useState(new Date().toLocaleDateString("sv-SE"));
   const [detailItems, setDetailItems] = useState([]);
   const [detailSummary, setDetailSummary] = useState({});
-  const [templates, setTemplates] = useState([]);
 
   const canEdit = auth?.role === "admin" || auth?.role === "manager" || auth?.role === "store_manager";
   const displayStores = sf ? stores.filter(s => s.id === sf) : stores;
@@ -42,11 +41,6 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
       .then(r => { setDetailItems(r.data || []); setDetailSummary(r.summary || {}); setLoading(false); });
   };
 
-  const loadTemplates = (storeId) => {
-    ap("/api/admin/worklogs?type=templates&store_id=" + storeId)
-      .then(r => setTemplates(r.data || []));
-  };
-
   useEffect(() => {
     if (view === "completion") loadCompletion();
     else if (view === "inventory") loadInventory();
@@ -55,14 +49,12 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
   return (
     <div>
       <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap" }}>
-        {["completion", "detail", "inventory", "templates"].map(v => {
-          const labels = { completion: "📊 各店完成度", detail: "📋 每日明細", inventory: "📦 盤點回報", templates: "⚙️ 模板管理" };
-          if (v === "templates" && !canEdit) return null;
+        {["completion", "detail", "inventory"].map(v => {
+          const labels = { completion: "📊 各店完成度", detail: "📋 每日明細", inventory: "📦 盤點回報" };
           return (
             <button key={v} onClick={() => {
               setView(v);
               if (v === "detail" && sf) loadDetail(sf, detailDate);
-              if (v === "templates" && sf) loadTemplates(sf);
             }} style={{
               padding: "4px 10px", borderRadius: 5, border: "1px solid #ddd",
               background: view === v ? "#1a1a1a" : "#fff",
@@ -210,58 +202,6 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
         </div>
       )}
 
-      {/* 模板管理（admin/manager/store_manager） */}
-      {!loading && view === "templates" && canEdit && (
-        <div>
-          <div style={{ display: "flex", gap: 4, marginBottom: 8, alignItems: "center" }}>
-            {!sf && <select value={detailStore || ""} onChange={e => { setDetailStore(e.target.value); if (e.target.value) loadTemplates(e.target.value); }}
-              style={{ padding: "4px 8px", borderRadius: 5, border: "1px solid #ddd", fontSize: 11 }}>
-              <option value="">選擇門市</option>
-              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>}
-            <button onClick={async () => {
-              const sid = sf || detailStore;
-              if (!sid) { alert("請先選門市"); return; }
-              const cat = prompt("分類（開店/打烊/清潔/盤點）：", "開店");
-              const item = prompt("項目名稱：");
-              if (!item) return;
-              const st = prompt("班別（opening/closing/all）：", "opening");
-              await ap("/api/admin/worklogs", { action: "add_template", store_id: sid, category: cat, item, shift_type: st });
-              loadTemplates(sid);
-            }} style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 11, cursor: "pointer" }}>
-              ＋新增項目
-            </button>
-          </div>
-          {templates.length === 0 ? (
-            <div style={{ background: "#fff", borderRadius: 8, padding: 30, textAlign: "center", color: "#ccc" }}>
-              {(sf || detailStore) ? "尚無模板" : "請先選擇門市"}
-            </div>
-          ) : (
-            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                <thead><tr style={{ background: "#faf8f5" }}>{["分類", "項目", "班別", "頻率", "操作"].map(h =>
-                  <th key={h} style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>
-                )}</tr></thead>
-                <tbody>{templates.map(t => (
-                  <tr key={t.id} style={{ borderBottom: "1px solid #f0eeea" }}>
-                    <td style={{ padding: 6 }}><span style={{ background: "#faf8f5", padding: "1px 5px", borderRadius: 3, fontSize: 10 }}>{t.category}</span></td>
-                    <td style={{ padding: 6, fontWeight: 500 }}>{t.item}</td>
-                    <td style={{ padding: 6, fontSize: 10 }}>{t.shift_type === "opening" ? "開店" : t.shift_type === "closing" ? "打烊" : "全天"}</td>
-                    <td style={{ padding: 6, fontSize: 10 }}>{t.frequency === "daily" ? "每日" : t.frequency === "weekly" ? "每週" : "每月"}</td>
-                    <td style={{ padding: 6 }}>
-                      <button onClick={async () => {
-                        if (!confirm("刪除「" + t.item + "」？")) return;
-                        await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id });
-                        loadTemplates(sf || detailStore);
-                      }} style={{ fontSize: 9, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>🗑</button>
-                    </td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
