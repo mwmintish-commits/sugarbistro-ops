@@ -636,6 +636,8 @@ export default function AdminPage() {
                 </>
               )}
               <button onClick={async()=>{
+                if(!sf){alert("請先選擇門市再發布（各店分開發布）");return;}
+                const storeName=stores.find(s=>s.id===sf)?.name||"該店";
                 let start, end, label;
                 if (sv === "week" || sv === "biweek") {
                   const days = sv === "biweek" ? 13 : 6;
@@ -646,8 +648,8 @@ export default function AdminPage() {
                   start = month+"-01"; end = new Date(y,m,0).toLocaleDateString("sv-SE");
                   label = month+" 整月";
                 }
-                if(!confirm("📢 發布 "+label+" 的班表？\n\n發布後員工即可看到。"))return;
-                const r = await ap("/api/admin/schedules",{action:"publish",week_start:start,week_end:end,store_id:sf||undefined});
+                if(!confirm("📢 發布 "+storeName+" "+label+" 的班表？\n\n發布後該店員工即可看到。"))return;
+                const r = await ap("/api/admin/schedules",{action:"publish",week_start:start,week_end:end,store_id:sf});
                 alert("✅ 已發布"+(r.published||0)+"筆，通知"+(r.notified||0)+"人");load();
               }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:11,cursor:"pointer",marginLeft:"auto"}}>
                 📢 發布班表
