@@ -88,7 +88,7 @@ export default function AdminPage() {
   const [sv, setSv] = useState("week");
   const [avReports, setAvReports] = useState([]);
   const [avView, setAvView] = useState("employee"); // "employee"|"day"
-  const [showAvail, setShowAvail] = useState(false);
+  const [showAvail, setShowAvail] = useState(true);
   const [ws, setWs] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - d.getDay());
@@ -765,7 +765,7 @@ export default function AdminPage() {
                               {emp.name}
                               <div style={{fontSize:7,color:"#888",marginTop:1}}>{mWorkDays}天 / {Math.round(mWorkHrs)}hr{mLeaveDays>0?" / 假"+mLeaveDays+"天":""}</div>
                             </td>
-                            {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);const hol=holidays.find(h=>h.date===date);const avRec=avReports.find(r=>r.employee_id===emp.id&&r.start_date===date);return(
+                            {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);const hol=holidays.find(h=>h.date===date);const avRec=showAvail?avReports.find(r=>r.employee_id===emp.id&&r.start_date===date):null;return(
                               <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top",borderLeft:new Date(date).getDay()===0?"2px solid #e0d0d0":"none",background:avRec?(avRec.half_day?"rgba(251,191,36,0.18)":"rgba(239,68,68,0.18)"):"transparent",position:"relative"}}>
                                 {avRec&&<div title={avRec.reason||"無備註"} style={{fontSize:7,color:avRec.half_day?"#854d0e":"#b91c1c",background:avRec.half_day?"rgba(254,249,195,0.9)":"rgba(254,226,226,0.9)",borderRadius:2,padding:"0 2px",marginBottom:1,lineHeight:1.4,textAlign:"center",fontWeight:600}}>{avRec.half_day?`可${avRec.half_day}`:"❌整天不可"}</div>}
                                 {sc?(() => {const isLeave=sc.type==="leave";const lt=isLeave?(LT[sc.leave_type]||LT.off):null;const isRest=sc.day_type==="rest_day";const isHol=sc.day_type==="national_holiday";const pc=positions.find(p=>p.name===sc.shifts?.role)?.color||sc.shifts?.color||"#0a7c42";const hasPartialLeave=Number(sc.leave_hours)>0&&sc.type!=="leave";return(
