@@ -190,11 +190,19 @@ export async function POST(request) {
     const { store_id, category, item, sort_order, role, shift_type, frequency, weekday, month_day, requires_value, value_label, value_min, value_max, checkpoints } = body;
     const cps = Array.isArray(checkpoints) && checkpoints.length > 0 ? checkpoints : null;
     const firstCp = cps ? cps[0] : (shift_type || "opening");
+    const num = (v) => (v === "" || v === null || v === undefined) ? null : Number(v);
     const { data, error } = await supabase.from("work_log_templates").insert({
-      store_id, category, item, sort_order: sort_order || 0, role: role || "all",
+      store_id, category, item,
+      sort_order: num(sort_order) ?? 0,
+      role: role || "all",
       shift_type: firstCp, frequency: frequency || "daily",
-      checkpoints: cps, weekday, month_day,
-      requires_value: requires_value || false, value_label, value_min, value_max,
+      checkpoints: cps,
+      weekday: num(weekday),
+      month_day: num(month_day),
+      requires_value: requires_value || false,
+      value_label: value_label || null,
+      value_min: num(value_min),
+      value_max: num(value_max),
     }).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
