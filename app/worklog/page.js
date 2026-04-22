@@ -19,6 +19,7 @@ export default function WorkLogPage() {
   const [deepContrib, setDeepContrib] = useState([]);
   const [deliveryMode, setDeliveryMode] = useState(false);
   const [deliveryLines, setDeliveryLines] = useState([]);
+  const [shiftMode, setShiftMode] = useState("single");
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
   const thisMonth = today.slice(0, 7);
   const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
@@ -56,6 +57,9 @@ export default function WorkLogPage() {
     ]).then(([wl, a, st, stl, sk]) => {
       setItems(wl.data || []); setAnns(a.data || []); setStockItems(sk.data || []);
       const store = (st.data || []).find(s => s.id === sid);
+      const mode = store?.shift_mode || "single";
+      setShiftMode(mode);
+      setTab(mode === "double" ? "morning_start" : "opening");
       const todayS = (stl.data || []).find(s => s.date === today);
       const monthS = (stl.data || []).reduce((s, r) => s + Number(r.net_sales || 0), 0);
       const dailyT = store ? Number(store.daily_target || 0) : 0;
@@ -89,14 +93,13 @@ export default function WorkLogPage() {
     await fetch("/api/admin/stock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_delivery", store_id: storeId, items: valid, received_by: empId, received_by_name: empName }) });
     setDeliveryMode(false); setDeliveryLines([]); alert("✅ 進貨已登記");
   };
-  const openingItems = items.filter(i => i.shift_type === "opening");
-  const duringItems = items.filter(i => i.shift_type === "during");
-  const closingItems = items.filter(i => i.shift_type === "closing");
-  const currentItems = tab === "opening" ? openingItems : tab === "during" ? duringItems : tab === "closing" ? closingItems : [];
+  const currentItems = tab === "deep" ? [] : items.filter(i => i.shift_type === tab);
   const grouped = {}; for (const item of currentItems) { const c = item.category || "其他"; if (!grouped[c]) grouped[c] = []; grouped[c].push(item); }
   const stockCats = [...new Set(stockItems.map(i => i.category))];
-  const stockPeriod = tab === "opening" ? "morning" : "evening";
-  const showStock = (tab === "opening" || tab === "closing") && stockItems.length > 0;
+  const openingTabs = shiftMode === "double" ? ["morning_start", "evening_start"] : ["opening"];
+  const closingTabs = shiftMode === "double" ? ["morning_end", "evening_end"] : ["closing"];
+  const stockPeriod = openingTabs.includes(tab) ? "morning" : "evening";
+  const showStock = (openingTabs.includes(tab) || closingTabs.includes(tab)) && stockItems.length > 0;
   const stockFilled = Object.values(stockQty).filter(v => v !== "" && v !== undefined).length;
   const tasksDone = currentItems.filter(i => i.completed).length;
   const tasksTotal = currentItems.length;
@@ -107,7 +110,9 @@ export default function WorkLogPage() {
   const deepMonthly = deepItems.filter(i => i.freq === "monthly");
   const weekDone = deepWeekly.filter(i => i.completed).length;
   const monthDone = deepMonthly.filter(i => i.completed).length;
-  const TABS = [{ id: "opening", l: "☀️開店" }, { id: "during", l: "🔥營業" }, { id: "closing", l: "🌙閉店" }, { id: "deep", l: "🧹清潔" }];
+  const TABS = shiftMode === "double"
+    ? [{ id: "morning_start", l: "🌅早上" }, { id: "morning_end", l: "🌤早下" }, { id: "evening_start", l: "🌇晚上" }, { id: "evening_end", l: "🌙晚下" }, { id: "deep", l: "🧹清潔" }]
+    : [{ id: "opening", l: "☀️開店" }, { id: "during", l: "🔥營業" }, { id: "closing", l: "🌙閉店" }, { id: "deep", l: "🧹清潔" }];
   if (loading) return <Box><div style={{ textAlign: "center", padding: 40, color: "#ccc" }}>載入中...</div></Box>;
   return (
     <Box>
@@ -129,7 +134,7 @@ export default function WorkLogPage() {
         </div>
       </div>
       {anns.filter(a => a.is_active).slice(0, 3).map(a => (<div key={a.id} style={{ background: a.priority === "urgent" ? "#fde8e8" : "#e6f1fb", borderRadius: 8, padding: "6px 10px", marginBottom: 4, fontSize: 12 }}><b style={{ color: a.priority === "urgent" ? "#b91c1c" : "#185fa5" }}>{(a.priority === "urgent" ? "🔴 " : "📢 ") + a.title}</b><div style={{ color: "#666", marginTop: 1, fontSize: 11 }}>{(a.content || "").slice(0, 60)}</div></div>))}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, margin: "8px 0 10px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${TABS.length}, 1fr)`, gap: 4, margin: "8px 0 10px" }}>
         {TABS.map(t => <button key={t.id} onClick={() => { setTab(t.id); setStockQty({}); setDeliveryMode(false); }} style={{ padding: "10px 2px", borderRadius: 10, border: tab === t.id ? "2px solid #1a1a1a" : "1px solid #ddd", background: tab === t.id ? "#1a1a1a" : "#fff", color: tab === t.id ? "#fff" : "#666", fontSize: 12, fontWeight: tab === t.id ? 700 : 400, cursor: "pointer" }}>{t.l}</button>)}
       </div>
       {tab !== "deep" && <>
@@ -145,7 +150,7 @@ export default function WorkLogPage() {
           <div style={{ display: "flex", gap: 6 }}><button onClick={() => setDeliveryLines([...deliveryLines, { item_id: "", quantity: "" }])} style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px dashed #ccc", background: "transparent", fontSize: 12, cursor: "pointer" }}>＋</button><button onClick={submitDelivery} style={{ flex: 1, padding: 8, borderRadius: 8, border: "none", background: "#b45309", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>確認進貨</button><button onClick={() => setDeliveryMode(false)} style={{ padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 12, cursor: "pointer" }}>取消</button></div>
         </div>}
         {Object.entries(grouped).map(([cat, ci]) => (<div key={cat} style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 4, padding: "0 4px" }}>{cat}</div><div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1" }}>{ci.map(item => <CI key={item.id} item={item} toggle={() => toggle(item, false)} submitValue={submitValue} />)}</div></div>))}
-        {showStock && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "#b45309", marginBottom: 4, padding: "0 4px" }}>📦 庫存盤點</div><div style={{ background: stockSubmitted[stockPeriod] ? "#e6f9f0" : "#fff", borderRadius: 10, border: "1px solid " + (stockSubmitted[stockPeriod] ? "#0a7c42" : "#e8e6e1") }}>{stockSubmitted[stockPeriod] ? <div style={{ padding: 20, textAlign: "center" }}><div style={{ fontSize: 28 }}>✅</div><div style={{ fontSize: 13, fontWeight: 600, color: "#0a7c42" }}>{(tab === "opening" ? "開店" : "閉店") + "盤點已送出"}</div></div> : <>{stockCats.map(cat => <div key={cat}><div style={{ fontSize: 10, fontWeight: 600, color: "#888", padding: "8px 12px 2px", background: "#faf8f5" }}>{cat}</div>{stockItems.filter(i => i.category === cat).map(item => <div key={item.id} style={{ display: "flex", alignItems: "center", padding: "10px 12px", borderBottom: "1px solid #f0eeea", gap: 10 }}><div style={{ flex: 1 }}><div style={{ fontSize: 14 }}>{item.name}</div>{item.par_level > 0 && <div style={{ fontSize: 10, color: "#888" }}>{"標準" + item.par_level + item.unit}</div>}</div><input type="number" inputMode="decimal" value={stockQty[item.id] || ""} onChange={e => setStockQty({ ...stockQty, [item.id]: e.target.value })} placeholder="0" style={{ width: 60, padding: "6px 4px", borderRadius: 8, border: "2px solid " + (stockQty[item.id] ? "#b45309" : "#ddd"), fontSize: 16, textAlign: "center", fontWeight: 700 }} /><span style={{ fontSize: 11, color: "#888" }}>{item.unit}</span></div>)}</div>)}<div style={{ padding: 12 }}><button onClick={() => submitStock(stockPeriod)} style={{ width: "100%", padding: 12, borderRadius: 10, border: "none", background: stockFilled > 0 ? "#b45309" : "#ddd", color: "#fff", fontSize: 14, fontWeight: 600, cursor: stockFilled > 0 ? "pointer" : "default" }}>{"📦送出" + (tab === "opening" ? "開店" : "閉店") + "盤點（" + stockFilled + "/" + stockItems.length + "）"}</button></div></>}</div></div>}
+        {showStock && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "#b45309", marginBottom: 4, padding: "0 4px" }}>📦 庫存盤點</div><div style={{ background: stockSubmitted[stockPeriod] ? "#e6f9f0" : "#fff", borderRadius: 10, border: "1px solid " + (stockSubmitted[stockPeriod] ? "#0a7c42" : "#e8e6e1") }}>{stockSubmitted[stockPeriod] ? <div style={{ padding: 20, textAlign: "center" }}><div style={{ fontSize: 28 }}>✅</div><div style={{ fontSize: 13, fontWeight: 600, color: "#0a7c42" }}>{(openingTabs.includes(tab) ? "開店" : "閉店") + "盤點已送出"}</div></div> : <>{stockCats.map(cat => <div key={cat}><div style={{ fontSize: 10, fontWeight: 600, color: "#888", padding: "8px 12px 2px", background: "#faf8f5" }}>{cat}</div>{stockItems.filter(i => i.category === cat).map(item => <div key={item.id} style={{ display: "flex", alignItems: "center", padding: "10px 12px", borderBottom: "1px solid #f0eeea", gap: 10 }}><div style={{ flex: 1 }}><div style={{ fontSize: 14 }}>{item.name}</div>{item.par_level > 0 && <div style={{ fontSize: 10, color: "#888" }}>{"標準" + item.par_level + item.unit}</div>}</div><input type="number" inputMode="decimal" value={stockQty[item.id] || ""} onChange={e => setStockQty({ ...stockQty, [item.id]: e.target.value })} placeholder="0" style={{ width: 60, padding: "6px 4px", borderRadius: 8, border: "2px solid " + (stockQty[item.id] ? "#b45309" : "#ddd"), fontSize: 16, textAlign: "center", fontWeight: 700 }} /><span style={{ fontSize: 11, color: "#888" }}>{item.unit}</span></div>)}</div>)}<div style={{ padding: 12 }}><button onClick={() => submitStock(stockPeriod)} style={{ width: "100%", padding: 12, borderRadius: 10, border: "none", background: stockFilled > 0 ? "#b45309" : "#ddd", color: "#fff", fontSize: 14, fontWeight: 600, cursor: stockFilled > 0 ? "pointer" : "default" }}>{"📦送出" + (openingTabs.includes(tab) ? "開店" : "閉店") + "盤點（" + stockFilled + "/" + stockItems.length + "）"}</button></div></>}</div></div>}
         {tasksTotal === 0 && !showStock && <div style={{ textAlign: "center", padding: 30, color: "#ccc", fontSize: 12 }}>此時段無工作項目</div>}
       </>}
       {tab === "deep" && <div>
