@@ -9,7 +9,7 @@ export async function GET(request) {
 
   let query = supabase
     .from("leave_requests")
-    .select("*, employees(name, store_id, employment_type, stores!store_id(name))")
+    .select("*, employees!leave_requests_employee_id_fkey(name, store_id, employment_type, stores!store_id(name))")
     .eq("request_type", "unavailable")
     .order("start_date");
 
