@@ -745,8 +745,9 @@ export default function AdminPage() {
                             return <th key={d} style={{padding:sv==="biweek"?"4px 1px":"7px 3px",textAlign:"center",fontWeight:isSun?700:500,color:hol?"#b91c1c":isWe?"#b45309":"#666",minWidth:sv==="biweek"?55:85,background:hol?"#fef2f2":isSun?"#f9f0f0":"transparent",borderLeft:i>0&&new Date(d).getDay()===0?"2px solid #e0d0d0":"none"}}>{d.slice(5)}<div style={{fontSize:sv==="biweek"?7:8,color:hol?"#b91c1c":"#999"}}>{day}{hol?" "+hol.name:""}</div></th>;})}
                         </tr></thead>
                         <tbody>{storeEmps.map(emp=>{
-                          // 統計以整月為單位
-                          const monthScheds=scheds.filter(s=>s.employee_id===emp.id&&s.date>=month+"-01"&&s.date<=month+"-31");
+                          // 統計以目前檢視範圍為單位（週/雙週用 wd 區間，月看整月）
+                          const rangeStart=wd[0], rangeEnd=wd[wd.length-1];
+                          const monthScheds=scheds.filter(s=>s.employee_id===emp.id&&s.date>=rangeStart&&s.date<=rangeEnd);
                           const mWorkDays=monthScheds.filter(s=>s.type==="shift").length;
                           const mWorkHrs=monthScheds.filter(s=>s.type==="shift").reduce((sum,s)=>{
                             if(!s.shifts?.start_time||!s.shifts?.end_time)return sum+8;
