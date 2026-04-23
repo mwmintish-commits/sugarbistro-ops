@@ -765,7 +765,7 @@ export default function AdminPage() {
                           <tr key={emp.id} style={{borderBottom:"1px solid #f0eeea"}}>
                             <td style={{padding:"4px 3px",fontWeight:500,fontSize:10,position:"sticky",left:0,background:"#fff",zIndex:1,minWidth:60}}>
                               {emp.name}
-                              <div style={{fontSize:7,color:"#888",marginTop:1}}>{mWorkDays}天 / {Math.round(mWorkHrs)}hr{mLeaveDays>0?" / 假"+mLeaveDays+"天":""}</div>
+                              <div style={{fontSize:7,color:"#888",marginTop:1}}>{Number(wd[0].slice(5,7))}月: {mWorkDays}天 / {Math.round(mWorkHrs)}hr{mLeaveDays>0?" / 假"+mLeaveDays+"天":""}</div>
                             </td>
                             {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);const hol=holidays.find(h=>h.date===date);const avRec=showAvail?avReports.find(r=>r.employee_id===emp.id&&r.start_date===date):null;return(
                               <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top",borderLeft:new Date(date).getDay()===0?"2px solid #e0d0d0":"none",background:avRec?(avRec.half_day?"rgba(251,191,36,0.18)":"rgba(239,68,68,0.18)"):"transparent",position:"relative"}}>
