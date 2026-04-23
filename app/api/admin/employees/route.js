@@ -227,22 +227,32 @@ export async function POST(request) {
     return Response.json({ data, bind_code: bindCode });
   }
 
-  // 調整排序（與相鄰員工交換 sort_order）
+  // 調整排序（與相鄰員工交換）— 先依當前顯示順序回填 sort_order，再交換相鄰兩人
   if (body.action === "reorder") {
     const { employee_id, direction } = body; // direction: "up" | "down"
-    const { data: me } = await supabase.from("employees").select("id, store_id, sort_order").eq("id", employee_id).single();
+    const { data: me } = await supabase.from("employees").select("id, store_id").eq("id", employee_id).single();
     if (!me) return Response.json({ error: "Not found" }, { status: 404 });
-    const cmp = direction === "up" ? "lt" : "gt";
-    const ord = direction === "up" ? false : true;
-    let q = supabase.from("employees").select("id, sort_order")
-      .eq("is_active", true)[cmp]("sort_order", me.sort_order || 0)
-      .order("sort_order", { ascending: ord }).limit(1);
+
+    // 撈出同店全部在職員工，依目前排序規則（sort_order NULLS LAST → created_at）
+    let q = supabase.from("employees").select("id, sort_order, created_at").eq("is_active", true);
     q = me.store_id ? q.eq("store_id", me.store_id) : q.is("store_id", null);
-    const { data: neighbors } = await q;
-    const neighbor = neighbors?.[0];
-    if (!neighbor) return Response.json({ ok: true, noop: true });
-    await supabase.from("employees").update({ sort_order: neighbor.sort_order }).eq("id", me.id);
-    await supabase.from("employees").update({ sort_order: me.sort_order || 0 }).eq("id", neighbor.id);
+    const { data: list } = await q;
+    if (!list || list.length < 2) return Response.json({ ok: true, noop: true });
+
+    const sorted = [...list].sort((a, b) => {
+      const ao = a.sort_order, bo = b.sort_order;
+      if (ao != null && bo != null) return ao - bo;
+      if (ao != null) return -1;
+      if (bo != null) return 1;
+      return (a.created_at || "").localeCompare(b.created_at || "");
+    });
+    const idx = sorted.findIndex(e => e.id === employee_id);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= sorted.length) return Response.json({ ok: true, noop: true });
+
+    // 交換陣列位置後依索引回寫 sort_order（避免 NULL 永遠交換失敗）
+    [sorted[idx], sorted[swapIdx]] = [sorted[swapIdx], sorted[idx]];
+    await Promise.all(sorted.map((e, i) => supabase.from("employees").update({ sort_order: i + 1 }).eq("id", e.id)));
     return Response.json({ ok: true });
   }
 
