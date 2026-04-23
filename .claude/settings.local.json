@@ -19,7 +19,22 @@
       "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops merge claude/pensive-edison-38e288 --no-ff -m \"Merge: 後台效能優化 + 清理舊選單設定\")",
       "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops merge claude/pensive-edison-38e288 --no-ff -m \"Merge: 薪資/考核 N+1 優化\")",
       "Bash(git -C /Users/maxwang/Desktop/sugarbistro-ops merge claude/pensive-edison-38e288 --no-ff -m \"Merge: 工作日誌 bug 修正\")",
-      "Bash(npm install *)"
+      "Bash(python3 -c ' *)",
+      "Bash(pip3 install *)",
+      "Bash(python3)",
+      "Bash(npx next *)",
+      "Bash(node -e ' *)",
+      "Bash(cat)",
+      "Read(//tmp/**)",
+      "Bash(gunzip -c \"/Users/maxwang/Downloads/runtime-log-20260422-000000-3c8dd1f5-001b-4657-8da5-ed3924d93f45.log.gz\")",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(s.get\\('id'\\),s.get\\('name'\\),s.get\\('shift_mode'\\)\\) for s in d.get\\('data',[]\\)]\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); items=[i for i in d.get\\('data',[]\\) if i.get\\('is_active'\\) and i.get\\('frequency'\\)=='daily']; print\\('active daily:', len\\(items\\)\\); [print\\(i.get\\('item'\\),'|',i.get\\('checkpoints'\\)\\) for i in items[:5]]\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); data=d.get\\('data',[]\\); print\\('total:',len\\(data\\)\\); evening=[i for i in data if i.get\\('shift_type'\\)=='evening_start']; print\\('evening_start:',len\\(evening\\)\\); [print\\(i.get\\('item_name'\\),'|',i.get\\('shift_type'\\)\\) for i in data[:3]]\")",
+      "Bash(grep -n \"盤點回報\\\\|view === \\\\\"inventory\\\\\"\\\\|</div>\\\\s*\\);$\\\\s*}$\" /Users/maxwang/Desktop/sugarbistro-ops/.claude/worktrees/pensive-edison-38e288/app/components/WorklogMgr.js)",
+      "Bash(git pull *)",
+      "Bash(git stash *)"
     ]
   }
 }

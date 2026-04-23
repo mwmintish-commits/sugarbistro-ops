@@ -1,6 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { ap, fmt } from "./utils";
+
+const WorklogSettings = dynamic(() => import("./SettingsMgr").then(m => ({ default: m.WorklogSettings })), { ssr: false, loading: () => <div style={{ textAlign: "center", padding: 20, color: "#ccc" }}>載入設定中...</div> });
 
 export default function WorklogMgr({ stores, sf, month, auth }) {
   const [view, setView] = useState("completion");
@@ -49,8 +52,8 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
   return (
     <div>
       <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap" }}>
-        {["completion", "detail", "inventory"].map(v => {
-          const labels = { completion: "📊 各店完成度", detail: "📋 每日明細", inventory: "📦 盤點回報" };
+        {["completion", "detail", "inventory", ...(auth?.role === "admin" ? ["settings"] : [])].map(v => {
+          const labels = { completion: "📊 各店完成度", detail: "📋 每日明細", inventory: "📦 盤點回報", settings: "⚙️ 日誌設定" };
           return (
             <button key={v} onClick={() => {
               setView(v);
@@ -243,6 +246,9 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
           </div>
         </div>
       )}
+
+      {/* 日誌設定（僅 admin） */}
+      {view === "settings" && auth?.role === "admin" && <WorklogSettings stores={stores} />}
 
     </div>
   );

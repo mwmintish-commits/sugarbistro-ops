@@ -86,6 +86,7 @@ export default function AdminPage() {
   const [anns, setAnns] = useState([]);
   const [annForm, setAnnForm] = useState(null); // null=關閉, {id?, title, content, tag, store_id, priority, starts_at, expires_at, push_line}
   const [annTagFilter, setAnnTagFilter] = useState("");
+  const [pubForm, setPubForm] = useState(null); // {store_id, start, end}
   const [detailId, setDetailId] = useState(null);
   const [sv, setSv] = useState("week");
   const [avReports, setAvReports] = useState([]);
@@ -651,22 +652,16 @@ export default function AdminPage() {
                   <button onClick={()=>{const next=!showAvail;setShowAvail(next);if(next){const months=new Set();const days=sv==="biweek"?14:7;for(let i=0;i<days;i++){const d=new Date(new Date(ws).getTime()+i*86400000).toLocaleDateString("sv-SE");months.add(d.slice(0,7));}Promise.all([...months].map(mo=>ap("/api/availability?month="+mo+(sf?"&store_id="+sf:"")))).then(rs=>{const all=rs.flatMap(r=>r.data||[]);setAvReports(all);});}}} style={{padding:"3px 8px",borderRadius:5,border:showAvail?"1px solid #854d0e":"1px solid #ddd",background:showAvail?"#fef9c3":"#fff",color:showAvail?"#854d0e":"#888",cursor:"pointer",fontSize:11,fontWeight:showAvail?600:400}}>📋 預排假</button>
                 </>
               )}
-              <button onClick={async()=>{
-                if(!sf){alert("請先選擇門市再發布（各店分開發布）");return;}
-                const storeName=stores.find(s=>s.id===sf)?.name||"該店";
-                let start, end, label;
+              <button onClick={()=>{
+                let start, end;
                 if (sv === "week" || sv === "biweek") {
                   const days = sv === "biweek" ? 13 : 6;
                   start = ws; end = new Date(new Date(ws).getTime()+days*86400000).toLocaleDateString("sv-SE");
-                  label = start+" ~ "+end;
                 } else {
                   const [y,m] = month.split("-").map(Number);
                   start = month+"-01"; end = new Date(y,m,0).toLocaleDateString("sv-SE");
-                  label = month+" 整月";
                 }
-                if(!confirm("📢 發布 "+storeName+" "+label+" 的班表？\n\n發布後該店員工即可看到。"))return;
-                const r = await ap("/api/admin/schedules",{action:"publish",week_start:start,week_end:end,store_id:sf});
-                alert("✅ 已發布"+(r.published||0)+"筆，通知"+(r.notified||0)+"人");load();
+                setPubForm({ store_id: sf || "", start, end });
               }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:11,cursor:"pointer",marginLeft:"auto"}}>
                 📢 發布班表
               </button>
@@ -2330,7 +2325,6 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📋 工作日誌</h3>
             <WorklogMgr stores={stores} sf={sf} month={month} auth={auth} />
-            {auth.role === "admin" && <WorklogSettings stores={stores} />}
           </div>
         )}
 
@@ -2481,6 +2475,69 @@ export default function AdminPage() {
         {!ld && tab === "settings" && (
           <SettingsMgr stores={stores} load={load} month={month} />
         )}
+
+        {/* 發布班表彈窗 */}
+        {pubForm && (() => {
+          const storeName = pubForm.store_id ? (stores.find(s=>s.id===pubForm.store_id)?.name || "") : "";
+          const dayCount = pubForm.start && pubForm.end ? Math.round((new Date(pubForm.end)-new Date(pubForm.start))/86400000)+1 : 0;
+          return (
+            <div onClick={()=>setPubForm(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+              <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:10,padding:20,maxWidth:440,width:"100%"}}>
+                <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600}}>📢 發布班表</h3>
+                <div style={{display:"grid",gap:12}}>
+                  <label style={{fontSize:11,color:"#666"}}>門市 *
+                    <select value={pubForm.store_id} onChange={e=>setPubForm({...pubForm,store_id:e.target.value})}
+                      style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}>
+                      <option value="">請選擇門市</option>
+                      {stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                    <div style={{fontSize:9,color:"#888",marginTop:3}}>各店分開發布，避免誤推其他門市</div>
+                  </label>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <label style={{fontSize:11,color:"#666"}}>開始日期 *
+                      <input type="date" value={pubForm.start} onChange={e=>setPubForm({...pubForm,start:e.target.value})}
+                        style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}/>
+                    </label>
+                    <label style={{fontSize:11,color:"#666"}}>結束日期 *
+                      <input type="date" value={pubForm.end} onChange={e=>setPubForm({...pubForm,end:e.target.value})}
+                        style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}/>
+                    </label>
+                  </div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    <button onClick={()=>{const d=new Date();d.setDate(d.getDate()-d.getDay());const e=new Date(d);e.setDate(e.getDate()+6);setPubForm({...pubForm,start:d.toLocaleDateString("sv-SE"),end:e.toLocaleDateString("sv-SE")});}}
+                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>本週</button>
+                    <button onClick={()=>{const d=new Date();d.setDate(d.getDate()-d.getDay()+7);const e=new Date(d);e.setDate(e.getDate()+6);setPubForm({...pubForm,start:d.toLocaleDateString("sv-SE"),end:e.toLocaleDateString("sv-SE")});}}
+                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>下週</button>
+                    <button onClick={()=>{const d=new Date();d.setDate(d.getDate()-d.getDay());const e=new Date(d);e.setDate(e.getDate()+13);setPubForm({...pubForm,start:d.toLocaleDateString("sv-SE"),end:e.toLocaleDateString("sv-SE")});}}
+                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>本+下週</button>
+                    <button onClick={()=>{const t=new Date();const s=new Date(t.getFullYear(),t.getMonth(),1);const e=new Date(t.getFullYear(),t.getMonth()+1,0);setPubForm({...pubForm,start:s.toLocaleDateString("sv-SE"),end:e.toLocaleDateString("sv-SE")});}}
+                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>本月</button>
+                    <button onClick={()=>{const t=new Date();const s=new Date(t.getFullYear(),t.getMonth()+1,1);const e=new Date(t.getFullYear(),t.getMonth()+2,0);setPubForm({...pubForm,start:s.toLocaleDateString("sv-SE"),end:e.toLocaleDateString("sv-SE")});}}
+                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>下個月</button>
+                  </div>
+                  {pubForm.store_id && pubForm.start && pubForm.end && (
+                    <div style={{padding:"8px 10px",background:"#f0fdf4",borderRadius:6,border:"1px solid #bbf7d0",fontSize:11,color:"#166534"}}>
+                      將發布 <b>{storeName}</b> {pubForm.start} ～ {pubForm.end}（共 {dayCount} 天）<br/>
+                      <span style={{fontSize:10,color:"#888"}}>發布後該店員工才能在 LINE / 我的班表頁看到</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:16}}>
+                  <button onClick={()=>setPubForm(null)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>取消</button>
+                  <button onClick={async()=>{
+                    if(!pubForm.store_id){alert("請選擇門市");return;}
+                    if(!pubForm.start||!pubForm.end){alert("請選擇日期區間");return;}
+                    if(pubForm.start>pubForm.end){alert("開始日期不可晚於結束日期");return;}
+                    const r=await ap("/api/admin/schedules",{action:"publish",week_start:pubForm.start,week_end:pubForm.end,store_id:pubForm.store_id});
+                    if(r.error){alert("錯誤："+r.error);return;}
+                    alert("✅ "+(r.message||`已發布 ${r.published||0} 筆，通知 ${r.notified||0} 人`));
+                    setPubForm(null); load();
+                  }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"#0a7c42",color:"#fff",fontSize:11,cursor:"pointer",fontWeight:600}}>📢 確認發布</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* IMAGE PREVIEW */}
         {/* 排班彈窗 */}

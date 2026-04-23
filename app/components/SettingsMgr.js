@@ -537,7 +537,7 @@ export function WorklogSettings({ stores }) {
 
   return (
     <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
-      <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📋 工作日誌模板設定（矩陣編輯器）</h4>
+      <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>⚙️ 日誌設定（矩陣編輯器）</h4>
       <select value={wlStore} onChange={e => setWlStore(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, marginBottom: 10, width: "100%" }}>
         <option value="">選擇門市</option>
         {stores.map(s => <option key={s.id} value={s.id}>{s.name + (s.shift_mode === "double" ? "（雙班）" : "")}</option>)}

@@ -59,6 +59,8 @@ export async function GET(request) {
     query = query.gte("date", startOfWeek.toLocaleDateString("sv-SE")).lte("date", endOfWeek.toLocaleDateString("sv-SE"));
   }
   if (week_start && week_end) query = query.gte("date", week_start).lte("date", week_end);
+  // 員工檢視：只回傳已發布的班表（或預假本人申請）
+  if (searchParams.get("published_only") === "1") query = query.or("published.eq.true,leave_type.eq.advance");
 
   const { data, error } = await query;
   if (error) return Response.json({ error: error.message }, { status: 500 });

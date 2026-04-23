@@ -43,7 +43,7 @@ export default function MySchedule() {
       we = we2.toLocaleDateString("sv-SE");
     }
     const storeParam = emp.store_id ? `&store_id=${emp.store_id}` : "";
-    fetch(`/api/admin/schedules?week_start=${ws}&week_end=${we}${storeParam}`).then(r => r.json()).then(r => {
+    fetch(`/api/admin/schedules?week_start=${ws}&week_end=${we}${storeParam}&published_only=1`).then(r => r.json()).then(r => {
       setScheds(r.data || []);
       setLoading(false);
     });
