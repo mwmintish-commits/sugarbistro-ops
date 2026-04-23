@@ -156,8 +156,12 @@ export default function AdminPage() {
     if (sf) p.set("store_id", sf);
     const viewDays = sv === "biweek" ? 13 : 6;
     const we2 = new Date(new Date(ws).getTime() + viewDays*86400000).toLocaleDateString("sv-SE");
+    // 週/雙週檢視時，把 schedules 查詢範圍擴展為「涵蓋可視區間的整個月份」
+    // 這樣員工列旁的天數/時數可以顯示整月累計，而非只是當週
+    const monthStart = (ymd) => ymd.slice(0,7) + "-01";
+    const monthEnd = (ymd) => { const [y,m] = ymd.split("-").map(Number); const last = new Date(y, m, 0).getDate(); return `${ymd.slice(0,7)}-${String(last).padStart(2,"0")}`; };
     const sp = (sv === "week" || sv === "biweek")
-      ? "week_start=" + ws + "&week_end=" + we2 + (sf ? "&store_id=" + sf : "")
+      ? "week_start=" + monthStart(ws) + "&week_end=" + monthEnd(we2) + (sf ? "&store_id=" + sf : "")
       : "month=" + month + (sf ? "&store_id=" + sf : "");
 
     // 以目前 tab 決定要抓哪些資料（未開啟的 tab 不抓）
@@ -745,9 +749,9 @@ export default function AdminPage() {
                             return <th key={d} style={{padding:sv==="biweek"?"4px 1px":"7px 3px",textAlign:"center",fontWeight:isSun?700:500,color:hol?"#b91c1c":isWe?"#b45309":"#666",minWidth:sv==="biweek"?55:85,background:hol?"#fef2f2":isSun?"#f9f0f0":"transparent",borderLeft:i>0&&new Date(d).getDay()===0?"2px solid #e0d0d0":"none"}}>{d.slice(5)}<div style={{fontSize:sv==="biweek"?7:8,color:hol?"#b91c1c":"#999"}}>{day}{hol?" "+hol.name:""}</div></th>;})}
                         </tr></thead>
                         <tbody>{storeEmps.map(emp=>{
-                          // 統計以目前檢視範圍為單位（週/雙週用 wd 區間，月看整月）
-                          const rangeStart=wd[0], rangeEnd=wd[wd.length-1];
-                          const monthScheds=scheds.filter(s=>s.employee_id===emp.id&&s.date>=rangeStart&&s.date<=rangeEnd);
+                          // 統計以「可視週起點所在月」為單位（schedules 已擴展抓整月）
+                          const ym=wd[0].slice(0,7);
+                          const monthScheds=scheds.filter(s=>s.employee_id===emp.id&&s.date>=ym+"-01"&&s.date<=ym+"-31");
                           const mWorkDays=monthScheds.filter(s=>s.type==="shift").length;
                           const mWorkHrs=monthScheds.filter(s=>s.type==="shift").reduce((sum,s)=>{
                             if(!s.shifts?.start_time||!s.shifts?.end_time)return sum+8;
