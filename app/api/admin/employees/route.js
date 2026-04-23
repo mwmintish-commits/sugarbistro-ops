@@ -252,8 +252,19 @@ export async function POST(request) {
 
     // 交換陣列位置後依索引回寫 sort_order（避免 NULL 永遠交換失敗）
     [sorted[idx], sorted[swapIdx]] = [sorted[swapIdx], sorted[idx]];
-    await Promise.all(sorted.map((e, i) => supabase.from("employees").update({ sort_order: i + 1 }).eq("id", e.id)));
-    return Response.json({ ok: true });
+    const results = await Promise.all(
+      sorted.map((e, i) => supabase.from("employees").update({ sort_order: (i + 1) * 10 }).eq("id", e.id).select("id").single())
+    );
+    const firstErr = results.find(r => r.error);
+    if (firstErr) {
+      const msg = firstErr.error.message || "";
+      // 欄位不存在 → 提醒跑 migration
+      if (/sort_order/i.test(msg) && /(column|does not exist|schema)/i.test(msg)) {
+        return Response.json({ error: "請先在 Supabase 跑 migration：employee-sort-order.sql（新增 sort_order 欄位）" }, { status: 500 });
+      }
+      return Response.json({ error: "排序更新失敗：" + msg }, { status: 500 });
+    }
+    return Response.json({ ok: true, reordered: sorted.length });
   }
 
   // 更新員工（保險、薪資設定等）

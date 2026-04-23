@@ -610,9 +610,9 @@ export default function AdminPage() {
                       <tbody>{storeEmps.map((e,idx)=>(
                         <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
                           <td style={{padding:4,whiteSpace:"nowrap"}}>
-                            <button disabled={idx===0} onClick={async()=>{await ap("/api/admin/employees",{action:"reorder",employee_id:e.id,direction:"up"});load();}}
+                            <button disabled={idx===0} onClick={async()=>{const r=await ap("/api/admin/employees",{action:"reorder",employee_id:e.id,direction:"up"});if(r?.error){alert("❌ "+r.error);return;}load();}}
                               style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:idx===0?"default":"pointer",opacity:idx===0?0.3:1,marginRight:2}}>↑</button>
-                            <button disabled={idx===storeEmps.length-1} onClick={async()=>{await ap("/api/admin/employees",{action:"reorder",employee_id:e.id,direction:"down"});load();}}
+                            <button disabled={idx===storeEmps.length-1} onClick={async()=>{const r=await ap("/api/admin/employees",{action:"reorder",employee_id:e.id,direction:"down"});if(r?.error){alert("❌ "+r.error);return;}load();}}
                               style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:idx===storeEmps.length-1?"default":"pointer",opacity:idx===storeEmps.length-1?0.3:1}}>↓</button>
                           </td>
                           <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}} onClick={()=>setDetailId(e.id)}>{e.name}<span style={{fontSize:9,color:e.employment_type==="parttime"?"#b45309":"#888",marginLeft:4,fontWeight:400}}>{e.employment_type==="parttime"?"兼職":"正職"}</span></td>
