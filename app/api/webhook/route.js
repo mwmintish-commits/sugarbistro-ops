@@ -684,9 +684,13 @@ async function handleEvent(event) {
       (stores || []).map(s => ({ type: "action", action: { type: "message", label: s.name, text: `報到門市:${s.name}` } }))
     );
   }
-  if (text.startsWith("報到門市:") && state?.current_flow === "onboard_store") {
-    const storeName = text.replace("報到門市:", "");
+  if (state?.current_flow === "onboard_store" && (text.startsWith("報到門市:") || text.length <= 20)) {
+    const storeName = text.startsWith("報到門市:") ? text.replace("報到門市:", "") : text;
     const store = await matchStore(storeName);
+    if (!store) {
+      const { data: stores } = await supabase.from("stores").select("name").eq("is_active", true);
+      return replyText(rt, `❌ 找不到門市「${storeName}」\n\n可用門市：\n${(stores||[]).map(s=>"・"+s.name).join("\n")}\n\n請重新輸入或點選按鈕`);
+    }
     const d = state.flow_data;
     const token = crypto.randomBytes(16).toString("hex");
     await supabase.from("onboarding_records").insert({
