@@ -52,7 +52,7 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
   return (
     <div>
       <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap" }}>
-        {["completion", "detail", "inventory", ...(auth?.role === "admin" ? ["settings"] : [])].map(v => {
+        {["completion", "detail", "inventory", ...((auth?.role === "admin" || auth?.role === "store_manager") ? ["settings"] : [])].map(v => {
           const labels = { completion: "📊 各店完成度", detail: "📋 每日明細", inventory: "📦 盤點回報", settings: "⚙️ 日誌設定" };
           return (
             <button key={v} onClick={() => {
@@ -247,8 +247,8 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
         </div>
       )}
 
-      {/* 日誌設定（僅 admin） */}
-      {view === "settings" && auth?.role === "admin" && <WorklogSettings stores={stores} />}
+      {/* 日誌設定（admin 或 store_manager） */}
+      {view === "settings" && (auth?.role === "admin" || auth?.role === "store_manager") && <WorklogSettings stores={stores} />}
 
     </div>
   );
