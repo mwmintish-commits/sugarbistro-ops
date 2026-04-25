@@ -17,8 +17,11 @@ export default function WorkLogPage() {
   const [incSending, setIncSending] = useState(false);
   const [deepItems, setDeepItems] = useState([]);
   const [deepContrib, setDeepContrib] = useState([]);
-  const [deliveryMode, setDeliveryMode] = useState(false);
-  const [deliveryLines, setDeliveryLines] = useState([]);
+  const [orderMode, setOrderMode] = useState(false); // 叫貨表單
+  const [orderLines, setOrderLines] = useState([]);
+  const [receiveMode, setReceiveMode] = useState(false); // 進貨（收貨）清單
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [invItems, setInvItems] = useState([]); // 庫存品項（叫貨用）
   const [shiftMode, setShiftMode] = useState("single");
   const [wasteMode, setWasteMode] = useState(false);
   const [wasteForm, setWasteForm] = useState({ item_id: "", quantity: "", patrol_location: "", waste_reason: "", note: "" });
@@ -88,11 +91,39 @@ export default function WorkLogPage() {
     fetch("/api/admin/waste?type=today&store_id=" + storeId).then(r => r.json()).then(r => setWasteToday(r.data || { no_waste: false, wastes: [] }));
   }, [storeId]);
   useEffect(() => { loadWasteToday(); }, [loadWasteToday]);
-  // 載入該店的庫存品項（報廢登記用）
+  // 載入該店的庫存品項（報廢登記 + 叫貨用）
   useEffect(() => {
     if (!storeId) return;
-    fetch("/api/admin/inventory?store_id=" + storeId).then(r => r.json()).then(r => setWasteItems(r.data || [])).catch(() => {});
+    fetch("/api/admin/inventory?store_id=" + storeId).then(r => r.json()).then(r => { setWasteItems(r.data || []); setInvItems(r.data || []); }).catch(() => {});
   }, [storeId]);
+  // 載入待收叫貨單
+  const loadPendingOrders = useCallback(() => {
+    if (!storeId) return;
+    fetch("/api/admin/inventory?type=orders&store_id=" + storeId + "&status=pending").then(r => r.json()).then(r => setPendingOrders(r.data || [])).catch(() => {});
+  }, [storeId]);
+  useEffect(() => { loadPendingOrders(); }, [loadPendingOrders]);
+  // 送出叫貨單
+  const submitOrder = async () => {
+    const valid = orderLines.filter(o => o.item_id && Number(o.quantity) > 0);
+    if (!valid.length) { alert("請至少填一項"); return; }
+    for (const o of valid) {
+      await fetch("/api/admin/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+        action: "order_create", item_id: o.item_id, quantity: Number(o.quantity), store_id: storeId,
+        requested_by: empId, requested_by_name: empName, notes: o.notes || "",
+      }) });
+    }
+    alert("✅ 已送出 " + valid.length + " 項叫貨單，待總部配貨");
+    setOrderMode(false); setOrderLines([]); loadPendingOrders();
+  };
+  // 確認收貨（進貨）
+  const confirmReceive = async (order, qty) => {
+    const r = await fetch("/api/admin/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      action: "order_receive", order_id: order.id, received_qty: Number(qty),
+      received_by: empId, received_by_name: empName,
+    }) }).then(r => r.json());
+    if (r.error) { alert("收貨失敗：" + r.error); return; }
+    loadPendingOrders();
+  };
   // 取得 GPS（一次）
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -260,7 +291,43 @@ export default function WorkLogPage() {
           <div style={{ height: 8, background: "#f0f0f0", borderRadius: 4, overflow: "hidden" }}><div style={{ height: "100%", width: pct + "%", background: pct === 100 ? "#0a7c42" : "#fbbf24", borderRadius: 4, transition: "width 0.3s" }} /></div>
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 10, color: "#888" }}><span>{"✅" + tasksDone + "/" + tasksTotal}</span>{showStock && <span>{"📦" + (stockSubmitted[stockPeriod] ? stockItems.length : stockFilled) + "/" + stockItems.length}</span>}</div>
         </div>}
-        {/* 進貨登記已整合至後台「庫存管理」叫貨單流程，由總部統一收貨 */}
+        {tab === "during" && !orderMode && !receiveMode && <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+          <button onClick={() => { setOrderMode(true); setOrderLines([{ item_id: "", quantity: "", notes: "" }]); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "2px dashed #b45309", background: "#fff8e6", color: "#b45309", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📦 向總部叫貨</button>
+          <button onClick={() => setReceiveMode(true)} style={{ flex: 1, padding: 12, borderRadius: 10, border: "2px dashed #0a7c42", background: "#e6f9f0", color: "#0a7c42", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📥 進貨{pendingOrders.length > 0 ? "（" + pendingOrders.length + "）" : ""}</button>
+        </div>}
+        {orderMode && <div style={{ background: "#fff8e6", borderRadius: 10, border: "1px solid #f0e6c8", padding: 12, marginBottom: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#b45309", marginBottom: 8 }}>📦 向總部叫貨</div>
+          {orderLines.map((d, idx) => (<div key={idx} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
+            <select value={d.item_id} onChange={e => { const n = [...orderLines]; n[idx].item_id = e.target.value; setOrderLines(n); }} style={{ flex: 2, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 12 }}>
+              <option value="">選品項</option>
+              {invItems.map(i => <option key={i.id} value={i.id}>{i.name + (i.unit ? " (" + i.unit + ")" : "")}</option>)}
+            </select>
+            <input type="number" inputMode="decimal" value={d.quantity} onChange={e => { const n = [...orderLines]; n[idx].quantity = e.target.value; setOrderLines(n); }} placeholder="數量" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 14, textAlign: "center" }} />
+            <button onClick={() => setOrderLines(orderLines.filter((_, i) => i !== idx))} style={{ border: "none", background: "none", color: "#b91c1c", fontSize: 16, cursor: "pointer" }}>✕</button>
+          </div>))}
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setOrderLines([...orderLines, { item_id: "", quantity: "", notes: "" }])} style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px dashed #ccc", background: "transparent", fontSize: 12, cursor: "pointer" }}>＋</button>
+            <button onClick={submitOrder} style={{ flex: 1, padding: 8, borderRadius: 8, border: "none", background: "#b45309", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>送出叫貨</button>
+            <button onClick={() => { setOrderMode(false); setOrderLines([]); }} style={{ padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 12, cursor: "pointer" }}>取消</button>
+          </div>
+        </div>}
+        {receiveMode && <div style={{ background: "#e6f9f0", borderRadius: 10, border: "1px solid #c8e6d4", padding: 12, marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#0a7c42" }}>📥 進貨（總部送達確認）</span>
+            <button onClick={() => setReceiveMode(false)} style={{ padding: "2px 8px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", fontSize: 11, cursor: "pointer" }}>關閉</button>
+          </div>
+          {pendingOrders.length === 0 && <div style={{ fontSize: 12, color: "#666", textAlign: "center", padding: 12 }}>目前沒有待收的叫貨單</div>}
+          {pendingOrders.map(o => (
+            <div key={o.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "8px 4px", borderBottom: "1px solid #d4e6d8" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{o.inventory_items?.name || "?"}</div>
+                <div style={{ fontSize: 10, color: "#666" }}>叫貨 {o.quantity}{o.unit || ""} · {o.requested_by_name || ""} · {o.requested_at?.slice(5, 10)}</div>
+              </div>
+              <input type="number" inputMode="decimal" id={"recv-" + o.id} defaultValue={o.quantity} style={{ width: 60, padding: 6, borderRadius: 6, border: "1px solid #ddd", fontSize: 14, textAlign: "center", fontWeight: 600 }} />
+              <button onClick={() => { const v = document.getElementById("recv-" + o.id)?.value; if (!v || Number(v) <= 0) { alert("請輸入實收數量"); return; } confirmReceive(o, v); }} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✅收貨</button>
+            </div>
+          ))}
+        </div>}
         {closingTabs.includes(tab) && <div style={{ marginBottom: 10 }}>
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #f0d6d6", padding: 10, marginBottom: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
