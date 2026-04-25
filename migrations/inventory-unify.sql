@@ -39,16 +39,18 @@ FROM inventory_items i
 JOIN _ii_keepers k ON k.name = i.name
 WHERE i.is_active = TRUE AND i.id != k.id;
 
--- 重新指向 keeper
-UPDATE purchase_orders po SET item_id = m.keep_id
-  FROM _ii_dupmap m WHERE po.item_id = m.dup_id;
-UPDATE shipment_lines sl SET item_id = m.keep_id
-  FROM _ii_dupmap m WHERE sl.item_id = m.dup_id;
-UPDATE inventory_movements im SET item_id = m.keep_id
-  FROM _ii_dupmap m WHERE im.item_id = m.dup_id;
-
+-- 重新指向 keeper（每張表都要先確認存在）
 DO $$
 BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'purchase_orders') THEN
+    EXECUTE 'UPDATE purchase_orders po SET item_id = m.keep_id FROM _ii_dupmap m WHERE po.item_id = m.dup_id';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'shipment_lines') THEN
+    EXECUTE 'UPDATE shipment_lines sl SET item_id = m.keep_id FROM _ii_dupmap m WHERE sl.item_id = m.dup_id';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'inventory_movements') THEN
+    EXECUTE 'UPDATE inventory_movements im SET item_id = m.keep_id FROM _ii_dupmap m WHERE im.item_id = m.dup_id';
+  END IF;
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'inventory_batches') THEN
     EXECUTE 'UPDATE inventory_batches ib SET item_id = m.keep_id FROM _ii_dupmap m WHERE ib.item_id = m.dup_id';
   END IF;
