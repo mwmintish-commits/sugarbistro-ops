@@ -14,15 +14,17 @@ export default function EmployeeHandbook() {
 
   useEffect(() => {
     setEid(new URLSearchParams(window.location.search).get("eid") || "");
-    fetch("/api/admin/system?key=handbook")
-      .then(r => r.json())
-      .then(r => {
-        const hb = (r.data && Array.isArray(r.data) && r.data.length > 0) ? r.data : [];
-        // 系統固定段落附加在最後
-        setSections([...hb, BONUS_SECTION]);
-        setLoading(false);
-      })
-      .catch(() => { setSections([BONUS_SECTION]); setLoading(false); });
+    Promise.all([
+      fetch("/api/admin/system?key=handbook").then(r => r.json()).catch(() => ({})),
+      fetch("/api/admin/system?key=bonus_terms").then(r => r.json()).catch(() => ({})),
+    ]).then(([hbRes, btRes]) => {
+      const hbVal = hbRes.data?.value;
+      const btVal = btRes.data?.value;
+      const hb = (Array.isArray(hbVal) && hbVal.length > 0) ? hbVal : [];
+      const bonus = (btVal && btVal.title && Array.isArray(btVal.items)) ? btVal : BONUS_SECTION;
+      setSections([...hb, bonus]);
+      setLoading(false);
+    }).catch(() => { setSections([BONUS_SECTION]); setLoading(false); });
   }, []);
 
   const wrap = { maxWidth: 480, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "#f7f5f0", minHeight: "100vh" };

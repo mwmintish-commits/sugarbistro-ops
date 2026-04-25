@@ -23,6 +23,7 @@ export default function OnboardingPage() {
   const [rec, setRec] = useState(null);
   const [tk, setTk] = useState("");
   const [handbook, setHandbook] = useState([]);
+  const [bonusSec, setBonusSec] = useState(BONUS_SECTION);
   const [contractText, setContractText] = useState(FALLBACK_CONTRACT);
   const [done, setDone] = useState(false);
   const [form, setForm] = useState({
@@ -44,16 +45,21 @@ export default function OnboardingPage() {
       fetch("/api/onboarding?token=" + t).then(r => r.json()),
       ap("/api/admin/system?key=handbook"),
       ap("/api/admin/system?key=contract"),
-    ]).then(([d, hbData, ctData]) => {
+      ap("/api/admin/system?key=bonus_terms"),
+    ]).then(([d, hbData, ctData, btData]) => {
       if (d.error) setErr(d.error);
       else {
         setRec(d.data);
         if (d.data?.contract_signed) setDone(true);
         setForm(f => ({ ...f, signature_name: d.data?.name || "", phone: d.data?.phone || "", email: d.data?.email || "" }));
       }
-      if (hbData.data && Array.isArray(hbData.data) && hbData.data.length > 0) setHandbook(hbData.data);
+      const hbVal = hbData.data?.value;
+      const ctVal = ctData.data?.value;
+      const btVal = btData.data?.value;
+      if (Array.isArray(hbVal) && hbVal.length > 0) setHandbook(hbVal);
       else setHandbook(FALLBACK_HB);
-      if (ctData.data) setContractText(ctData.data);
+      if (typeof ctVal === "string" && ctVal) setContractText(ctVal);
+      if (btVal && btVal.title && Array.isArray(btVal.items)) setBonusSec(btVal);
       setLd(false);
     }).catch(() => { setErr("載入失敗"); setLd(false); });
   }, []);
@@ -92,7 +98,7 @@ export default function OnboardingPage() {
       setSub(true);
       try {
         // 守則內容包含後台編輯版本 + 系統固定的獎金福利段落（單一來源）
-        const fullHandbook = [...handbook, BONUS_SECTION];
+        const fullHandbook = [...handbook, bonusSec];
         const res = await fetch("/api/onboarding", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -191,7 +197,7 @@ export default function OnboardingPage() {
         <div style={{background:"#fff",borderRadius:10,border:"1px solid #e8e6e1",padding:14,marginBottom:10,maxHeight:420,overflowY:"auto"}}>
           <h3 style={{fontSize:14,fontWeight:600,marginBottom:4,textAlign:"center"}}>📖 員工守則暨福利條款</h3>
           <p style={{fontSize:10,color:"#888",textAlign:"center",marginBottom:10}}>小食糖 SUGARbISTRO｜到職日起即受本規範約束</p>
-          {[...handbook, BONUS_SECTION].map((ch,i)=><div key={i} style={{marginBottom:10}}>
+          {[...handbook, bonusSec].map((ch,i)=><div key={i} style={{marginBottom:10}}>
             <h4 style={{fontSize:12,fontWeight:600,padding:"4px 8px",borderRadius:4,background:(ch.title||"").includes("零容忍")||(ch.title||"").includes("最高")?"#fde8e8":"#faf8f5",color:(ch.title||"").includes("零容忍")||(ch.title||"").includes("最高")?"#b91c1c":"#333",marginBottom:4}}>{ch.title}</h4>
             {(ch.items||[]).map((item,j)=><div key={j} style={{fontSize:11,lineHeight:1.8,color:"#444",paddingLeft:10}}>{"▸ "+item}</div>)}
           </div>)}

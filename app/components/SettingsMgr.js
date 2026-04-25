@@ -25,6 +25,8 @@ export default function SettingsMgr({ stores, load, month }) {
   const [hbSaving, setHbSaving] = useState(false);
   const [editCh, setEditCh] = useState(null);
   const [contractText, setContractText] = useState(DEFAULT_CONTRACT);
+  const [bonusSec, setBonusSec] = useState(BONUS_SECTION);
+  const [bonusSaving, setBonusSaving] = useState(false);
   const [newStore, setNewStore] = useState({ name: "", address: "" });
   const [clockSettings, setClockSettings] = useState({ late_grace_minutes: 5, overtime_min_minutes: 30 });
   const [wlStore, setWlStore] = useState("");
@@ -72,6 +74,7 @@ export default function SettingsMgr({ stores, load, month }) {
     ap("/api/admin/system?key=company_name").then(r => { if (r.data?.value) setCompanyName(r.data.value); }).catch(() => {});
     ap("/api/admin/system?key=handbook").then(r => { setHb(r.data?.value || DEFAULT_HB); setHbLoading(false); }).catch(() => { setHb(DEFAULT_HB); setHbLoading(false); });
     ap("/api/admin/system?key=contract").then(r => { if (r.data?.value) setContractText(r.data.value); }).catch(() => {});
+    ap("/api/admin/system?key=bonus_terms").then(r => { if (r.data?.value && r.data.value.title && Array.isArray(r.data.value.items)) setBonusSec(r.data.value); }).catch(() => {});
     ap("/api/admin/holidays?year=" + new Date().getFullYear()).then(r => setHols(r.data || [])).catch(() => {});
     ap("/api/admin/attendance?type=settings").then(r => { if (r.data) setClockSettings(r.data); }).catch(() => {});
     ap("/api/admin/system?key=role_tabs").then(r => { if (r.data?.value) setRoleTabs(r.data.value); else setRoleTabs({ manager:["employees","schedules","leaves","attendance","overtime","payroll","reviews","settlements","deposits","expenses","payments","pnl","recipes","production","inventory","clients","orders","products","shifts","worklogs"], store_manager:["schedules","leaves","store_staff","shifts","worklogs","inventory","announcements","settlements","deposits","expenses"] }); }).catch(() => {});
@@ -281,19 +284,46 @@ export default function SettingsMgr({ stores, load, month }) {
             </div>
           </div>
         )}
-        {/* 系統固定段落：獎金與福利（不可編輯，自動附加在守則最後） */}
-        <div style={{ marginTop: 12, padding: 10, background: "#fef9f3", border: "1px dashed #d4a373", borderRadius: 6 }}>
+        {/* 獎金與福利條款編輯器（自動附加在守則最後） */}
+        <div style={{ marginTop: 12, padding: 10, background: "#fef9f3", border: "1px solid #d4a373", borderRadius: 6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#8a4b00" }}>📌 系統固定段落（不可編輯）</span>
-            <span style={{ fontSize: 9, color: "#a46a2a" }}>自動附加在守則最後 · 同步顯示於 /employee-handbook 與報到簽署頁</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#8a4b00" }}>🏆 獎金與福利條款（自動附加在守則最後）</span>
+            <span style={{ fontSize: 9, color: "#a46a2a" }}>同步顯示於 /employee-handbook 與報到簽署頁</span>
           </div>
-          <div style={{ background: "#fff", borderRadius: 4, padding: 8 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{BONUS_SECTION.title}</div>
-            {BONUS_SECTION.items.map((it, i) => (
-              <div key={i} style={{ fontSize: 11, lineHeight: 1.7, color: "#555", paddingLeft: 8 }}>{"▸ " + it}</div>
+          <div style={{ background: "#fff", borderRadius: 4, padding: 8, marginBottom: 6 }}>
+            <input value={bonusSec.title} onChange={e => setBonusSec({ ...bonusSec, title: e.target.value })}
+              style={{ width: "100%", padding: 4, fontSize: 12, fontWeight: 600, border: "1px solid #f0e6d6", borderRadius: 3, marginBottom: 6 }} />
+            {(bonusSec.items || []).map((it, i) => (
+              <div key={i} style={{ display: "flex", gap: 4, marginBottom: 3 }}>
+                <span style={{ color: "#a46a2a", fontSize: 11, marginTop: 4 }}>▸</span>
+                <textarea value={it}
+                  onChange={e => { const next = [...bonusSec.items]; next[i] = e.target.value; setBonusSec({ ...bonusSec, items: next }); }}
+                  rows={2}
+                  style={{ flex: 1, padding: 4, fontSize: 11, lineHeight: 1.6, border: "1px solid #f0e6d6", borderRadius: 3, resize: "vertical", fontFamily: "system-ui" }} />
+                <button onClick={() => { const next = bonusSec.items.filter((_, j) => j !== i); setBonusSec({ ...bonusSec, items: next }); }}
+                  style={{ fontSize: 10, color: "#b91c1c", background: "none", border: "none", cursor: "pointer", alignSelf: "flex-start", marginTop: 4 }}>✕</button>
+              </div>
             ))}
+            <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+              <button onClick={() => setBonusSec({ ...bonusSec, items: [...(bonusSec.items || []), ""] })}
+                style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid #ddd", background: "transparent", fontSize: 10, cursor: "pointer" }}>＋新增條款</button>
+              <button onClick={() => { if (confirm("還原為系統預設版本？將覆蓋目前內容（儲存後生效）")) setBonusSec(BONUS_SECTION); }}
+                style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid #ddd", background: "transparent", fontSize: 10, color: "#666", cursor: "pointer" }}>🔄 還原預設</button>
+              <button onClick={async () => {
+                setBonusSaving(true);
+                const r = await ap("/api/admin/system", { key: "bonus_terms", value: bonusSec });
+                setBonusSaving(false);
+                if (r.error) alert("❌ " + r.error); else alert("✅ 獎金條款已儲存（員工頁面與報到頁同步更新）");
+              }} disabled={bonusSaving}
+                style={{ padding: "3px 14px", borderRadius: 4, border: "none", background: bonusSaving ? "#ccc" : "#8a4b00", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                {bonusSaving ? "儲存中..." : "💾 儲存獎金條款"}
+              </button>
+            </div>
           </div>
-          <div style={{ fontSize: 10, color: "#888", marginTop: 6 }}>※ 此段為法律風險控管必要條款，如需調整請修改原始檔 <code>lib/bonus-terms.js</code>。</div>
+          <div style={{ fontSize: 10, color: "#888", lineHeight: 1.5 }}>
+            ※ 建議保留「恩惠性給與 / 不計入工資基數 / 公司保留調整裁量權」核心字句，避免被認定為經常性給與。<br/>
+            ※ 修改後立即套用於下一位報到員工的簽署版本；已簽署員工的歷史版本以簽署當下為準（存於 employee_documents）。
+          </div>
         </div>
       </div>
 
