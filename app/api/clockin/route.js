@@ -47,7 +47,9 @@ export async function POST(request) {
   const now = new Date();
   const taipeiNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
   const today = taipeiNow.toLocaleDateString("sv-SE");
-  const currentTime = taipeiNow.toTimeString().slice(0, 5);
+  let currentTime = taipeiNow.toTimeString().slice(0, 5);
+  let recordedTimestamp = now.toISOString();
+  let autoCorrected = false;
 
   const { data: schedule } = await supabase.from("schedules").select("*, shifts(*)").eq("employee_id", t.employee_id).eq("date", today).single();
 
@@ -57,6 +59,23 @@ export async function POST(request) {
   // 位置異常不可打卡
   if (distance !== null && !isValid) return Response.json({ error: `位置異常（距門市${distance}m，超出${store.radius_m || 200}m），無法打卡。` }, { status: 403 });
   const { data: settings } = await supabase.from("attendance_settings").select("*").limit(1).single();
+
+  // 自動矯正：下班超過 end_time 但未達加班起算門檻 → 視為準時下班（記錄為排班 end_time）
+  if (t.type === "clock_out" && schedule?.shifts?.end_time) {
+    const [eh0, em0] = schedule.shifts.end_time.split(":").map(Number);
+    const [ch0, cm0] = currentTime.split(":").map(Number);
+    const overMin = (ch0 * 60 + cm0) - (eh0 * 60 + em0);
+    const minOt = settings?.overtime_min_minutes || 30;
+    if (overMin > 0 && overMin < minOt) {
+      // 矯正打卡時間為排班結束時間
+      currentTime = schedule.shifts.end_time.slice(0, 5);
+      const corrected = new Date(taipeiNow);
+      corrected.setHours(eh0, em0, 0, 0);
+      // 換算回 UTC ISO（taipeiNow 是已轉成 Taipei wall-clock 的 Date，差 8hr）
+      recordedTimestamp = new Date(corrected.getTime() - 8 * 3600 * 1000).toISOString();
+      autoCorrected = true;
+    }
+  }
 
   let lateMinutes = 0;
   let earlyLeaveMinutes = 0;
@@ -79,7 +98,7 @@ export async function POST(request) {
   // 防呆：若 attendances 缺欄位（如 work_type），降級重試以確保打卡不被擋
   const baseAtt = {
     employee_id: t.employee_id, store_id: store?.id, type: t.type,
-    timestamp: now.toISOString(), latitude, longitude,
+    timestamp: recordedTimestamp, latitude, longitude,
     is_valid: isValid, distance_meters: distance,
     late_minutes: lateMinutes, early_leave_minutes: earlyLeaveMinutes,
     schedule_id: schedule?.id, shift_id: schedule?.shift_id, clock_in_token: token,
@@ -97,7 +116,7 @@ export async function POST(request) {
   try { await supabase.from("clockin_tokens").update({ used: true }).eq("token", token); } catch {}
 
   const label = t.type === "clock_in" ? "上班" : "下班";
-  let msg = `✅ ${label}打卡成功！\n\n👤 ${emp?.name}\n🏠 ${store?.name || "?"}\n⏰ ${currentTime}\n📍 距門市 ${distance ?? "?"}m`;
+  let msg = `✅ ${label}打卡成功！\n\n👤 ${emp?.name}\n🏠 ${store?.name || "?"}\n⏰ ${currentTime}${autoCorrected ? "（依排班結束時間記錄，未達加班門檻）" : ""}\n📍 距門市 ${distance ?? "?"}m`;
   if (!isValid) msg += `\n⚠️ 超出範圍（${distance}m > ${store?.radius_m}m）`;
   if (lateMinutes > 0) msg += `\n⏰ 遲到 ${lateMinutes} 分鐘`;
   if (earlyLeaveMinutes > 0) msg += `\n🏃 早退 ${earlyLeaveMinutes} 分鐘`;
