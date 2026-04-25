@@ -139,19 +139,20 @@ export async function POST(request) {
     }).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
 
-    // 通知主管
+    // 分層通知：該店店長 + 區經理（不再推總部 admin）
     try {
-      const { data: mgrs } = await supabase.from("employees")
-        .select("line_uid").in("role", ["admin", "manager"]).eq("is_active", true);
+      const { getStoreManagers } = await import("@/lib/notify");
+      const recipients = await getStoreManagers(supabase, store_id);
       const { data: it } = await supabase.from("inventory_items").select("name, unit").eq("id", item_id).single();
+      const { data: st } = await supabase.from("stores").select("name").eq("id", store_id).single();
       const { pushText } = await import("@/lib/line");
-      const msg = "🗑 報廢登記\n門市: " + store_id +
-        "\n位置: " + LOC_LABEL[patrol_location] +
-        "\n品項: " + (it?.name || "?") + " " + Math.abs(quantity) + (it?.unit || "") +
-        "\n原因: " + (waste_reason || "未分類") +
-        "\n登記人: " + (employee_name || "?") +
+      const msg = "🗑 報廢登記\n🏠 " + (st?.name || store_id) +
+        "\n📍 " + LOC_LABEL[patrol_location] +
+        "\n📦 " + (it?.name || "?") + " " + Math.abs(quantity) + (it?.unit || "") +
+        "\n📝 " + (waste_reason || "未分類") +
+        "\n👤 " + (employee_name || "?") +
         "\n→ 請至後台稽核";
-      if (mgrs) for (const m of mgrs) if (m.line_uid) await pushText(m.line_uid, msg).catch(() => {});
+      for (const r of recipients) await pushText(r.line_uid, msg).catch(() => {});
     } catch {}
 
     return Response.json({ data });

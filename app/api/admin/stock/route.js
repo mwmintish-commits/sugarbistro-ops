@@ -182,13 +182,20 @@ export async function POST(request) {
         }
       }
 
-      if (alerts.length > 0) {
-        const { pushText } = await import("@/lib/line");
-        const { data: admins } = await supabase.from("employees").select("line_uid").eq("role", "admin").eq("is_active", true);
-        const msg = `🚨 庫存差異警示\n🏠 ${storeData?.name || ""} ${date}\n━━━━━━━━━━━━━━\n` + alerts.map(a => `❌ ${a.name}：早${a.morning}+進${a.delivered}=理論${a.theoretical}，實際${a.evening}，差${a.diff > 0 ? "+" : ""}${a.diff}`).join("\n");
-        for (const admin of admins || []) {
-          if (admin.line_uid) await pushText(admin.line_uid, msg).catch(() => {});
-        }
+      // 分層通知：該店店長 + 區經理（不再推總部 admin）
+      const { getStoreManagers } = await import("@/lib/notify");
+      const { pushText } = await import("@/lib/line");
+      const recipients = await getStoreManagers(supabase, store_id);
+
+      // 每晚一定推送盤點結果摘要
+      const summaryMsg = `📦 晚盤完成\n🏠 ${storeData?.name || ""} ${date}\n👤 ${submitted_by_name || "?"}\n━━━━━━━━━━━━━━\n` +
+        lineData.slice(0, 20).map(l => `• ${l.item_name}：${l.quantity}${l.unit || ""}`).join("\n") +
+        (lineData.length > 20 ? `\n… 共 ${lineData.length} 項` : "") +
+        (alerts.length > 0
+          ? `\n━━━━━━━━━━━━━━\n🚨 差異警示 ${alerts.length} 項：\n` + alerts.map(a => `❌ ${a.name}：理論${a.theoretical}/實際${a.evening}（差${a.diff > 0 ? "+" : ""}${a.diff}）`).join("\n")
+          : "\n✅ 無異常差異");
+      for (const r of recipients) {
+        await pushText(r.line_uid, summaryMsg).catch(() => {});
       }
     }
 

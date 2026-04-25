@@ -133,9 +133,11 @@ export async function POST(request) {
   }
 
   if (lateMinutes > 0 || earlyLeaveMinutes > 0) {
-    const { data: mgrs } = await supabase.from("employees").select("line_uid").in("role", ["admin", "manager"]).eq("is_active", true);
+    // 分層通知：該店店長 + 區經理（不再推總部 admin）
+    const { getStoreManagers } = await import("@/lib/notify");
+    const recipients = await getStoreManagers(supabase, store?.id);
     const tag = lateMinutes > 0 ? `⏰ 遲到 ${lateMinutes}分鐘` : `🏃 早退 ${earlyLeaveMinutes}分鐘`;
-    if (mgrs) for (const m of mgrs) if (m.line_uid) await pushText(m.line_uid, `${tag}｜${emp?.name}（${store?.name}）`).catch(() => {});
+    for (const r of recipients) await pushText(r.line_uid, `${tag}｜${emp?.name}（${store?.name}）`).catch(() => {});
   }
 
   return Response.json({ success: true, type: t.type, time: currentTime, distance, is_valid: isValid, late_minutes: lateMinutes, early_leave_minutes: earlyLeaveMinutes, store_name: store?.name });

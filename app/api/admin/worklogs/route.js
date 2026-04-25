@@ -232,10 +232,11 @@ export async function POST(request) {
     const { store_id, employee_id, employee_name, type, description, image_url } = body;
     const { data, error } = await supabase.from("incident_reports").insert({ store_id, employee_id, employee_name, type, description, image_url }).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
-    // 通知主管和總部
-    const { data: mgrs } = await supabase.from("employees").select("line_uid").in("role", ["admin", "manager"]).eq("is_active", true);
+    // 分層通知：該店店長 + 區經理（不再推總部 admin）
+    const { getStoreManagers } = await import("@/lib/notify");
+    const recipients = await getStoreManagers(supabase, store_id);
     const { pushText } = await import("@/lib/line");
-    if (mgrs) for (const m of mgrs) if (m.line_uid) await pushText(m.line_uid, "⚠️ 異常回報\n" + employee_name + "\n類型：" + type + "\n" + (description || "")).catch(() => {});
+    for (const r of recipients) await pushText(r.line_uid, "⚠️ 異常回報\n" + employee_name + "\n類型：" + type + "\n" + (description || "")).catch(() => {});
     return Response.json({ data });
   }
 

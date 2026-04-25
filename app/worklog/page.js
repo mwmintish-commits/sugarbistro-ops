@@ -62,7 +62,7 @@ export default function WorkLogPage() {
       fetch("/api/admin/announcements").then(r => r.json()),
       fetch("/api/admin/stores").then(r => r.json()).catch(() => ({ data: [] })),
       fetch("/api/admin/settlements?store_id=" + sid + "&month=" + thisMonth).then(r => r.json()).catch(() => ({ data: [] })),
-      fetch("/api/admin/stock?type=items&store_id=" + sid).then(r => r.json()).catch(() => ({ data: [] })),
+      fetch("/api/admin/inventory?store_id=" + sid).then(r => r.json()).catch(() => ({ data: [] })),
     ]).then(([wl, a, st, stl, sk]) => {
       setItems(wl.data || []); setAnns(a.data || []); setStockItems(sk.data || []);
       const store = (st.data || []).find(s => s.id === sid);

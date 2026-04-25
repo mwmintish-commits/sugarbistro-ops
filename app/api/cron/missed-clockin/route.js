@@ -63,15 +63,12 @@ export async function GET(request) {
       ).catch(() => {});
     }
 
-    // 推主管（同店店長/manager/admin）
-    const { data: mgrs } = await supabase.from("employees")
-      .select("line_uid, role")
-      .or(`store_id.eq.${s.store_id},role.in.(manager,admin)`)
-      .in("role", ["store_manager", "manager", "admin"])
-      .eq("is_active", true);
-    for (const m of mgrs || []) {
-      if (m.line_uid && m.line_uid !== s.employees?.line_uid) {
-        await pushText(m.line_uid,
+    // 分層通知：該店店長 + 區經理（不再推總部 admin）
+    const { getStoreManagers } = await import("@/lib/notify");
+    const recipients = await getStoreManagers(supabase, s.store_id);
+    for (const r of recipients) {
+      if (r.line_uid !== s.employees?.line_uid) {
+        await pushText(r.line_uid,
           `🚨 缺勤警告\n👤 ${empName}（${storeName}）\n⏰ ${startStr} 應上班，已過 ${lateMin} 分鐘未打卡`
         ).catch(() => {});
       }

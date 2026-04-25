@@ -1,5 +1,6 @@
 import { supabase, eom, auditLog } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
+import { getStoreManagers } from "@/lib/notify";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -35,16 +36,15 @@ export async function POST(request) {
       half_day: half_day || null, reason,
       request_type: request_type || "leave",
       status: "pending",
-    }).select("*, employees(name)").single();
+    }).select("*, employees(name, store_id)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
 
-    const { data: admins } = await supabase.from("employees").select("line_uid").in("role", ["admin", "manager", "store_manager"]).eq("is_active", true);
-    if (admins) {
-      const typeMap = { annual: "特休", sick: "病假", personal: "事假", menstrual: "生理假", official: "公假", off: "例假", rest: "休息日", comp_time: "補休" };
-      const label = request_type === "pre_arranged" ? "📆 預排假申請" : "🙋 請假申請";
-      for (const a of admins) {
-        if (a.line_uid) await pushText(a.line_uid, `${label}\n👤 ${data.employees?.name}\n📋 ${typeMap[leave_type] || leave_type}\n📅 ${start_date}${end_date && end_date !== start_date ? ` ~ ${end_date}` : ""}${half_day ? `（${half_day === "am" ? "上午" : "下午"}半天）` : ""}\n💬 ${reason || "無"}\n\n請到後台審核`).catch(() => {});
-      }
+    // 分層通知：該店店長 + 區經理（不再推總部 admin）
+    const recipients = await getStoreManagers(supabase, data.employees?.store_id);
+    const typeMap = { annual: "特休", sick: "病假", personal: "事假", menstrual: "生理假", official: "公假", off: "例假", rest: "休息日", comp_time: "補休" };
+    const label = request_type === "pre_arranged" ? "📆 預排假申請" : "🙋 請假申請";
+    for (const a of recipients) {
+      await pushText(a.line_uid, `${label}\n👤 ${data.employees?.name}\n📋 ${typeMap[leave_type] || leave_type}\n📅 ${start_date}${end_date && end_date !== start_date ? ` ~ ${end_date}` : ""}${half_day ? `（${half_day === "am" ? "上午" : "下午"}半天）` : ""}\n💬 ${reason || "無"}\n\n請到後台審核`).catch(() => {});
     }
     return Response.json({ data });
   }
@@ -60,14 +60,14 @@ export async function POST(request) {
       }).select("id").single();
       if (!error && data) results.push(data);
     }
-    const { data: emp } = await supabase.from("employees").select("name").eq("id", employee_id).single();
-    const { data: admins } = await supabase.from("employees").select("line_uid").in("role", ["admin", "manager", "store_manager"]).eq("is_active", true);
-    if (admins && emp) {
+    const { data: emp } = await supabase.from("employees").select("name, store_id").eq("id", employee_id).single();
+    if (emp) {
+      const recipients = await getStoreManagers(supabase, emp.store_id);
       const typeMap = { annual: "特休", sick: "病假", personal: "事假", off: "例假", rest: "休息日", comp_time: "補休" };
       const sorted = [...(dates || [])].sort();
       const dateList = sorted.length <= 5 ? sorted.join("、") : sorted.slice(0, 5).join("、") + ` 等 ${sorted.length} 天`;
-      for (const a of admins) {
-        if (a.line_uid) await pushText(a.line_uid, `📆 預排假申請\n👤 ${emp.name}\n📋 ${typeMap[leave_type] || leave_type}\n📅 ${dateList}\n💬 ${reason || "無"}\n\n請到後台審核`).catch(() => {});
+      for (const a of recipients) {
+        await pushText(a.line_uid, `📆 預排假申請\n👤 ${emp.name}\n📋 ${typeMap[leave_type] || leave_type}\n📅 ${dateList}\n💬 ${reason || "無"}\n\n請到後台審核`).catch(() => {});
       }
     }
     return Response.json({ data: results });
