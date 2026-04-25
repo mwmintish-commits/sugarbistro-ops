@@ -34,6 +34,26 @@ export default function OnboardingPage() {
   const [files, setFiles] = useState({ id_front: null, id_back: null, health_check: null });
   const [agreed, setAgreed] = useState({ handbook: false, contract: false });
   const [sigs, setSigs] = useState({ contract: null });
+  const [scrolled, setScrolled] = useState({ handbook: false, contract: false });
+  const onScrollEnd = (key) => (e) => {
+    const el = e.target;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 30) {
+      setScrolled(s => s[key] ? s : { ...s, [key]: true });
+    }
+  };
+  // 內容若不需捲動（高度未超出容器）即視為已詳閱
+  useEffect(() => {
+    if (ld) return;
+    const t = setTimeout(() => {
+      document.querySelectorAll("[data-scrollkey]").forEach(el => {
+        const key = el.getAttribute("data-scrollkey");
+        if (el.scrollHeight - el.clientHeight < 10) {
+          setScrolled(s => s[key] ? s : { ...s, [key]: true });
+        }
+      });
+    }, 100);
+    return () => clearTimeout(t);
+  }, [step, ld, handbook, bonusSec, contractText]);
   const [sub, setSub] = useState(false);
 
   useEffect(() => {
@@ -92,8 +112,12 @@ export default function OnboardingPage() {
     if (step === 1) {
       // 體檢表/身分證為選填，可稍後補上傳
     }
-    if (step === 2) { if (!agreed.handbook) { setErr("請勾選同意已詳閱守則暨福利條款"); return; } }
+    if (step === 2) {
+      if (!scrolled.handbook) { setErr("請將守則內容捲動至最下方，確認已詳閱"); return; }
+      if (!agreed.handbook) { setErr("請勾選同意已詳閱守則暨福利條款"); return; }
+    }
     if (step === 3) {
+      if (!scrolled.contract) { setErr("請將合約內容捲動至最下方，確認已詳閱"); return; }
       if (!agreed.contract || !sigs.contract) { setErr("請勾選同意並簽名"); return; }
       setSub(true);
       try {
@@ -192,28 +216,35 @@ export default function OnboardingPage() {
         </div>
       </Card>}
 
-      {/* Step 2: 員工守則暨福利（後台版本 + 系統固定獎金福利段落，僅勾選確認，不簽名） */}
+      {/* Step 2: 員工守則暨福利（必須捲到底才能勾選） */}
       {step===2 && <>
-        <div style={{background:"#fff",borderRadius:10,border:"1px solid #e8e6e1",padding:14,marginBottom:10,maxHeight:420,overflowY:"auto"}}>
+        <div data-scrollkey="handbook" onScroll={onScrollEnd("handbook")}
+          style={{background:"#fff",borderRadius:10,border:"1px solid #e8e6e1",padding:14,marginBottom:6,maxHeight:420,overflowY:"auto",position:"relative"}}>
           <h3 style={{fontSize:14,fontWeight:600,marginBottom:4,textAlign:"center"}}>📖 員工守則暨福利條款</h3>
           <p style={{fontSize:10,color:"#888",textAlign:"center",marginBottom:10}}>小食糖 SUGARbISTRO｜到職日起即受本規範約束</p>
           {[...handbook, bonusSec].map((ch,i)=><div key={i} style={{marginBottom:10}}>
             <h4 style={{fontSize:12,fontWeight:600,padding:"4px 8px",borderRadius:4,background:(ch.title||"").includes("零容忍")||(ch.title||"").includes("最高")?"#fde8e8":"#faf8f5",color:(ch.title||"").includes("零容忍")||(ch.title||"").includes("最高")?"#b91c1c":"#333",marginBottom:4}}>{ch.title}</h4>
             {(ch.items||[]).map((item,j)=><div key={j} style={{fontSize:11,lineHeight:1.8,color:"#444",paddingLeft:10}}>{"▸ "+item}</div>)}
           </div>)}
+          <div style={{textAlign:"center",fontSize:10,color:scrolled.handbook?"#0a7c42":"#b91c1c",fontWeight:600,padding:"6px 0"}}>{scrolled.handbook?"✅ 已詳閱完畢":"— 請繼續往下捲動 —"}</div>
+        </div>
+        <div style={{fontSize:10,color:scrolled.handbook?"#888":"#b91c1c",textAlign:"center",marginBottom:10}}>
+          {scrolled.handbook?"📖 已捲動到底，請於下方勾選同意":"⬇ 必須完整閱讀（捲動至最下方）後才能勾選同意"}
         </div>
         <Card title="">
-          <label style={{display:"flex",gap:8,cursor:"pointer"}}>
-            <input type="checkbox" checked={agreed.handbook} onChange={e=>setAgreed({...agreed,handbook:e.target.checked})} style={{width:18,height:18,marginTop:2}} />
+          <label style={{display:"flex",gap:8,cursor:scrolled.handbook?"pointer":"not-allowed",opacity:scrolled.handbook?1:0.5}}>
+            <input type="checkbox" disabled={!scrolled.handbook} checked={agreed.handbook} onChange={e=>setAgreed({...agreed,handbook:e.target.checked})} style={{width:18,height:18,marginTop:2}} />
             <span style={{fontSize:12,lineHeight:1.6}}>本人已詳閱「員工守則暨福利條款」全部內容（含獎金與福利說明），了解相關獎金與福利均屬恩惠性給與，公司保留調整與停發之裁量權，本人同意遵守。</span>
           </label>
           <p style={{fontSize:10,color:"#888",marginTop:8,lineHeight:1.5}}>※ 守則內容後台可隨時查閱，與簽署版本一致；正式簽名於下一步「工作合約」一併完成。</p>
         </Card>
       </>}
 
-      {/* Step 3: 工作合約（唯一簽名） */}
+      {/* Step 3: 工作合約（必須捲到底才能勾選與簽名） */}
       {step===3 && <>
-        <Card title="📝 工作合約">
+        <div data-scrollkey="contract" onScroll={onScrollEnd("contract")}
+          style={{background:"#fff",borderRadius:10,border:"1px solid #e8e6e1",padding:14,marginBottom:6,maxHeight:420,overflowY:"auto"}}>
+          <h3 style={{fontSize:14,fontWeight:600,marginBottom:10,textAlign:"center"}}>📝 工作合約</h3>
           <div style={{fontSize:12,lineHeight:1.8,color:"#444"}}>
             <div style={{textAlign:"center",marginBottom:10}}>
               <b style={{fontSize:14}}>小食糖 SUGARbISTRO</b><br/>
@@ -228,13 +259,19 @@ export default function OnboardingPage() {
             <p style={{fontWeight:600,marginBottom:6}}>雙方同意依下列條款訂定本勞動契約：</p>
             {contractText.split("\n").filter(Boolean).map((line,i)=><p key={i} style={{paddingLeft:4}}>{line}</p>)}
           </div>
-        </Card>
-        <div style={{background:"#fff",borderRadius:10,border:"2px solid #0a7c42",padding:14,marginBottom:10}}>
-          <label style={{display:"flex",gap:8,cursor:"pointer",marginBottom:10}}>
-            <input type="checkbox" checked={agreed.contract} onChange={e=>setAgreed({...agreed,contract:e.target.checked})} style={{width:18,height:18,marginTop:2}} />
+          <div style={{textAlign:"center",fontSize:10,color:scrolled.contract?"#0a7c42":"#b91c1c",fontWeight:600,padding:"6px 0"}}>{scrolled.contract?"✅ 已詳閱完畢":"— 請繼續往下捲動 —"}</div>
+        </div>
+        <div style={{fontSize:10,color:scrolled.contract?"#888":"#b91c1c",textAlign:"center",marginBottom:10}}>
+          {scrolled.contract?"📝 已捲動到底，請於下方勾選同意並簽名":"⬇ 必須完整閱讀（捲動至最下方）後才能勾選同意"}
+        </div>
+        <div style={{background:"#fff",borderRadius:10,border:"2px solid "+(scrolled.contract?"#0a7c42":"#ddd"),padding:14,marginBottom:10,opacity:scrolled.contract?1:0.55}}>
+          <label style={{display:"flex",gap:8,cursor:scrolled.contract?"pointer":"not-allowed",marginBottom:10}}>
+            <input type="checkbox" disabled={!scrolled.contract} checked={agreed.contract} onChange={e=>setAgreed({...agreed,contract:e.target.checked})} style={{width:18,height:18,marginTop:2}} />
             <span style={{fontSize:12,lineHeight:1.6}}>本人確認以上資料正確無誤，同意簽署工作合約</span>
           </label>
-          <SigPad label="合約簽名" sig={sigs.contract} onSign={d=>setSigs({...sigs,contract:d})} />
+          {scrolled.contract
+            ? <SigPad label="合約簽名" sig={sigs.contract} onSign={d=>setSigs({...sigs,contract:d})} />
+            : <div style={{border:"2px dashed #ddd",borderRadius:8,padding:20,background:"#fafafa",textAlign:"center",fontSize:12,color:"#aaa"}}>🔒 詳閱合約後才能簽名</div>}
         </div>
       </>}
 
