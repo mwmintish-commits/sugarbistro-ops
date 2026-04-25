@@ -31,24 +31,62 @@ export async function GET(request) {
     return Response.json({ data: low });
   }
 
-  // 全域品項主檔（去重後 store_id=NULL）；庫存從 inventory_stock 取，依 store_id 過濾或加總
+  // 全域品項主檔；庫存若有 inventory_stock 表就用，否則 fallback 到 current_stock
   let q = supabase.from("inventory_items").select("*").eq("is_active", true).order("category").order("name");
   if (searchParams.get("type_filter")) q = q.eq("type", searchParams.get("type_filter"));
   const { data: items } = await q;
-  const { data: stocks } = await supabase.from("inventory_stock").select("*");
-  const stockBy = new Map();
-  for (const s of stocks || []) {
-    const key = s.item_id;
-    if (!stockBy.has(key)) stockBy.set(key, []);
-    stockBy.get(key).push(s);
+
+  let stocks = null;
+  try {
+    const r = await supabase.from("inventory_stock").select("*");
+    if (!r.error) stocks = r.data;
+  } catch (e) { stocks = null; }
+
+  // 去重：同名只顯示一筆（保留 store_id=NULL 那筆，否則隨機留一筆）
+  const byName = new Map();
+  for (const it of items || []) {
+    const k = it.name;
+    if (!byName.has(k)) byName.set(k, it);
+    else {
+      const cur = byName.get(k);
+      // 優先全域 store_id=NULL
+      if (cur.store_id && !it.store_id) byName.set(k, it);
+    }
   }
-  const data = (items || []).map(i => {
-    const ss = stockBy.get(i.id) || [];
-    const filtered = store_id ? ss.filter(s => s.store_id === store_id) : ss;
-    const current = filtered.reduce((sum, s) => sum + Number(s.current_stock || 0), 0);
-    const stocksByStore = ss.reduce((acc, s) => { acc[s.store_id] = Number(s.current_stock || 0); return acc; }, {});
-    return { ...i, current_stock: current, stocks_by_store: stocksByStore };
-  });
+  const uniqItems = Array.from(byName.values());
+
+  let data;
+  if (stocks) {
+    const stockBy = new Map();
+    for (const s of stocks) {
+      if (!stockBy.has(s.item_id)) stockBy.set(s.item_id, []);
+      stockBy.get(s.item_id).push(s);
+    }
+    // 同名所有 inventory_items.id 都映射到 keeper
+    const aliasGroups = new Map(); // name -> [ids]
+    for (const it of items || []) {
+      if (!aliasGroups.has(it.name)) aliasGroups.set(it.name, []);
+      aliasGroups.get(it.name).push(it.id);
+    }
+    data = uniqItems.map(i => {
+      const allIds = aliasGroups.get(i.name) || [i.id];
+      const ss = allIds.flatMap(id => stockBy.get(id) || []);
+      const filtered = store_id ? ss.filter(s => s.store_id === store_id) : ss;
+      const current = filtered.reduce((sum, s) => sum + Number(s.current_stock || 0), 0);
+      const stocksByStore = ss.reduce((acc, s) => {
+        acc[s.store_id] = (acc[s.store_id] || 0) + Number(s.current_stock || 0);
+        return acc;
+      }, {});
+      return { ...i, current_stock: current, stocks_by_store: stocksByStore };
+    });
+  } else {
+    // Fallback：直接用 inventory_items.current_stock，同名加總
+    data = uniqItems.map(i => {
+      const same = (items || []).filter(x => x.name === i.name);
+      const total = same.reduce((s, x) => s + Number(x.current_stock || 0), 0);
+      return { ...i, current_stock: total, stocks_by_store: {} };
+    });
+  }
   const total = data.reduce((s, i) => s + Number(i.current_stock || 0) * Number(i.cost_per_unit || 0), 0);
   return Response.json({ data, summary: { count: data.length, totalValue: total } });
 }
@@ -65,11 +103,13 @@ export async function POST(request) {
       par_level, alert_threshold: alert_threshold || 2, is_key_item: !!is_key_item, is_active: true,
     }).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
-    // 為所有啟用門市建立 inventory_stock
-    const { data: stores } = await supabase.from("stores").select("id").eq("is_active", true);
-    if (stores?.length) {
-      await supabase.from("inventory_stock").insert(stores.map(s => ({ item_id: data.id, store_id: s.id, current_stock: 0 })));
-    }
+    // 為所有啟用門市建立 inventory_stock（若表存在）
+    try {
+      const { data: stores } = await supabase.from("stores").select("id").eq("is_active", true);
+      if (stores?.length) {
+        await supabase.from("inventory_stock").insert(stores.map(s => ({ item_id: data.id, store_id: s.id, current_stock: 0 })));
+      }
+    } catch (e) {}
     return Response.json({ data });
   }
 
@@ -86,12 +126,24 @@ export async function POST(request) {
     await supabase.from("inventory_movements").insert({ item_id, type, quantity, unit_cost, reference_type, reference_id, batch_number, expiry_date, from_store_id, to_store_id, store_id, operated_by, operated_by_name, notes });
     const delta = type === "in" || type === "adjust" ? quantity : -quantity;
     const sid = to_store_id || store_id || from_store_id;
+    let written = false;
     if (sid) {
-      const { data: cur } = await supabase.from("inventory_stock").select("current_stock").eq("item_id", item_id).eq("store_id", sid).maybeSingle();
-      const newStock = Number(cur?.current_stock || 0) + delta;
-      await supabase.from("inventory_stock").upsert({
-        item_id, store_id: sid, current_stock: Math.max(0, newStock), updated_at: new Date().toISOString(),
-      }, { onConflict: "item_id,store_id" });
+      try {
+        const { data: cur, error: e1 } = await supabase.from("inventory_stock").select("current_stock").eq("item_id", item_id).eq("store_id", sid).maybeSingle();
+        if (!e1) {
+          const newStock = Number(cur?.current_stock || 0) + delta;
+          const { error: e2 } = await supabase.from("inventory_stock").upsert({
+            item_id, store_id: sid, current_stock: Math.max(0, newStock), updated_at: new Date().toISOString(),
+          }, { onConflict: "item_id,store_id" });
+          if (!e2) written = true;
+        }
+      } catch (e) {}
+    }
+    if (!written) {
+      // Fallback：寫到 inventory_items.current_stock
+      const { data: item } = await supabase.from("inventory_items").select("current_stock").eq("id", item_id).single();
+      const newStock = Number(item?.current_stock || 0) + delta;
+      await supabase.from("inventory_items").update({ current_stock: Math.max(0, newStock) }).eq("id", item_id);
     }
     if (unit_cost) await supabase.from("inventory_items").update({ cost_per_unit: unit_cost }).eq("id", item_id);
     return Response.json({ success: true });
@@ -130,12 +182,22 @@ export async function POST(request) {
       to_store_id: po.store_id, operated_by: received_by, operated_by_name: received_by_name,
       notes: "總部叫貨收貨",
     });
+    let written = false;
     if (po.store_id) {
-      const { data: cur } = await supabase.from("inventory_stock").select("current_stock").eq("item_id", po.item_id).eq("store_id", po.store_id).maybeSingle();
-      const newStock = Number(cur?.current_stock || 0) + qty;
-      await supabase.from("inventory_stock").upsert({
-        item_id: po.item_id, store_id: po.store_id, current_stock: Math.max(0, newStock), updated_at: new Date().toISOString(),
-      }, { onConflict: "item_id,store_id" });
+      try {
+        const { data: cur, error: e1 } = await supabase.from("inventory_stock").select("current_stock").eq("item_id", po.item_id).eq("store_id", po.store_id).maybeSingle();
+        if (!e1) {
+          const newStock = Number(cur?.current_stock || 0) + qty;
+          const { error: e2 } = await supabase.from("inventory_stock").upsert({
+            item_id: po.item_id, store_id: po.store_id, current_stock: Math.max(0, newStock), updated_at: new Date().toISOString(),
+          }, { onConflict: "item_id,store_id" });
+          if (!e2) written = true;
+        }
+      } catch (e) {}
+    }
+    if (!written) {
+      const { data: item } = await supabase.from("inventory_items").select("current_stock").eq("id", po.item_id).single();
+      await supabase.from("inventory_items").update({ current_stock: Math.max(0, Number(item?.current_stock || 0) + qty) }).eq("id", po.item_id);
     }
     if (cost) await supabase.from("inventory_items").update({ cost_per_unit: cost }).eq("id", po.item_id);
     // 更新訂單
