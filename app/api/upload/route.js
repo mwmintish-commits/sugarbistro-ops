@@ -18,10 +18,13 @@ export async function POST(request) {
 
   // AI 辨識 + 建立草稿記錄（每張照片一筆）
   if (body.action === "analyze") {
-    const { type, base64, store_id, store_name, employee_id, employee_name, image_url, image_urls, expense_type } = body;
+    const { type, base64, store_id: rawStoreId, store_name, employee_id: rawEmpId, employee_name, image_url, image_urls, expense_type } = body;
     const SITE = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
     const imgUrl = image_url || image_urls?.[0] || "";
     const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+    // UUID 欄位空字串要轉 null
+    const store_id = rawStoreId === "" ? null : rawStoreId;
+    const employee_id = rawEmpId === "" ? null : rawEmpId;
 
     try {
       if (type === "settlement") {
@@ -119,8 +122,10 @@ export async function POST(request) {
 
   // CSV/Excel 匯入費用
   if (body.action === "import_csv") {
-    const { rows, store_id, employee_id, employee_name, expense_type } = body;
+    const { rows, store_id: rawStoreId, employee_id: rawEmpId, employee_name, expense_type } = body;
     const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
+    const store_id = rawStoreId === "" ? null : rawStoreId;
+    const employee_id = rawEmpId === "" ? null : rawEmpId;
     const isHq = store_id === "__hq__";
     const normalizedStore = isHq ? null : store_id;
     let imported = 0;
