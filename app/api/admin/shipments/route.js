@@ -201,15 +201,27 @@ export async function POST(request) {
       operated_by: received_by, operated_by_name: received_by_name,
       notes: `出貨單 ${line.shipments?.shipment_number} 收貨` + (variance !== 0 ? `（差異 ${variance > 0 ? "+" : ""}${variance}）` : ""),
     });
-    // 寫到 per-store inventory_stock
+    // 寫到 per-store inventory_stock；表不存在則 fallback
     const sid = line.shipments?.store_id;
+    let written = false;
     if (sid) {
-      const { data: cur } = await supabase.from("inventory_stock").select("current_stock").eq("item_id", line.item_id).eq("store_id", sid).maybeSingle();
-      await supabase.from("inventory_stock").upsert({
-        item_id: line.item_id, store_id: sid,
-        current_stock: Math.max(0, Number(cur?.current_stock || 0) + recv),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "item_id,store_id" });
+      try {
+        const { data: cur, error: e1 } = await supabase.from("inventory_stock").select("current_stock").eq("item_id", line.item_id).eq("store_id", sid).maybeSingle();
+        if (!e1) {
+          const { error: e2 } = await supabase.from("inventory_stock").upsert({
+            item_id: line.item_id, store_id: sid,
+            current_stock: Math.max(0, Number(cur?.current_stock || 0) + recv),
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "item_id,store_id" });
+          if (!e2) written = true;
+        }
+      } catch (e) {}
+    }
+    if (!written) {
+      const { data: it } = await supabase.from("inventory_items").select("current_stock").eq("id", line.item_id).single();
+      await supabase.from("inventory_items").update({
+        current_stock: Math.max(0, Number(it?.current_stock || 0) + recv),
+      }).eq("id", line.item_id);
     }
     if (line.unit_cost) await supabase.from("inventory_items").update({ cost_per_unit: line.unit_cost }).eq("id", line.item_id);
 
