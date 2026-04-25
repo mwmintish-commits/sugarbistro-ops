@@ -76,16 +76,25 @@ export async function POST(request) {
 
   // 寫入打卡（含 work_type 從排班帶過來）
   const workType = schedule?.day_type || "work";
-  await supabase.from("attendances").insert({
+  // 防呆：若 attendances 缺欄位（如 work_type），降級重試以確保打卡不被擋
+  const baseAtt = {
     employee_id: t.employee_id, store_id: store?.id, type: t.type,
     timestamp: now.toISOString(), latitude, longitude,
     is_valid: isValid, distance_meters: distance,
     late_minutes: lateMinutes, early_leave_minutes: earlyLeaveMinutes,
     schedule_id: schedule?.id, shift_id: schedule?.shift_id, clock_in_token: token,
-    work_type: workType,
-  });
+  };
+  let attErr = null;
+  try {
+    const r = await supabase.from("attendances").insert({ ...baseAtt, work_type: workType });
+    if (r.error) attErr = r.error;
+  } catch (e) { attErr = e; }
+  if (attErr) {
+    // 二次嘗試：去掉 work_type
+    try { await supabase.from("attendances").insert(baseAtt); } catch {}
+  }
 
-  await supabase.from("clockin_tokens").update({ used: true }).eq("token", token);
+  try { await supabase.from("clockin_tokens").update({ used: true }).eq("token", token); } catch {}
 
   const label = t.type === "clock_in" ? "上班" : "下班";
   let msg = `✅ ${label}打卡成功！\n\n👤 ${emp?.name}\n🏠 ${store?.name || "?"}\n⏰ ${currentTime}\n📍 距門市 ${distance ?? "?"}m`;
@@ -106,39 +115,44 @@ export async function POST(request) {
   }
 
   // 下班打卡：自動偵測加班（依 schedule.day_type 區分費率，與 payroll 邏輯一致）
-  if (t.type === "clock_out" && schedule?.shifts?.end_time) {
-    const [eh, em2] = schedule.shifts.end_time.split(":").map(Number);
-    const [ch2, cm2] = currentTime.split(":").map(Number);
-    const otMinutes = (ch2 * 60 + cm2) - (eh * 60 + em2);
-    const minOt = settings?.overtime_min_minutes || 30;
-    if (otMinutes >= minOt) {
-      const dt = workType;  // schedule.day_type
-      // 統一以 day_type 對應費率（不再混用 dayOfWeek 與 national_holidays 雙來源）
-      let otType, rate;
-      if (dt === "national_holiday") { otType = "holiday"; rate = 2.0; }
-      else if (dt === "rest_day") {
-        // 休息日：前 2hr 1.34、之後 1.67（>8hr 階梯由薪資結算統一處理）
-        otType = "rest_1"; rate = otMinutes <= 120 ? 1.34 : 1.67;
+  // 整段以 try-catch 包覆 — 加班記錄失敗不影響打卡成功
+  try {
+    if (t.type === "clock_out" && schedule?.shifts?.end_time) {
+      const [eh, em2] = schedule.shifts.end_time.split(":").map(Number);
+      const [ch2, cm2] = currentTime.split(":").map(Number);
+      const otMinutes = (ch2 * 60 + cm2) - (eh * 60 + em2);
+      const minOt = settings?.overtime_min_minutes || 30;
+      if (otMinutes >= minOt) {
+        const dt = workType;
+        let otType, rate;
+        if (dt === "national_holiday") { otType = "holiday"; rate = 2.0; }
+        else if (dt === "rest_day") {
+          otType = "rest_1"; rate = otMinutes <= 120 ? 1.34 : 1.67;
+        }
+        else { otType = otMinutes <= 120 ? "weekday_1" : "weekday_2"; rate = otMinutes <= 120 ? 1.34 : 1.67; }
+        const hourlyRate = calcHourlyRate(emp);
+        const otAmount = Math.round(hourlyRate * (otMinutes / 60) * rate);
+        try {
+          await supabase.from("overtime_records").insert({
+            employee_id: t.employee_id, store_id: store?.id, date: today,
+            scheduled_end: schedule.shifts.end_time, actual_end: currentTime,
+            overtime_minutes: otMinutes, overtime_type: otType, rate, amount: otAmount,
+          });
+        } catch (e) { console.error("overtime_records insert failed:", e?.message); }
+        msg += "\n⏱ 加班 " + otMinutes + " 分鐘（待核准）";
       }
-      else { otType = otMinutes <= 120 ? "weekday_1" : "weekday_2"; rate = otMinutes <= 120 ? 1.34 : 1.67; }
-      const hourlyRate = calcHourlyRate(emp);
-      const otAmount = Math.round(hourlyRate * (otMinutes / 60) * rate);
-      await supabase.from("overtime_records").insert({
-        employee_id: t.employee_id, store_id: store?.id, date: today,
-        scheduled_end: schedule.shifts.end_time, actual_end: currentTime,
-        overtime_minutes: otMinutes, overtime_type: otType, rate, amount: otAmount,
-      }).catch(() => {});
-      msg += "\n⏱ 加班 " + otMinutes + " 分鐘（待核准）";
     }
-  }
+  } catch (e) { console.error("OT block error:", e?.message); }
 
-  if (lateMinutes > 0 || earlyLeaveMinutes > 0) {
-    // 分層通知：該店店長 + 區經理（不再推總部 admin）
-    const { getStoreManagers } = await import("@/lib/notify");
-    const recipients = await getStoreManagers(supabase, store?.id);
-    const tag = lateMinutes > 0 ? `⏰ 遲到 ${lateMinutes}分鐘` : `🏃 早退 ${earlyLeaveMinutes}分鐘`;
-    for (const r of recipients) await pushText(r.line_uid, `${tag}｜${emp?.name}（${store?.name}）`).catch(() => {});
-  }
+  // 分層通知：該店店長 + 區經理（失敗不影響打卡）
+  try {
+    if (lateMinutes > 0 || earlyLeaveMinutes > 0) {
+      const { getStoreManagers } = await import("@/lib/notify");
+      const recipients = await getStoreManagers(supabase, store?.id);
+      const tag = lateMinutes > 0 ? `⏰ 遲到 ${lateMinutes}分鐘` : `🏃 早退 ${earlyLeaveMinutes}分鐘`;
+      for (const r of recipients) await pushText(r.line_uid, `${tag}｜${emp?.name}（${store?.name}）`).catch(() => {});
+    }
+  } catch (e) { console.error("Notify block error:", e?.message); }
 
   return Response.json({ success: true, type: t.type, time: currentTime, distance, is_valid: isValid, late_minutes: lateMinutes, early_leave_minutes: earlyLeaveMinutes, store_name: store?.name });
 }
