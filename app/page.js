@@ -146,7 +146,12 @@ export default function AdminPage() {
   const effectiveRoleTabs = auth?.role === "admin" ? ROLE_TABS : { ...ROLE_TABS, ...(customRoleTabs || {}) };
   const myTabs = auth ? (effectiveRoleTabs[auth.role] || ROLE_TABS[auth.role] || []) : [];
   useEffect(() => {
-    if (auth && myTabs.length > 0 && !tab) setTab(myTabs[0]);
+    if (auth && myTabs.length > 0 && !tab) {
+      // 支援 ?tab=xxx 從員工面板深連到指定 tab
+      const urlTab = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
+      if (urlTab && myTabs.includes(urlTab)) setTab(urlTab);
+      else setTab(myTabs[0]);
+    }
   }, [auth]);
 
   const load = useCallback(() => {

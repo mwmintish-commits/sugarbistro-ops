@@ -24,9 +24,9 @@ const worklogUrl = (emp, eid) => {
   return `/worklog?${params.toString()}`;
 };
 
-const ITEMS = (eid, emp) => {
-  const isManager = ["admin", "manager", "store_manager"].includes(emp?.role);
-  const base = [
+// 一般員工 / 店長：個人出缺勤導向
+const STAFF_ITEMS = (eid, emp) => {
+  const items = [
     { icon: "🟢", label: "上班打卡", desc: "GPS 定位", action: "clockin", type: "clock_in", bg: "#e6f9f0", color: "#0a7c42" },
     { icon: "🔴", label: "下班打卡", desc: "GPS 定位", action: "clockin", type: "clock_out", bg: "#fde8e8", color: "#b91c1c" },
     { icon: "🕐", label: "補打卡",   desc: "申請補登",    href: webUrl("/amendment", eid),      bg: "#fff8e6", color: "#8a6d00" },
@@ -39,22 +39,40 @@ const ITEMS = (eid, emp) => {
     { icon: "📋", label: "工作日誌", desc: "每日任務回報", href: worklogUrl(emp, eid),          bg: "#e0f2fe", color: "#075985" },
     { icon: "📖", label: "員工守則", desc: "規範查閱",    href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
   ];
-  if (isManager) {
-    base.push(
+  // 店長保留採購入口
+  if (emp?.role === "store_manager") {
+    items.push(
       { icon: "📦", label: "月結單據", desc: "廠商單據上傳", href: uploadUrl("vendor", emp, eid),      bg: "#dbeafe", color: "#1d4ed8" },
       { icon: "🪙", label: "零用金",   desc: "費用收據上傳", href: uploadUrl("petty_cash", emp, eid),  bg: "#fef9c3", color: "#854d0e" },
       { icon: "🏢", label: "總部代付", desc: "總部代付上傳", href: uploadUrl("hq_advance", emp, eid),  bg: "#e0e7ff", color: "#4338ca" },
       { icon: "🖥", label: "後台",     desc: "管理系統",     href: "/",                                bg: "#f3e8ff", color: "#6b21a8" },
     );
   }
-  return base;
+  return items;
 };
+
+// admin / manager：稽核導向
+const AUDIT_ITEMS = (eid, emp) => [
+  { icon: "📊", label: "今日總覽",   desc: "各店即時狀態", href: "/?tab=dashboard",     bg: "#e0f2fe", color: "#075985" },
+  { icon: "⚠️", label: "待審事項",   desc: "請假/補卡",   href: "/?tab=leaves",        bg: "#fef3c7", color: "#92400e" },
+  { icon: "💰", label: "日結存款",   desc: "回報狀態",    href: "/?tab=settlements",   bg: "#fef9c3", color: "#854d0e" },
+  { icon: "🚨", label: "出勤異常",   desc: "遲到/缺勤",   href: "/?tab=attendance",    bg: "#fde8e8", color: "#b91c1c" },
+  { icon: "📋", label: "日誌完成度", desc: "各店完成率",  href: "/?tab=worklogs",      bg: "#e6f9f0", color: "#0a7c42" },
+  { icon: "📢", label: "公告管理",   desc: "發布/編輯",   href: "/?tab=announcements", bg: "#f3e8ff", color: "#6b21a8" },
+  { icon: "📋", label: "工作日誌",   desc: "每日任務回報", href: worklogUrl(emp, eid),  bg: "#e0f2fe", color: "#075985" },
+  { icon: "📖", label: "員工守則",   desc: "規範查閱",    href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
+  { icon: "📦", label: "月結單據",   desc: "廠商單據上傳", href: uploadUrl("vendor", emp, eid),     bg: "#dbeafe", color: "#1d4ed8" },
+  { icon: "🪙", label: "零用金",     desc: "費用收據上傳", href: uploadUrl("petty_cash", emp, eid), bg: "#fef9c3", color: "#854d0e" },
+  { icon: "🏢", label: "總部代付",   desc: "總部代付上傳", href: uploadUrl("hq_advance", emp, eid), bg: "#e0e7ff", color: "#4338ca" },
+  { icon: "🖥", label: "後台",       desc: "完整管理介面", href: "/",                               bg: "#f3e8ff", color: "#6b21a8" },
+];
 
 export default function MePanel() {
   const [emp, setEmp] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [clockinLoading, setClockinLoading] = useState("");
+  const [auditSum, setAuditSum] = useState(null);
 
   const eid = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("eid") : null;
 
@@ -65,6 +83,10 @@ export default function MePanel() {
       .then(r => {
         if (r.error || !r.data) { setErr("找不到員工資料"); setLoading(false); return; }
         setEmp(r.data); setLoading(false);
+        // admin/manager 抓稽核摘要
+        if (["admin", "manager"].includes(r.data.role)) {
+          fetch("/api/admin/audit-summary").then(x => x.json()).then(setAuditSum).catch(() => {});
+        }
       })
       .catch(() => { setErr("載入失敗"); setLoading(false); });
   }, []);
@@ -88,21 +110,36 @@ export default function MePanel() {
   if (loading) return <div style={wrap}><p style={{ textAlign: "center", color: "#888", padding: 60 }}>載入中...</p></div>;
   if (err)     return <div style={wrap}><p style={{ textAlign: "center", color: "#b91c1c", padding: 60 }}>{err}</p></div>;
 
-  const items = ITEMS(eid || "", emp);
+  const isAuditRole = ["admin", "manager"].includes(emp?.role);
+  const items = isAuditRole ? AUDIT_ITEMS(eid || "", emp) : STAFF_ITEMS(eid || "", emp);
   const roleLabel = { admin: "總部管理員", manager: "區經理", store_manager: "店長", staff: "員工" }[emp?.role] || emp?.role;
   const now = new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Taipei" });
 
+  // 稽核摘要顯示文字
+  let auditLine = null;
+  if (isAuditRole && auditSum) {
+    const parts = [];
+    if (auditSum.pending?.total > 0) parts.push(`⚠️ ${auditSum.pending.total} 件待審`);
+    if (auditSum.settlement?.unsettled > 0) parts.push(`💰 ${auditSum.settlement.unsettled} 店未日結`);
+    auditLine = parts.length > 0 ? parts.join("　·　") : "✅ 今日無待辦";
+  }
+
   return (
     <div style={wrap}>
-      <div style={{ background: "linear-gradient(135deg, #fbbf24, #f59e0b)", borderRadius: 16, padding: "20px 18px", marginBottom: 14, color: "#fff", boxShadow: "0 2px 8px rgba(245,158,11,0.25)" }}>
+      <div style={{ background: isAuditRole ? "linear-gradient(135deg, #6366f1, #4338ca)" : "linear-gradient(135deg, #fbbf24, #f59e0b)", borderRadius: 16, padding: "20px 18px", marginBottom: 14, color: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 11, opacity: 0.9 }}>🍯 小食糖員工面板</div>
+            <div style={{ fontSize: 11, opacity: 0.9 }}>{isAuditRole ? "🛡️ 小食糖稽核面板" : "🍯 小食糖員工面板"}</div>
             <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4 }}>{emp?.name}</div>
             <div style={{ fontSize: 12, marginTop: 4, opacity: 0.92 }}>{roleLabel}　·　{emp?.stores?.name || "🏢 總部"}</div>
           </div>
           <div style={{ fontSize: 24, fontWeight: 700, opacity: 0.9 }}>{now}</div>
         </div>
+        {auditLine && (
+          <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(255,255,255,0.18)", borderRadius: 10, fontSize: 13, fontWeight: 500, textAlign: "center" }}>
+            {auditLine}
+          </div>
+        )}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
@@ -130,7 +167,7 @@ export default function MePanel() {
       </div>
 
       <div style={{ marginTop: 18, textAlign: "center", fontSize: 11, color: "#888" }}>
-        打卡/補打卡/請假/班表/薪資 在網頁內完成，不消耗 LINE 訊息
+        {isAuditRole ? "面板聚焦稽核與審核作業，個人事項請至後台查詢" : "打卡/補打卡/請假/班表/薪資 在網頁內完成，不消耗 LINE 訊息"}
       </div>
     </div>
   );
