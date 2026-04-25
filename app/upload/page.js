@@ -84,7 +84,8 @@ export default function UploadPage() {
           body: JSON.stringify({ action: "analyze", type, base64: b64, store_id: storeId, store_name: storeName, employee_id: empId, employee_name: empName, image_url: upRes.url, expense_type: expenseType }),
         }).then(r => r.json());
 
-        allResults.push({ index: i + 1, image_url: upRes.url, ...aiRes, success: true });
+        const ok = !aiRes.error && !!aiRes.draft_id;
+        allResults.push({ index: i + 1, image_url: upRes.url, ...aiRes, success: ok });
       } catch (e) {
         allResults.push({ index: i + 1, error: e.message, success: false });
       }

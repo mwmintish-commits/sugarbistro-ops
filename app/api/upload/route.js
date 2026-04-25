@@ -63,10 +63,14 @@ export async function POST(request) {
       }
 
       if (type === "expense") {
-        const r = await analyzeExpenseReceipt(base64);
-        const expDate = r?.date || today;
         const isHq = store_id === "__hq__";
         const normalizedStore = isHq ? null : store_id;
+        // AI 辨識（失敗不阻擋建草稿，使用者可進 review 頁手動填）
+        let r = null;
+        let aiError = null;
+        try { r = await analyzeExpenseReceipt(base64); }
+        catch (e) { aiError = e.message; }
+        const expDate = r?.date || today;
 
         // 若發票已存在且仍為 draft/pending/approved，直接重用避免重複
         if (r?.invoice_number) {
@@ -85,7 +89,7 @@ export async function POST(request) {
           }
         }
 
-        const { data: draft } = await supabase.from("expenses").insert({
+        const { data: draft, error: insErr } = await supabase.from("expenses").insert({
           store_id: normalizedStore, expense_type: expense_type || "vendor",
           date: expDate, amount: r?.total_amount || 0,
           vendor_name: r?.vendor_name || "", description: r?.description || "",
@@ -94,10 +98,15 @@ export async function POST(request) {
           image_url: imgUrl, submitted_by: employee_id,
           month_key: expDate.slice(0, 7), status: "draft",
         }).select().single();
+        if (insErr) {
+          console.error("expense insert failed:", insErr);
+          return Response.json({ error: "建立草稿失敗：" + insErr.message }, { status: 500 });
+        }
         return Response.json({
           success: true, draft_id: draft?.id,
           vendor_name: r?.vendor_name, amount: r?.total_amount,
           invoice_number: r?.invoice_number, date: expDate,
+          ai_error: aiError,
           redirect: `${SITE}/expense-review?id=${draft?.id}`,
         });
       }
