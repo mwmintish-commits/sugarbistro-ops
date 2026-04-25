@@ -12,7 +12,8 @@ async function sendOnboardingEmails({ email, name, storeName, idNumber, hireDate
   if (!email) { console.error("[ONBOARD-EMAIL] ❌ 員工未填 Email，未寄出。"); return { ok: false, reason: "no_email" }; }
   const signDate = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
   const fromAddr = process.env.RESEND_FROM || "小食糖 <onboarding@resend.dev>";
-  console.log("[ONBOARD-EMAIL] ➡️ 準備寄出 from=" + fromAddr + " to=" + email);
+  const hrBcc = process.env.HR_BCC_EMAIL || "service@camgoldia.com";
+  console.log("[ONBOARD-EMAIL] ➡️ 準備寄出 from=" + fromAddr + " to=" + email + " bcc=" + hrBcc);
 
   // 共用樣式
   const style = "font-family:'Noto Sans TC',sans-serif;max-width:700px;margin:0 auto;padding:30px;color:#333;line-height:1.8;";
@@ -40,7 +41,7 @@ async function sendOnboardingEmails({ email, name, storeName, idNumber, hireDate
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + RESEND_KEY },
-      body: JSON.stringify({ from: fromAddr, to: email, subject: "【小食糖】員工守則簽署確認 - " + name, html: hbBody }),
+      body: JSON.stringify({ from: fromAddr, to: email, bcc: hrBcc, subject: "【小食糖】員工守則簽署確認 - " + name, html: hbBody }),
     });
     const txt = await r.text();
     if (!r.ok) console.error("[ONBOARD-EMAIL] ❌ 守則寄送失敗 status=" + r.status + " body=" + txt.slice(0, 400));
@@ -65,7 +66,7 @@ async function sendOnboardingEmails({ email, name, storeName, idNumber, hireDate
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + RESEND_KEY },
-      body: JSON.stringify({ from: fromAddr, to: email, subject: "【小食糖】工作合約簽署確認 - " + name, html: ctBody }),
+      body: JSON.stringify({ from: fromAddr, to: email, bcc: hrBcc, subject: "【小食糖】工作合約簽署確認 - " + name, html: ctBody }),
     });
     const txt = await r.text();
     if (!r.ok) { console.error("[ONBOARD-EMAIL] ❌ 合約寄送失敗 status=" + r.status + " body=" + txt.slice(0, 400)); return { ok: false, reason: "resend_error", status: r.status, body: txt }; }
