@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { BONUS_SECTION } from "@/lib/bonus-terms";
 
-const STEPS = ["基本資料","文件上傳","員工守則","獎金與福利","工作合約"];
+const STEPS = ["基本資料","文件上傳","員工守則暨福利","工作合約"];
 const ap = async (url, body) => { const opts = body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}; return fetch(url, opts).then(r => r.json()); };
 
 const FALLBACK_HB = [
@@ -13,7 +14,7 @@ const FALLBACK_HB = [
   { title: "六、違規等級", items: ["▲輕微→口頭警告","■中度→書面警告+考核扣分","●嚴重→停職或解僱","◆零容忍→立即解僱+法律追訴"] },
 ];
 
-const FALLBACK_CONTRACT = "一、乙方同意遵守甲方之員工行為規範與工作守則。\n二、乙方了解並同意季績效獎金制度之計算方式與發放條件。\n三、乙方之薪資、工時、休假依勞動基準法及甲方規定辦理。\n四、乙方同意甲方依法代扣勞健保及所得稅。\n五、乙方應對甲方之營業秘密負保密義務，離職後仍有效。\n六、任一方得依勞動基準法規定終止本合約。\n七、本合約自到職日起生效。\n八、本合約一式兩份，甲乙雙方各執一份為憑。";
+const FALLBACK_CONTRACT = "一、薪資、工時、休假依勞動基準法及甲方規定辦理。\n二、甲方依法代扣勞工保險、全民健康保險及所得稅。\n三、任一方得依勞動基準法規定終止本合約；乙方離職應依規定辦理交接。\n四、本合約自到職日起生效，未盡事宜依勞動基準法及相關法令辦理。\n五、本合約一式兩份，甲乙雙方各執一份為憑。";
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(0);
@@ -30,8 +31,8 @@ export default function OnboardingPage() {
     bank_name: "", bank_account: ""
   });
   const [files, setFiles] = useState({ id_front: null, id_back: null, health_check: null });
-  const [agreed, setAgreed] = useState({ handbook: false, bonus: false, contract: false });
-  const [sigs, setSigs] = useState({ handbook: null, contract: null });
+  const [agreed, setAgreed] = useState({ handbook: false, contract: false });
+  const [sigs, setSigs] = useState({ contract: null });
   const [sub, setSub] = useState(false);
 
   useEffect(() => {
@@ -85,12 +86,13 @@ export default function OnboardingPage() {
     if (step === 1) {
       // 體檢表/身分證為選填，可稍後補上傳
     }
-    if (step === 2) { if (!agreed.handbook || !sigs.handbook) { setErr("請勾選同意並簽名"); return; } }
-    if (step === 3) { if (!agreed.bonus) { setErr("請勾選確認已了解"); return; } }
-    if (step === 4) {
+    if (step === 2) { if (!agreed.handbook) { setErr("請勾選同意已詳閱守則暨福利條款"); return; } }
+    if (step === 3) {
       if (!agreed.contract || !sigs.contract) { setErr("請勾選同意並簽名"); return; }
       setSub(true);
       try {
+        // 守則內容包含後台編輯版本 + 系統固定的獎金福利段落（單一來源）
+        const fullHandbook = [...handbook, BONUS_SECTION];
         const res = await fetch("/api/onboarding", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -99,8 +101,8 @@ export default function OnboardingPage() {
             ...form,
             health_check_url: files.health_check,
             id_front_url: files.id_front, id_back_url: files.id_back,
-            handbook_signature: sigs.handbook, contract_signature: sigs.contract,
-            handbook_content: handbook, contract_content: contractText,
+            handbook_signature: null, contract_signature: sigs.contract,
+            handbook_content: fullHandbook, contract_content: contractText,
           }),
         });
         if (!res.ok) {
@@ -184,74 +186,27 @@ export default function OnboardingPage() {
         </div>
       </Card>}
 
-      {/* Step 2: 員工守則（完整顯示） */}
+      {/* Step 2: 員工守則暨福利（後台版本 + 系統固定獎金福利段落，僅勾選確認，不簽名） */}
       {step===2 && <>
-        <div style={{background:"#fff",borderRadius:10,border:"1px solid #e8e6e1",padding:14,marginBottom:10,maxHeight:400,overflowY:"auto"}}>
-          <h3 style={{fontSize:14,fontWeight:600,marginBottom:4,textAlign:"center"}}>📖 員工行為規範與工作守則</h3>
+        <div style={{background:"#fff",borderRadius:10,border:"1px solid #e8e6e1",padding:14,marginBottom:10,maxHeight:420,overflowY:"auto"}}>
+          <h3 style={{fontSize:14,fontWeight:600,marginBottom:4,textAlign:"center"}}>📖 員工守則暨福利條款</h3>
           <p style={{fontSize:10,color:"#888",textAlign:"center",marginBottom:10}}>小食糖 SUGARbISTRO｜到職日起即受本規範約束</p>
-          {handbook.map((ch,i)=><div key={i} style={{marginBottom:10}}>
+          {[...handbook, BONUS_SECTION].map((ch,i)=><div key={i} style={{marginBottom:10}}>
             <h4 style={{fontSize:12,fontWeight:600,padding:"4px 8px",borderRadius:4,background:(ch.title||"").includes("零容忍")||(ch.title||"").includes("最高")?"#fde8e8":"#faf8f5",color:(ch.title||"").includes("零容忍")||(ch.title||"").includes("最高")?"#b91c1c":"#333",marginBottom:4}}>{ch.title}</h4>
             {(ch.items||[]).map((item,j)=><div key={j} style={{fontSize:11,lineHeight:1.8,color:"#444",paddingLeft:10}}>{"▸ "+item}</div>)}
           </div>)}
         </div>
         <Card title="">
-          <label style={{display:"flex",gap:8,cursor:"pointer",marginBottom:10}}>
-            <input type="checkbox" checked={agreed.handbook} onChange={e=>setAgreed({...agreed,handbook:e.target.checked})} style={{width:18,height:18,marginTop:2}} />
-            <span style={{fontSize:12,lineHeight:1.6}}>本人已詳閱「員工行為規範與工作守則」全文並同意遵守</span>
-          </label>
-          <SigPad label="員工簽名" sig={sigs.handbook} onSign={d=>setSigs({...sigs,handbook:d})} />
-        </Card>
-      </>}
-
-      {/* Step 3: 獎金與福利制度 */}
-      {step===3 && <>
-        <div style={{background:"#fff",borderRadius:10,border:"1px solid #e8e6e1",padding:14,marginBottom:10}}>
-          <h3 style={{fontSize:14,fontWeight:600,marginBottom:8,textAlign:"center"}}>🏆 獎金與福利制度</h3>
-
-          <Sec t="一、季績效獎金" items={[
-            "適用範圍：全體正式員工（試用期不納入），以季為單位計算並發放。",
-            "業績達標率：各門市依每日營業目標計算月達標率，達 85% 以上方可發放，120% 以上額外加成。",
-            "季末考核：個人考核滿分 100 分，涵蓋出勤、完成度、服務態度與違規紀錄。80 分以上全額、70~79 分發放 50%、未達 70 分取消資格。",
-            "發放條件：季度累計營收不得虧損；發放日仍在職且未提離職方可領取；個人考核須達 70 分以上。",
-          ]} />
-
-          <Sec t="二、三節獎金（端午、中秋、農曆年）" items={[
-            "屬恩惠性、獎勵性給與，非經常性薪資，不構成勞動契約之必然義務。",
-            "金額及發放與否依公司當年度營運盈餘、個人考核、服務年資綜合決定，公司保留最終裁量權。",
-            "到職未滿 3 個月者不予發放；3~12 個月者依在職月數按比例發放。",
-            "發放日當日須仍在職且未提出離職、未受懲戒處分者方可領取；於發放日前離職者不得溯及補發。",
-          ]} />
-
-          <Sec t="三、年終獎金" items={[
-            "屬恩惠性、獎勵性給與，非勞動基準法第 29 條所定之分配紅利或經常性薪資。",
-            "發放金額、月數及時點，由公司依當年度獲利狀況、營運計畫及個人績效綜合裁量，並非保證每年發放。",
-            "通常於農曆年前發放；發放日仍在職、未提出離職且未受重大懲戒處分者方可領取。",
-            "到職未滿一個完整年度者，得依在職月數按比例計算或不予發放，由公司決定。",
-          ]} />
-
-          <Sec t="四、員工聚餐、旅遊、教育訓練及其他福利" items={[
-            "屬員工關係維繫性質之福利活動，非勞動契約義務，亦不屬工資。",
-            "舉辦次數、時間、地點、金額，由公司依年度預算及營運狀況決定，得隨時調整、延期或停辦。",
-            "員工選擇不參加者，公司無補貼、折換現金或其他補償義務。",
-          ]} />
-
-          <Sec t="五、共通法律聲明" warn items={[
-            "上開各項獎金與福利，全部屬「恩惠性給與」（discretionary bonus），非勞動基準法第 2 條第 3 款所稱之工資，不計入平均工資、退休金提繳工資、資遣費及加班費基數。",
-            "公司基於誠信原則，保有依市場環境、營運狀況、法令變更或個人表現，調整、暫停、變更或終止上述任一制度之最終裁量權，毋須個別徵得員工同意。",
-            "本制度之歷次發放，不構成默示或明示之勞動條件約定，員工不得以「過往慣例」主張請求權。",
-            "如因不可抗力（疫情、天災、重大商業變故等）致公司營運受嚴重影響，公司得暫停或取消當期發放，員工同意拋棄相關請求權。",
-          ]} />
-        </div>
-        <Card title="">
           <label style={{display:"flex",gap:8,cursor:"pointer"}}>
-            <input type="checkbox" checked={agreed.bonus} onChange={e=>setAgreed({...agreed,bonus:e.target.checked})} style={{width:18,height:18,marginTop:2}} />
-            <span style={{fontSize:12,lineHeight:1.6}}>本人已詳閱上述「獎金與福利制度」全部條款，了解所有獎金與福利均屬恩惠性給與，非經常性薪資，公司保留調整與停發之裁量權，本人同意並接受。</span>
+            <input type="checkbox" checked={agreed.handbook} onChange={e=>setAgreed({...agreed,handbook:e.target.checked})} style={{width:18,height:18,marginTop:2}} />
+            <span style={{fontSize:12,lineHeight:1.6}}>本人已詳閱「員工守則暨福利條款」全部內容（含獎金與福利說明），了解相關獎金與福利均屬恩惠性給與，公司保留調整與停發之裁量權，本人同意遵守。</span>
           </label>
+          <p style={{fontSize:10,color:"#888",marginTop:8,lineHeight:1.5}}>※ 守則內容後台可隨時查閱，與簽署版本一致；正式簽名於下一步「工作合約」一併完成。</p>
         </Card>
       </>}
 
-      {/* Step 4: 工作合約（完整版，從設定讀取） */}
-      {step===4 && <>
+      {/* Step 3: 工作合約（唯一簽名） */}
+      {step===3 && <>
         <Card title="📝 工作合約">
           <div style={{fontSize:12,lineHeight:1.8,color:"#444"}}>
             <div style={{textAlign:"center",marginBottom:10}}>
@@ -281,7 +236,7 @@ export default function OnboardingPage() {
         {step>0 && <button onClick={()=>{setErr("");setStep(step-1);}} style={{flex:1,padding:12,borderRadius:10,border:"1px solid #ddd",background:"#fff",fontSize:14,cursor:"pointer"}}>←</button>}
         <button onClick={goNext} disabled={sub}
           style={{flex:2,padding:12,borderRadius:10,border:"none",background:sub?"#ccc":"#0a7c42",color:"#fff",fontSize:15,fontWeight:600,cursor:sub?"default":"pointer"}}>
-          {sub?"提交中...":step===4?"✅ 確認簽署完成報到":"下一步 →"}
+          {sub?"提交中...":step===3?"✅ 確認簽署完成報到":"下一步 →"}
         </button>
       </div>}
     </Box>

@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { ap, fmt } from "./utils";
+import { BONUS_SECTION } from "@/lib/bonus-terms";
 
 const DEFAULT_HB = [
   { title: "一、出勤、排班與請假", items: ["準時上班：應提前5分鐘到崗，完成更衣、儀容確認後方可開始工作。","依公司系統（QR Code）進行上下班打卡，不得代打、協助他人代打。","不得無故曠職：曠職視為嚴重違規，第一次書面警告，第二次以上得依規定解僱。","事假、病假至少提前4小時以書面（LINE群組）通知直屬主管。","病假超過3日須檢附醫院證明，否則視為事假計算。","換班須提前告知主管並經書面同意，當事雙方負連帶責任。"] },
@@ -14,7 +15,7 @@ const DEFAULT_HB = [
   { title: "九、申訴與舉報", items: ["可向直屬主管提出書面申訴，主管須於5個工作日內回覆。","涉及主管本身之違規，可直接向總部提出，舉報者身分受保密保護。","公司禁止任何形式的報復行為。"] },
 ];
 
-const DEFAULT_CONTRACT = "一、乙方同意遵守甲方之員工行為規範與工作守則，並了解違反規定之懲處標準。\n二、乙方了解並同意季績效獎金制度之計算方式與發放條件，獎金屬恩惠性給與。\n三、乙方之薪資、工時、休假依勞動基準法及甲方規定辦理。\n四、乙方同意甲方依法代扣勞工保險、全民健康保險及所得稅。\n五、乙方應對甲方之營業秘密、配方、成本、客戶資料等負保密義務，離職後仍有效。\n六、任一方得依勞動基準法規定終止本合約，乙方離職應依規定辦理交接。\n七、本合約自到職日起生效，未盡事宜依勞動基準法及相關法令辦理。\n八、本合約一式兩份，甲乙雙方各執一份為憑。";
+const DEFAULT_CONTRACT = "一、薪資、工時、休假依勞動基準法及甲方規定辦理。\n二、甲方依法代扣勞工保險、全民健康保險及所得稅。\n三、任一方得依勞動基準法規定終止本合約；乙方離職應依規定辦理交接。\n四、本合約自到職日起生效，未盡事宜依勞動基準法及相關法令辦理。\n五、本合約一式兩份，甲乙雙方各執一份為憑。";
 
 export default function SettingsMgr({ stores, load, month }) {
   const [companyName, setCompanyName] = useState("小食糖 Sugar Bistro");
@@ -280,6 +281,20 @@ export default function SettingsMgr({ stores, load, month }) {
             </div>
           </div>
         )}
+        {/* 系統固定段落：獎金與福利（不可編輯，自動附加在守則最後） */}
+        <div style={{ marginTop: 12, padding: 10, background: "#fef9f3", border: "1px dashed #d4a373", borderRadius: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#8a4b00" }}>📌 系統固定段落（不可編輯）</span>
+            <span style={{ fontSize: 9, color: "#a46a2a" }}>自動附加在守則最後 · 同步顯示於 /employee-handbook 與報到簽署頁</span>
+          </div>
+          <div style={{ background: "#fff", borderRadius: 4, padding: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{BONUS_SECTION.title}</div>
+            {BONUS_SECTION.items.map((it, i) => (
+              <div key={i} style={{ fontSize: 11, lineHeight: 1.7, color: "#555", paddingLeft: 8 }}>{"▸ " + it}</div>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: "#888", marginTop: 6 }}>※ 此段為法律風險控管必要條款，如需調整請修改原始檔 <code>lib/bonus-terms.js</code>。</div>
+        </div>
       </div>
 
       {/* 工作合約編輯器 */}
