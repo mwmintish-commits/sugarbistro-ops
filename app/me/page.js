@@ -43,6 +43,7 @@ const ITEMS = (eid, emp) => {
     base.push(
       { icon: "📦", label: "月結單據", desc: "廠商單據上傳", href: uploadUrl("vendor", emp, eid),      bg: "#dbeafe", color: "#1d4ed8" },
       { icon: "🪙", label: "零用金",   desc: "費用收據上傳", href: uploadUrl("petty_cash", emp, eid),  bg: "#fef9c3", color: "#854d0e" },
+      { icon: "🏢", label: "總部代付", desc: "總部代付上傳", href: uploadUrl("hq_advance", emp, eid),  bg: "#e0e7ff", color: "#4338ca" },
       { icon: "🖥", label: "後台",     desc: "管理系統",     href: "/",                                bg: "#f3e8ff", color: "#6b21a8" },
     );
   }

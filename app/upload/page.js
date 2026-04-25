@@ -28,7 +28,7 @@ export default function UploadPage() {
   const expenseType = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("expense_type") || "vendor";
   const typeLabels = {
     settlement: "📊 日結單", deposit: "🏦 存款單",
-    expense: expenseType === "petty_cash" ? "🪙 零用金收據" : "📦 月結單據",
+    expense: expenseType === "petty_cash" ? "🪙 零用金收據" : expenseType === "hq_advance" ? "🏢 總部代付" : "📦 月結單據",
   };
 
   const addPhotos = (files) => {
