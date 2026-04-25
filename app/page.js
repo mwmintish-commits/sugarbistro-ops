@@ -114,6 +114,7 @@ export default function AdminPage() {
   const [pmtSum, setPmtSum] = useState({});
   const [holidays, setHolidays] = useState([]);
   const [invItems, setInvItems] = useState([]);
+  const [invOrders, setInvOrders] = useState([]);
   const [invSum, setInvSum] = useState({});
   const [recipeList, setRecipeList] = useState([]);
   const [clientList, setClientList] = useState([]);
@@ -246,6 +247,7 @@ export default function AdminPage() {
     }
     if (need(["inventory","stock"]) && myTabs.includes("inventory")) {
       ap("/api/admin/inventory").then(r => { setInvItems(r.data||[]); setInvSum(r.summary||{}); });
+      ap("/api/admin/inventory?type=orders").then(r => setInvOrders(r.data||[]));
     }
     if (need(["recipes","production"]) && myTabs.includes("recipes")) {
       ap("/api/admin/recipes").then(r => setRecipeList(r.data||[]));
@@ -1929,6 +1931,45 @@ export default function AdminPage() {
               <button onClick={async()=>{const from=prompt("來源門市ID：");const to=prompt("目標門市ID：");const item=prompt("品項ID：");const qty=prompt("數量：");if(!from||!to||!item||!qty)return;await ap("/api/admin/inventory",{action:"movement",item_id:item,store_id:from,type:"transfer_out",quantity:-Number(qty),notes:"調撥至其他門市"});await ap("/api/admin/inventory",{action:"movement",item_id:item,store_id:to,type:"transfer_in",quantity:Number(qty),notes:"從其他門市調入"});alert("調撥完成");load();}}
                 style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"transparent",color:"#4361ee",fontSize:11,cursor:"pointer"}}>🔄 門市調撥</button>
             </div>
+            {/* 叫貨單區塊 */}
+            {(() => {
+              const pending = invOrders.filter(o => o.status === "pending");
+              const recent = invOrders.filter(o => o.status !== "pending").slice(0, 5);
+              return (
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10,marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <span style={{fontSize:12,fontWeight:600}}>📦 叫貨單（待收 {pending.length}）</span>
+                    <button onClick={async()=>{ await ap("/api/admin/inventory?type=orders").then(r=>setInvOrders(r.data||[])); }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>↻ 刷新</button>
+                  </div>
+                  {pending.length === 0 && recent.length === 0 && <div style={{fontSize:10,color:"#999",padding:6}}>尚無叫貨紀錄</div>}
+                  {pending.map(o => (
+                    <div key={o.id} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 4px",borderBottom:"1px solid #f0eeea",fontSize:11}}>
+                      <span style={{flex:1}}><b>{o.inventory_items?.name||"?"}</b> × {o.quantity}{o.unit||""} <span style={{color:"#888"}}>({o.stores?.name||"-"} / {o.supplier_name||"無供應商"})</span></span>
+                      <span style={{fontSize:9,color:"#888"}}>{o.requested_by_name||""} · {o.requested_at?.slice(5,10)}</span>
+                      <button onClick={async()=>{
+                        const q=prompt("實收數量：",String(o.quantity));if(!q)return;
+                        const c=prompt("實際單價（留空沿用）：",String(o.unit_cost||""));
+                        const r=await ap("/api/admin/inventory",{action:"order_receive",order_id:o.id,received_qty:Number(q),unit_cost:c?Number(c):undefined,received_by_name:auth?.name||"admin"});
+                        if(r.error){alert("收貨失敗："+r.error);return;}
+                        load();
+                      }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid #0a7c42",background:"#e6f9f0",color:"#0a7c42",fontSize:10,cursor:"pointer"}}>✅收貨</button>
+                      <button onClick={async()=>{
+                        const reason=prompt("取消原因：","");if(reason===null)return;
+                        await ap("/api/admin/inventory",{action:"order_cancel",order_id:o.id,cancelled_reason:reason});load();
+                      }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid #888",background:"#fff",color:"#888",fontSize:10,cursor:"pointer"}}>✕取消</button>
+                    </div>
+                  ))}
+                  {recent.length > 0 && <details style={{marginTop:6}}>
+                    <summary style={{fontSize:10,color:"#888",cursor:"pointer"}}>近期已處理 {recent.length} 筆</summary>
+                    {recent.map(o => (
+                      <div key={o.id} style={{fontSize:10,color:"#888",padding:"3px 4px",borderBottom:"1px solid #f8f6f1"}}>
+                        {o.status==="received"?"✅":"✕"} {o.inventory_items?.name} × {o.received_qty||o.quantity}{o.unit||""} · {o.received_at?.slice(0,10)||o.requested_at?.slice(0,10)}
+                      </div>
+                    ))}
+                  </details>}
+                </div>
+              );
+            })()}
             {/* ✦19 效期警示 */}
             {invItems.filter(i=>i.expiry_days>0).length>0 && (
               <div style={{background:"#fef9c3",borderRadius:6,padding:8,marginBottom:8,fontSize:10}}>
@@ -1957,6 +1998,14 @@ export default function AdminPage() {
                         const ss=prompt("安全庫存：",String(i.safe_stock||0));
                         await ap("/api/admin/inventory",{action:"update",item_id:i.id,name:n,zone:z||null,category:cat||null,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss)});load();
                       }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #4361ee",background:"transparent",fontSize:9,cursor:"pointer",color:"#4361ee"}}>編輯</button>
+                      <button onClick={async()=>{
+                        const q=prompt("叫貨數量：","");if(!q)return;
+                        const sup=prompt("供應商（留空沿用）：",i.supplier_name||"");
+                        const exp=prompt("預計到貨日 YYYY-MM-DD（可空）：","");
+                        const r=await ap("/api/admin/inventory",{action:"order_create",item_id:i.id,quantity:Number(q),store_id:i.store_id||sf||null,supplier_name:sup||undefined,expected_date:exp||undefined,requested_by_name:auth?.name||"admin"});
+                        if(r.error){alert("叫貨失敗："+r.error);return;}
+                        alert("✅ 已建立叫貨單");load();
+                      }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b45309",background:"transparent",fontSize:9,cursor:"pointer",color:"#b45309",marginLeft:2}}>📦叫貨</button>
                       <button onClick={async()=>{const q=prompt("入庫數量：");if(!q)return;await ap("/api/admin/inventory",{action:"movement",item_id:i.id,store_id:sf||null,type:"purchase",quantity:Number(q),notes:"手動入庫"});load();}}
                         style={{padding:"1px 6px",borderRadius:3,border:"1px solid #0a7c42",background:"transparent",fontSize:9,cursor:"pointer",color:"#0a7c42",marginLeft:2}}>+入庫</button>
                       <button onClick={async()=>{const q=prompt("出庫數量：");if(!q)return;await ap("/api/admin/inventory",{action:"movement",item_id:i.id,store_id:sf||null,type:"usage",quantity:-Number(q),notes:"手動出庫"});load();}}
