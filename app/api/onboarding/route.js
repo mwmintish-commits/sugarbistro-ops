@@ -8,9 +8,11 @@ async function sendContractEmail(email, name, storeName, signedAt) {
 
 async function sendOnboardingEmails({ email, name, storeName, idNumber, hireDate, handbookContent, contractContent, handbookSig, contractSig }) {
   const RESEND_KEY = process.env.RESEND_API_KEY;
-  if (!RESEND_KEY || !email) { console.log("No RESEND_API_KEY or email, skip"); return; }
+  if (!RESEND_KEY) { console.error("[ONBOARD-EMAIL] ❌ 缺少 RESEND_API_KEY 環境變數，未寄出。請至 Zeabur 後台設定環境變數。"); return { ok: false, reason: "no_api_key" }; }
+  if (!email) { console.error("[ONBOARD-EMAIL] ❌ 員工未填 Email，未寄出。"); return { ok: false, reason: "no_email" }; }
   const signDate = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
   const fromAddr = process.env.RESEND_FROM || "小食糖 <onboarding@resend.dev>";
+  console.log("[ONBOARD-EMAIL] ➡️ 準備寄出 from=" + fromAddr + " to=" + email);
 
   // 共用樣式
   const style = "font-family:'Noto Sans TC',sans-serif;max-width:700px;margin:0 auto;padding:30px;color:#333;line-height:1.8;";
@@ -35,12 +37,15 @@ async function sendOnboardingEmails({ email, name, storeName, idNumber, hireDate
       hbHtml +
       footerHtml.replace("SIG_PLACEHOLDER", handbookSig ? "<img src='" + handbookSig + "' style='height:50px' />" : "(已電子簽署)") +
       "</div>";
-    await fetch("https://api.resend.com/emails", {
+    const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + RESEND_KEY },
       body: JSON.stringify({ from: fromAddr, to: email, subject: "【小食糖】員工守則簽署確認 - " + name, html: hbBody }),
     });
-  } catch (e) { console.error("Handbook email error:", e); }
+    const txt = await r.text();
+    if (!r.ok) console.error("[ONBOARD-EMAIL] ❌ 守則寄送失敗 status=" + r.status + " body=" + txt.slice(0, 400));
+    else console.log("[ONBOARD-EMAIL] ✅ 守則寄出 " + txt.slice(0, 200));
+  } catch (e) { console.error("[ONBOARD-EMAIL] Handbook email exception:", e.message); }
 
   // 2. 工作合約 Email
   try {
@@ -57,12 +62,16 @@ async function sendOnboardingEmails({ email, name, storeName, idNumber, hireDate
       ctHtml +
       footerHtml.replace("SIG_PLACEHOLDER", contractSig ? "<img src='" + contractSig + "' style='height:50px' />" : "(已電子簽署)") +
       "</div>";
-    await fetch("https://api.resend.com/emails", {
+    const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + RESEND_KEY },
       body: JSON.stringify({ from: fromAddr, to: email, subject: "【小食糖】工作合約簽署確認 - " + name, html: ctBody }),
     });
-  } catch (e) { console.error("Contract email error:", e); }
+    const txt = await r.text();
+    if (!r.ok) { console.error("[ONBOARD-EMAIL] ❌ 合約寄送失敗 status=" + r.status + " body=" + txt.slice(0, 400)); return { ok: false, reason: "resend_error", status: r.status, body: txt }; }
+    console.log("[ONBOARD-EMAIL] ✅ 合約寄出 " + txt.slice(0, 200));
+  } catch (e) { console.error("[ONBOARD-EMAIL] Contract email exception:", e.message); return { ok: false, reason: "exception", message: e.message }; }
+  return { ok: true };
 }
 
 export async function GET(request) {
