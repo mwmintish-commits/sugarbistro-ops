@@ -1924,7 +1924,7 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📊 庫存管理</h3>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
-              <button onClick={async()=>{const n=prompt("品項名稱：");if(!n)return;const t=prompt("類型(raw_material/finished/packaging)：","raw_material");const u=prompt("單位：","個");const c=prompt("單位成本：","0");const ss=prompt("安全庫存：","0");await ap("/api/admin/inventory",{action:"create",name:n,type:t,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss)});load();}}
+              <button onClick={async()=>{const n=prompt("品項名稱：");if(!n)return;const t=prompt("類型(raw_material/finished/packaging)：","raw_material");const u=prompt("單位：","個");const c=prompt("單位成本：","0");const ss=prompt("安全庫存：","0");const z=prompt("巡邏區域(refrig=冷藏 / freezer=冷凍 / ambient=常溫 / display=展示櫃，留空=不分區)：","");const cat=prompt("分類（可留空，例：原物料/包材/麵包/甜點）：","");await ap("/api/admin/inventory",{action:"create",name:n,type:t,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss),zone:z||null,category:cat||null,store_id:sf||null});load();}}
                 style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增品項</button>
               <button onClick={async()=>{const from=prompt("來源門市ID：");const to=prompt("目標門市ID：");const item=prompt("品項ID：");const qty=prompt("數量：");if(!from||!to||!item||!qty)return;await ap("/api/admin/inventory",{action:"movement",item_id:item,store_id:from,type:"transfer_out",quantity:-Number(qty),notes:"調撥至其他門市"});await ap("/api/admin/inventory",{action:"movement",item_id:item,store_id:to,type:"transfer_in",quantity:Number(qty),notes:"從其他門市調入"});alert("調撥完成");load();}}
                 style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"transparent",color:"#4361ee",fontSize:11,cursor:"pointer"}}>🔄 門市調撥</button>
@@ -1937,19 +1937,32 @@ export default function AdminPage() {
             )}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["品項","類型","庫存","安全量","單價","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["品項","類型","區域","分類","庫存","安全量","單價","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{invItems.map(i=>(
                   <tr key={i.id} style={{borderBottom:"1px solid #f0eeea",background:i.safe_stock>0&&i.current_stock<=i.safe_stock?"#fef9c3":"transparent"}}>
                     <td style={{padding:6,fontWeight:500}}>{i.name}{i.safe_stock>0&&i.current_stock<=i.safe_stock&&<span style={{color:"#b91c1c",fontSize:9}}> ⚠️低</span>}</td>
                     <td style={{padding:6,fontSize:10}}>{i.type==="raw_material"?"原料":i.type==="finished"?"成品":"包材"}</td>
+                    <td style={{padding:6,fontSize:10}}>{i.zone==="refrig"?"🧊冷藏":i.zone==="freezer"?"❄️冷凍":i.zone==="ambient"?"🌡常溫":i.zone==="display"?"🪟展示櫃":"-"}</td>
+                    <td style={{padding:6,fontSize:10}}>{i.category||"-"}</td>
                     <td style={{padding:6,fontWeight:600}}>{i.current_stock+" "+(i.unit||"")}</td>
                     <td style={{padding:6}}>{i.safe_stock||"-"}</td>
                     <td style={{padding:6}}>{fmt(i.cost_per_unit)}</td>
                     <td style={{padding:6,whiteSpace:"nowrap"}}>
+                      <button onClick={async()=>{
+                        const n=prompt("品項名稱：",i.name);if(n===null)return;
+                        const z=prompt("區域(refrig/freezer/ambient/display，留空=不分區)：",i.zone||"");
+                        const cat=prompt("分類：",i.category||"");
+                        const u=prompt("單位：",i.unit||"");
+                        const c=prompt("單位成本：",String(i.cost_per_unit||0));
+                        const ss=prompt("安全庫存：",String(i.safe_stock||0));
+                        await ap("/api/admin/inventory",{action:"update",item_id:i.id,name:n,zone:z||null,category:cat||null,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss)});load();
+                      }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #4361ee",background:"transparent",fontSize:9,cursor:"pointer",color:"#4361ee"}}>編輯</button>
                       <button onClick={async()=>{const q=prompt("入庫數量：");if(!q)return;await ap("/api/admin/inventory",{action:"movement",item_id:i.id,store_id:sf||null,type:"purchase",quantity:Number(q),notes:"手動入庫"});load();}}
-                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid #0a7c42",background:"transparent",fontSize:9,cursor:"pointer",color:"#0a7c42"}}>+入庫</button>
+                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid #0a7c42",background:"transparent",fontSize:9,cursor:"pointer",color:"#0a7c42",marginLeft:2}}>+入庫</button>
                       <button onClick={async()=>{const q=prompt("出庫數量：");if(!q)return;await ap("/api/admin/inventory",{action:"movement",item_id:i.id,store_id:sf||null,type:"usage",quantity:-Number(q),notes:"手動出庫"});load();}}
                         style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b91c1c",background:"transparent",fontSize:9,cursor:"pointer",color:"#b91c1c",marginLeft:2}}>-出庫</button>
+                      <button onClick={async()=>{if(!confirm("確定刪除「"+i.name+"」？"))return;await ap("/api/admin/inventory",{action:"delete",item_id:i.id});load();}}
+                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid #888",background:"transparent",fontSize:9,cursor:"pointer",color:"#888",marginLeft:2}}>刪除</button>
                     </td>
                   </tr>
                 ))}</tbody>

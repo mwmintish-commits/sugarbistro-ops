@@ -31,8 +31,8 @@ export async function POST(request) {
   const body = await request.json();
 
   if (body.action === "create") {
-    const { name, sku, type, category, unit, safe_stock, cost_per_unit, store_id, supplier_name, expiry_days, notes } = body;
-    const { data, error } = await supabase.from("inventory_items").insert({ name, sku, type, category, unit, safe_stock, cost_per_unit, store_id, supplier_name, expiry_days, notes }).select().single();
+    const { name, sku, type, category, unit, safe_stock, cost_per_unit, store_id, supplier_name, expiry_days, notes, zone } = body;
+    const { data, error } = await supabase.from("inventory_items").insert({ name, sku, type, category, unit, safe_stock, cost_per_unit, store_id, supplier_name, expiry_days, notes, zone }).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
   }

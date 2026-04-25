@@ -20,35 +20,49 @@ export async function GET(request) {
     const selectCols = "*, work_log_templates(requires_value, value_label, value_min, value_max)";
     let { data: items } = await supabase.from("work_log_items").select(selectCols).eq("store_id", store_id).eq("date", date).eq("frequency", freq).order("created_at");
 
-    // 如果當日還沒初始化，從模板建立
-    if (!items || items.length === 0) {
-      let tq = supabase.from("work_log_templates").select("*").eq("store_id", store_id).eq("is_active", true).order("sort_order");
+    // 不論是否已初始化，皆對照當前模板 (template_id, shift_type) 補齊缺漏項目，
+    // 讓後台對「班別時段」勾選的修改即時反映到前台
+    let tq = supabase.from("work_log_templates").select("*").eq("store_id", store_id).eq("is_active", true).order("sort_order");
+    if (freq === "daily") {
+      tq = tq.eq("frequency", "daily");
+    } else if (freq === "weekly") {
+      const dow = new Date(date).getDay();
+      tq = tq.eq("frequency", "weekly").or(`weekday.eq.${dow},weekday.is.null`);
+    } else if (freq === "monthly") {
+      const dom = new Date(date).getDate();
+      tq = tq.eq("frequency", "monthly").or(`month_day.eq.${dom},month_day.is.null`);
+    }
+    const { data: templates } = await tq;
 
-      if (freq === "daily") {
-        tq = tq.eq("frequency", "daily");
-      } else if (freq === "weekly") {
-        const dow = new Date(date).getDay();
-        tq = tq.eq("frequency", "weekly").or(`weekday.eq.${dow},weekday.is.null`);
-      } else if (freq === "monthly") {
-        const dom = new Date(date).getDate();
-        tq = tq.eq("frequency", "monthly").or(`month_day.eq.${dom},month_day.is.null`);
-      }
-
-      const { data: templates } = await tq;
-      if (templates && templates.length > 0) {
-        // 每個 checkpoint 建一筆 item（雙班店兩班各自打勾）
-        const cleanItems = [];
-        for (const t of templates) {
-          const cps = (Array.isArray(t.checkpoints) && t.checkpoints.length > 0) ? t.checkpoints : [t.shift_type || "opening"];
-          for (const cp of cps) {
-            cleanItems.push({
-              store_id, date, template_id: t.id, item_name: t.item, category: t.category,
-              shift_type: cp, frequency: freq,
-            });
+    if (templates && templates.length > 0) {
+      // 既有 (template_id|shift_type) 集合
+      const have = new Set((items || []).map(i => `${i.template_id}|${i.shift_type}`));
+      // 模板期望的 (template_id|shift_type) 集合
+      const want = new Set();
+      const missing = [];
+      for (const t of templates) {
+        const cps = (Array.isArray(t.checkpoints) && t.checkpoints.length > 0) ? t.checkpoints : [t.shift_type || "opening"];
+        for (const cp of cps) {
+          const k = `${t.id}|${cp}`;
+          want.add(k);
+          if (!have.has(k)) {
+            missing.push({ store_id, date, template_id: t.id, item_name: t.item, category: t.category, shift_type: cp, frequency: freq });
           }
         }
-        const { data: created } = await supabase.from("work_log_items").insert(cleanItems).select(selectCols);
-        items = created || [];
+      }
+      // 補齊缺的 items
+      if (missing.length > 0) {
+        try { await supabase.from("work_log_items").insert(missing); } catch {}
+      }
+      // 刪除已不在模板中且未完成的舊 items（後台取消勾選的班別）
+      const stale = (items || []).filter(i => i.template_id && !i.completed && !want.has(`${i.template_id}|${i.shift_type}`));
+      if (stale.length > 0) {
+        try { await supabase.from("work_log_items").delete().in("id", stale.map(s => s.id)); } catch {}
+      }
+      // 重新查詢
+      if (missing.length > 0 || stale.length > 0) {
+        const { data: refreshed } = await supabase.from("work_log_items").select(selectCols).eq("store_id", store_id).eq("date", date).eq("frequency", freq).order("created_at");
+        items = refreshed || [];
       }
     }
 

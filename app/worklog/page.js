@@ -277,17 +277,36 @@ export default function WorkLogPage() {
               <button onClick={confirmNoWaste} disabled={wasteToday.no_waste} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid " + (wasteToday.no_waste ? "#ccc" : "#0a7c42"), background: wasteToday.no_waste ? "#eee" : "#e6f9f0", color: wasteToday.no_waste ? "#999" : "#0a7c42", fontSize: 12, fontWeight: 600, cursor: wasteToday.no_waste ? "default" : "pointer" }}>{wasteToday.no_waste ? "✅ 已確認" : "本日無報廢"}</button>
             </div>}
             {wasteMode && <div style={{ marginTop: 4 }}>
-              <select value={wasteForm.patrol_location} onChange={e => setWasteForm({ ...wasteForm, patrol_location: e.target.value })} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, marginBottom: 6 }}>
+              <select value={wasteForm.patrol_location} onChange={e => setWasteForm({ ...wasteForm, patrol_location: e.target.value, item_id: "" })} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, marginBottom: 6 }}>
                 <option value="">📍 巡邏位置...</option>
                 <option value="refrig">🧊 冷藏</option>
                 <option value="freezer">❄️ 冷凍</option>
                 <option value="ambient">🌡 常溫</option>
                 <option value="display">🪟 展示櫃</option>
               </select>
-              <select value={wasteForm.item_id} onChange={e => setWasteForm({ ...wasteForm, item_id: e.target.value })} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, marginBottom: 6 }}>
-                <option value="">{wasteItems.length === 0 ? "（此門市無報廢品項，請聯絡管理員）" : "選擇品項..."}</option>
-                {wasteItems.map(i => <option key={i.id} value={i.id}>{i.name + " (" + (i.unit || "") + ")"}</option>)}
-              </select>
+              {(() => {
+                const zoneLabel = { refrig: "🧊 冷藏", freezer: "❄️ 冷凍", ambient: "🌡 常溫", display: "🪟 展示櫃" };
+                const filtered = wasteForm.patrol_location
+                  ? wasteItems.filter(i => i.zone === wasteForm.patrol_location)
+                  : wasteItems;
+                // 未選位置時依 zone 分組顯示；選了位置就只顯示該區
+                const groups = {};
+                for (const i of filtered) { const z = i.zone || "unzoned"; if (!groups[z]) groups[z] = []; groups[z].push(i); }
+                const order = ["refrig", "freezer", "ambient", "display", "unzoned"];
+                return (
+                  <select value={wasteForm.item_id} onChange={e => setWasteForm({ ...wasteForm, item_id: e.target.value })} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, marginBottom: 6 }}>
+                    <option value="">{filtered.length === 0 ? (wasteForm.patrol_location ? "（此區無品項，請至後台分類）" : "（此門市無報廢品項，請聯絡管理員）") : "選擇品項..."}</option>
+                    {wasteForm.patrol_location
+                      ? filtered.map(i => <option key={i.id} value={i.id}>{i.name + " (" + (i.unit || "") + ")"}</option>)
+                      : order.filter(z => groups[z]).map(z => (
+                          <optgroup key={z} label={zoneLabel[z] || "未分區"}>
+                            {groups[z].map(i => <option key={i.id} value={i.id}>{i.name + " (" + (i.unit || "") + ")"}</option>)}
+                          </optgroup>
+                        ))
+                    }
+                  </select>
+                );
+              })()}
               <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
                 <input type="number" inputMode="decimal" value={wasteForm.quantity} onChange={e => setWasteForm({ ...wasteForm, quantity: e.target.value })} placeholder="報廢數量" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 14, textAlign: "center" }} />
                 <select value={wasteForm.waste_reason} onChange={e => setWasteForm({ ...wasteForm, waste_reason: e.target.value })} style={{ flex: 2, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }}>
