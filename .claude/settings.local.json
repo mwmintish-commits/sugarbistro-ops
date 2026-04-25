@@ -34,7 +34,29 @@
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); data=d.get\\('data',[]\\); print\\('total:',len\\(data\\)\\); evening=[i for i in data if i.get\\('shift_type'\\)=='evening_start']; print\\('evening_start:',len\\(evening\\)\\); [print\\(i.get\\('item_name'\\),'|',i.get\\('shift_type'\\)\\) for i in data[:3]]\")",
       "Bash(grep -n \"盤點回報\\\\|view === \\\\\"inventory\\\\\"\\\\|</div>\\\\s*\\);$\\\\s*}$\" /Users/maxwang/Desktop/sugarbistro-ops/.claude/worktrees/pensive-edison-38e288/app/components/WorklogMgr.js)",
       "Bash(git pull *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "mcp__Claude_in_Chrome__tabs_create_mcp",
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__get_page_text",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__read_page",
+      "mcp__Claude_in_Chrome__javascript_tool",
+      "Bash(git fetch *)",
+      "Bash(node -e \"require\\('@babel/parser'\\).parse\\(require\\('fs'\\).readFileSync\\('app/worklog/page.js','utf8'\\),{sourceType:'module',plugins:['jsx']}\\);console.log\\('worklog OK'\\)\")",
+      "Bash(node -e \"new Function\\(require\\('fs'\\).readFileSync\\('app/api/admin/waste/route.js','utf8'\\).replace\\(/export /g,''\\).replace\\(/import.*from.*;/g,''\\)\\);console.log\\('waste API syntax OK'\\)\")",
+      "Bash(npx --yes acorn --ecma2022 --module --silent app/api/admin/waste/route.js)",
+      "Bash(npx --yes acorn --ecma2022 --module --silent app/components/WorklogMgr.js)",
+      "Bash(npx --yes next build)",
+      "Bash(psql --version)",
+      "Bash(brew --prefix libpq)",
+      "Read(//opt/homebrew/opt/libpq/bin/**)",
+      "Read(//usr/local/opt/libpq/bin/**)",
+      "Bash(brew install *)",
+      "Bash(npm i *)",
+      "Bash(export DB_URL=$\\(grep ^DATABASE_URL /Users/maxwang/Desktop/sugarbistro-ops/.env.local)",
+      "Bash(awk -F= '/^DATABASE_URL=/{print substr\\($0,length\\($1\\)+2\\)}' /Users/maxwang/Desktop/sugarbistro-ops/.env.local)"
     ]
   }
 }

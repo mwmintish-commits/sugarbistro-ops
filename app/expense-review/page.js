@@ -12,6 +12,9 @@ export default function ExpenseReview() {
   const [aiLoading, setAiLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState("");
+  const [stores, setStores] = useState([]);
+  // hq_advance 才用：'shared' = 總部均攤(store_id=null) / '<store_id>' = 指定單一門市
+  const [hqMode, setHqMode] = useState("shared");
 
   const id = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("id") : null;
 
@@ -21,10 +24,18 @@ export default function ExpenseReview() {
       if (r.error || !r.data) { setErr("找不到費用資料"); setLoading(false); return; }
       setData(r.data);
       setForm({ amount: r.data.amount || "", vendor_name: r.data.vendor_name || "", date: r.data.date || "", description: r.data.description || "", category_suggestion: r.data.category_suggestion || "其他", invoice_number: r.data.invoice_number || "" });
+      // 初始化 hqMode：若已指定門市則用門市 id，否則 shared
+      if (r.data.expense_type === "hq_advance") {
+        setHqMode(r.data.store_id ? r.data.store_id : "shared");
+      }
       setLoading(false);
       // 如果金額是 0（新上傳），自動觸發 AI
       if (!r.data.amount || r.data.amount == 0) runAI(r.data);
     }).catch(() => { setErr("載入失敗"); setLoading(false); });
+    // 抓門市清單（只 hq_advance 用得到，但無妨先抓）
+    fetch("/api/admin/stores").then(r => r.json()).then(r => {
+      setStores((r.data || []).filter(s => s.is_active !== false));
+    }).catch(() => {});
   }, []);
 
   const runAI = async (expData) => {
@@ -59,6 +70,11 @@ export default function ExpenseReview() {
       if (dupCheck.duplicate) { alert("⚠️ 發票 " + form.invoice_number + " 已存在！（" + dupCheck.duplicate.date + " " + (dupCheck.duplicate.vendor_name || "") + "）\n\n如確定不是重複，請移除發票號碼後再送出。"); return; }
     }
     const updates = { status: status || "pending", amount: Number(form.amount || 0), vendor_name: form.vendor_name, date: form.date, description: form.description, category_suggestion: form.category_suggestion, invoice_number: form.invoice_number, month_key: (form.date || "").slice(0, 7) };
+    // 總部代付：根據 hqMode 決定 store_id
+    if (data?.expense_type === "hq_advance") {
+      if (hqMode === "shared") { updates.store_id = null; updates.is_shared = true; }
+      else { updates.store_id = hqMode; updates.is_shared = false; }
+    }
     if (reason) { updates.edit_reason = reason; updates.edited_at = new Date().toISOString(); }
     const r = await fetch("/api/admin/expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update", expense_id: id, ...updates }) }).then(r => r.json());
     if (r.error) alert("❌ " + r.error);
@@ -116,6 +132,36 @@ export default function ExpenseReview() {
           </select>
         </div>
         <Field label="🧾 發票" value={form.invoice_number} onChange={v => setForm({ ...form, invoice_number: v })} placeholder="AB-12345678" />
+
+        {/* 總部代付：歸屬選擇 */}
+        {data?.expense_type === "hq_advance" && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed #ddd" }}>
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 6, fontWeight: 600 }}>🏢 費用歸屬</div>
+            <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+              <button type="button" onClick={() => setHqMode("shared")}
+                style={{ flex: 1, padding: "8px 6px", borderRadius: 6, border: hqMode === "shared" ? "2px solid #4338ca" : "1px solid #ddd",
+                  background: hqMode === "shared" ? "#e0e7ff" : "#fff", color: hqMode === "shared" ? "#4338ca" : "#666",
+                  fontSize: 12, fontWeight: hqMode === "shared" ? 600 : 400, cursor: "pointer" }}>
+                🏢 總部均攤
+              </button>
+              <button type="button" onClick={() => setHqMode(stores[0]?.id || "")}
+                style={{ flex: 1, padding: "8px 6px", borderRadius: 6, border: hqMode !== "shared" ? "2px solid #4338ca" : "1px solid #ddd",
+                  background: hqMode !== "shared" ? "#e0e7ff" : "#fff", color: hqMode !== "shared" ? "#4338ca" : "#666",
+                  fontSize: 12, fontWeight: hqMode !== "shared" ? 600 : 400, cursor: "pointer" }}>
+                🏪 指定門市
+              </button>
+            </div>
+            {hqMode !== "shared" && (
+              <select value={hqMode} onChange={e => setHqMode(e.target.value)}
+                style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13 }}>
+                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            )}
+            <div style={{ fontSize: 10, color: "#888", marginTop: 4 }}>
+              {hqMode === "shared" ? "此費用將平均分攤到所有門市的損益" : "此費用將整筆計入指定門市的損益"}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 修改原因 */}

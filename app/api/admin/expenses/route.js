@@ -148,8 +148,13 @@ export async function POST(request) {
   }
 
   if (body.action === "update") {
-    const { expense_id, amount, vendor_name, category_suggestion, description, date, invoice_number, status, edit_reason, edit_changes, edited_at } = body;
+    const { expense_id, amount, vendor_name, category_suggestion, description, date, invoice_number, status, edit_reason, edit_changes, edited_at, store_id, is_shared } = body;
     const updates = {};
+    if (store_id !== undefined) {
+      // "__hq__" 或空 → null (總部均攤)
+      updates.store_id = (store_id === "__hq__" || store_id === "" || store_id === null) ? null : store_id;
+    }
+    if (is_shared !== undefined) updates.is_shared = is_shared;
     if (amount !== undefined) updates.amount = amount;
     if (vendor_name !== undefined) updates.vendor_name = vendor_name;
     if (category_suggestion !== undefined) updates.category_suggestion = category_suggestion;
