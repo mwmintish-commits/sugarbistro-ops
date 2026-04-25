@@ -27,6 +27,7 @@ export default function WorkLogPage() {
   const [wasteAnalyzing, setWasteAnalyzing] = useState(false);
   const [wasteAiHint, setWasteAiHint] = useState("");
   const [wasteToday, setWasteToday] = useState({ no_waste: false, wastes: [] });
+  const [wasteItems, setWasteItems] = useState([]);
   const [gps, setGps] = useState(null);
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
   const thisMonth = today.slice(0, 7);
@@ -87,6 +88,11 @@ export default function WorkLogPage() {
     fetch("/api/admin/waste?type=today&store_id=" + storeId).then(r => r.json()).then(r => setWasteToday(r.data || { no_waste: false, wastes: [] }));
   }, [storeId]);
   useEffect(() => { loadWasteToday(); }, [loadWasteToday]);
+  // 載入該店的庫存品項（報廢登記用）
+  useEffect(() => {
+    if (!storeId) return;
+    fetch("/api/admin/inventory?store_id=" + storeId).then(r => r.json()).then(r => setWasteItems(r.data || [])).catch(() => {});
+  }, [storeId]);
   // 取得 GPS（一次）
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -279,8 +285,8 @@ export default function WorkLogPage() {
                 <option value="display">🪟 展示櫃</option>
               </select>
               <select value={wasteForm.item_id} onChange={e => setWasteForm({ ...wasteForm, item_id: e.target.value })} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, marginBottom: 6 }}>
-                <option value="">選擇品項...</option>
-                {stockItems.map(i => <option key={i.id} value={i.id}>{i.name + " (" + i.unit + ")"}</option>)}
+                <option value="">{wasteItems.length === 0 ? "（此門市無報廢品項，請聯絡管理員）" : "選擇品項..."}</option>
+                {wasteItems.map(i => <option key={i.id} value={i.id}>{i.name + " (" + (i.unit || "") + ")"}</option>)}
               </select>
               <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
                 <input type="number" inputMode="decimal" value={wasteForm.quantity} onChange={e => setWasteForm({ ...wasteForm, quantity: e.target.value })} placeholder="報廢數量" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 14, textAlign: "center" }} />
