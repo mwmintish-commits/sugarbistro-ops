@@ -1934,7 +1934,7 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📊 庫存管理</h3>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
-              <button onClick={async()=>{const n=prompt("品項名稱：");if(!n)return;const t=prompt("類型(raw_material/finished/packaging)：","raw_material");const u=prompt("單位：","個");const c=prompt("單位成本：","0");const ss=prompt("安全庫存：","0");const z=prompt("巡邏區域(refrig=冷藏 / freezer=冷凍 / ambient=常溫 / display=展示櫃，留空=不分區)：","");const cat=prompt("分類（可留空，例：原物料/包材/麵包/甜點）：","");await ap("/api/admin/inventory",{action:"create",name:n,type:t,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss),zone:z||null,category:cat||null,store_id:sf||null});load();}}
+              <button onClick={async()=>{const n=prompt("品項名稱：");if(!n)return;const t=prompt("類型(raw_material/finished/packaging)：","raw_material");const u=prompt("單位：","個");const c=prompt("單位成本：","0");const ss=prompt("安全庫存：","0");const par=prompt("標準存量(par_level)：","0");const z=prompt("區域(refrig=冷藏 / freezer=冷凍 / ambient=常溫 / display=展示櫃，留空=不分區)：","");const cat=prompt("分類（可留空，例：原物料/包材/麵包/甜點）：","");const ki=confirm("是否為「重點品項」（高風險/高成本）？\n按確定=是、取消=否");await ap("/api/admin/inventory",{action:"create",name:n,type:t,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss),par_level:Number(par)||null,zone:z||null,category:cat||null,is_key_item:ki});load();}}
                 style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增品項</button>
               <button onClick={async()=>{const from=prompt("來源門市ID：");const to=prompt("目標門市ID：");const item=prompt("品項ID：");const qty=prompt("數量：");if(!from||!to||!item||!qty)return;await ap("/api/admin/inventory",{action:"movement",item_id:item,store_id:from,type:"transfer_out",quantity:-Number(qty),notes:"調撥至其他門市"});await ap("/api/admin/inventory",{action:"movement",item_id:item,store_id:to,type:"transfer_in",quantity:Number(qty),notes:"從其他門市調入"});alert("調撥完成");load();}}
                 style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"transparent",color:"#4361ee",fontSize:11,cursor:"pointer"}}>🔄 門市調撥</button>
@@ -1986,13 +1986,14 @@ export default function AdminPage() {
             )}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["品項","類型","區域","分類","庫存","安全量","單價","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["品項","類型","區域","分類","各店庫存","總量","安全量","單價","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{invItems.map(i=>(
                   <tr key={i.id} style={{borderBottom:"1px solid #f0eeea",background:i.safe_stock>0&&i.current_stock<=i.safe_stock?"#fef9c3":"transparent"}}>
                     <td style={{padding:6,fontWeight:500}}>{i.name}{i.is_key_item&&<span style={{fontSize:9,color:"#b45309",marginLeft:3,background:"#fff8e6",padding:"1px 4px",borderRadius:3}}>★重點</span>}{i.safe_stock>0&&i.current_stock<=i.safe_stock&&<span style={{color:"#b91c1c",fontSize:9}}> ⚠️低</span>}</td>
                     <td style={{padding:6,fontSize:10}}>{i.type==="raw_material"?"原料":i.type==="finished"?"成品":"包材"}</td>
                     <td style={{padding:6,fontSize:10}}>{i.zone==="refrig"?"🧊冷藏":i.zone==="freezer"?"❄️冷凍":i.zone==="ambient"?"🌡常溫":i.zone==="display"?"🪟展示櫃":"-"}</td>
                     <td style={{padding:6,fontSize:10}}>{i.category||"-"}</td>
+                    <td style={{padding:6,fontSize:9,color:"#555"}}>{stores.filter(s=>s.is_active!==false).map(s=>{const q=(i.stocks_by_store||{})[s.id]||0;return s.name.slice(0,2)+":"+q;}).join(" | ")||"-"}</td>
                     <td style={{padding:6,fontWeight:600}}>{i.current_stock+" "+(i.unit||"")}</td>
                     <td style={{padding:6}}>{i.safe_stock||"-"}</td>
                     <td style={{padding:6}}>{fmt(i.cost_per_unit)}</td>
@@ -2004,8 +2005,9 @@ export default function AdminPage() {
                         const u=prompt("單位：",i.unit||"");
                         const c=prompt("單位成本：",String(i.cost_per_unit||0));
                         const ss=prompt("安全庫存：",String(i.safe_stock||0));
+                        const par=prompt("標準存量(par_level)：",String(i.par_level||0));
                         const ki=confirm("此品項是否為「重點品項」（高風險/高成本，銷售對帳優先）？\n按確定=是、取消=否");
-                        await ap("/api/admin/inventory",{action:"update",item_id:i.id,name:n,zone:z||null,category:cat||null,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss),is_key_item:ki});load();
+                        await ap("/api/admin/inventory",{action:"update",item_id:i.id,name:n,zone:z||null,category:cat||null,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss),par_level:Number(par)||null,is_key_item:ki});load();
                       }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #4361ee",background:"transparent",fontSize:9,cursor:"pointer",color:"#4361ee"}}>編輯</button>
                       <button onClick={async()=>{
                         const q=prompt("叫貨數量（向總部叫貨）：","");if(!q)return;
@@ -2064,7 +2066,19 @@ export default function AdminPage() {
           const STATUS_COLOR = { draft: "#888", shipped: "#b45309", received: "#0a7c42", partial: "#b91c1c", cancelled: "#888" };
           return (
             <div>
-              <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>🚚 出貨單管理</h3>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <h3 style={{fontSize:14,fontWeight:600,margin:0}}>🚚 出貨單管理</h3>
+                <button onClick={() => {
+                  const opts = stores.filter(s=>s.is_active!==false).map((s,i)=>`${i+1}. ${s.name}`).join("\n");
+                  const pick = prompt("為哪間門市新增出貨單？\n"+opts+"\n\n請輸入編號：","1");
+                  if (!pick) return;
+                  const idx = parseInt(pick)-1;
+                  const st = stores.filter(s=>s.is_active!==false)[idx];
+                  if (!st) { alert("無效編號"); return; }
+                  setShipBuildStore(st.id);
+                  setShipBuildLines([{ item_id:"", item_name:"", unit:"", requested_qty:0, shipped_qty:"", order_id:null }]);
+                }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"#b45309",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>＋新增出貨單</button>
+              </div>
 
               {/* 待出貨：依門市彙總 pending 叫貨 */}
               <div style={{background:"#fff8e6",borderRadius:8,border:"1px solid #f0e6c8",padding:10,marginBottom:10}}>
