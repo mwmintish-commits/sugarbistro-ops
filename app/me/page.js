@@ -37,7 +37,7 @@ const ITEMS = (eid, emp) => {
     { icon: "💰", label: "我的薪資", desc: "薪資明細",    href: webUrl("/my-salary", eid),      bg: "#fef3c7", color: "#a16207" },
     { icon: "📝", label: "我的考核", desc: "績效分數",    href: webUrl("/my-review", eid),      bg: "#e8f5e9", color: "#1b5e20" },
     { icon: "📋", label: "工作日誌", desc: "每日任務回報", href: worklogUrl(emp, eid),          bg: "#e0f2fe", color: "#075985" },
-    { icon: "📖", label: "員工守則", desc: "規範查閱",    href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
+    { icon: "📖", label: "員工手冊", desc: "守則 + 獎金福利",    href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
   ];
   if (isManager) {
     base.push(
