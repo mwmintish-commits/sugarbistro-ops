@@ -18,10 +18,10 @@ export async function GET(request) {
     return Response.json({ error: "Session expired" }, { status: 401 });
   }
 
-  // ✦33 更新最後活動時間
-  await supabase.from("admin_sessions").update({
+  // ✦33 更新最後活動時間（fire-and-forget，不阻塞回應）
+  supabase.from("admin_sessions").update({
     last_active_at: new Date().toISOString()
-  }).eq("token", token);
+  }).eq("token", token).then(() => {}, () => {});
 
   return Response.json({
     authenticated: true,
@@ -90,20 +90,24 @@ export async function POST(request) {
       return Response.json({ error: !vc ? "驗證碼錯誤" : "驗證碼已過期" }, { status: 400 });
     }
 
-    await supabase.from("verify_codes").update({ used: true }).eq("phone", phone).eq("code", code);
-
-    const { data: emp } = await supabase.from("employees")
-      .select("id, name, role, store_id, stores!store_id(name)")
-      .eq("phone", phone).eq("is_active", true).single();
+    // 並行：標記驗證碼用過 + 查員工資料
+    const [, empRes] = await Promise.all([
+      supabase.from("verify_codes").update({ used: true }).eq("phone", phone).eq("code", code),
+      supabase.from("employees")
+        .select("id, name, role, store_id, stores!store_id(name)")
+        .eq("phone", phone).eq("is_active", true).single(),
+    ]);
+    const emp = empRes.data;
     if (!emp) return Response.json({ error: "帳號錯誤" }, { status: 404 });
 
-    // ✦33 清除舊 Session（同帳號僅1個）+ 重置失敗計數
-    await supabase.from("admin_sessions").delete().eq("employee_id", emp.id);
-    await supabase.from("employees").update({
-      login_fail_count: 0, locked_until: null, last_login_at: new Date().toISOString()
-    }).eq("id", emp.id);
-
+    // 並行：清除舊 Session、重置失敗計數、建新 Session
     const token = crypto.randomBytes(32).toString("hex");
+    await Promise.all([
+      supabase.from("admin_sessions").delete().eq("employee_id", emp.id),
+      supabase.from("employees").update({
+        login_fail_count: 0, locked_until: null, last_login_at: new Date().toISOString()
+      }).eq("id", emp.id),
+    ]);
     await supabase.from("admin_sessions").insert({
       token, employee_id: emp.id, role: emp.role,
       store_id: emp.store_id,
@@ -111,7 +115,8 @@ export async function POST(request) {
       last_active_at: new Date().toISOString(),
     });
 
-    await auditLog(emp.id, emp.name, "login", "session", null, { phone });
+    // auditLog fire-and-forget
+    auditLog(emp.id, emp.name, "login", "session", null, { phone }).catch(() => {});
 
     return Response.json({
       success: true, token, employee_id: emp.id,

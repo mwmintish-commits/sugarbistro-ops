@@ -156,12 +156,13 @@ export default function AdminPage() {
     if (sf) p.set("store_id", sf);
     const viewDays = sv === "biweek" ? 13 : 6;
     const we2 = new Date(new Date(ws).getTime() + viewDays*86400000).toLocaleDateString("sv-SE");
-    // 週/雙週檢視時，把 schedules 查詢範圍擴展為「涵蓋可視區間的整個月份」
-    // 這樣員工列旁的天數/時數可以顯示整月累計，而非只是當週
+    // 只有在「排班 tab + 週/雙週檢視」時才把 schedules 查詢擴展為整月（顯示員工累計）
+    // 其他 tab（dashboard/payroll/...）維持狹窄範圍，避免拖慢登入後首頁
     const monthStart = (ymd) => ymd.slice(0,7) + "-01";
     const monthEnd = (ymd) => { const [y,m] = ymd.split("-").map(Number); const last = new Date(y, m, 0).getDate(); return `${ymd.slice(0,7)}-${String(last).padStart(2,"0")}`; };
+    const expandForCounts = tab === "schedules" && (sv === "week" || sv === "biweek");
     const sp = (sv === "week" || sv === "biweek")
-      ? "week_start=" + monthStart(ws) + "&week_end=" + monthEnd(we2) + (sf ? "&store_id=" + sf : "")
+      ? "week_start=" + (expandForCounts ? monthStart(ws) : ws) + "&week_end=" + (expandForCounts ? monthEnd(we2) : we2) + (sf ? "&store_id=" + sf : "")
       : "month=" + month + (sf ? "&store_id=" + sf : "");
 
     // 以目前 tab 決定要抓哪些資料（未開啟的 tab 不抓）
