@@ -281,6 +281,127 @@ async function confirmLeave(rt, uid, state) {
   return replyWithQuickReply(rt, `✅ 請假申請已送出！\n\n🏖 ${d.leave_label}\n📅 ${d.start_date}${d.end_date !== d.start_date ? ` ~ ${d.end_date}` : ""}${d.half_day ? `（${d.half_day === "am" ? "上午" : "下午"}）` : ""}\n\n⏳ 等待主管核准`, getMenu("staff"));
 }
 
+// ===== 加班事前申請流程 =====
+async function startOTRequest(rt, emp) {
+  await setUserState(emp.line_uid, "ot_select_date", { employee_id: emp.id, employee_name: emp.name, store_id: emp.store_id });
+  return replyWithQuickReply(rt, `⏱ 加班申請\n👤 ${emp.name}\n\n📌 事前申請可避免事後追補\n📌 主管核准後，下班打卡自動成立\n\n選擇加班日期：`, [
+    { type: "action", action: { type: "message", label: "📅 今日", text: "加班日:今日" } },
+    { type: "action", action: { type: "message", label: "📅 明日", text: "加班日:明日" } },
+    { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+  ]);
+}
+
+async function handleOTDate(rt, uid, dateCode, state) {
+  const today = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
+  const target = new Date(today);
+  if (dateCode === "明日") target.setDate(target.getDate() + 1);
+  const dateStr = target.toLocaleDateString("sv-SE");
+
+  // 檢查當日是否有排班
+  const { data: sch } = await supabase.from("schedules")
+    .select("*, shifts(name, start_time, end_time)")
+    .eq("employee_id", state.flow_data.employee_id)
+    .eq("date", dateStr).eq("type", "shift").maybeSingle();
+  if (!sch || !sch.shifts) {
+    await clearUserState(uid);
+    return replyText(rt, `❌ ${dateStr} 無排班，無法申請加班。\n請先確認排班表，或聯繫主管。`);
+  }
+
+  await setUserState(uid, "ot_select_minutes", { ...state.flow_data, date: dateStr, shift_end: sch.shifts.end_time });
+  return replyWithQuickReply(rt, `📅 ${dateStr}（排班 ${sch.shifts.start_time?.slice(0,5)}~${sch.shifts.end_time?.slice(0,5)}）\n\n預估加班時數：`, [
+    { type: "action", action: { type: "message", label: "30 分", text: "加班時數:30" } },
+    { type: "action", action: { type: "message", label: "60 分", text: "加班時數:60" } },
+    { type: "action", action: { type: "message", label: "90 分", text: "加班時數:90" } },
+    { type: "action", action: { type: "message", label: "120 分", text: "加班時數:120" } },
+    { type: "action", action: { type: "message", label: "180 分", text: "加班時數:180" } },
+    { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+  ]);
+}
+
+async function handleOTMinutes(rt, uid, mins, state) {
+  await setUserState(uid, "ot_select_pref", { ...state.flow_data, requested_minutes: Number(mins) });
+  return replyWithQuickReply(rt, `⏱ 預估加班 ${mins} 分鐘\n\n選擇結算方式：`, [
+    { type: "action", action: { type: "message", label: "💵 加班費", text: "加班方式:pay" } },
+    { type: "action", action: { type: "message", label: "🔄 補休", text: "加班方式:comp" } },
+    { type: "action", action: { type: "message", label: "🤝 由主管決定", text: "加班方式:auto" } },
+    { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
+  ]);
+}
+
+async function handleOTPref(rt, uid, pref, state) {
+  await setUserState(uid, "ot_input_reason", { ...state.flow_data, comp_pref: pref });
+  return replyText(rt, `請輸入加班原因（簡述，例：客流暴增、月底盤點、新品上市備料）：`);
+}
+
+async function confirmOTRequest(rt, uid, reason, state) {
+  const d = state.flow_data;
+  const prefLabel = { pay: "💵 加班費", comp: "🔄 補休", auto: "🤝 由主管決定" }[d.comp_pref] || "?";
+
+  // 寫入 overtime_records (status=requested, is_pre_approved=true)
+  const { data: rec, error } = await supabase.from("overtime_records").insert({
+    employee_id: d.employee_id, store_id: d.store_id, date: d.date,
+    requested_minutes: d.requested_minutes, request_reason: reason,
+    request_comp_pref: d.comp_pref, is_pre_approved: true,
+    status: "requested", overtime_minutes: 0, amount: 0, rate: 0,
+    requested_at: new Date().toISOString(),
+  }).select().single();
+  if (error) {
+    await clearUserState(uid);
+    return replyText(rt, "❌ 申請失敗：" + error.message);
+  }
+
+  await clearUserState(uid);
+
+  // 推店長/區經理
+  try {
+    const { getStoreManagers } = await import("@/lib/notify");
+    const recipients = await getStoreManagers(supabase, d.store_id);
+    const { data: st } = await supabase.from("stores").select("name").eq("id", d.store_id).single();
+    const msg = `📩 加班申請待核准\n👤 ${d.employee_name}（${st?.name || ""}）\n📅 ${d.date}\n⏱ 預估 ${d.requested_minutes} 分鐘\n💼 ${prefLabel}\n📝 ${reason}\n\n核准請輸入：加班核准:${rec.id.slice(0,8)}\n退回請輸入：加班退回:${rec.id.slice(0,8)}`;
+    for (const r of recipients) await pushText(r.line_uid, msg).catch(() => {});
+  } catch {}
+
+  return replyText(rt, `✅ 加班申請已送出\n\n📅 ${d.date}\n⏱ ${d.requested_minutes} 分鐘\n💼 ${prefLabel}\n📝 ${reason}\n\n⏳ 等待主管核准（核准後下班打卡自動成立）`);
+}
+
+async function handleOTReview(rt, emp, otIdShort, decision) {
+  // 只有主管/區經理/admin 可核准
+  if (!["store_manager", "manager", "admin"].includes(emp.role)) {
+    return replyText(rt, "❌ 你沒有核准加班的權限");
+  }
+  // 用前 8 碼 prefix 找
+  const { data: rec } = await supabase.from("overtime_records")
+    .select("*, employees(name, line_uid), stores(name)")
+    .ilike("id", otIdShort + "%").eq("status", "requested").single();
+  if (!rec) return replyText(rt, "❌ 找不到對應的加班申請（或已處理）");
+
+  // store_manager 只能核准自己店的
+  if (emp.role === "store_manager" && rec.store_id !== emp.store_id) {
+    return replyText(rt, "❌ 你只能核准本店的加班申請");
+  }
+
+  let updates = { status: decision === "approve" ? "approved" : "rejected", reviewed_by: emp.id, reviewed_at: new Date().toISOString() };
+
+  if (decision === "approve") {
+    // 套用申請者偏好；auto 預設先設 pay，等實際打卡再決定
+    const pref = rec.request_comp_pref === "comp" ? "comp" : "pay";
+    updates.comp_type = pref === "comp" ? "comp" : "pending";
+  }
+
+  await supabase.from("overtime_records").update(updates).eq("id", rec.id);
+
+  const tag = decision === "approve" ? "✅ 已核准" : "❌ 已退回";
+  // 通知員工
+  if (rec.employees?.line_uid) {
+    await pushText(rec.employees.line_uid,
+      `${tag} 加班申請\n📅 ${rec.date}\n⏱ ${rec.requested_minutes} 分鐘\n📝 ${rec.request_reason || ""}` +
+      (decision === "approve" ? `\n\n下班打卡時將自動成立加班記錄` : `\n\n如有疑問請聯繫主管`)
+    ).catch(() => {});
+  }
+
+  return replyText(rt, `${tag}\n👤 ${rec.employees?.name}（${rec.stores?.name || ""}）\n📅 ${rec.date} ⏱ ${rec.requested_minutes}min`);
+}
+
 // ===== 日結/存款/營收（保持原有功能，精簡版）=====
 async function matchStore(name) {
   if (!name) return null;
@@ -861,6 +982,15 @@ async function handleEvent(event) {
     const net = base + otPay - ls - hs;
     return replyText(rt, "💰 " + emp.name + " " + mk + " 預估薪資\n━━━━━━━━━━━━━━\n📅 出勤 " + wd + " 天\n💵 底薪 " + fmt(base) + (otPay > 0 ? "\n⏱ 加班費 +" + fmt(otPay) : "") + (ls > 0 ? "\n🛡 勞保 -" + fmt(ls) : "") + (hs > 0 ? "\n🏥 健保 -" + fmt(hs) : "") + "\n━━━━━━━━━━━━━━\n💰 預估實發 " + fmt(net) + "\n\n⚠️ 此為預估，實際以月底結算為準");
   }
+
+  // 加班申請流程
+  if (text === "加班申請") return startOTRequest(rt, emp);
+  if (text.startsWith("加班日:") && state?.current_flow === "ot_select_date") return handleOTDate(rt, userId, text.replace("加班日:", ""), state);
+  if (text.startsWith("加班時數:") && state?.current_flow === "ot_select_minutes") return handleOTMinutes(rt, userId, text.replace("加班時數:", ""), state);
+  if (text.startsWith("加班方式:") && state?.current_flow === "ot_select_pref") return handleOTPref(rt, userId, text.replace("加班方式:", ""), state);
+  if (state?.current_flow === "ot_input_reason" && text && text !== "取消") return confirmOTRequest(rt, userId, text, state);
+  if (text.startsWith("加班核准:")) return handleOTReview(rt, emp, text.replace("加班核准:", "").trim(), "approve");
+  if (text.startsWith("加班退回:")) return handleOTReview(rt, emp, text.replace("加班退回:", "").trim(), "reject");
 
   // 請假流程
   if (text === "請假申請" || text === "預休假") return startLeaveRequest(rt, emp);

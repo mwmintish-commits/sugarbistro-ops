@@ -151,14 +151,52 @@ export async function POST(request) {
         else { otType = otMinutes <= 120 ? "weekday_1" : "weekday_2"; rate = otMinutes <= 120 ? 1.34 : 1.67; }
         const hourlyRate = calcHourlyRate(emp);
         const otAmount = Math.round(hourlyRate * (otMinutes / 60) * rate);
+
+        // 對照「事前申請且已核准」的加班記錄
+        let preApproved = null;
         try {
-          await supabase.from("overtime_records").insert({
-            employee_id: t.employee_id, store_id: store?.id, date: today,
-            scheduled_end: schedule.shifts.end_time, actual_end: currentTime,
-            overtime_minutes: otMinutes, overtime_type: otType, rate, amount: otAmount,
-          });
-        } catch (e) { console.error("overtime_records insert failed:", e?.message); }
-        msg += "\n⏱ 加班 " + otMinutes + " 分鐘（待核准）";
+          const { data: pre } = await supabase.from("overtime_records")
+            .select("id, requested_minutes, request_comp_pref, comp_type")
+            .eq("employee_id", t.employee_id).eq("date", today)
+            .eq("is_pre_approved", true).eq("status", "approved")
+            .order("requested_at", { ascending: false }).limit(1).maybeSingle();
+          preApproved = pre;
+        } catch {}
+
+        if (preApproved) {
+          // 已預約 → 更新該筆，自動成立
+          try {
+            const updates = {
+              scheduled_end: schedule.shifts.end_time, actual_end: currentTime,
+              overtime_minutes: otMinutes, overtime_type: otType, rate, amount: otAmount,
+            };
+            // 補休偏好 → 換算 comp_hours + expiry
+            if (preApproved.comp_type === "comp" || preApproved.request_comp_pref === "comp") {
+              updates.comp_type = "comp";
+              updates.comp_hours = Math.round((otMinutes / 60) * 10) / 10;
+              const exp = new Date(today); exp.setMonth(exp.getMonth() + 6);
+              updates.comp_expiry_date = exp.toLocaleDateString("sv-SE");
+              updates.amount = 0;
+            } else {
+              updates.comp_type = "pay";
+            }
+            await supabase.from("overtime_records").update(updates).eq("id", preApproved.id);
+            const overReq = otMinutes - (preApproved.requested_minutes || 0);
+            msg += `\n⏱ 加班 ${otMinutes} 分鐘（已核准成立）`;
+            if (Math.abs(overReq) > 15) msg += `\n📝 與預約差 ${overReq > 0 ? "+" : ""}${overReq} 分鐘`;
+          } catch (e) { console.error("pre-approved update failed:", e?.message); }
+        } else {
+          // 無預約 → 寫入 pending 等事後核准
+          try {
+            await supabase.from("overtime_records").insert({
+              employee_id: t.employee_id, store_id: store?.id, date: today,
+              scheduled_end: schedule.shifts.end_time, actual_end: currentTime,
+              overtime_minutes: otMinutes, overtime_type: otType, rate, amount: otAmount,
+              status: "pending", is_pre_approved: false,
+            });
+          } catch (e) { console.error("overtime_records insert failed:", e?.message); }
+          msg += `\n⏱ 加班 ${otMinutes} 分鐘（待核准）\n💡 下次可先輸入「加班申請」事前申報`;
+        }
       }
     }
   } catch (e) { console.error("OT block error:", e?.message); }
