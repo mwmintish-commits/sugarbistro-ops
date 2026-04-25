@@ -1987,7 +1987,19 @@ export default function AdminPage() {
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                 <thead><tr style={{background:"#faf8f5"}}>{["品項","類型","區域","分類","各店庫存","總量","安全量","單價","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
-                <tbody>{invItems.map(i=>(
+                {(() => {
+                  const ZONES = [
+                    { key:"refrig", label:"🧊 冷藏", bg:"#e0f2fe" },
+                    { key:"freezer", label:"❄️ 冷凍", bg:"#dbeafe" },
+                    { key:"ambient", label:"🌡 常溫", bg:"#fef3c7" },
+                    { key:"display", label:"🪟 展示櫃", bg:"#fce7f3" },
+                    { key:"other", label:"📦 未分區", bg:"#f3f4f6" },
+                  ];
+                  const groups = ZONES.map(z => ({ ...z, items: invItems.filter(i => (i.zone||"other") === z.key) })).filter(g => g.items.length > 0);
+                  return groups.map(g => (
+                    <tbody key={g.key}>
+                      <tr style={{background:g.bg}}><td colSpan={9} style={{padding:"4px 6px",fontSize:11,fontWeight:600,color:"#444"}}>{g.label}（{g.items.length}）</td></tr>
+                      {g.items.map(i=>(
                   <tr key={i.id} style={{borderBottom:"1px solid #f0eeea",background:i.safe_stock>0&&i.current_stock<=i.safe_stock?"#fef9c3":"transparent"}}>
                     <td style={{padding:6,fontWeight:500}}>{i.name}{i.is_key_item&&<span style={{fontSize:9,color:"#b45309",marginLeft:3,background:"#fff8e6",padding:"1px 4px",borderRadius:3}}>★重點</span>}{i.safe_stock>0&&i.current_stock<=i.safe_stock&&<span style={{color:"#b91c1c",fontSize:9}}> ⚠️低</span>}</td>
                     <td style={{padding:6,fontSize:10}}>{i.type==="raw_material"?"原料":i.type==="finished"?"成品":"包材"}</td>
@@ -2025,6 +2037,8 @@ export default function AdminPage() {
                     </td>
                   </tr>
                 ))}</tbody>
+                  ));
+                })()}
               </table>
             </div>
           </div>
@@ -2377,19 +2391,34 @@ export default function AdminPage() {
               {stockItems.length>0&&(
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                   <thead><tr style={{background:"#faf8f5"}}>{["品項","分類","單位","標準量","警示值","操作"].map(h=><th key={h} style={{padding:4,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
-                  <tbody>{stockItems.map(item=>(
-                    <tr key={item.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                      <td style={{padding:4,fontWeight:500}}>{item.name}</td>
-                      <td style={{padding:4,fontSize:10,color:"#888"}}>{item.category}</td>
-                      <td style={{padding:4}}>{item.unit}</td>
-                      <td style={{padding:4}}>{item.par_level}</td>
-                      <td style={{padding:4}}>{item.alert_threshold}</td>
-                      <td style={{padding:4}}>
-                        <button onClick={async()=>{const par=prompt("標準量：",item.par_level);if(par===null)return;await ap("/api/admin/stock",{action:"update_item",item_id:item.id,par_level:Number(par)});const r=await ap("/api/admin/stock?type=items&store_id="+(sf||stores[0]?.id));setStockItems(r.data||[]);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10}}>✏️</button>
-                        <button onClick={async()=>{if(!confirm("停用「"+item.name+"」？"))return;await ap("/api/admin/stock",{action:"delete_item",item_id:item.id});const r=await ap("/api/admin/stock?type=items&store_id="+(sf||stores[0]?.id));setStockItems(r.data||[]);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
-                      </td>
-                    </tr>
-                  ))}</tbody>
+                  {(() => {
+                    const ZONES = [
+                      { key:"refrig", label:"🧊 冷藏", bg:"#e0f2fe" },
+                      { key:"freezer", label:"❄️ 冷凍", bg:"#dbeafe" },
+                      { key:"ambient", label:"🌡 常溫", bg:"#fef3c7" },
+                      { key:"display", label:"🪟 展示櫃", bg:"#fce7f3" },
+                      { key:"other", label:"📦 未分區", bg:"#f3f4f6" },
+                    ];
+                    const groups = ZONES.map(z => ({ ...z, items: stockItems.filter(it => (it.zone||"other") === z.key) })).filter(g => g.items.length > 0);
+                    return groups.map(g => (
+                      <tbody key={g.key}>
+                        <tr style={{background:g.bg}}><td colSpan={6} style={{padding:"4px 6px",fontSize:11,fontWeight:600,color:"#444"}}>{g.label}（{g.items.length}）</td></tr>
+                        {g.items.map(item=>(
+                          <tr key={item.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                            <td style={{padding:4,fontWeight:500}}>{item.name}</td>
+                            <td style={{padding:4,fontSize:10,color:"#888"}}>{item.category}</td>
+                            <td style={{padding:4}}>{item.unit}</td>
+                            <td style={{padding:4}}>{item.par_level}</td>
+                            <td style={{padding:4}}>{item.alert_threshold}</td>
+                            <td style={{padding:4}}>
+                              <button onClick={async()=>{const par=prompt("標準量：",item.par_level);if(par===null)return;await ap("/api/admin/stock",{action:"update_item",item_id:item.id,par_level:Number(par)});const r=await ap("/api/admin/stock?type=items&store_id="+(sf||stores[0]?.id));setStockItems(r.data||[]);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10}}>✏️</button>
+                              <button onClick={async()=>{if(!confirm("停用「"+item.name+"」？"))return;await ap("/api/admin/stock",{action:"delete_item",item_id:item.id});const r=await ap("/api/admin/stock?type=items&store_id="+(sf||stores[0]?.id));setStockItems(r.data||[]);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    ));
+                  })()}
                 </table>
               )}
             </div>
