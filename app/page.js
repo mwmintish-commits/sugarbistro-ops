@@ -25,7 +25,7 @@ const ROLE_TABS = {
 };
 const TAB_L = {
   dashboard:"🏠總覽",employees:"👥員工",schedules:"📅排班",leaves:"🙋請假",
-  attendance:"📍出勤",overtime:"🏖休假表",payroll:"💰薪資",
+  attendance:"📍出勤",overtime:"⏱加班/補休",payroll:"💰薪資",
   reviews:"📝考核",bonus:"🏆獎金",
   settlements:"💰日結",
   deposits:"🏦存款",expenses:"📦費用",payments:"💳撥款",pnl:"📊損益",
