@@ -15,6 +15,34 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
   const [detailDate, setDetailDate] = useState(new Date().toLocaleDateString("sv-SE"));
   const [detailItems, setDetailItems] = useState([]);
   const [detailSummary, setDetailSummary] = useState({});
+  const [wasteQueue, setWasteQueue] = useState([]);
+  const [wasteStatus, setWasteStatus] = useState("pending");
+  const [wasteStats, setWasteStats] = useState(null);
+  const [wasteAuditNote, setWasteAuditNote] = useState({});
+
+  const LOC_LABEL = { refrig: "🧊 冷藏", freezer: "❄️ 冷凍", ambient: "🌡 常溫", display: "🪟 展示櫃" };
+
+  const loadWaste = () => {
+    setLoading(true);
+    Promise.all([
+      ap("/api/admin/waste?type=queue&status=" + wasteStatus + (sf ? "&store_id=" + sf : "")),
+      ap("/api/admin/waste?type=stats&month=" + month + (sf ? "&store_id=" + sf : "")),
+    ]).then(([q, s]) => {
+      setWasteQueue(q.data || []);
+      setWasteStats(s.data || null);
+      setLoading(false);
+    });
+  };
+
+  const auditWaste = async (id, decision) => {
+    const note = wasteAuditNote[id] || "";
+    if (decision === "rejected" && !note) { alert("退回必須填寫原因"); return; }
+    await fetch("/api/admin/waste", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      action: "audit", movement_id: id, decision, audit_note: note, audit_by: auth?.name || auth?.id,
+    }) });
+    setWasteAuditNote({ ...wasteAuditNote, [id]: "" });
+    loadWaste();
+  };
 
   const canEdit = auth?.role === "admin" || auth?.role === "manager" || auth?.role === "store_manager";
   const displayStores = sf ? stores.filter(s => s.id === sf) : stores;
@@ -47,13 +75,14 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
   useEffect(() => {
     if (view === "completion") loadCompletion();
     else if (view === "inventory") loadInventory();
-  }, [view, month, sf, invDate]);
+    else if (view === "waste") loadWaste();
+  }, [view, month, sf, invDate, wasteStatus]);
 
   return (
     <div>
       <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap" }}>
-        {["completion", "detail", "inventory", ...((auth?.role === "admin" || auth?.role === "store_manager") ? ["settings"] : [])].map(v => {
-          const labels = { completion: "📊 各店完成度", detail: "📋 每日明細", inventory: "📦 盤點回報", settings: "⚙️ 日誌設定" };
+        {["completion", "detail", "inventory", "waste", ...((auth?.role === "admin" || auth?.role === "store_manager") ? ["settings"] : [])].map(v => {
+          const labels = { completion: "📊 各店完成度", detail: "📋 每日明細", inventory: "📦 盤點回報", waste: "🗑 報廢稽核", settings: "⚙️ 日誌設定" };
           return (
             <button key={v} onClick={() => {
               setView(v);
@@ -244,6 +273,64 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* 報廢稽核 */}
+      {!loading && view === "waste" && (
+        <div>
+          {/* 統計卡 */}
+          {wasteStats && <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 10 }}>
+            <div style={{ background: "#fff", borderRadius: 8, padding: 10, border: "1px solid #eee" }}>
+              <div style={{ fontSize: 10, color: "#888" }}>本月報廢成本</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#b91c1c" }}>{fmt ? fmt(Math.round(wasteStats.totalCost)) : "$" + Math.round(wasteStats.totalCost).toLocaleString()}</div>
+            </div>
+            <div style={{ background: "#fff", borderRadius: 8, padding: 10, border: "1px solid #eee" }}>
+              <div style={{ fontSize: 10, color: "#888" }}>筆數</div>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>{wasteStats.count}</div>
+            </div>
+            <div style={{ background: "#fff", borderRadius: 8, padding: 10, border: "1px solid #eee" }}>
+              <div style={{ fontSize: 10, color: "#888" }}>主要位置</div>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>{Object.entries(wasteStats.byLoc || {}).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k,v])=>(LOC_LABEL[k]||k)+" "+Math.round(v)).join(" / ") || "—"}</div>
+            </div>
+            <div style={{ background: "#fff", borderRadius: 8, padding: 10, border: "1px solid #eee" }}>
+              <div style={{ fontSize: 10, color: "#888" }}>主要原因</div>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>{Object.entries(wasteStats.byReason || {}).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k,v])=>k+" "+Math.round(v)).join(" / ") || "—"}</div>
+            </div>
+          </div>}
+
+          {/* 狀態切換 */}
+          <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+            {[["pending","🟡 待稽核"],["approved","✅ 已核准"],["rejected","❌ 已退回"],["observe","👁 觀察中"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setWasteStatus(k)} style={{ padding:"4px 10px", borderRadius:5, border:"1px solid #ddd", background: wasteStatus===k?"#1a1a1a":"#fff", color: wasteStatus===k?"#fff":"#666", fontSize:11, cursor:"pointer" }}>{l}</button>
+            ))}
+          </div>
+
+          {/* 佇列 */}
+          {wasteQueue.length === 0 && <div style={{ background:"#fff", borderRadius:8, padding:30, textAlign:"center", color:"#ccc" }}>無紀錄</div>}
+          {wasteQueue.map(w => (
+            <div key={w.id} style={{ background:"#fff", borderRadius:8, padding:10, marginBottom:6, border:"1px solid #eee", display:"flex", gap:10 }}>
+              {w.waste_photo_url && <a href={w.waste_photo_url} target="_blank" rel="noreferrer"><img src={w.waste_photo_url} alt="" style={{ width:80, height:80, objectFit:"cover", borderRadius:6 }} /></a>}
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:600 }}>
+                  {w.type === "no_waste" ? "✅ 本日無報廢" : (LOC_LABEL[w.patrol_location] || w.patrol_location || "?") + " · " + (w.inventory_items?.name || "?") + " " + Math.abs(w.quantity) + (w.inventory_items?.unit || "")}
+                </div>
+                <div style={{ fontSize:11, color:"#666", marginTop:2 }}>
+                  {(w.stores?.name || "") + " · " + (w.submitted_by_name || "—") + " · " + new Date(w.created_at).toLocaleString("zh-TW",{ timeZone:"Asia/Taipei" })}
+                </div>
+                {w.type === "waste" && <div style={{ fontSize:11, color:"#b91c1c", marginTop:2 }}>原因: {w.waste_reason || "—"}{w.note ? " · "+w.note : ""}</div>}
+                {w.audit_note && <div style={{ fontSize:10, color:"#888", marginTop:2 }}>稽核備註: {w.audit_note} ({w.audit_by})</div>}
+                {canEdit && wasteStatus === "pending" && w.type === "waste" && (
+                  <div style={{ marginTop:6, display:"flex", gap:4, flexWrap:"wrap" }}>
+                    <input type="text" placeholder="備註（退回必填）" value={wasteAuditNote[w.id]||""} onChange={e=>setWasteAuditNote({...wasteAuditNote,[w.id]:e.target.value})} style={{ flex:1, minWidth:120, padding:"4px 6px", borderRadius:4, border:"1px solid #ddd", fontSize:11 }} />
+                    <button onClick={()=>auditWaste(w.id,"approved")} style={{ padding:"4px 10px", borderRadius:4, border:"none", background:"#0a7c42", color:"#fff", fontSize:11, cursor:"pointer" }}>核准</button>
+                    <button onClick={()=>auditWaste(w.id,"observe")} style={{ padding:"4px 10px", borderRadius:4, border:"none", background:"#b45309", color:"#fff", fontSize:11, cursor:"pointer" }}>觀察</button>
+                    <button onClick={()=>auditWaste(w.id,"rejected")} style={{ padding:"4px 10px", borderRadius:4, border:"none", background:"#b91c1c", color:"#fff", fontSize:11, cursor:"pointer" }}>退回</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

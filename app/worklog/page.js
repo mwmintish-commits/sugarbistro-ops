@@ -20,6 +20,14 @@ export default function WorkLogPage() {
   const [deliveryMode, setDeliveryMode] = useState(false);
   const [deliveryLines, setDeliveryLines] = useState([]);
   const [shiftMode, setShiftMode] = useState("single");
+  const [wasteMode, setWasteMode] = useState(false);
+  const [wasteForm, setWasteForm] = useState({ item_id: "", quantity: "", patrol_location: "", waste_reason: "", note: "" });
+  const [wastePhoto, setWastePhoto] = useState(null); // dataURL with watermark
+  const [wasteUploading, setWasteUploading] = useState(false);
+  const [wasteAnalyzing, setWasteAnalyzing] = useState(false);
+  const [wasteAiHint, setWasteAiHint] = useState("");
+  const [wasteToday, setWasteToday] = useState({ no_waste: false, wastes: [] });
+  const [gps, setGps] = useState(null);
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
   const thisMonth = today.slice(0, 7);
   const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
@@ -59,7 +67,11 @@ export default function WorkLogPage() {
       const store = (st.data || []).find(s => s.id === sid);
       const mode = store?.shift_mode || "single";
       setShiftMode(mode);
-      setTab(mode === "double" ? "morning_start" : "opening");
+      const wantTab = p.get("tab");
+      const closingDefault = mode === "double" ? "evening_end" : "closing";
+      const openingDefault = mode === "double" ? "morning_start" : "opening";
+      setTab(wantTab === "closing" ? closingDefault : (wantTab || openingDefault));
+      if (p.get("waste") === "1") setWasteMode(true);
       const todayS = (stl.data || []).find(s => s.date === today);
       const monthS = (stl.data || []).reduce((s, r) => s + Number(r.net_sales || 0), 0);
       const dailyT = store ? Number(store.daily_target || 0) : 0;
@@ -70,6 +82,105 @@ export default function WorkLogPage() {
   }, []);
   useEffect(() => { if (tab === "deep") loadDeep(); }, [tab, loadDeep]);
   useEffect(() => { if (!storeId) return; const t = setInterval(loadItems, 30000); return () => clearInterval(t); }, [storeId, loadItems]);
+  const loadWasteToday = useCallback(() => {
+    if (!storeId) return;
+    fetch("/api/admin/waste?type=today&store_id=" + storeId).then(r => r.json()).then(r => setWasteToday(r.data || { no_waste: false, wastes: [] }));
+  }, [storeId]);
+  useEffect(() => { loadWasteToday(); }, [loadWasteToday]);
+  // 取得 GPS（一次）
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(p => setGps({ lat: p.coords.latitude, lng: p.coords.longitude }), () => {}, { timeout: 8000 });
+  }, []);
+  // 拍照後加浮水印（GPS+時間）
+  const handleWastePhoto = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // 縮圖到最大寬 1280
+        const maxW = 1280;
+        const scale = img.width > maxW ? maxW / img.width : 1;
+        const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        // 浮水印底色
+        const ts = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false });
+        const gpsTxt = gps ? gps.lat.toFixed(5) + ", " + gps.lng.toFixed(5) : "GPS 未取得";
+        const lines = ["小食糖 報廢佐證", ts, "GPS: " + gpsTxt, "登記人: " + empName];
+        const fontSize = Math.max(14, Math.round(w / 50));
+        ctx.font = "bold " + fontSize + "px sans-serif";
+        const lineH = fontSize + 4;
+        const boxH = lines.length * lineH + 12;
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(0, h - boxH, w, boxH);
+        ctx.fillStyle = "#fff";
+        lines.forEach((t, i) => ctx.fillText(t, 8, h - boxH + (i + 1) * lineH));
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        setWastePhoto(dataUrl);
+        // 拍照完成後送 AI 辨識（背景執行，不阻塞）
+        analyzeWasteAI(dataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  const analyzeWasteAI = async (dataUrl) => {
+    setWasteAnalyzing(true);
+    setWasteAiHint("🤖 AI 辨識中...");
+    try {
+      const base64 = dataUrl.split(",")[1];
+      const r = await fetch("/api/admin/waste", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "analyze_photo", base64, store_id: storeId }) }).then(r => r.json());
+      if (r.error) { setWasteAiHint("⚠️ AI 辨識失敗，請手動填寫"); return; }
+      // 只在欄位為空時自動填入；保留使用者已填內容
+      setWasteForm(prev => ({
+        ...prev,
+        item_id: prev.item_id || r.item_id || "",
+        quantity: prev.quantity || (r.quantity ? String(r.quantity) : ""),
+        waste_reason: prev.waste_reason || r.reason || "",
+      }));
+      const conf = r.confidence === "high" ? "🎯 高" : r.confidence === "medium" ? "⚖️ 中" : "❓ 低";
+      setWasteAiHint(`AI 建議：${r.item_name || "?"} × ${r.quantity || "?"}${r.unit || ""}（信心${conf}）— 請確認後送出`);
+    } catch (e) {
+      setWasteAiHint("⚠️ AI 辨識失敗，請手動填寫");
+    } finally { setWasteAnalyzing(false); }
+  };
+  const submitWaste = async () => {
+    if (!wasteForm.item_id || !wasteForm.quantity || !wasteForm.patrol_location || !wasteForm.waste_reason) {
+      alert("請完整填寫品項/數量/位置/原因"); return;
+    }
+    if (!wastePhoto) { alert("請拍照佐證（含垃圾袋入鏡）"); return; }
+    setWasteUploading(true);
+    try {
+      // 1) 上傳照片
+      const base64 = wastePhoto.split(",")[1];
+      const fn = "waste_" + storeId + "_" + Date.now();
+      const up = await fetch("/api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base64, folder: "waste", filename: fn }) }).then(r => r.json());
+      if (!up.url) throw new Error("照片上傳失敗");
+      // 2) 提交報廢
+      const r = await fetch("/api/admin/waste", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+        action: "submit_waste", store_id: storeId, employee_id: empId, employee_name: empName,
+        item_id: wasteForm.item_id, quantity: Number(wasteForm.quantity),
+        patrol_location: wasteForm.patrol_location, waste_reason: wasteForm.waste_reason,
+        waste_photo_url: up.url, gps_lat: gps?.lat, gps_lng: gps?.lng, note: wasteForm.note,
+      }) }).then(r => r.json());
+      if (r.error) { alert("提交失敗：" + r.error); return; }
+      alert("✅ 已送出，待主管稽核");
+      setWasteForm({ item_id: "", quantity: "", patrol_location: "", waste_reason: "", note: "" });
+      setWastePhoto(null); setWasteMode(false);
+      loadWasteToday();
+    } finally { setWasteUploading(false); }
+  };
+  const confirmNoWaste = async () => {
+    if (!confirm("確認本日 4 區（冷藏/冷凍/常溫/展示櫃）皆已巡邏，無任何食材需報廢？")) return;
+    const r = await fetch("/api/admin/waste", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "confirm_no_waste", store_id: storeId, employee_id: empId, employee_name: empName }) }).then(r => r.json());
+    if (r.error) { alert("失敗：" + r.error); return; }
+    alert("✅ 已紀錄本日無報廢");
+    loadWasteToday();
+  };
   const toggle = async (item, isDeep) => {
     const next = !item.completed;
     const setter = isDeep ? setDeepItems : setItems;
@@ -148,6 +259,60 @@ export default function WorkLogPage() {
           <div style={{ fontSize: 13, fontWeight: 600, color: "#b45309", marginBottom: 8 }}>📦 進貨登記</div>
           {deliveryLines.map((d, idx) => (<div key={idx} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}><select value={d.item_id} onChange={e => { const item = stockItems.find(i => i.id === e.target.value); const n = [...deliveryLines]; n[idx] = { ...n[idx], item_id: e.target.value, item_name: item?.name || "", unit: item?.unit || "" }; setDeliveryLines(n); }} style={{ flex: 2, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 12 }}><option value="">選品項</option>{stockItems.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select><input type="number" inputMode="decimal" value={d.quantity} onChange={e => { const n = [...deliveryLines]; n[idx].quantity = e.target.value; setDeliveryLines(n); }} placeholder="數量" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 14, textAlign: "center" }} /><button onClick={() => setDeliveryLines(deliveryLines.filter((_, i) => i !== idx))} style={{ border: "none", background: "none", color: "#b91c1c", fontSize: 16, cursor: "pointer" }}>✕</button></div>))}
           <div style={{ display: "flex", gap: 6 }}><button onClick={() => setDeliveryLines([...deliveryLines, { item_id: "", quantity: "" }])} style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px dashed #ccc", background: "transparent", fontSize: 12, cursor: "pointer" }}>＋</button><button onClick={submitDelivery} style={{ flex: 1, padding: 8, borderRadius: 8, border: "none", background: "#b45309", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>確認進貨</button><button onClick={() => setDeliveryMode(false)} style={{ padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 12, cursor: "pointer" }}>取消</button></div>
+        </div>}
+        {closingTabs.includes(tab) && <div style={{ marginBottom: 10 }}>
+          <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #f0d6d6", padding: 10, marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#b91c1c" }}>🗑 食材報廢稽核</span>
+              <span style={{ fontSize: 10, color: "#888" }}>{wasteToday.no_waste ? "✅ 本日已確認無報廢" : (wasteToday.wastes?.length > 0 ? "本日已登記 " + wasteToday.wastes.length + " 筆" : "尚未登記")}</span>
+            </div>
+            {!wasteMode && <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => setWasteMode(true)} style={{ flex: 2, padding: 10, borderRadius: 8, border: "2px dashed #b91c1c", background: "#fff5f5", color: "#b91c1c", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🗑 報廢登記</button>
+              <button onClick={confirmNoWaste} disabled={wasteToday.no_waste} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid " + (wasteToday.no_waste ? "#ccc" : "#0a7c42"), background: wasteToday.no_waste ? "#eee" : "#e6f9f0", color: wasteToday.no_waste ? "#999" : "#0a7c42", fontSize: 12, fontWeight: 600, cursor: wasteToday.no_waste ? "default" : "pointer" }}>{wasteToday.no_waste ? "✅ 已確認" : "本日無報廢"}</button>
+            </div>}
+            {wasteMode && <div style={{ marginTop: 4 }}>
+              <select value={wasteForm.patrol_location} onChange={e => setWasteForm({ ...wasteForm, patrol_location: e.target.value })} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, marginBottom: 6 }}>
+                <option value="">📍 巡邏位置...</option>
+                <option value="refrig">🧊 冷藏</option>
+                <option value="freezer">❄️ 冷凍</option>
+                <option value="ambient">🌡 常溫</option>
+                <option value="display">🪟 展示櫃</option>
+              </select>
+              <select value={wasteForm.item_id} onChange={e => setWasteForm({ ...wasteForm, item_id: e.target.value })} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, marginBottom: 6 }}>
+                <option value="">選擇品項...</option>
+                {stockItems.map(i => <option key={i.id} value={i.id}>{i.name + " (" + i.unit + ")"}</option>)}
+              </select>
+              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                <input type="number" inputMode="decimal" value={wasteForm.quantity} onChange={e => setWasteForm({ ...wasteForm, quantity: e.target.value })} placeholder="報廢數量" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 14, textAlign: "center" }} />
+                <select value={wasteForm.waste_reason} onChange={e => setWasteForm({ ...wasteForm, waste_reason: e.target.value })} style={{ flex: 2, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }}>
+                  <option value="">原因...</option>
+                  <option value="過期">過期</option>
+                  <option value="受潮/變質">受潮/變質</option>
+                  <option value="製作失敗">製作失敗</option>
+                  <option value="客退">客退</option>
+                  <option value="掉落污染">掉落污染</option>
+                  <option value="其他">其他</option>
+                </select>
+              </div>
+              <input type="text" value={wasteForm.note} onChange={e => setWasteForm({ ...wasteForm, note: e.target.value })} placeholder="補充說明（可選）" style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 12, marginBottom: 6 }} />
+              <label style={{ display: "block", padding: 10, borderRadius: 8, border: "2px dashed " + (wastePhoto ? "#0a7c42" : "#b91c1c"), background: wastePhoto ? "#e6f9f0" : "#fff5f5", color: wastePhoto ? "#0a7c42" : "#b91c1c", fontSize: 12, textAlign: "center", cursor: "pointer", marginBottom: 6 }}>
+                {wastePhoto ? "✅ 已拍照（含浮水印）— 點此重拍" : "📷 拍照佐證（含垃圾袋入鏡，自動加 GPS+時間浮水印）"}
+                <input type="file" accept="image/*" capture="environment" onChange={e => handleWastePhoto(e.target.files?.[0])} style={{ display: "none" }} />
+              </label>
+              {wastePhoto && <img src={wastePhoto} alt="預覽" style={{ width: "100%", borderRadius: 8, marginBottom: 6 }} />}
+              {wasteAiHint && <div style={{ padding: "6px 8px", borderRadius: 6, background: "#fff8e6", color: "#92400e", fontSize: 11, marginBottom: 6 }}>{wasteAiHint}</div>}
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={submitWaste} disabled={wasteUploading} style={{ flex: 2, padding: 10, borderRadius: 8, border: "none", background: wasteUploading ? "#ccc" : "#b91c1c", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{wasteUploading ? "送出中..." : "送出報廢"}</button>
+                <button onClick={() => { setWasteMode(false); setWastePhoto(null); setWasteForm({ item_id: "", quantity: "", patrol_location: "", waste_reason: "", note: "" }); }} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ddd", background: "#fff", fontSize: 12, cursor: "pointer" }}>取消</button>
+              </div>
+            </div>}
+            {wasteToday.wastes?.length > 0 && <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0eeea" }}>
+              {wasteToday.wastes.map(w => (<div key={w.id} style={{ fontSize: 11, color: "#666", padding: "3px 0" }}>
+                {"• " + (w.inventory_items?.name || "?") + " " + Math.abs(w.quantity) + (w.inventory_items?.unit || "") + " · " + (w.waste_reason || "") + " · "}
+                <span style={{ color: w.audit_status === "approved" ? "#0a7c42" : w.audit_status === "rejected" ? "#b91c1c" : "#b45309" }}>{w.audit_status === "approved" ? "已核准" : w.audit_status === "rejected" ? "已退回" : w.audit_status === "observe" ? "觀察中" : "待稽核"}</span>
+              </div>))}
+            </div>}
+          </div>
         </div>}
         {Object.entries(grouped).map(([cat, ci]) => (<div key={cat} style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 4, padding: "0 4px" }}>{cat}</div><div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1" }}>{ci.map(item => <CI key={item.id} item={item} toggle={() => toggle(item, false)} submitValue={submitValue} />)}</div></div>))}
         {showStock && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "#b45309", marginBottom: 4, padding: "0 4px" }}>📦 庫存盤點</div><div style={{ background: stockSubmitted[stockPeriod] ? "#e6f9f0" : "#fff", borderRadius: 10, border: "1px solid " + (stockSubmitted[stockPeriod] ? "#0a7c42" : "#e8e6e1") }}>{stockSubmitted[stockPeriod] ? <div style={{ padding: 20, textAlign: "center" }}><div style={{ fontSize: 28 }}>✅</div><div style={{ fontSize: 13, fontWeight: 600, color: "#0a7c42" }}>{(openingTabs.includes(tab) ? "開店" : "閉店") + "盤點已送出"}</div></div> : <>{stockCats.map(cat => <div key={cat}><div style={{ fontSize: 10, fontWeight: 600, color: "#888", padding: "8px 12px 2px", background: "#faf8f5" }}>{cat}</div>{stockItems.filter(i => i.category === cat).map(item => <div key={item.id} style={{ display: "flex", alignItems: "center", padding: "10px 12px", borderBottom: "1px solid #f0eeea", gap: 10 }}><div style={{ flex: 1 }}><div style={{ fontSize: 14 }}>{item.name}</div>{item.par_level > 0 && <div style={{ fontSize: 10, color: "#888" }}>{"標準" + item.par_level + item.unit}</div>}</div><input type="number" inputMode="decimal" value={stockQty[item.id] || ""} onChange={e => setStockQty({ ...stockQty, [item.id]: e.target.value })} placeholder="0" style={{ width: 60, padding: "6px 4px", borderRadius: 8, border: "2px solid " + (stockQty[item.id] ? "#b45309" : "#ddd"), fontSize: 16, textAlign: "center", fontWeight: 700 }} /><span style={{ fontSize: 11, color: "#888" }}>{item.unit}</span></div>)}</div>)}<div style={{ padding: 12 }}><button onClick={() => submitStock(stockPeriod)} style={{ width: "100%", padding: 12, borderRadius: 10, border: "none", background: stockFilled > 0 ? "#b45309" : "#ddd", color: "#fff", fontSize: 14, fontWeight: 600, cursor: stockFilled > 0 ? "pointer" : "default" }}>{"📦送出" + (openingTabs.includes(tab) ? "開店" : "閉店") + "盤點（" + stockFilled + "/" + stockItems.length + "）"}</button></div></>}</div></div>}

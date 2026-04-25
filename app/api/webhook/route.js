@@ -946,6 +946,14 @@ async function handleEvent(event) {
     return lineClient.replyMessage({ replyToken: rt, messages: [{ type: "text", text: `📋 盤點和進貨已整合到工作日誌中\n\n點下方開啟：`, quickReply: { items: [{ type: "action", action: { type: "uri", label: "📋 開啟工作日誌", uri: url } }] } }] });
   }
 
+  // 報廢登記（直接導向工作日誌的閉店分頁並自動開啟報廢表單）
+  if (text === "報廢" || text === "報廢登記") {
+    const store = emp.store_id && emp.stores ? emp.stores : null;
+    if (!store) return replyText(rt, "❌ 請先綁定門市");
+    const url = `${SITE}/worklog?eid=${emp.id}&sid=${emp.store_id}&name=${encodeURIComponent(emp.name)}&tab=closing&waste=1`;
+    return lineClient.replyMessage({ replyToken: rt, messages: [{ type: "text", text: `🗑 食材報廢登記\n🏠 ${store.name}｜👤 ${emp.name}\n\n4 區（冷藏/冷凍/常溫/展示櫃）巡邏，丟棄時拍照佐證`, quickReply: { items: [{ type: "action", action: { type: "uri", label: "🗑 開啟報廢登記", uri: url } }] } }] });
+  }
+
   // 工作日誌
   if (text === "工作日誌" || text === "日誌") {
     const store = emp.store_id && emp.stores ? emp.stores : null;

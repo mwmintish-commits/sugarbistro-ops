@@ -37,6 +37,7 @@ const STAFF_ITEMS = (eid, emp) => {
     { icon: "💰", label: "我的薪資", desc: "薪資明細",    href: webUrl("/my-salary", eid),      bg: "#fef3c7", color: "#a16207" },
     { icon: "📝", label: "我的考核", desc: "績效分數",    href: webUrl("/my-review", eid),      bg: "#e8f5e9", color: "#1b5e20" },
     { icon: "📋", label: "工作日誌", desc: "每日任務回報", href: worklogUrl(emp, eid),          bg: "#e0f2fe", color: "#075985" },
+    { icon: "🗑", label: "報廢登記", desc: "閉店巡邏丟棄",  href: worklogUrl(emp, eid) + "&tab=closing&waste=1", bg: "#fef2f2", color: "#b91c1c" },
     { icon: "📖", label: "員工守則", desc: "規範查閱",    href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
   ];
   // 店長保留採購入口
@@ -58,6 +59,7 @@ const AUDIT_ITEMS = (eid, emp) => [
   { icon: "💰", label: "日結存款",   desc: "回報狀態",    href: "/?tab=settlements",   bg: "#fef9c3", color: "#854d0e" },
   { icon: "🚨", label: "出勤異常",   desc: "遲到/缺勤",   href: "/?tab=attendance",    bg: "#fde8e8", color: "#b91c1c" },
   { icon: "📋", label: "日誌完成度", desc: "各店完成率",  href: "/?tab=worklogs",      bg: "#e6f9f0", color: "#0a7c42" },
+  { icon: "🗑", label: "報廢稽核",   desc: "待核准/觀察",  href: "/?tab=worklogs&worklog_view=waste", bg: "#fef2f2", color: "#b91c1c" },
   { icon: "📢", label: "公告管理",   desc: "發布/編輯",   href: "/?tab=announcements", bg: "#f3e8ff", color: "#6b21a8" },
   { icon: "📋", label: "工作日誌",   desc: "每日任務回報", href: worklogUrl(emp, eid),  bg: "#e0f2fe", color: "#075985" },
   { icon: "📖", label: "員工守則",   desc: "規範查閱",    href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
