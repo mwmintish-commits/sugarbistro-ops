@@ -99,7 +99,7 @@ export async function POST(request) {
       item_id: po.item_id, type: "in", quantity: qty, unit_cost: cost,
       reference_type: "purchase_order", reference_id: order_id,
       to_store_id: po.store_id, operated_by: received_by, operated_by_name: received_by_name,
-      notes: "叫貨收貨：" + (po.supplier_name || ""),
+      notes: "總部叫貨收貨",
     });
     const { data: item } = await supabase.from("inventory_items").select("current_stock").eq("id", po.item_id).single();
     const newStock = Number(item?.current_stock || 0) + qty;

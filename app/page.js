@@ -1944,7 +1944,7 @@ export default function AdminPage() {
                   {pending.length === 0 && recent.length === 0 && <div style={{fontSize:10,color:"#999",padding:6}}>尚無叫貨紀錄</div>}
                   {pending.map(o => (
                     <div key={o.id} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 4px",borderBottom:"1px solid #f0eeea",fontSize:11}}>
-                      <span style={{flex:1}}><b>{o.inventory_items?.name||"?"}</b> × {o.quantity}{o.unit||""} <span style={{color:"#888"}}>({o.stores?.name||"-"} / {o.supplier_name||"無供應商"})</span></span>
+                      <span style={{flex:1}}><b>{o.inventory_items?.name||"?"}</b> × {o.quantity}{o.unit||""} <span style={{color:"#888"}}>({o.stores?.name||"-"})</span></span>
                       <span style={{fontSize:9,color:"#888"}}>{o.requested_by_name||""} · {o.requested_at?.slice(5,10)}</span>
                       <button onClick={async()=>{
                         const q=prompt("實收數量：",String(o.quantity));if(!q)return;
@@ -1999,10 +1999,9 @@ export default function AdminPage() {
                         await ap("/api/admin/inventory",{action:"update",item_id:i.id,name:n,zone:z||null,category:cat||null,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss)});load();
                       }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #4361ee",background:"transparent",fontSize:9,cursor:"pointer",color:"#4361ee"}}>編輯</button>
                       <button onClick={async()=>{
-                        const q=prompt("叫貨數量：","");if(!q)return;
-                        const sup=prompt("供應商（留空沿用）：",i.supplier_name||"");
+                        const q=prompt("叫貨數量（向總部叫貨）：","");if(!q)return;
                         const exp=prompt("預計到貨日 YYYY-MM-DD（可空）：","");
-                        const r=await ap("/api/admin/inventory",{action:"order_create",item_id:i.id,quantity:Number(q),store_id:i.store_id||sf||null,supplier_name:sup||undefined,expected_date:exp||undefined,requested_by_name:auth?.name||"admin"});
+                        const r=await ap("/api/admin/inventory",{action:"order_create",item_id:i.id,quantity:Number(q),store_id:i.store_id||sf||null,expected_date:exp||undefined,requested_by_name:auth?.name||"admin"});
                         if(r.error){alert("叫貨失敗："+r.error);return;}
                         alert("✅ 已建立叫貨單");load();
                       }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b45309",background:"transparent",fontSize:9,cursor:"pointer",color:"#b45309",marginLeft:2}}>📦叫貨</button>
