@@ -201,11 +201,17 @@ export async function POST(request) {
       operated_by: received_by, operated_by_name: received_by_name,
       notes: `出貨單 ${line.shipments?.shipment_number} 收貨` + (variance !== 0 ? `（差異 ${variance > 0 ? "+" : ""}${variance}）` : ""),
     });
-    const { data: it } = await supabase.from("inventory_items").select("current_stock").eq("id", line.item_id).single();
-    await supabase.from("inventory_items").update({
-      current_stock: Math.max(0, Number(it?.current_stock || 0) + recv),
-      cost_per_unit: line.unit_cost || undefined,
-    }).eq("id", line.item_id);
+    // 寫到 per-store inventory_stock
+    const sid = line.shipments?.store_id;
+    if (sid) {
+      const { data: cur } = await supabase.from("inventory_stock").select("current_stock").eq("item_id", line.item_id).eq("store_id", sid).maybeSingle();
+      await supabase.from("inventory_stock").upsert({
+        item_id: line.item_id, store_id: sid,
+        current_stock: Math.max(0, Number(cur?.current_stock || 0) + recv),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "item_id,store_id" });
+    }
+    if (line.unit_cost) await supabase.from("inventory_items").update({ cost_per_unit: line.unit_cost }).eq("id", line.item_id);
 
     // 若有對應 order，也標記已收
     if (line.order_id) {

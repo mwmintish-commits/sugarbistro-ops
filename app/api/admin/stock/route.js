@@ -1,5 +1,27 @@
 import { supabase } from "@/lib/supabase";
 
+// 統一資料源：盤點/進貨/叫貨/報廢都用 inventory_items + inventory_stock(per-store)
+// stock_items 已棄用；本檔僅保留盤點/銷售/差異邏輯，品項一律從 inventory_items 取
+
+async function getItems(store_id) {
+  // 全域品項主檔
+  const { data: items } = await supabase.from("inventory_items").select("*").eq("is_active", true).order("category").order("name");
+  if (!store_id) return (items || []).map(i => ({ ...i, current_stock: i.current_stock, par_level: i.par_level, alert_threshold: i.alert_threshold || 2 }));
+  // 套用該店覆寫
+  const { data: stocks } = await supabase.from("inventory_stock").select("*").eq("store_id", store_id);
+  const map = new Map((stocks || []).map(s => [s.item_id, s]));
+  return (items || []).map(i => {
+    const s = map.get(i.id);
+    return {
+      ...i,
+      current_stock: s ? Number(s.current_stock || 0) : 0,
+      par_level: s?.par_level ?? i.par_level,
+      safe_stock: s?.safe_stock ?? i.safe_stock,
+      alert_threshold: i.alert_threshold || 2,
+    };
+  });
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
@@ -7,11 +29,9 @@ export async function GET(request) {
   const date = searchParams.get("date");
   const month = searchParams.get("month");
 
-  // 盤點品項清單
+  // 盤點品項清單（從 inventory_items + inventory_stock）
   if (type === "items") {
-    let q = supabase.from("stock_items").select("*").eq("is_active", true).order("category").order("sort_order").order("name");
-    if (store_id) q = q.eq("store_id", store_id);
-    const { data } = await q;
+    const data = await getItems(store_id);
     return Response.json({ data });
   }
 
@@ -25,22 +45,22 @@ export async function GET(request) {
     return Response.json({ data });
   }
 
-  // 進貨紀錄
+  // 進貨紀錄（從 shipment_lines 取，含 inventory_movements 為輔）
   if (type === "deliveries") {
-    let q = supabase.from("stock_deliveries").select("*").order("date", { ascending: false });
+    let q = supabase.from("inventory_movements").select("*, inventory_items(name, unit, category)").eq("type", "in").order("created_at", { ascending: false });
     if (store_id) q = q.eq("store_id", store_id);
-    if (date) q = q.eq("date", date);
-    if (month) q = q.gte("date", month + "-01").lte("date", month + "-31");
+    if (date) q = q.gte("created_at", date + "T00:00:00").lte("created_at", date + "T23:59:59");
+    if (month) q = q.gte("created_at", month + "-01").lte("created_at", month + "-31T23:59:59");
     const { data } = await q.limit(200);
     return Response.json({ data });
   }
 
   // 差異報告（某日某店）
   if (type === "variance" && store_id && date) {
-    const { data: items } = await supabase.from("stock_items").select("*").eq("store_id", store_id).eq("is_active", true).order("category").order("sort_order");
+    const items = await getItems(store_id);
     const { data: morning } = await supabase.from("stock_counts").select("*, stock_count_lines(*)").eq("store_id", store_id).eq("date", date).eq("period", "morning").maybeSingle();
     const { data: evening } = await supabase.from("stock_counts").select("*, stock_count_lines(*)").eq("store_id", store_id).eq("date", date).eq("period", "evening").maybeSingle();
-    const { data: deliveries } = await supabase.from("stock_deliveries").select("*").eq("store_id", store_id).eq("date", date);
+    const { data: deliveries } = await supabase.from("inventory_movements").select("*").eq("store_id", store_id).eq("type", "in").gte("created_at", date + "T00:00:00").lte("created_at", date + "T23:59:59");
     const { data: sales } = await supabase.from("stock_sales").select("*").eq("store_id", store_id).eq("date", date);
 
     const report = (items || []).map(item => {
@@ -50,7 +70,6 @@ export async function GET(request) {
       const sold = (sales || []).filter(s => s.item_id === item.id).reduce((s, d) => s + Number(d.quantity || 0), 0);
       const morningQty = mLine ? Number(mLine.quantity) : null;
       const eveningQty = eLine ? Number(eLine.quantity) : null;
-      // 理論 = 早盤 + 進貨 - POS銷售
       const theoretical = morningQty !== null ? morningQty + delivered - sold : null;
       const variance = theoretical !== null && eveningQty !== null ? eveningQty - theoretical : null;
       const alert = variance !== null && Math.abs(variance) > Number(item.alert_threshold || 2);
@@ -76,26 +95,24 @@ export async function GET(request) {
 
   // 備料需求（根據最新盤點 vs par_level）
   if (type === "restock") {
-    const { data: items } = await supabase.from("stock_items").select("*, stores(name)").eq("is_active", true).order("store_id").order("category");
-    const storeIds = [...new Set((items || []).map(i => i.store_id))];
+    const { data: stores } = await supabase.from("stores").select("*").eq("is_active", true);
     const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
     const yesterday = new Date(Date.now() - 86400000).toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
 
     const needs = [];
-    for (const sid of storeIds) {
-      // 找最新一次盤點（今天晚盤 or 昨天晚盤）
-      let { data: latest } = await supabase.from("stock_counts").select("*, stock_count_lines(*)").eq("store_id", sid).in("date", [today, yesterday]).eq("period", "evening").order("date", { ascending: false }).limit(1);
+    for (const st of stores || []) {
+      const items = await getItems(st.id);
+      let { data: latest } = await supabase.from("stock_counts").select("*, stock_count_lines(*)").eq("store_id", st.id).in("date", [today, yesterday]).eq("period", "evening").order("date", { ascending: false }).limit(1);
       if (!latest?.length) {
-        ({ data: latest } = await supabase.from("stock_counts").select("*, stock_count_lines(*)").eq("store_id", sid).order("date", { ascending: false }).limit(1));
+        ({ data: latest } = await supabase.from("stock_counts").select("*, stock_count_lines(*)").eq("store_id", st.id).order("date", { ascending: false }).limit(1));
       }
       const count = latest?.[0];
-      const storeItems = (items || []).filter(i => i.store_id === sid);
-      for (const item of storeItems) {
+      for (const item of items) {
         const line = count?.stock_count_lines?.find(l => l.item_id === item.id);
         const current = line ? Number(line.quantity) : null;
         const par = Number(item.par_level || 0);
-        if (current !== null && current < par) {
-          needs.push({ store_name: item.stores?.name, item_name: item.name, current, par_level: par, need: par - current, unit: item.unit, category: item.category });
+        if (current !== null && par > 0 && current < par) {
+          needs.push({ store_name: st.name, item_name: item.name, current, par_level: par, need: par - current, unit: item.unit, category: item.category });
         }
       }
     }
@@ -108,64 +125,76 @@ export async function GET(request) {
 export async function POST(request) {
   const body = await request.json();
 
-  // 新增盤點品項
+  // 新增品項（全域，寫 inventory_items）
   if (body.action === "add_item") {
-    const { store_id, name, category, unit, par_level, alert_threshold } = body;
-    const { data, error } = await supabase.from("stock_items").insert({
-      store_id, name, category: category || "食材", unit: unit || "個",
+    const { name, category, unit, par_level, alert_threshold, safe_stock } = body;
+    const { data, error } = await supabase.from("inventory_items").insert({
+      name, category: category || "食材", unit: unit || "個",
       par_level: par_level || 0, alert_threshold: alert_threshold || 2,
+      safe_stock: safe_stock || 0, type: "raw_material", is_active: true,
     }).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
+    // 為所有啟用門市建立 inventory_stock
+    const { data: stores } = await supabase.from("stores").select("id").eq("is_active", true);
+    if (stores?.length) {
+      await supabase.from("inventory_stock").insert(stores.map(s => ({ item_id: data.id, store_id: s.id, current_stock: 0 })));
+    }
     return Response.json({ data });
   }
 
-  // 修改品項
+  // 修改品項（更新 inventory_items）
   if (body.action === "update_item") {
     const { item_id, ...updates } = body;
     delete updates.action;
-    const { data, error } = await supabase.from("stock_items").update(updates).eq("id", item_id).select().single();
+    delete updates.current_stock; // 不從這裡改庫存
+    const { data, error } = await supabase.from("inventory_items").update(updates).eq("id", item_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });
   }
 
-  // 刪除品項
-  if (body.action === "delete_item") {
-    await supabase.from("stock_items").update({ is_active: false }).eq("id", body.item_id);
+  // 設定該店覆寫（par_level / safe_stock）
+  if (body.action === "set_store_override") {
+    const { item_id, store_id, par_level, safe_stock, current_stock } = body;
+    const upd = { updated_at: new Date().toISOString() };
+    if (par_level !== undefined) upd.par_level = par_level;
+    if (safe_stock !== undefined) upd.safe_stock = safe_stock;
+    if (current_stock !== undefined) upd.current_stock = current_stock;
+    const { error } = await supabase.from("inventory_stock").upsert({ item_id, store_id, ...upd }, { onConflict: "item_id,store_id" });
+    if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ success: true });
   }
 
-  // 複製品項到另一門市
-  if (body.action === "copy_items") {
-    const { from_store_id, to_store_id } = body;
-    const { data: items } = await supabase.from("stock_items").select("*").eq("store_id", from_store_id).eq("is_active", true);
-    let copied = 0;
-    for (const item of items || []) {
-      await supabase.from("stock_items").insert({ store_id: to_store_id, name: item.name, category: item.category, unit: item.unit, par_level: item.par_level, alert_threshold: item.alert_threshold, sort_order: item.sort_order });
-      copied++;
-    }
-    return Response.json({ success: true, copied });
+  // 停用品項
+  if (body.action === "delete_item") {
+    await supabase.from("inventory_items").update({ is_active: false }).eq("id", body.item_id);
+    return Response.json({ success: true });
   }
 
-  // 提交盤點
+  // 提交盤點（line.item_id 指 inventory_items.id）
   if (body.action === "submit_count") {
     const { store_id, date, period, lines, submitted_by, submitted_by_name, notes } = body;
-    // upsert header
     const { data: count, error } = await supabase.from("stock_counts").upsert({
       store_id, date, period, submitted_by, submitted_by_name, notes, submitted_at: new Date().toISOString(),
     }, { onConflict: "store_id,date,period" }).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
 
-    // 刪除舊明細再插入新的
     await supabase.from("stock_count_lines").delete().eq("count_id", count.id);
     const lineData = (lines || []).map(l => ({
       count_id: count.id, item_id: l.item_id, item_name: l.item_name, quantity: Number(l.quantity || 0), unit: l.unit,
     }));
     if (lineData.length) await supabase.from("stock_count_lines").insert(lineData);
 
-    // 如果是晚盤，檢查差異並通知
-    if (period === "evening") {
+    // 晚盤後同步 inventory_stock.current_stock = 盤點實際數
+    if (period === "evening" && lineData.length) {
+      for (const l of lineData) {
+        await supabase.from("inventory_stock").upsert({
+          item_id: l.item_id, store_id, current_stock: Number(l.quantity || 0), updated_at: new Date().toISOString(),
+        }, { onConflict: "item_id,store_id" });
+      }
+
+      // 差異警示
       const { data: morningCount } = await supabase.from("stock_counts").select("*, stock_count_lines(*)").eq("store_id", store_id).eq("date", date).eq("period", "morning").maybeSingle();
-      const { data: deliveries } = await supabase.from("stock_deliveries").select("*").eq("store_id", store_id).eq("date", date);
+      const { data: deliveries } = await supabase.from("inventory_movements").select("*").eq("store_id", store_id).eq("type", "in").gte("created_at", date + "T00:00:00").lte("created_at", date + "T23:59:59");
       const { data: storeData } = await supabase.from("stores").select("name").eq("id", store_id).single();
 
       const alerts = [];
@@ -175,19 +204,17 @@ export async function POST(request) {
         const delivered = (deliveries || []).filter(d => d.item_id === line.item_id).reduce((s, d) => s + Number(d.quantity || 0), 0);
         const theoretical = Number(mLine.quantity) + delivered;
         const diff = Number(line.quantity) - theoretical;
-        const { data: itemData } = await supabase.from("stock_items").select("alert_threshold").eq("id", line.item_id).maybeSingle();
+        const { data: itemData } = await supabase.from("inventory_items").select("alert_threshold").eq("id", line.item_id).maybeSingle();
         const threshold = Number(itemData?.alert_threshold || 2);
         if (Math.abs(diff) > threshold) {
           alerts.push({ name: line.item_name, morning: mLine.quantity, delivered, theoretical, evening: line.quantity, diff });
         }
       }
 
-      // 分層通知：該店店長 + 區經理（不再推總部 admin）
       const { getStoreManagers } = await import("@/lib/notify");
       const { pushText } = await import("@/lib/line");
       const recipients = await getStoreManagers(supabase, store_id);
 
-      // 每晚一定推送盤點結果摘要
       const summaryMsg = `📦 晚盤完成\n🏠 ${storeData?.name || ""} ${date}\n👤 ${submitted_by_name || "?"}\n━━━━━━━━━━━━━━\n` +
         lineData.slice(0, 20).map(l => `• ${l.item_name}：${l.quantity}${l.unit || ""}`).join("\n") +
         (lineData.length > 20 ? `\n… 共 ${lineData.length} 項` : "") +
@@ -195,25 +222,11 @@ export async function POST(request) {
           ? `\n━━━━━━━━━━━━━━\n🚨 差異警示 ${alerts.length} 項：\n` + alerts.map(a => `❌ ${a.name}：理論${a.theoretical}/實際${a.evening}（差${a.diff > 0 ? "+" : ""}${a.diff}）`).join("\n")
           : "\n✅ 無異常差異");
       for (const r of recipients) {
-        await pushText(r.line_uid, summaryMsg).catch(() => {});
+        try { await pushText(r.line_uid, summaryMsg); } catch (e) {}
       }
     }
 
     return Response.json({ success: true, count_id: count.id });
-  }
-
-  // 登記進貨
-  if (body.action === "add_delivery") {
-    const { store_id, items, received_by, received_by_name } = body;
-    const date = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
-    const inserts = (items || []).map(i => ({
-      store_id, date, item_id: i.item_id, item_name: i.item_name,
-      quantity: Number(i.quantity || 0), unit: i.unit, supplier: i.supplier || "",
-      received_by, received_by_name,
-    }));
-    const { error } = await supabase.from("stock_deliveries").insert(inserts);
-    if (error) return Response.json({ error: error.message }, { status: 500 });
-    return Response.json({ success: true, count: inserts.length });
   }
 
   // 刪除盤點
@@ -223,19 +236,17 @@ export async function POST(request) {
     return Response.json({ success: true });
   }
 
-  // 匯入 POS 銷售（AI 辨識結果）
+  // 匯入 POS 銷售
   if (body.action === "import_sales") {
     const { store_id, date, items, source, submitted_by } = body;
     const dt = date || new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
-    // 先刪除同日同源的舊資料（避免重複匯入）
     await supabase.from("stock_sales").delete().eq("store_id", store_id).eq("date", dt).eq("source", source || "manual");
 
-    // 匹配品名 → stock_items
-    const { data: stockItems } = await supabase.from("stock_items").select("id, name").eq("store_id", store_id).eq("is_active", true);
+    const { data: invItems } = await supabase.from("inventory_items").select("id, name").eq("is_active", true);
     const matched = [];
     const unmatched = [];
     for (const item of items || []) {
-      const match = (stockItems || []).find(si =>
+      const match = (invItems || []).find(si =>
         si.name === item.name ||
         si.name.includes(item.name) ||
         item.name.includes(si.name) ||
@@ -251,7 +262,6 @@ export async function POST(request) {
     return Response.json({ success: true, matched: matched.length, unmatched, total: (items || []).length });
   }
 
-  // AI 辨識 POS 銷售截圖
   if (body.action === "analyze_sales_photo") {
     const { analyzePosSales } = await import("@/lib/anthropic");
     const r = await analyzePosSales(body.base64);
@@ -259,7 +269,6 @@ export async function POST(request) {
     return Response.json({ data: r });
   }
 
-  // 解析 CSV 內容
   if (body.action === "parse_sales_csv") {
     const { parsePosCsv } = await import("@/lib/anthropic");
     const r = await parsePosCsv(body.csv_content);
@@ -267,7 +276,6 @@ export async function POST(request) {
     return Response.json({ data: r });
   }
 
-  // 手動新增單筆銷售
   if (body.action === "add_sale") {
     const { store_id, date, item_id, item_name, quantity, submitted_by } = body;
     const { data, error } = await supabase.from("stock_sales").insert({
@@ -277,7 +285,6 @@ export async function POST(request) {
     return Response.json({ data });
   }
 
-  // 刪除銷售紀錄
   if (body.action === "delete_sales") {
     await supabase.from("stock_sales").delete().eq("store_id", body.store_id).eq("date", body.date);
     return Response.json({ success: true });
