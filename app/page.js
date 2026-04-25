@@ -14,13 +14,13 @@ const ROLE_TABS = {
   admin: ["dashboard","employees","schedules","leaves","attendance","overtime","payroll",
     "reviews","bonus",
     "settlements","deposits","expenses","payments","pnl",
-    "recipes","production","inventory","stock","clients","orders","products",
+    "recipes","production","inventory","shipments","stock","clients","orders","products",
     "shifts","worklogs","announcements","audit","settings"],
   manager: ["employees","schedules","leaves","attendance","overtime","payroll",
     "reviews",
     "settlements","deposits","expenses","payments","pnl",
-    "recipes","production","inventory","stock","clients","orders","products","shifts","worklogs"],
-  store_manager: ["schedules","leaves","store_staff","shifts","worklogs","inventory","stock",
+    "recipes","production","inventory","shipments","stock","clients","orders","products","shifts","worklogs"],
+  store_manager: ["schedules","leaves","store_staff","shifts","worklogs","inventory","shipments","stock",
     "announcements","settlements","deposits","expenses"]
 };
 const TAB_L = {
@@ -29,7 +29,7 @@ const TAB_L = {
   reviews:"📝考核",bonus:"🏆獎金",
   settlements:"💰日結",
   deposits:"🏦存款",expenses:"📦費用",payments:"💳撥款",pnl:"📊損益",
-  recipes:"📋配方",production:"🏭生產",inventory:"📊庫存",stock:"📦盤點",
+  recipes:"📋配方",production:"🏭生產",inventory:"📊庫存",shipments:"🚚出貨",stock:"📦盤點",
   clients:"👥客戶",orders:"📝訂單",products:"🏷️產品",shifts:"⏰崗位",worklogs:"📋日誌",
   announcements:"📢公告",audit:"📋操作日誌",settings:"⚙️設定",store_staff:"👥本店員工"
 };
@@ -37,7 +37,7 @@ const TAB_GROUPS = {
   "總覽":["dashboard"],
   "人資":["employees","store_staff","schedules","leaves","attendance","overtime","payroll","reviews","bonus"],
   "財務":["settlements","deposits","expenses","payments","pnl"],
-  "生產":["recipes","production","inventory","stock"],
+  "生產":["recipes","production","inventory","shipments","stock"],
   "業務":["products","clients","orders"],
   "管理":["shifts","worklogs","announcements","audit","settings"]
 };
@@ -115,6 +115,12 @@ export default function AdminPage() {
   const [holidays, setHolidays] = useState([]);
   const [invItems, setInvItems] = useState([]);
   const [invOrders, setInvOrders] = useState([]);
+  const [shipPending, setShipPending] = useState([]); // 待出貨：依門市彙總的 pending 叫貨單
+  const [shipList, setShipList] = useState([]); // 出貨單列表
+  const [shipDetailId, setShipDetailId] = useState(null);
+  const [shipDetail, setShipDetail] = useState(null);
+  const [shipBuildStore, setShipBuildStore] = useState(""); // 建單目標門市
+  const [shipBuildLines, setShipBuildLines] = useState([]); // 建單編輯中 lines
   const [invSum, setInvSum] = useState({});
   const [recipeList, setRecipeList] = useState([]);
   const [clientList, setClientList] = useState([]);
@@ -245,9 +251,11 @@ export default function AdminPage() {
           .then(r => setMonthlyReport(r.data||[])).catch(() => {});
       }
     }
-    if (need(["inventory","stock"]) && myTabs.includes("inventory")) {
+    if (need(["inventory","stock","shipments"]) && (myTabs.includes("inventory") || myTabs.includes("shipments"))) {
       ap("/api/admin/inventory").then(r => { setInvItems(r.data||[]); setInvSum(r.summary||{}); });
       ap("/api/admin/inventory?type=orders").then(r => setInvOrders(r.data||[]));
+      ap("/api/admin/shipments?type=pending_orders_by_store").then(r => setShipPending(r.data||[]));
+      ap("/api/admin/shipments").then(r => setShipList(r.data||[]));
     }
     if (need(["recipes","production"]) && myTabs.includes("recipes")) {
       ap("/api/admin/recipes").then(r => setRecipeList(r.data||[]));
@@ -1981,7 +1989,7 @@ export default function AdminPage() {
                 <thead><tr style={{background:"#faf8f5"}}>{["品項","類型","區域","分類","庫存","安全量","單價","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{invItems.map(i=>(
                   <tr key={i.id} style={{borderBottom:"1px solid #f0eeea",background:i.safe_stock>0&&i.current_stock<=i.safe_stock?"#fef9c3":"transparent"}}>
-                    <td style={{padding:6,fontWeight:500}}>{i.name}{i.safe_stock>0&&i.current_stock<=i.safe_stock&&<span style={{color:"#b91c1c",fontSize:9}}> ⚠️低</span>}</td>
+                    <td style={{padding:6,fontWeight:500}}>{i.name}{i.is_key_item&&<span style={{fontSize:9,color:"#b45309",marginLeft:3,background:"#fff8e6",padding:"1px 4px",borderRadius:3}}>★重點</span>}{i.safe_stock>0&&i.current_stock<=i.safe_stock&&<span style={{color:"#b91c1c",fontSize:9}}> ⚠️低</span>}</td>
                     <td style={{padding:6,fontSize:10}}>{i.type==="raw_material"?"原料":i.type==="finished"?"成品":"包材"}</td>
                     <td style={{padding:6,fontSize:10}}>{i.zone==="refrig"?"🧊冷藏":i.zone==="freezer"?"❄️冷凍":i.zone==="ambient"?"🌡常溫":i.zone==="display"?"🪟展示櫃":"-"}</td>
                     <td style={{padding:6,fontSize:10}}>{i.category||"-"}</td>
@@ -1996,7 +2004,8 @@ export default function AdminPage() {
                         const u=prompt("單位：",i.unit||"");
                         const c=prompt("單位成本：",String(i.cost_per_unit||0));
                         const ss=prompt("安全庫存：",String(i.safe_stock||0));
-                        await ap("/api/admin/inventory",{action:"update",item_id:i.id,name:n,zone:z||null,category:cat||null,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss)});load();
+                        const ki=confirm("此品項是否為「重點品項」（高風險/高成本，銷售對帳優先）？\n按確定=是、取消=否");
+                        await ap("/api/admin/inventory",{action:"update",item_id:i.id,name:n,zone:z||null,category:cat||null,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss),is_key_item:ki});load();
                       }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #4361ee",background:"transparent",fontSize:9,cursor:"pointer",color:"#4361ee"}}>編輯</button>
                       <button onClick={async()=>{
                         const q=prompt("叫貨數量（向總部叫貨）：","");if(!q)return;
@@ -2018,6 +2027,176 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* SHIPMENTS 出貨單 */}
+        {!ld && tab === "shipments" && (() => {
+          const reloadShip = () => {
+            ap("/api/admin/shipments?type=pending_orders_by_store").then(r => setShipPending(r.data||[]));
+            ap("/api/admin/shipments").then(r => setShipList(r.data||[]));
+            if (shipDetailId) ap("/api/admin/shipments?type=detail&id=" + shipDetailId).then(r => setShipDetail(r.data||null));
+          };
+          // 開始建立出貨單：把該店所有 pending orders 帶入編輯區
+          const startBuild = (storeBucket) => {
+            setShipBuildStore(storeBucket.store_id);
+            setShipBuildLines(storeBucket.orders.map(o => ({
+              item_id: o.item_id, item_name: o.inventory_items?.name || "?",
+              unit: o.inventory_items?.unit || "", requested_qty: Number(o.quantity),
+              shipped_qty: String(o.quantity), order_id: o.id,
+              is_key_item: o.inventory_items?.is_key_item,
+            })));
+          };
+          const addBlankLine = () => {
+            setShipBuildLines([...shipBuildLines, { item_id: "", item_name: "", unit: "", requested_qty: 0, shipped_qty: "", order_id: null }]);
+          };
+          const submitShip = async (autoShip) => {
+            const valid = shipBuildLines.filter(l => l.item_id && Number(l.shipped_qty) > 0);
+            if (!valid.length) { alert("請至少填一項"); return; }
+            const r = await sap("/api/admin/shipments", {
+              action: "create", store_id: shipBuildStore, auto_ship: autoShip,
+              created_by_name: auth?.name || "admin",
+              lines: valid.map(l => ({ item_id: l.item_id, shipped_qty: Number(l.shipped_qty), order_id: l.order_id })),
+            });
+            if (!r) return;
+            alert((autoShip ? "✅ 出貨單已建立並出貨" : "✅ 出貨單已建立（草稿）") + "：" + r.data.shipment_number);
+            setShipBuildStore(""); setShipBuildLines([]); reloadShip();
+          };
+          const STATUS_LABEL = { draft: "📝 草稿", shipped: "🚚 已出貨", received: "✅ 已收貨", partial: "⚠️ 部分差異", cancelled: "✕ 取消" };
+          const STATUS_COLOR = { draft: "#888", shipped: "#b45309", received: "#0a7c42", partial: "#b91c1c", cancelled: "#888" };
+          return (
+            <div>
+              <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>🚚 出貨單管理</h3>
+
+              {/* 待出貨：依門市彙總 pending 叫貨 */}
+              <div style={{background:"#fff8e6",borderRadius:8,border:"1px solid #f0e6c8",padding:10,marginBottom:10}}>
+                <div style={{fontSize:12,fontWeight:600,color:"#b45309",marginBottom:8}}>📋 待出貨：各門市待處理叫貨單</div>
+                {shipPending.length === 0 && <div style={{fontSize:11,color:"#999",padding:6}}>目前沒有待處理叫貨單</div>}
+                {shipPending.map(b => (
+                  <div key={b.store_id} style={{background:"#fff",borderRadius:6,padding:8,marginBottom:6}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                      <span style={{fontSize:12,fontWeight:600}}>🏠 {b.store_name}（{b.orders.length} 項）</span>
+                      <button onClick={() => startBuild(b)} style={{padding:"3px 10px",borderRadius:4,border:"none",background:"#b45309",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>📦 建立出貨單</button>
+                    </div>
+                    <div style={{fontSize:10,color:"#666"}}>
+                      {b.orders.slice(0, 8).map(o => (o.inventory_items?.name || "?") + " ×" + o.quantity + (o.inventory_items?.unit || "")).join("、")}
+                      {b.orders.length > 8 && " … 共 " + b.orders.length + " 項"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 建立中的出貨單編輯區 */}
+              {shipBuildStore && (
+                <div style={{background:"#fff",borderRadius:8,border:"2px solid #b45309",padding:12,marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <span style={{fontSize:13,fontWeight:600,color:"#b45309"}}>📦 編輯出貨內容（{stores.find(s=>s.id===shipBuildStore)?.name||"-"}）</span>
+                    <button onClick={() => { setShipBuildStore(""); setShipBuildLines([]); }} style={{padding:"3px 10px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>取消</button>
+                  </div>
+                  <div style={{fontSize:10,color:"#888",marginBottom:6}}>※ 實際出貨數量可不同於叫貨數量。可加入未叫貨的補貨品項。</div>
+                  <table style={{width:"100%",fontSize:11,borderCollapse:"collapse"}}>
+                    <thead><tr style={{background:"#faf8f5"}}>
+                      <th style={{padding:4,textAlign:"left",fontWeight:500,color:"#666"}}>品項</th>
+                      <th style={{padding:4,textAlign:"center",fontWeight:500,color:"#666"}}>叫貨</th>
+                      <th style={{padding:4,textAlign:"center",fontWeight:500,color:"#666"}}>實出</th>
+                      <th></th>
+                    </tr></thead>
+                    <tbody>{shipBuildLines.map((l, idx) => (
+                      <tr key={idx} style={{borderBottom:"1px solid #f0eeea"}}>
+                        <td style={{padding:4}}>
+                          {l.item_id
+                            ? <span>{l.item_name}{l.is_key_item && <span style={{fontSize:9,color:"#b45309",marginLeft:3,background:"#fff8e6",padding:"1px 3px",borderRadius:3}}>★</span>}</span>
+                            : <select value={l.item_id} onChange={e => { const it=invItems.find(x=>x.id===e.target.value); const n=[...shipBuildLines]; n[idx]={...n[idx],item_id:e.target.value,item_name:it?.name||"",unit:it?.unit||"",is_key_item:it?.is_key_item}; setShipBuildLines(n); }} style={{padding:4,fontSize:11,borderRadius:4,border:"1px solid #ddd",width:"100%"}}>
+                                <option value="">補貨品項...</option>
+                                {invItems.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                              </select>}
+                        </td>
+                        <td style={{padding:4,textAlign:"center",color:"#888"}}>{l.requested_qty || "-"}{l.unit}</td>
+                        <td style={{padding:4,textAlign:"center"}}>
+                          <input type="number" value={l.shipped_qty} onChange={e => { const n=[...shipBuildLines]; n[idx].shipped_qty=e.target.value; setShipBuildLines(n); }} style={{width:50,padding:3,fontSize:12,textAlign:"center",borderRadius:4,border:"1px solid #ddd"}} />{l.unit}
+                        </td>
+                        <td style={{padding:4}}>
+                          <button onClick={() => setShipBuildLines(shipBuildLines.filter((_,i)=>i!==idx))} style={{border:"none",background:"none",color:"#b91c1c",cursor:"pointer"}}>✕</button>
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                  <div style={{display:"flex",gap:6,marginTop:8}}>
+                    <button onClick={addBlankLine} style={{flex:1,padding:6,borderRadius:6,border:"1px dashed #ccc",background:"transparent",fontSize:11,cursor:"pointer"}}>＋ 加品項</button>
+                    <button onClick={() => submitShip(false)} style={{flex:1,padding:6,borderRadius:6,border:"1px solid #888",background:"#fff",fontSize:11,cursor:"pointer"}}>💾 存草稿</button>
+                    <button onClick={() => submitShip(true)} style={{flex:2,padding:6,borderRadius:6,border:"none",background:"#b45309",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>🚚 確認並出貨（推 LINE）</button>
+                  </div>
+                </div>
+              )}
+
+              {/* 出貨單列表 */}
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                <div style={{padding:8,borderBottom:"1px solid #f0eeea",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:12,fontWeight:600}}>📋 所有出貨單（最近 200 筆）</span>
+                  <button onClick={reloadShip} style={{padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>↻ 刷新</button>
+                </div>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                  <thead><tr style={{background:"#faf8f5"}}>{["編號","門市","狀態","品項","建立","出貨","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                  <tbody>{shipList.map(s => (
+                    <tr key={s.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                      <td style={{padding:6,fontWeight:600,fontSize:10}}>{s.shipment_number}</td>
+                      <td style={{padding:6}}>{s.stores?.name || "-"}</td>
+                      <td style={{padding:6,fontSize:10,color:STATUS_COLOR[s.status]}}>{STATUS_LABEL[s.status] || s.status}</td>
+                      <td style={{padding:6,fontSize:10}}>{s.line_summary?.received || 0}/{s.line_summary?.total || 0}</td>
+                      <td style={{padding:6,fontSize:10,color:"#888"}}>{s.created_at?.slice(5, 16)?.replace("T", " ")}</td>
+                      <td style={{padding:6,fontSize:10,color:"#888"}}>{s.shipped_at?.slice(5, 16)?.replace("T", " ") || "-"}</td>
+                      <td style={{padding:6,whiteSpace:"nowrap"}}>
+                        <button onClick={() => { setShipDetailId(s.id); ap("/api/admin/shipments?type=detail&id=" + s.id).then(r => setShipDetail(r.data||null)); }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #4361ee",background:"transparent",fontSize:9,cursor:"pointer",color:"#4361ee"}}>查看</button>
+                        {s.status === "draft" && <button onClick={async()=>{ await sap("/api/admin/shipments",{action:"ship",shipment_id:s.id,shipped_by_name:auth?.name||"admin"}); reloadShip(); }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b45309",background:"transparent",fontSize:9,cursor:"pointer",color:"#b45309",marginLeft:2}}>🚚出貨</button>}
+                        {(s.status === "draft" || s.status === "shipped") && <button onClick={async()=>{ const r=prompt("取消原因：",""); if(r===null)return; await sap("/api/admin/shipments",{action:"cancel",shipment_id:s.id,cancelled_reason:r}); reloadShip(); }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #888",background:"transparent",fontSize:9,cursor:"pointer",color:"#888",marginLeft:2}}>✕取消</button>}
+                        {auth?.role === "admin" && <button onClick={async()=>{ if(!confirm("admin 強制刪除「"+s.shipment_number+"」？")) return; await sap("/api/admin/shipments",{action:"admin_delete",shipment_id:s.id}); reloadShip(); }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b91c1c",background:"transparent",fontSize:9,cursor:"pointer",color:"#b91c1c",marginLeft:2}}>🗑</button>}
+                      </td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+
+              {/* 出貨單詳情 modal */}
+              {shipDetailId && shipDetail && (
+                <div onClick={() => { setShipDetailId(null); setShipDetail(null); }} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}}>
+                  <div onClick={e => e.stopPropagation()} style={{background:"#fff",borderRadius:10,padding:16,maxWidth:600,width:"100%",maxHeight:"90vh",overflow:"auto"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                      <h4 style={{fontSize:14,fontWeight:600,margin:0}}>📋 {shipDetail.shipment_number}</h4>
+                      <button onClick={() => { setShipDetailId(null); setShipDetail(null); }} style={{border:"none",background:"none",fontSize:18,cursor:"pointer"}}>✕</button>
+                    </div>
+                    <div style={{fontSize:11,color:"#666",marginBottom:8}}>
+                      🏠 {shipDetail.stores?.name} · <span style={{color:STATUS_COLOR[shipDetail.status]}}>{STATUS_LABEL[shipDetail.status]}</span>
+                      <br />建立：{shipDetail.created_by_name || "-"} {shipDetail.created_at?.slice(0, 16).replace("T", " ")}
+                      {shipDetail.shipped_at && <><br />出貨：{shipDetail.shipped_by_name || "-"} {shipDetail.shipped_at?.slice(0, 16).replace("T", " ")}</>}
+                    </div>
+                    {shipDetail.notes && <div style={{fontSize:11,padding:6,background:"#faf8f5",borderRadius:4,marginBottom:8}}>📝 {shipDetail.notes}</div>}
+                    <table style={{width:"100%",fontSize:11,borderCollapse:"collapse"}}>
+                      <thead><tr style={{background:"#faf8f5"}}>{["品項","出貨","實收","差異","狀態",auth?.role==="admin"?"修改":""].filter(Boolean).map(h=><th key={h} style={{padding:4,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                      <tbody>{(shipDetail.lines || []).map(l => (
+                        <tr key={l.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                          <td style={{padding:4}}>{l.inventory_items?.name}{l.inventory_items?.is_key_item && <span style={{fontSize:9,color:"#b45309",marginLeft:3}}>★</span>}</td>
+                          <td style={{padding:4}}>{l.shipped_qty}{l.unit||""}</td>
+                          <td style={{padding:4}}>{l.received_qty != null ? l.received_qty + (l.unit||"") : "-"}</td>
+                          <td style={{padding:4,color:l.variance ? "#b91c1c" : "#888"}}>{l.variance ? (l.variance>0?"+":"") + l.variance : "-"}</td>
+                          <td style={{padding:4,fontSize:10}}>{l.status==="received"?"✅":l.status==="variance"?"⚠️":"⏳"}</td>
+                          {auth?.role === "admin" && <td style={{padding:4}}>
+                            <button onClick={async()=>{
+                              const sq=prompt("修改出貨數量：",String(l.shipped_qty));if(sq===null)return;
+                              const rq=prompt("修改實收數量（留空不改）：",l.received_qty!=null?String(l.received_qty):"");
+                              const patch={action:"admin_edit_line",line_id:l.id,shipped_qty:Number(sq)};
+                              if(rq!==null && rq!=="") patch.received_qty=Number(rq);
+                              await sap("/api/admin/shipments",patch);
+                              ap("/api/admin/shipments?type=detail&id="+shipDetail.id).then(r=>setShipDetail(r.data||null));
+                              reloadShip();
+                            }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #4361ee",background:"transparent",fontSize:9,cursor:"pointer",color:"#4361ee"}}>改</button>
+                          </td>}
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* PRODUCTS */}
         {!ld && tab === "products" && (

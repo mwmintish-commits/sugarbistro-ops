@@ -21,6 +21,7 @@ export default function WorkLogPage() {
   const [orderLines, setOrderLines] = useState([]);
   const [receiveMode, setReceiveMode] = useState(false); // 進貨（收貨）清單
   const [pendingOrders, setPendingOrders] = useState([]);
+  const [openShipments, setOpenShipments] = useState([]); // 待收出貨單（已含 lines）
   const [invItems, setInvItems] = useState([]); // 庫存品項（叫貨用）
   const [shiftMode, setShiftMode] = useState("single");
   const [wasteMode, setWasteMode] = useState(false);
@@ -115,14 +116,25 @@ export default function WorkLogPage() {
     alert("✅ 已送出 " + valid.length + " 項叫貨單，待總部配貨");
     setOrderMode(false); setOrderLines([]); loadPendingOrders();
   };
-  // 確認收貨（進貨）
-  const confirmReceive = async (order, qty) => {
-    const r = await fetch("/api/admin/inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-      action: "order_receive", order_id: order.id, received_qty: Number(qty),
+  // 載入待收出貨單（shipments）
+  const loadOpenShipments = useCallback(async () => {
+    if (!storeId) return;
+    const r = await fetch("/api/admin/shipments?store_id=" + storeId + "&status=shipped,partial").then(r => r.json());
+    const ships = r.data || [];
+    // 撈每張的 lines
+    const detail = await Promise.all(ships.map(s => fetch("/api/admin/shipments?type=detail&id=" + s.id).then(r => r.json()).then(r => r.data).catch(() => null)));
+    setOpenShipments(detail.filter(Boolean));
+  }, [storeId]);
+  useEffect(() => { loadOpenShipments(); }, [loadOpenShipments]);
+  // 確認收貨：對 shipment_line 收貨
+  const receiveLine = async (lineId, qty) => {
+    const r = await fetch("/api/admin/shipments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      action: "receive_line", line_id: lineId, received_qty: Number(qty),
       received_by: empId, received_by_name: empName,
     }) }).then(r => r.json());
     if (r.error) { alert("收貨失敗：" + r.error); return; }
-    loadPendingOrders();
+    if (r.variance && r.variance !== 0) alert(`已記錄。差異 ${r.variance > 0 ? "+" : ""}${r.variance}（已通知主管）`);
+    loadOpenShipments();
   };
   // 取得 GPS（一次）
   useEffect(() => {
@@ -293,7 +305,7 @@ export default function WorkLogPage() {
         </div>}
         {tab === "during" && !orderMode && !receiveMode && <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
           <button onClick={() => { setOrderMode(true); setOrderLines([{ item_id: "", quantity: "", notes: "" }]); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "2px dashed #b45309", background: "#fff8e6", color: "#b45309", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📦 向總部叫貨</button>
-          <button onClick={() => setReceiveMode(true)} style={{ flex: 1, padding: 12, borderRadius: 10, border: "2px dashed #0a7c42", background: "#e6f9f0", color: "#0a7c42", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📥 進貨{pendingOrders.length > 0 ? "（" + pendingOrders.length + "）" : ""}</button>
+          <button onClick={() => setReceiveMode(true)} style={{ flex: 1, padding: 12, borderRadius: 10, border: "2px dashed #0a7c42", background: "#e6f9f0", color: "#0a7c42", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📥 進貨{openShipments.reduce((s, sh) => s + (sh.lines || []).filter(l => l.status === "pending").length, 0) > 0 ? "（" + openShipments.reduce((s, sh) => s + (sh.lines || []).filter(l => l.status === "pending").length, 0) + "）" : ""}</button>
         </div>}
         {orderMode && <div style={{ background: "#fff8e6", borderRadius: 10, border: "1px solid #f0e6c8", padding: 12, marginBottom: 10 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#b45309", marginBottom: 8 }}>📦 向總部叫貨</div>
@@ -313,18 +325,33 @@ export default function WorkLogPage() {
         </div>}
         {receiveMode && <div style={{ background: "#e6f9f0", borderRadius: 10, border: "1px solid #c8e6d4", padding: 12, marginBottom: 10 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#0a7c42" }}>📥 進貨（總部送達確認）</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#0a7c42" }}>📥 進貨（總部出貨單核對）</span>
             <button onClick={() => setReceiveMode(false)} style={{ padding: "2px 8px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", fontSize: 11, cursor: "pointer" }}>關閉</button>
           </div>
-          {pendingOrders.length === 0 && <div style={{ fontSize: 12, color: "#666", textAlign: "center", padding: 12 }}>目前沒有待收的叫貨單</div>}
-          {pendingOrders.map(o => (
-            <div key={o.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "8px 4px", borderBottom: "1px solid #d4e6d8" }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{o.inventory_items?.name || "?"}</div>
-                <div style={{ fontSize: 10, color: "#666" }}>叫貨 {o.quantity}{o.unit || ""} · {o.requested_by_name || ""} · {o.requested_at?.slice(5, 10)}</div>
-              </div>
-              <input type="number" inputMode="decimal" id={"recv-" + o.id} defaultValue={o.quantity} style={{ width: 60, padding: 6, borderRadius: 6, border: "1px solid #ddd", fontSize: 14, textAlign: "center", fontWeight: 600 }} />
-              <button onClick={() => { const v = document.getElementById("recv-" + o.id)?.value; if (!v || Number(v) <= 0) { alert("請輸入實收數量"); return; } confirmReceive(o, v); }} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✅收貨</button>
+          {openShipments.length === 0 && <div style={{ fontSize: 12, color: "#666", textAlign: "center", padding: 12 }}>目前沒有待收的出貨單</div>}
+          {openShipments.map(sh => (
+            <div key={sh.id} style={{ background: "#fff", borderRadius: 8, border: "1px solid #d4e6d8", padding: 10, marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "#0a7c42" }}>📋 {sh.shipment_number} <span style={{ fontSize: 10, color: "#888", fontWeight: 400 }}>· 出貨：{sh.shipped_at?.slice(5, 16)?.replace("T", " ") || "-"}</span></div>
+              {sh.notes && <div style={{ fontSize: 10, color: "#666", marginBottom: 6, padding: "4px 6px", background: "#faf8f5", borderRadius: 4 }}>📝 {sh.notes}</div>}
+              {(sh.lines || []).map(l => {
+                const done = l.status !== "pending";
+                return (
+                  <div key={l.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "6px 0", borderBottom: "1px solid #f0eeea" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: done ? "#aaa" : "#333", textDecoration: done ? "line-through" : "none" }}>
+                        {l.inventory_items?.name || "?"}
+                        {l.inventory_items?.is_key_item && <span style={{ fontSize: 9, color: "#b45309", marginLeft: 4, background: "#fff8e6", padding: "1px 4px", borderRadius: 3 }}>★重點</span>}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#666" }}>出 {l.shipped_qty}{l.unit || ""}{done && ` · 已收 ${l.received_qty}${l.unit || ""}${l.variance ? `（差${l.variance > 0 ? "+" : ""}${l.variance}）` : ""}`}</div>
+                    </div>
+                    {!done && <>
+                      <input type="number" inputMode="decimal" id={"recv-" + l.id} defaultValue={l.shipped_qty} style={{ width: 60, padding: 6, borderRadius: 6, border: "1px solid #ddd", fontSize: 14, textAlign: "center", fontWeight: 600 }} />
+                      <button onClick={() => { const v = document.getElementById("recv-" + l.id)?.value; if (v === "" || v === null || Number(v) < 0) { alert("請輸入實收數量"); return; } receiveLine(l.id, v); }} style={{ padding: "6px 10px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>✅收</button>
+                    </>}
+                    {done && <span style={{ fontSize: 11, color: l.status === "variance" ? "#b91c1c" : "#0a7c42" }}>{l.status === "variance" ? "⚠差異" : "✅"}</span>}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>}
