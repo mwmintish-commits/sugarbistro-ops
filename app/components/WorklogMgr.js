@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { ap, fmt } from "./utils";
+import { ap, fmt, wlCategory } from "./utils";
 
 const WorklogSettings = dynamic(() => import("./SettingsMgr").then(m => ({ default: m.WorklogSettings })), { ssr: false, loading: () => <div style={{ textAlign: "center", padding: 20, color: "#ccc" }}>載入設定中...</div> });
 
@@ -167,7 +167,7 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
             const CAT_ICON = { "🧹 清潔": "🧹", "⚙️ 設備檢查": "⚙️", "🍰 備料": "🍰", "💰 財務": "💰", "📋 行政交接": "📋", "🛒 庫存補貨": "🛒", "其他": "📌" };
             const grouped = {};
             for (const it of detailItems) {
-              const k = it.category || "其他";
+              const k = wlCategory(it.item_name || it.item, it.category);
               if (!grouped[k]) grouped[k] = [];
               grouped[k].push(it);
             }

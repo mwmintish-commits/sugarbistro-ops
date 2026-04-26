@@ -24,6 +24,21 @@ export async function sap(u, b) {
 
 export const fmt = (n) => "$" + Number(n || 0).toLocaleString();
 
+// 工作日誌分類：依品項名稱關鍵字優先順序歸類（不依賴 DB 的舊 category）
+export const WL_CATS = ["🧹 清潔", "⚙️ 設備檢查", "🍰 備料", "💰 財務", "📋 行政交接", "🛒 庫存補貨", "其他"];
+export function wlCategory(item, fallbackCategory) {
+  // 若 DB 已是新分類，直接回傳
+  if (fallbackCategory && WL_CATS.includes(fallbackCategory)) return fallbackCategory;
+  const s = String(item || "");
+  if (/結帳|收銀|日結|存款|發票|找零|現金|對帳|入帳|押金/.test(s)) return "💰 財務";
+  if (/報到|交接|儀容|服裝|簽到|簽退|班表|回報|公告|通知|站位|早會|晚會/.test(s)) return "📋 行政交接";
+  if (/盤點|叫貨|進貨|訂貨|庫存|補貨|月結|單據/.test(s)) return "🛒 庫存補貨";
+  if (/備料|食材|解凍|裝盤|烘焙|麵糊|糖漿|鮮奶|奶油|麵包|蛋糕|甜點|餅乾|泡芙|冰塊|儲冰/.test(s)) return "🍰 備料";
+  if (/清潔|擦拭|擦|清洗|抹布|拖地|洗淨|掃|垃圾|回收|廚餘|清空|消毒|定位/.test(s)) return "🧹 清潔";
+  if (/開機|關機|開\/關|機|燈|POS|iPad|電視|音樂|閨蜜|空調|冷氣|溫度|電源|檢查|蒸氣|咖啡機|磨豆|奶泡|氣炸|烤箱|冰箱|冷藏|冷凍|展示櫃/.test(s)) return "⚙️ 設備檢查";
+  return "其他";
+}
+
 export const ROLES = {
   admin: "👑總部", manager: "🏠管理",
   store_manager: "🏪門店主管", staff: "👤員工"
