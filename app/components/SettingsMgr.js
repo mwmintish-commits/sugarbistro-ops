@@ -17,7 +17,8 @@ const DEFAULT_HB = [
 
 const DEFAULT_CONTRACT = "一、薪資、工時、休假依勞動基準法及甲方規定辦理。\n二、甲方依法代扣勞工保險、全民健康保險及所得稅。\n三、任一方得依勞動基準法規定終止本合約；乙方離職應依規定辦理交接。\n四、本合約自到職日起生效，未盡事宜依勞動基準法及相關法令辦理。\n五、本合約一式兩份，甲乙雙方各執一份為憑。";
 
-export default function SettingsMgr({ stores, load, month }) {
+export default function SettingsMgr({ stores, load, month, auth }) {
+  const isAdmin = auth?.role === "admin";
   const [companyName, setCompanyName] = useState("小食糖 Sugar Bistro");
   const [hols, setHols] = useState([]);
   const [hb, setHb] = useState(null);
@@ -222,7 +223,8 @@ export default function SettingsMgr({ stores, load, month }) {
       </div>
 
 
-      {/* 國定假日 */}
+      {/* 國定假日（僅 admin） */}
+      {isAdmin && (
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
           {"🗓 " + new Date().getFullYear() + " 國定假日（" + hols.filter(h => h.is_active !== false).length + "/" + hols.length + "天啟用）"}
@@ -247,8 +249,10 @@ export default function SettingsMgr({ stores, load, month }) {
         </div>
         <p style={{ fontSize: 10, color: "#888", marginTop: 6 }}>點擊可啟用/停用，停用的假日不標紅、不計雙倍薪</p>
       </div>
+      )}
 
-      {/* 員工守則 */}
+      {/* 員工守則 + 獎金條款（僅 admin） */}
+      {isAdmin && (
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📋 員工守則編輯器</h4>
         {hbLoading ? <p style={{ color: "#aaa" }}>載入中...</p> : (
@@ -326,8 +330,10 @@ export default function SettingsMgr({ stores, load, month }) {
           </div>
         </div>
       </div>
+      )}
 
-      {/* 工作合約編輯器 */}
+      {/* 工作合約編輯器（僅 admin） */}
+      {isAdmin && (
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📝 工作合約編輯器</h4>
         <p style={{ fontSize: 10, color: "#888", marginBottom: 6 }}>新人報到簽署的合約內容，每行一個條款（自動加上編號）</p>
@@ -338,8 +344,10 @@ export default function SettingsMgr({ stores, load, month }) {
           alert("合約已儲存");
         }} style={{ marginTop: 6, padding: "5px 16px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer" }}>💾 儲存合約</button>
       </div>
+      )}
 
-      {/* 權限管理 */}
+      {/* 權限管理（僅 admin） */}
+      {isAdmin && (
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🔐 角色權限管理</h4>
         <div style={{ fontSize: 10, color: "#888", marginBottom: 8 }}>👑總部管理員 擁有所有權限（不可修改）。以下設定其他角色的可見功能：</div>
@@ -380,6 +388,7 @@ export default function SettingsMgr({ stores, load, month }) {
           </div>
         )}
       </div>
+      )}
 
       {/* 備份管理 */}
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>

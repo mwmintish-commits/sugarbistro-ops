@@ -16,10 +16,11 @@ const ROLE_TABS = {
     "settlements","deposits","expenses","payments","pnl",
     "recipes","production","inventory","shipments","stock","clients","orders","products",
     "shifts","worklogs","announcements","audit","settings"],
-  manager: ["employees","schedules","leaves","attendance","overtime","payroll",
-    "reviews",
+  manager: ["dashboard","employees","schedules","leaves","attendance","overtime","payroll",
+    "reviews","bonus",
     "settlements","deposits","expenses","payments","pnl",
-    "recipes","production","inventory","shipments","stock","clients","orders","products","shifts","worklogs"],
+    "recipes","production","inventory","shipments","stock","clients","orders","products",
+    "shifts","worklogs","announcements","audit","settings"],
   store_manager: ["schedules","leaves","store_staff","shifts","worklogs","inventory","shipments","stock",
     "announcements","settlements","deposits","expenses"]
 };
@@ -2767,7 +2768,7 @@ export default function AdminPage() {
         )}
 
         {!ld && tab === "settings" && (
-          <SettingsMgr stores={stores} load={load} month={month} />
+          <SettingsMgr stores={stores} load={load} month={month} auth={auth} />
         )}
 
         {/* 發布班表彈窗 */}
