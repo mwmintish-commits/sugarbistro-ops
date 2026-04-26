@@ -545,11 +545,11 @@ export function WorklogSettings({ stores }) {
   const [wlStore, setWlStore] = useState("");
   const [wlTemplates, setWlTemplates] = useState([]);
   const [wlCopyTarget, setWlCopyTarget] = useState("");
-  const [wlNew, setWlNew] = useState({ category: "開店前準備", item: "", role: "all", checkpoints: [], frequency: "daily", weekday: "", requires_value: false, value_label: "" });
+  const [wlNew, setWlNew] = useState({ category: "🧹 清潔", item: "", role: "all", checkpoints: [], frequency: "daily", weekday: "", requires_value: false, value_label: "" });
   const loadT = () => { if (!wlStore) return; ap("/api/admin/worklogs?type=templates&store_id=" + wlStore).then(r => setWlTemplates(r.data || [])); };
   useEffect(() => { loadT(); }, [wlStore]);
 
-  const WL_CATS = ["開店前準備", "營業中交接", "閉店後清潔"];
+  const WL_CATS = ["🧹 清潔", "⚙️ 設備檢查", "🍰 備料", "💰 財務", "📋 行政交接", "🛒 庫存補貨", "其他"];
   const store = stores.find(s => s.id === wlStore);
   const isDouble = store?.shift_mode === "double";
   const CPS = isDouble
@@ -577,8 +577,12 @@ export function WorklogSettings({ stores }) {
 
   const dailyTpls = wlTemplates.filter(t => t.frequency === "daily").sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   const deepTpls = wlTemplates.filter(t => t.frequency === "weekly" || t.frequency === "monthly");
+  const byCatRaw = {};
+  for (const t of dailyTpls) { const c = t.category || "其他"; (byCatRaw[c] ||= []).push(t); }
+  // 依 WL_CATS 順序排列，未列入的放最後
   const byCat = {};
-  for (const t of dailyTpls) { const c = t.category || "其他"; (byCat[c] ||= []).push(t); }
+  for (const c of WL_CATS) if (byCatRaw[c]) byCat[c] = byCatRaw[c];
+  for (const c of Object.keys(byCatRaw)) if (!byCat[c]) byCat[c] = byCatRaw[c];
 
   return (
     <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
