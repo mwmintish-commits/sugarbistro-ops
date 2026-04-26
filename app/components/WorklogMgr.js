@@ -163,8 +163,8 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
               during:        { l: "營業中", c: "#185fa5", bg: "#e6f1fb" },
               closing:       { l: "閉店", c: "#b91c1c", bg: "#fde8e8" },
             };
-            const CAT_ORDER = ["開店前準備", "營業中交接", "閉店後清潔"];
-            const CAT_ICON = { "開店前準備": "🌅", "營業中交接": "☀️", "閉店後清潔": "🌙" };
+            const CAT_ORDER = ["🧹 清潔", "⚙️ 設備檢查", "🍰 備料", "💰 財務", "📋 行政交接", "🛒 庫存補貨", "其他"];
+            const CAT_ICON = { "🧹 清潔": "🧹", "⚙️ 設備檢查": "⚙️", "🍰 備料": "🍰", "💰 財務": "💰", "📋 行政交接": "📋", "🛒 庫存補貨": "🛒", "其他": "📌" };
             const grouped = {};
             for (const it of detailItems) {
               const k = it.category || "其他";
