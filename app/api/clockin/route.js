@@ -79,13 +79,15 @@ export async function POST(request) {
 
   let lateMinutes = 0;
   let earlyLeaveMinutes = 0;
-  if (t.type === "clock_in" && schedule?.shifts?.start_time) {
+  // 例假/休息日不算遲到早退（即使排班殘留 shift_id）
+  const isOffDay = schedule?.day_type === "regular_off" || schedule?.day_type === "rest_day";
+  if (!isOffDay && t.type === "clock_in" && schedule?.shifts?.start_time) {
     const [sh, sm] = schedule.shifts.start_time.split(":").map(Number);
     const [ch, cm] = currentTime.split(":").map(Number);
     const diff = (ch * 60 + cm) - (sh * 60 + sm);
     lateMinutes = diff > (settings?.late_grace_minutes || 5) ? diff : 0;
   }
-  if (t.type === "clock_out" && schedule?.shifts?.end_time) {
+  if (!isOffDay && t.type === "clock_out" && schedule?.shifts?.end_time) {
     const [eh, emn] = schedule.shifts.end_time.split(":").map(Number);
     const [ch, cm] = currentTime.split(":").map(Number);
     const diff = (eh * 60 + emn) - (ch * 60 + cm);  // 早多少分鐘下班

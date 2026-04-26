@@ -5,8 +5,15 @@ import { pushText } from "@/lib/line";
 async function recalcAttendance(scheduleId) {
   if (!scheduleId) return;
   const { data: sch } = await supabase.from("schedules")
-    .select("id, shifts(start_time, end_time)").eq("id", scheduleId).single();
+    .select("id, day_type, shifts(start_time, end_time)").eq("id", scheduleId).single();
   if (!sch) return;
+  // 例假/休息日：直接清除遲到早退
+  if (sch.day_type === "regular_off" || sch.day_type === "rest_day") {
+    await supabase.from("attendances")
+      .update({ late_minutes: 0, early_leave_minutes: 0 })
+      .eq("schedule_id", scheduleId);
+    return;
+  }
   const { data: settings } = await supabase.from("attendance_settings").select("*").limit(1).single();
   const graceIn = settings?.late_grace_minutes ?? 5;
   const graceOut = settings?.early_leave_minutes ?? 5;

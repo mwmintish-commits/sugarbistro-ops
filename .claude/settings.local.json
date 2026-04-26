@@ -56,7 +56,9 @@
       "Bash(brew install *)",
       "Bash(npm i *)",
       "Bash(export DB_URL=$\\(grep ^DATABASE_URL /Users/maxwang/Desktop/sugarbistro-ops/.env.local)",
-      "Bash(awk -F= '/^DATABASE_URL=/{print substr\\($0,length\\($1\\)+2\\)}' /Users/maxwang/Desktop/sugarbistro-ops/.env.local)"
+      "Bash(awk -F= '/^DATABASE_URL=/{print substr\\($0,length\\($1\\)+2\\)}' /Users/maxwang/Desktop/sugarbistro-ops/.env.local)",
+      "Bash(node -e \"const fs=require\\('fs'\\);console.log\\(JSON.stringify\\(fs.readFileSync\\('/tmp/combined-migration.sql','utf8'\\)\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\);const sql=fs.readFileSync\\('/tmp/combined-migration.sql','utf8'\\);process.stdout.write\\('window.__migSQL='+JSON.stringify\\(sql\\)\\)\")"
     ]
   }
 }
