@@ -254,7 +254,11 @@ export default function WorkLogPage() {
     setDeliveryMode(false); setDeliveryLines([]); alert("✅ 進貨已登記");
   };
   const currentItems = tab === "deep" ? [] : items.filter(i => i.shift_type === tab);
-  const grouped = {}; for (const item of currentItems) { const c = item.category || "其他"; if (!grouped[c]) grouped[c] = []; grouped[c].push(item); }
+  const WL_CAT_ORDER = ["🧹 清潔", "⚙️ 設備檢查", "🍰 備料", "💰 財務", "📋 行政交接", "🛒 庫存補貨", "其他"];
+  const groupedRaw = {}; for (const item of currentItems) { const c = item.category || "其他"; if (!groupedRaw[c]) groupedRaw[c] = []; groupedRaw[c].push(item); }
+  const grouped = {};
+  for (const c of WL_CAT_ORDER) if (groupedRaw[c]) grouped[c] = groupedRaw[c];
+  for (const c of Object.keys(groupedRaw)) if (!grouped[c]) grouped[c] = groupedRaw[c];
   const STOCK_ZONES = [
     { key:"refrig", label:"🧊 冷藏", bg:"#e0f2fe" },
     { key:"freezer", label:"❄️ 冷凍", bg:"#dbeafe" },
