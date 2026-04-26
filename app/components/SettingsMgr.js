@@ -546,6 +546,7 @@ export function WorklogSettings({ stores }) {
   const [wlTemplates, setWlTemplates] = useState([]);
   const [wlCopyTarget, setWlCopyTarget] = useState("");
   const [wlNew, setWlNew] = useState({ category: "🧹 清潔", item: "", role: "all", checkpoints: [], frequency: "daily", weekday: "", requires_value: false, value_label: "" });
+  const [wlView, setWlView] = useState("checkpoint"); // category | checkpoint
   const loadT = () => { if (!wlStore) return; ap("/api/admin/worklogs?type=templates&store_id=" + wlStore).then(r => setWlTemplates(r.data || [])); };
   useEffect(() => { loadT(); }, [wlStore]);
 
@@ -576,6 +577,29 @@ export function WorklogSettings({ stores }) {
   };
 
   const dailyTpls = wlTemplates.filter(t => t.frequency === "daily").sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  // 時段視圖：將項目依 checkpoint 分群
+  const byCp = {};
+  for (const c of CPS) byCp[c.id] = [];
+  for (const t of dailyTpls) for (const cp of getCps(t)) if (byCp[cp]) byCp[cp].push(t);
+  // 上下移動：與同群組相鄰項目交換 sort_order
+  const moveItem = async (list, idx, delta) => {
+    const target = list[idx + delta]; const cur = list[idx];
+    if (!target || !cur) return;
+    const a = cur.sort_order || 0, b = target.sort_order || 0;
+    // 若兩者皆 0 或相同，先重新編號（每項間隔 10）
+    if (a === b) {
+      for (let i = 0; i < list.length; i++) {
+        await ap("/api/admin/worklogs", { action: "update_template", template_id: list[i].id, sort_order: (i + 1) * 10 });
+      }
+      const newCur = (idx + 1) * 10, newTgt = (idx + delta + 1) * 10;
+      await ap("/api/admin/worklogs", { action: "update_template", template_id: cur.id, sort_order: newTgt });
+      await ap("/api/admin/worklogs", { action: "update_template", template_id: target.id, sort_order: newCur });
+    } else {
+      await ap("/api/admin/worklogs", { action: "update_template", template_id: cur.id, sort_order: b });
+      await ap("/api/admin/worklogs", { action: "update_template", template_id: target.id, sort_order: a });
+    }
+    loadT();
+  };
   const deepTpls = wlTemplates.filter(t => t.frequency === "weekly" || t.frequency === "monthly");
   // 即時依品項名稱重新分類，不依賴 DB 舊 category
   const byCatRaw = {};
@@ -592,12 +616,50 @@ export function WorklogSettings({ stores }) {
         {stores.map(s => <option key={s.id} value={s.id}>{s.name + (s.shift_mode === "double" ? "（雙班）" : "")}</option>)}
       </select>
       {wlStore && <div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+          <span style={{ fontSize: 10, color: "#888" }}>視圖：</span>
+          <button onClick={() => setWlView("checkpoint")} style={{ padding: "3px 8px", fontSize: 11, borderRadius: 6, border: "1px solid " + (wlView === "checkpoint" ? "#0a7c42" : "#ddd"), background: wlView === "checkpoint" ? "#0a7c42" : "#fff", color: wlView === "checkpoint" ? "#fff" : "#333", cursor: "pointer" }}>依時段（可排序）</button>
+          <button onClick={() => setWlView("category")} style={{ padding: "3px 8px", fontSize: 11, borderRadius: 6, border: "1px solid " + (wlView === "category" ? "#0a7c42" : "#ddd"), background: wlView === "category" ? "#0a7c42" : "#fff", color: wlView === "category" ? "#fff" : "#333", cursor: "pointer" }}>依分類（矩陣）</button>
+        </div>
         <div style={{ fontSize: 10, color: "#888", marginBottom: 6 }}>
-          {isDouble ? "雙班模式：早班/晚班各自打勾，矩陣中打勾的時段該班需做" : "單班模式：勾選該項目出現在開店/營業/閉店哪個時段"}
+          {wlView === "checkpoint" ? "依時段顯示：用 ↑↓ 調整該時段內順序（員工頁也會依此順序顯示）" : (isDouble ? "雙班模式：早班/晚班各自打勾，矩陣中打勾的時段該班需做" : "單班模式：勾選該項目出現在開店/營業/閉店哪個時段")}
         </div>
 
-        {/* 矩陣表格 */}
-        <div style={{ overflowX: "auto", marginBottom: 10 }}>
+        {/* 時段視圖 */}
+        {wlView === "checkpoint" && <div style={{ marginBottom: 10 }}>
+          {CPS.map(c => {
+            const list = byCp[c.id] || [];
+            return (<div key={c.id} style={{ marginBottom: 10, border: "1px solid #e8e6e1", borderRadius: 8, overflow: "hidden" }}>
+              <div style={{ padding: "6px 10px", background: "#faf8f5", fontSize: 12, fontWeight: 600 }}>{c.l}（{list.length}）</div>
+              {list.length === 0 ? <div style={{ padding: 12, textAlign: "center", fontSize: 11, color: "#ccc" }}>此時段尚無項目</div> :
+                list.map((t, idx) => (
+                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderTop: idx > 0 ? "1px solid #f0eeea" : "none" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                      <button onClick={() => moveItem(list, idx, -1)} disabled={idx === 0} style={{ width: 22, height: 16, fontSize: 10, padding: 0, borderRadius: 3, border: "1px solid #ddd", background: idx === 0 ? "#f5f5f5" : "#fff", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#ccc" : "#333" }}>↑</button>
+                      <button onClick={() => moveItem(list, idx, 1)} disabled={idx === list.length - 1} style={{ width: 22, height: 16, fontSize: 10, padding: 0, borderRadius: 3, border: "1px solid #ddd", background: idx === list.length - 1 ? "#f5f5f5" : "#fff", cursor: idx === list.length - 1 ? "default" : "pointer", color: idx === list.length - 1 ? "#ccc" : "#333" }}>↓</button>
+                    </div>
+                    <span style={{ fontSize: 11, color: "#888", minWidth: 22, textAlign: "right" }}>{idx + 1}.</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12 }}>{t.item}</div>
+                      <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 2 }}>
+                        <select value={wlCategory(t.item, t.category)} onChange={async e => { await ap("/api/admin/worklogs", { action: "update_template", template_id: t.id, category: e.target.value }); loadT(); }} style={{ fontSize: 9, padding: "1px 3px", borderRadius: 4, border: "1px solid #ddd", background: "#faf8f5" }}>
+                          {WL_CATS.map(cc => <option key={cc} value={cc}>{cc}</option>)}
+                        </select>
+                        {t.requires_value && <span style={{ fontSize: 8, background: "#e6f9f0", color: "#0a7c42", padding: "0 4px", borderRadius: 3 }}>{"📊" + (t.value_label || "")}</span>}
+                        {t.role !== "all" && <span style={{ fontSize: 8, background: "#fef9c3", color: "#8a6d00", padding: "0 4px", borderRadius: 3 }}>{t.role}</span>}
+                      </div>
+                    </div>
+                    <button onClick={() => toggleTplCp(t, c.id)} title="從此時段移除" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid #ddd", background: "#fff", cursor: "pointer", color: "#888" }}>移除</button>
+                    <button onClick={async () => { if (!confirm("刪除整個項目？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 12, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+                  </div>
+                ))
+              }
+            </div>);
+          })}
+        </div>}
+
+        {/* 矩陣表格（依分類） */}
+        {wlView === "category" && <div style={{ overflowX: "auto", marginBottom: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
             <thead>
               <tr style={{ background: "#faf8f5" }}>
@@ -636,7 +698,7 @@ export function WorklogSettings({ stores }) {
               {dailyTpls.length === 0 && <tr><td colSpan={CPS.length + 2} style={{ padding: 16, textAlign: "center", color: "#ccc" }}>尚無工作項目</td></tr>}
             </tbody>
           </table>
-        </div>
+        </div>}
 
         {/* 細部清潔（週/月） */}
         {deepTpls.length > 0 && <div style={{ marginBottom: 8 }}>

@@ -254,7 +254,7 @@ export default function WorkLogPage() {
     await fetch("/api/admin/stock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_delivery", store_id: storeId, items: valid, received_by: empId, received_by_name: empName }) });
     setDeliveryMode(false); setDeliveryLines([]); alert("✅ 進貨已登記");
   };
-  const currentItems = tab === "deep" ? [] : items.filter(i => i.shift_type === tab);
+  const currentItems = tab === "deep" ? [] : items.filter(i => i.shift_type === tab).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   // 即時依品項名稱重新分類，不依賴 DB 舊 category
   const groupedRaw = {}; for (const item of currentItems) { const c = wlCategory(item.item, item.category); if (!groupedRaw[c]) groupedRaw[c] = []; groupedRaw[c].push(item); }
   const grouped = {};
