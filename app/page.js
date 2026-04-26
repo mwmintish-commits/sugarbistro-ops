@@ -1466,6 +1466,52 @@ export default function AdminPage() {
                 exportCSV("日結_"+month+".csv",["日期","門市","營收","現金","LINE Pay","TWQR","UberEat","悠遊卡","餐券","應存"],
                   stl.map(s=>[s.date,s.stores?.name,s.net_sales,s.cash_amount,s.line_pay_amount,s.twqr_amount,s.uber_eat_amount,s.easy_card_amount,s.meal_voucher_amount,s.cash_to_deposit]));
               }} style={{marginLeft:8,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
+              <label style={{marginLeft:6,padding:"2px 8px",borderRadius:4,border:"1px solid #4361ee",background:"#fff",color:"#4361ee",fontSize:10,cursor:"pointer",display:"inline-block"}}>
+                📤 匯入iChef CSV
+                <input type="file" accept=".csv,text/csv" style={{display:"none"}} onChange={async e=>{
+                  const file = e.target.files?.[0]; e.target.value = "";
+                  if (!file) return;
+                  if (!sf) { alert("請先在上方選擇門市篩選後再匯入"); return; }
+                  try {
+                    let text = await file.text();
+                    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+                    const parseCSV = (s) => {
+                      const rows = []; let cur = []; let cell = ""; let inQ = false;
+                      for (let i=0; i<s.length; i++) {
+                        const c = s[i];
+                        if (inQ) {
+                          if (c === '"' && s[i+1] === '"') { cell += '"'; i++; }
+                          else if (c === '"') inQ = false;
+                          else cell += c;
+                        } else {
+                          if (c === '"') inQ = true;
+                          else if (c === ',') { cur.push(cell); cell = ""; }
+                          else if (c === '\n') { cur.push(cell); rows.push(cur); cur = []; cell = ""; }
+                          else if (c === '\r') { /* skip */ }
+                          else cell += c;
+                        }
+                      }
+                      if (cell.length || cur.length) { cur.push(cell); rows.push(cur); }
+                      return rows.filter(r => r.some(v => String(v||"").trim() !== ""));
+                    };
+                    const rows = parseCSV(text);
+                    if (rows.length < 2) { alert("CSV 內容為空或格式錯誤"); return; }
+                    const headers = rows[0].map(h => String(h||"").trim());
+                    const data = rows.slice(1).map(r => {
+                      const o = {};
+                      headers.forEach((h, i) => { o[h] = r[i] ?? ""; });
+                      return o;
+                    });
+                    const r = await fetch("/api/admin/settlements", {
+                      method:"POST", headers:{"Content-Type":"application/json"},
+                      body: JSON.stringify({ action:"import_csv", store_id: sf, rows: data })
+                    }).then(r=>r.json());
+                    if (r.error) { alert("匯入失敗：" + r.error); return; }
+                    alert(r.message + (r.errors?.length ? "\n錯誤範例：" + r.errors.join("; ") : ""));
+                    load();
+                  } catch (err) { alert("匯入失敗：" + (err.message || String(err))); }
+                }} />
+              </label>
             </h3>
             {stl.length > 0 && (
               <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
