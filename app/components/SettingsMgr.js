@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { ap, fmt } from "./utils";
+import { ap, fmt, wlCategory, WL_CATS as WL_CATS_SHARED } from "./utils";
 import { BONUS_SECTION } from "@/lib/bonus-terms";
 
 const DEFAULT_HB = [
@@ -577,9 +577,9 @@ export function WorklogSettings({ stores }) {
 
   const dailyTpls = wlTemplates.filter(t => t.frequency === "daily").sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   const deepTpls = wlTemplates.filter(t => t.frequency === "weekly" || t.frequency === "monthly");
+  // 即時依品項名稱重新分類，不依賴 DB 舊 category
   const byCatRaw = {};
-  for (const t of dailyTpls) { const c = t.category || "其他"; (byCatRaw[c] ||= []).push(t); }
-  // 依 WL_CATS 順序排列，未列入的放最後
+  for (const t of dailyTpls) { const c = wlCategory(t.item, t.category); (byCatRaw[c] ||= []).push(t); }
   const byCat = {};
   for (const c of WL_CATS) if (byCatRaw[c]) byCat[c] = byCatRaw[c];
   for (const c of Object.keys(byCatRaw)) if (!byCat[c]) byCat[c] = byCatRaw[c];
