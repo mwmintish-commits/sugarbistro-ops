@@ -185,7 +185,8 @@ export default function AdminPage() {
     const needDep    = need(["dashboard","deposits"]) && myTabs.includes("deposits");
     const needSched  = need(["dashboard","schedules","payroll","reviews","bonus"]);
     const needAtt    = need(["dashboard","attendance","payroll","reviews"]);
-    const needLv     = need(["dashboard","leaves","payroll","reviews","schedules","attendance","employees","store_staff"]);
+    const needLv     = need(["dashboard","leaves","payroll","reviews"]);
+    const needShifts = need(["dashboard","schedules","settings","attendance","payroll","reviews","bonus"]);
     const needExp    = need(["dashboard","expenses","pnl"]);
     const needPnl    = T === "pnl" && myTabs.includes("pnl");
     const needAnn    = need(["dashboard","announcements","store_staff"]);
@@ -194,7 +195,7 @@ export default function AdminPage() {
       needSettle ? ap("/api/admin/settlements?" + p) : Promise.resolve({data:[],summary:{}}),
       needDep    ? ap("/api/admin/deposits?"    + p) : Promise.resolve({data:[]}),
       ap("/api/admin/employees" + (sf ? "?store_id=" + sf : "")),
-      ap("/api/admin/shifts" + (sf ? "?store_id=" + sf : "")),
+      needShifts ? ap("/api/admin/shifts" + (sf ? "?store_id=" + sf : "")) : Promise.resolve({data:[]}),
       needSched  ? ap("/api/admin/schedules?" + sp) : Promise.resolve({data:[]}),
       needAtt    ? ap("/api/admin/attendance?" + p) : Promise.resolve({data:[]}),
       needAtt    ? ap("/api/admin/attendance?summary=true&" + p) : Promise.resolve({}),
@@ -205,7 +206,7 @@ export default function AdminPage() {
     ]).then(([s,d,e,shs,sc,at2,as3,lr2,ex,pl2,an]) => {
       if (needSettle) { setStl(s.data||[]); setSum(s.summary||{}); }
       if (needDep) setDep(d.data||[]);
-      setEmps(e.data||[]); setShifts(shs.data||[]);
+      setEmps(e.data||[]); if (needShifts) setShifts(shs.data||[]);
       // 待審核員工的文件完整度
       const pendingIds = (e.data||[]).filter(x=>!x.is_active).map(x=>x.id);
       if (pendingIds.length > 0 && (T === "employees" || T === "dashboard" || T === "store_staff")) {
