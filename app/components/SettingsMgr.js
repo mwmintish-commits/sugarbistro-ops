@@ -615,8 +615,13 @@ export function WorklogSettings({ stores }) {
                     return (<tr key={t.id} style={{ borderBottom: "1px solid #f0eeea" }}>
                       <td style={{ padding: "4px" }}>
                         <div style={{ fontSize: 12 }}>{t.item}</div>
-                        {t.requires_value && <span style={{ fontSize: 8, background: "#e6f9f0", color: "#0a7c42", padding: "0 4px", borderRadius: 3, marginRight: 4 }}>{"📊" + (t.value_label || "")}</span>}
-                        {t.role !== "all" && <span style={{ fontSize: 8, background: "#fef9c3", color: "#8a6d00", padding: "0 4px", borderRadius: 3 }}>{t.role}</span>}
+                        <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 2 }}>
+                          <select value={cat} onChange={async e => { await ap("/api/admin/worklogs", { action: "update_template", template_id: t.id, category: e.target.value }); loadT(); }} style={{ fontSize: 9, padding: "1px 3px", borderRadius: 4, border: "1px solid #ddd", background: "#faf8f5" }}>
+                            {WL_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          {t.requires_value && <span style={{ fontSize: 8, background: "#e6f9f0", color: "#0a7c42", padding: "0 4px", borderRadius: 3 }}>{"📊" + (t.value_label || "")}</span>}
+                          {t.role !== "all" && <span style={{ fontSize: 8, background: "#fef9c3", color: "#8a6d00", padding: "0 4px", borderRadius: 3 }}>{t.role}</span>}
+                        </div>
                       </td>
                       {CPS.map(c => (
                         <td key={c.id} style={{ padding: "4px", textAlign: "center" }}>
