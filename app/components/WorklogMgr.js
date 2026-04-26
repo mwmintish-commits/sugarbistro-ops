@@ -334,8 +334,8 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
         </div>
       )}
 
-      {/* 日誌設定（admin 或 store_manager） */}
-      {view === "settings" && (auth?.role === "admin" || auth?.role === "store_manager") && <WorklogSettings stores={stores} />}
+      {/* 日誌設定（admin / manager / store_manager 皆可編輯） */}
+      {view === "settings" && (auth?.role === "admin" || auth?.role === "manager" || auth?.role === "store_manager") && <WorklogSettings stores={stores} />}
 
     </div>
   );
