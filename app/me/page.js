@@ -24,41 +24,31 @@ const worklogUrl = (emp, eid) => {
   return `/worklog?${params.toString()}`;
 };
 
-// 一般員工 / 店長：個人出缺勤導向
-const STAFF_ITEMS = (eid, emp) => {
-  const items = [
-    { icon: "🟢", label: "上班打卡", desc: "GPS 定位", action: "clockin", type: "clock_in", bg: "#e6f9f0", color: "#0a7c42" },
-    { icon: "🔴", label: "下班打卡", desc: "GPS 定位", action: "clockin", type: "clock_out", bg: "#fde8e8", color: "#b91c1c" },
-    { icon: "🕐", label: "補打卡",   desc: "申請補登",    href: webUrl("/amendment", eid),      bg: "#fff8e6", color: "#8a6d00" },
-    { icon: "🏖", label: "我要請假", desc: "事假/特休...", href: webUrl("/leave-apply", eid),    bg: "#e6f1fb", color: "#185fa5" },
-    { icon: "📋", label: "預排假",   desc: "不可出勤回報", href: webUrl("/pre-leave", eid),      bg: "#e8eaf6", color: "#1a237e" },
-    { icon: "📅", label: "我的班表", desc: "近期排班",    href: webUrl("/my-schedule", eid),    bg: "#f3e8ff", color: "#6b21a8" },
-    { icon: "📊", label: "我的假勤", desc: "出勤統計",    href: webUrl("/my-attendance", eid),  bg: "#fef3c7", color: "#92400e" },
-    { icon: "💰", label: "我的薪資", desc: "薪資明細",    href: webUrl("/my-salary", eid),      bg: "#fef3c7", color: "#a16207" },
-    { icon: "📝", label: "我的考核", desc: "績效分數",    href: webUrl("/my-review", eid),      bg: "#e8f5e9", color: "#1b5e20" },
-    { icon: "📋", label: "工作日誌", desc: "每日任務回報", href: worklogUrl(emp, eid),          bg: "#e0f2fe", color: "#075985" },
-    { icon: "🗑", label: "報廢登記", desc: "閉店巡邏丟棄",  href: worklogUrl(emp, eid) + "&tab=closing&waste=1", bg: "#fef2f2", color: "#b91c1c" },
-    { icon: "📖", label: "員工守則", desc: "規範查閱",    href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
-  ];
-  // 店長保留採購入口
-  if (emp?.role === "store_manager") {
-    items.push(
-      { icon: "📦", label: "月結單據", desc: "廠商單據上傳", href: uploadUrl("vendor", emp, eid),      bg: "#dbeafe", color: "#1d4ed8" },
-      { icon: "🪙", label: "零用金",   desc: "費用收據上傳", href: uploadUrl("petty_cash", emp, eid),  bg: "#fef9c3", color: "#854d0e" },
-      { icon: "🏢", label: "總部代付", desc: "總部代付上傳", href: uploadUrl("hq_advance", emp, eid),  bg: "#e0e7ff", color: "#4338ca" },
-      { icon: "🖥", label: "後台",     desc: "管理系統",     href: "/",                                bg: "#f3e8ff", color: "#6b21a8" },
-    );
-  }
-  return items;
-};
+// 個人出缺勤項目（員工/店長/管理 共用）
+const personalItems = (eid, emp) => [
+  { icon: "🟢", label: "上班打卡", desc: "GPS 定位", action: "clockin", type: "clock_in", bg: "#e6f9f0", color: "#0a7c42" },
+  { icon: "🔴", label: "下班打卡", desc: "GPS 定位", action: "clockin", type: "clock_out", bg: "#fde8e8", color: "#b91c1c" },
+  { icon: "🕐", label: "補打卡",   desc: "申請補登",    href: webUrl("/amendment", eid),      bg: "#fff8e6", color: "#8a6d00" },
+  { icon: "🏖", label: "我要請假", desc: "事假/特休...", href: webUrl("/leave-apply", eid),    bg: "#e6f1fb", color: "#185fa5" },
+  { icon: "📋", label: "預排假",   desc: "不可出勤回報", href: webUrl("/pre-leave", eid),      bg: "#e8eaf6", color: "#1a237e" },
+  { icon: "📅", label: "我的班表", desc: "近期排班",    href: webUrl("/my-schedule", eid),    bg: "#f3e8ff", color: "#6b21a8" },
+  { icon: "📊", label: "我的假勤", desc: "出勤統計",    href: webUrl("/my-attendance", eid),  bg: "#fef3c7", color: "#92400e" },
+  { icon: "💰", label: "我的薪資", desc: "薪資明細",    href: webUrl("/my-salary", eid),      bg: "#fef3c7", color: "#a16207" },
+  { icon: "📝", label: "我的考核", desc: "績效分數",    href: webUrl("/my-review", eid),      bg: "#e8f5e9", color: "#1b5e20" },
+  { icon: "📋", label: "工作日誌", desc: "每日任務回報", href: worklogUrl(emp, eid),          bg: "#e0f2fe", color: "#075985" },
+  { icon: "🗑", label: "報廢登記", desc: "閉店巡邏丟棄",  href: worklogUrl(emp, eid) + "&tab=closing&waste=1", bg: "#fef2f2", color: "#b91c1c" },
+  { icon: "📖", label: "員工守則", desc: "規範查閱",    href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
+];
 
-// admin / manager：稽核導向（manager 仍需打卡）
-const AUDIT_ITEMS = (eid, emp) => [
-  ...(emp?.role === "manager" ? [
-    { icon: "🟢", label: "上班打卡", desc: "GPS 定位", action: "clockin", type: "clock_in",  bg: "#e6f9f0", color: "#0a7c42" },
-    { icon: "🔴", label: "下班打卡", desc: "GPS 定位", action: "clockin", type: "clock_out", bg: "#fde8e8", color: "#b91c1c" },
-    { icon: "🕐", label: "補打卡",   desc: "申請補登",  href: webUrl("/amendment", eid),    bg: "#fff8e6", color: "#8a6d00" },
-  ] : []),
+// 採購上傳入口（店長/管理 共用）
+const purchaseItems = (emp, eid) => [
+  { icon: "📦", label: "月結單據", desc: "廠商單據上傳", href: uploadUrl("vendor", emp, eid),      bg: "#dbeafe", color: "#1d4ed8" },
+  { icon: "🪙", label: "零用金",   desc: "費用收據上傳", href: uploadUrl("petty_cash", emp, eid),  bg: "#fef9c3", color: "#854d0e" },
+  { icon: "🏢", label: "總部代付", desc: "總部代付上傳", href: uploadUrl("hq_advance", emp, eid),  bg: "#e0e7ff", color: "#4338ca" },
+];
+
+// 稽核捷徑（admin/manager 共用）
+const auditShortcuts = (eid, emp) => [
   { icon: "📊", label: "今日總覽",   desc: "各店即時狀態", href: "/?tab=dashboard",     bg: "#e0f2fe", color: "#075985" },
   { icon: "⚠️", label: "待審事項",   desc: "請假/補卡",   href: "/?tab=leaves",        bg: "#fef3c7", color: "#92400e" },
   { icon: "💰", label: "日結存款",   desc: "回報狀態",    href: "/?tab=settlements",   bg: "#fef9c3", color: "#854d0e" },
@@ -66,13 +56,27 @@ const AUDIT_ITEMS = (eid, emp) => [
   { icon: "📋", label: "日誌完成度", desc: "各店完成率",  href: "/?tab=worklogs",      bg: "#e6f9f0", color: "#0a7c42" },
   { icon: "🗑", label: "報廢稽核",   desc: "待核准/觀察",  href: "/?tab=worklogs&worklog_view=waste", bg: "#fef2f2", color: "#b91c1c" },
   { icon: "📢", label: "公告管理",   desc: "發布/編輯",   href: "/?tab=announcements", bg: "#f3e8ff", color: "#6b21a8" },
-  { icon: "📋", label: "工作日誌",   desc: "每日任務回報", href: worklogUrl(emp, eid),  bg: "#e0f2fe", color: "#075985" },
-  { icon: "📖", label: "員工守則",   desc: "規範查閱",    href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
-  { icon: "📦", label: "月結單據",   desc: "廠商單據上傳", href: uploadUrl("vendor", emp, eid),     bg: "#dbeafe", color: "#1d4ed8" },
-  { icon: "🪙", label: "零用金",     desc: "費用收據上傳", href: uploadUrl("petty_cash", emp, eid), bg: "#fef9c3", color: "#854d0e" },
-  { icon: "🏢", label: "總部代付",   desc: "總部代付上傳", href: uploadUrl("hq_advance", emp, eid), bg: "#e0e7ff", color: "#4338ca" },
-  { icon: "🖥", label: "後台",       desc: "完整管理介面", href: "/",                               bg: "#f3e8ff", color: "#6b21a8" },
 ];
+
+// 依角色組合面板項目
+const buildItems = (eid, emp) => {
+  const role = emp?.role;
+  const backstage = { icon: "🖥", label: "後台", desc: "完整管理介面", href: "/", bg: "#f3e8ff", color: "#6b21a8" };
+  if (role === "admin") {
+    // 總部：稽核 + 採購 + 後台（無打卡、無個人項目）
+    return [...auditShortcuts(eid, emp), ...purchaseItems(emp, eid), backstage];
+  }
+  if (role === "manager") {
+    // 管理：個人項目 + 稽核 + 採購 + 後台
+    return [...personalItems(eid, emp), ...auditShortcuts(eid, emp), ...purchaseItems(emp, eid), backstage];
+  }
+  if (role === "store_manager") {
+    // 店長：個人項目 + 採購 + 後台
+    return [...personalItems(eid, emp), ...purchaseItems(emp, eid), backstage];
+  }
+  // 一般員工：個人項目
+  return personalItems(eid, emp);
+};
 
 export default function MePanel() {
   const [emp, setEmp] = useState(null);
@@ -118,7 +122,7 @@ export default function MePanel() {
   if (err)     return <div style={wrap}><p style={{ textAlign: "center", color: "#b91c1c", padding: 60 }}>{err}</p></div>;
 
   const isAuditRole = ["admin", "manager"].includes(emp?.role);
-  const items = isAuditRole ? AUDIT_ITEMS(eid || "", emp) : STAFF_ITEMS(eid || "", emp);
+  const items = buildItems(eid || "", emp);
   const roleLabel = { admin: "總部管理員", manager: "區經理", store_manager: "店長", staff: "員工" }[emp?.role] || emp?.role;
   const now = new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Taipei" });
 
