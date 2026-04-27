@@ -52,8 +52,13 @@ const STAFF_ITEMS = (eid, emp) => {
   return items;
 };
 
-// admin / manager：稽核導向
+// admin / manager：稽核導向（manager 仍需打卡）
 const AUDIT_ITEMS = (eid, emp) => [
+  ...(emp?.role === "manager" ? [
+    { icon: "🟢", label: "上班打卡", desc: "GPS 定位", action: "clockin", type: "clock_in",  bg: "#e6f9f0", color: "#0a7c42" },
+    { icon: "🔴", label: "下班打卡", desc: "GPS 定位", action: "clockin", type: "clock_out", bg: "#fde8e8", color: "#b91c1c" },
+    { icon: "🕐", label: "補打卡",   desc: "申請補登",  href: webUrl("/amendment", eid),    bg: "#fff8e6", color: "#8a6d00" },
+  ] : []),
   { icon: "📊", label: "今日總覽",   desc: "各店即時狀態", href: "/?tab=dashboard",     bg: "#e0f2fe", color: "#075985" },
   { icon: "⚠️", label: "待審事項",   desc: "請假/補卡",   href: "/?tab=leaves",        bg: "#fef3c7", color: "#92400e" },
   { icon: "💰", label: "日結存款",   desc: "回報狀態",    href: "/?tab=settlements",   bg: "#fef9c3", color: "#854d0e" },
