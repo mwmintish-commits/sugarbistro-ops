@@ -826,12 +826,28 @@ async function handleEvent(event) {
   }
 
   if (!emp) return replyText(rt, "🍯 歡迎！\n\n新員工請輸入「新人報到」\n已有帳號請輸入「綁定 你的6位數綁定碼」");
+
+  // 打卡 / 面板（Rich Menu 按鈕對應）— 必須優先處理，避免被未知訊息阻擋
+  if (text === "上班打卡") return handleClockAction(rt, emp, "clock_in");
+  if (text === "下班打卡") return handleClockAction(rt, emp, "clock_out");
+  if (text === "面板" || text === "我的面板" || text === "📱 面板") {
+    const SITE = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
+    const panelUrl = `${SITE}/me?eid=${emp.id}`;
+    return lineClient.replyMessage({ replyToken: rt, messages: [{
+      type: "template", altText: "開啟我的面板",
+      template: {
+        type: "buttons",
+        title: `🍯 ${emp.name} 的面板`,
+        text: `${getRoleLabel(emp.role)}｜${emp.stores?.name || "總部"}`,
+        actions: [{ type: "uri", label: "📱 開啟面板", uri: panelUrl }],
+      }
+    }]});
+  }
+  // 其他訊息不回應（保留 a8d0f48 的策略）
   return;
   if (text === "取消" || text === "選單" || text === "主選單" || text === "menu") { await clearUserState(userId); return replyWithQuickReply(rt, "🍯 " + getRoleLabel(emp.role) + " " + emp.name, getMenu(emp.role).slice(0, 13)); }
 
-  // 打卡
-  if (text === "上班打卡") return handleClockAction(rt, emp, "clock_in");
-  if (text === "下班打卡") return handleClockAction(rt, emp, "clock_out");
+  // （以下原打卡 handler 已移到上方）
 
   // ✦13 補打卡申請
   if (text === "補打卡") {
