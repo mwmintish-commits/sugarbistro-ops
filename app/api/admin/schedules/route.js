@@ -227,12 +227,22 @@ export async function POST(request) {
 
     // 無排班或已刪除原排班 → 新增假別
     const dayType = leave_type === "off" ? "regular_off" : leave_type === "rest" ? "rest_day" : "paid_leave";
-    const { data, error } = await supabase.from("schedules").upsert({
-      employee_id, date, type: "leave", leave_type, half_day, note,
+    // 補上 store_id（避免被 store_id 篩選過濾掉）
+    const { data: empRow } = await supabase.from("employees").select("store_id").eq("id", employee_id).single();
+    const payload = {
+      employee_id,
+      store_id: empRow?.store_id || null,
+      date, type: "leave", leave_type,
       status: "confirmed", day_type: dayType,
-    }, { onConflict: "employee_id,date" }).select().single();
-    if (error) return Response.json({ error: error.message }, { status: 500 });
-    return Response.json({ data });
+    };
+    if (half_day) payload.half_day = half_day;
+    if (note) payload.note = note;
+    const { data, error } = await supabase.from("schedules").upsert(payload, { onConflict: "employee_id,date" }).select().single();
+    if (error) {
+      console.error("add_leave upsert error:", error);
+      return Response.json({ error: error.message }, { status: 500 });
+    }
+    return Response.json({ data, message: "✅ 已加入假別" });
   }
 
   if (action === "publish") {
