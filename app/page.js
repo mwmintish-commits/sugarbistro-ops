@@ -335,11 +335,10 @@ export default function AdminPage() {
   const saveShift = async () => {
     const autoName = (sf2.role||"全場") + " " + (sf2.start_time||"").slice(0,5) + "~" + (sf2.end_time||"").slice(0,5);
     const payload = { ...sf2, name: sf2.name || autoName };
-    if (es) {
-      await ap("/api/admin/shifts", { action: "update", shift_id: es.id, ...payload });
-    } else {
-      await ap("/api/admin/shifts", { action: "create", ...payload });
-    }
+    const r = es
+      ? await sap("/api/admin/shifts", { action: "update", shift_id: es.id, ...payload })
+      : await sap("/api/admin/shifts", { action: "create", ...payload });
+    if (!r) return; // 失敗時保持編輯狀態，sap 已顯示錯誤
     setSsf(false); setEs(null); load();
   };
   const editShift = (s) => {
@@ -2895,7 +2894,18 @@ export default function AdminPage() {
               if (!holMode) setHolMode("choose");
               return;
             }
-            await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: storeId, shift_id: sid, date: schPop.date });
+            const r = await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: storeId, shift_id: sid, date: schPop.date });
+            if (r?.needs_force) {
+              if (confirm(r.warning + "\n\n確定要覆蓋原假別並排入此班？")) {
+                const r2 = await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: storeId, shift_id: sid, date: schPop.date, force: true });
+                if (r2?.error) alert(r2.error);
+                else if (r2?.warning) alert(r2.warning);
+              }
+            } else if (r?.warning) {
+              alert(r.warning);
+            } else if (r?.error) {
+              alert(r.error);
+            }
             load();
           };
           const confirmHol = async (mode) => {

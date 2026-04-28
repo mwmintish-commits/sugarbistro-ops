@@ -79,7 +79,7 @@ export async function POST(request) {
   const { action } = body;
 
   if (action === "create") {
-    const { employee_id, store_id, shift_id, date, type, leave_type, half_day, note, is_rest_day, leave_hours } = body;
+    const { employee_id, store_id, shift_id, date, type, leave_type, half_day, note, is_rest_day, leave_hours, force } = body;
     let { day_type } = body;
     // 自動推導 day_type：明確指定者優先；否則由 leave_type / is_rest_day 推導
     if (!day_type) {
@@ -106,8 +106,11 @@ export async function POST(request) {
           // 繼續往下建立排班 + is_rest_day = true
         } else if (existing[0].leave_type === "off") {
           return Response.json({ skipped: true, warning: "⚠️ " + date + " 為例假日，依法不可排班。如需出勤請改為休息日。" });
+        } else if (force) {
+          // 強制覆蓋：刪除原假別，繼續排班
+          await supabase.from("schedules").delete().eq("id", existing[0].id);
         } else {
-          return Response.json({ skipped: true, warning: "⏭ " + date + " 已有" + (lt[existing[0].leave_type] || "休假") + "，已跳過" });
+          return Response.json({ skipped: true, needs_force: true, warning: "⏭ " + date + " 已有" + (lt[existing[0].leave_type] || "休假") + "，已跳過" });
         }
       }
     }
