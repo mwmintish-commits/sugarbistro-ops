@@ -219,6 +219,9 @@ export default function AdminPage() {
       if (needPnl) setPnl(pl2);
       if (needAnn) setAnns(an.data||[]);
       setLd(false);
+    }).catch(err => {
+      console.error("dashboard load failed:", err);
+      setLd(false); // 確保不會卡在「載入中」
     });
 
     if (need(["dashboard","overtime","payroll","reviews"]) && myTabs.includes("overtime")) {

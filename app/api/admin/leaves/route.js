@@ -10,7 +10,8 @@ export async function GET(request) {
 
   const request_type = searchParams.get("request_type");
 
-  let query = supabase.from("leave_requests").select("*, employees(name, store_id, line_uid, stores!store_id(name))").order("created_at", { ascending: false });
+  // 明確指定走 employee_id FK（leave_requests 還有 reviewed_by FK 指向 employees，不指明會 500）
+  let query = supabase.from("leave_requests").select("*, employees!leave_requests_employee_id_fkey(name, store_id, line_uid, stores!store_id(name))").order("created_at", { ascending: false });
   if (status) query = query.eq("status", status);
   if (employee_id) query = query.eq("employee_id", employee_id);
   if (month) query = query.gte("start_date", `${month}-01`).lte("start_date", `${eom(month)}`);
