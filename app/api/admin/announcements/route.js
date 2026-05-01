@@ -4,29 +4,43 @@ import { pushText } from "@/lib/line";
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const tag = searchParams.get("tag");
-  let q = supabase.from("announcements").select("*, employees:created_by(name)").eq("is_active", true).order("created_at", { ascending: false }).limit(50);
+  let q = supabase.from("announcements").select("*").eq("is_active", true).order("created_at", { ascending: false }).limit(50);
   if (tag) q = q.eq("tag", tag);
   if (searchParams.get("active_only") === "1") {
     const today = new Date().toLocaleDateString("sv-SE");
     q = q.or(`starts_at.is.null,starts_at.lte.${today}`).or(`expires_at.is.null,expires_at.gte.${today}`);
   }
-  const { data } = await q;
-  return Response.json({ data });
+  const { data, error: getErr } = await q;
+  if (getErr) return Response.json({ error: getErr.message, data: [] });
+  if (!data || data.length === 0) return Response.json({ data: [] });
+
+  // 取各公告的已讀人數
+  const ids = data.map(a => a.id);
+  const { data: reads } = await supabase.from("announcement_reads")
+    .select("announcement_id")
+    .in("announcement_id", ids);
+  const countMap = {};
+  for (const r of reads || []) {
+    countMap[r.announcement_id] = (countMap[r.announcement_id] || 0) + 1;
+  }
+  const result = data.map(a => ({ ...a, read_count: countMap[a.id] || 0 }));
+  return Response.json({ data: result });
 }
 
 export async function POST(request) {
   const body = await request.json();
   if (body.action === "create") {
     const { title, content, store_id, priority, created_by, starts_at, expires_at, tag, push_line } = body;
-    const { data } = await supabase.from("announcements").insert({
+    const { data, error: insErr } = await supabase.from("announcements").insert({
       title, content,
       store_id: store_id || null,
       priority: priority || "normal",
-      created_by,
+      created_by: created_by || null,
       starts_at: starts_at || null,
       expires_at: expires_at || null,
       tag: tag || null,
     }).select().single();
+    if (insErr) return Response.json({ error: insErr.message }, { status: 500 });
 
     if (push_line) {
       let eq = supabase.from("employees").select("line_uid").eq("is_active", true).not("line_uid", "is", null);

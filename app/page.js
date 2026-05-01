@@ -2721,6 +2721,7 @@ export default function AdminPage() {
                     {(a.starts_at||a.expires_at) && <span>📅 {a.starts_at||"—"} ~ {a.expires_at||"長期"}</span>}
                     {a.store_id && <span>🏠 {stores.find(s=>s.id===a.store_id)?.name||""}</span>}
                     {!a.store_id && <span>🌐 全體</span>}
+                    <span style={{color: a.read_count>0?"#16a34a":"#aaa",fontWeight:a.read_count>0?600:400}}>👁 已讀 {a.read_count||0} 人</span>
                   </div>
                 </div>
               );
