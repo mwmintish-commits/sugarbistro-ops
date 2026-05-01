@@ -12,7 +12,19 @@ export async function GET(request) {
   }
   const { data, error: getErr } = await q;
   if (getErr) return Response.json({ error: getErr.message, data: [] });
-  return Response.json({ data });
+  if (!data || data.length === 0) return Response.json({ data: [] });
+
+  // 取各公告的已讀人數
+  const ids = data.map(a => a.id);
+  const { data: reads } = await supabase.from("announcement_reads")
+    .select("announcement_id")
+    .in("announcement_id", ids);
+  const countMap = {};
+  for (const r of reads || []) {
+    countMap[r.announcement_id] = (countMap[r.announcement_id] || 0) + 1;
+  }
+  const result = data.map(a => ({ ...a, read_count: countMap[a.id] || 0 }));
+  return Response.json({ data: result });
 }
 
 export async function POST(request) {

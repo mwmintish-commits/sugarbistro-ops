@@ -84,6 +84,9 @@ export default function MePanel() {
   const [err, setErr] = useState("");
   const [clockinLoading, setClockinLoading] = useState("");
   const [auditSum, setAuditSum] = useState(null);
+  const [anns, setAnns] = useState([]);
+  const [expandedAnn, setExpandedAnn] = useState(null);
+  const [markingRead, setMarkingRead] = useState(null);
 
   const eid = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("eid") : null;
 
@@ -98,6 +101,7 @@ export default function MePanel() {
         if (["admin", "manager"].includes(r.data.role)) {
           fetch("/api/admin/audit-summary").then(x => x.json()).then(setAuditSum).catch(() => {});
         }
+        fetch("/api/employee/announcements?eid=" + eid).then(x => x.json()).then(x => setAnns(x.data || [])).catch(() => {});
       })
       .catch(() => { setErr("載入失敗"); setLoading(false); });
   }, []);
@@ -114,6 +118,19 @@ export default function MePanel() {
     } catch (e) {
       alert("❌ 連線失敗"); setClockinLoading("");
     }
+  };
+
+  const markRead = async (annId) => {
+    setMarkingRead(annId);
+    try {
+      await fetch("/api/employee/announcements", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "read", announcement_id: annId, employee_id: eid }),
+      });
+      setAnns(prev => prev.map(a => a.id === annId ? { ...a, is_read: true } : a));
+      setExpandedAnn(null);
+    } catch (e) {}
+    setMarkingRead(null);
   };
 
   const wrap = { maxWidth: 480, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "#f7f5f0", minHeight: "100vh" };
@@ -152,6 +169,52 @@ export default function MePanel() {
           </div>
         )}
       </div>
+
+      {anns.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          {(() => {
+            const unread = anns.filter(a => !a.is_read).length;
+            return (
+              <div style={{ display: "flex", alignItems: "center", marginBottom: 8, gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#333" }}>📢 公告</span>
+                {unread > 0 && <span style={{ background: "#ef4444", color: "#fff", borderRadius: 99, fontSize: 11, fontWeight: 700, padding: "1px 8px" }}>{unread} 則未讀</span>}
+              </div>
+            );
+          })()}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {anns.map(ann => {
+              const isExpanded = expandedAnn === ann.id;
+              const isUrgent = ann.priority === "urgent";
+              return (
+                <div key={ann.id} style={{ background: "#fff", borderRadius: 12, border: isUrgent ? "1.5px solid #ef4444" : "1px solid #e8e6e1", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+                  <button
+                    onClick={() => setExpandedAnn(isExpanded ? null : ann.id)}
+                    style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+                    <span style={{ fontSize: 16 }}>{isUrgent ? "🔴" : "📣"}</span>
+                    <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: isUrgent ? "#b91c1c" : "#222", lineHeight: 1.3 }}>{ann.title}</span>
+                    <span style={{ fontSize: 11, color: ann.is_read ? "#4ade80" : "#f59e0b", fontWeight: 700, whiteSpace: "nowrap" }}>{ann.is_read ? "✓ 已讀" : "未讀"}</span>
+                    <span style={{ fontSize: 12, color: "#aaa", marginLeft: 4 }}>{isExpanded ? "▲" : "▼"}</span>
+                  </button>
+                  {isExpanded && (
+                    <div style={{ borderTop: "1px solid #f0ede8", padding: "12px 14px 14px" }}>
+                      <div style={{ fontSize: 13, color: "#444", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{ann.content}</div>
+                      {ann.tag && <div style={{ marginTop: 8, display: "inline-block", fontSize: 11, color: "#6b7280", background: "#f3f4f6", padding: "2px 8px", borderRadius: 99 }}>#{ann.tag}</div>}
+                      {!ann.is_read && (
+                        <button
+                          onClick={() => markRead(ann.id)}
+                          disabled={markingRead === ann.id}
+                          style={{ marginTop: 14, width: "100%", padding: "10px 0", background: "#22c55e", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: markingRead === ann.id ? "wait" : "pointer", opacity: markingRead === ann.id ? 0.6 : 1 }}>
+                          {markingRead === ann.id ? "處理中..." : "✓ 閱讀完畢"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
         {items.map((it, i) => {
