@@ -9,6 +9,7 @@ export default function WorkLogPage() {
   const [stockItems, setStockItems] = useState([]);
   const [stockQty, setStockQty] = useState({});
   const [stockSubmitted, setStockSubmitted] = useState({ morning: false, evening: false });
+  const [anns, setAnns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("opening");
   const [revenue, setRevenue] = useState({ dt: 0, mt: 0, ta: 0, mm: 0 });
@@ -63,11 +64,12 @@ export default function WorkLogPage() {
     setEmpId(eid); setStoreId(sid); setEmpName(name || "");
     Promise.all([
       fetch("/api/admin/worklogs?type=collab&store_id=" + sid + "&date=" + today + "&frequency=daily").then(r => r.json()),
+      fetch("/api/admin/announcements").then(r => r.json()),
       fetch("/api/admin/stores").then(r => r.json()).catch(() => ({ data: [] })),
       fetch("/api/admin/settlements?store_id=" + sid + "&month=" + thisMonth).then(r => r.json()).catch(() => ({ data: [] })),
       fetch("/api/admin/inventory?store_id=" + sid).then(r => r.json()).catch(() => ({ data: [] })),
-    ]).then(([wl, st, stl, sk]) => {
-      setItems(wl.data || []); setStockItems(sk.data || []);
+    ]).then(([wl, a, st, stl, sk]) => {
+      setItems(wl.data || []); setAnns(a.data || []); setStockItems(sk.data || []);
       const store = (st.data || []).find(s => s.id === sid);
       const mode = store?.shift_mode || "single";
       setShiftMode(mode);
@@ -303,6 +305,7 @@ export default function WorkLogPage() {
           {revenue.mt > 0 && <><div style={{ marginTop: 3, height: 6, background: "#f0f0f0", borderRadius: 3 }}><div style={{ height: "100%", width: Math.min(100, Math.round(revenue.mm / revenue.mt * 100)) + "%", background: revenue.mm >= revenue.mt ? "#0a7c42" : "#4361ee", borderRadius: 3 }} /></div><div style={{ fontSize: 9, color: "#888", marginTop: 2 }}>{"月目標$" + revenue.mt.toLocaleString()}</div></>}
         </div>
       </div>
+      {anns.filter(a => a.is_active).slice(0, 3).map(a => (<div key={a.id} style={{ background: a.priority === "urgent" ? "#fde8e8" : "#e6f1fb", borderRadius: 8, padding: "6px 10px", marginBottom: 4, fontSize: 12 }}><b style={{ color: a.priority === "urgent" ? "#b91c1c" : "#185fa5" }}>{(a.priority === "urgent" ? "🔴 " : "📢 ") + a.title}</b><div style={{ color: "#666", marginTop: 1, fontSize: 11 }}>{(a.content || "").slice(0, 60)}</div></div>))}
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${TABS.length}, 1fr)`, gap: 4, margin: "8px 0 10px" }}>
         {TABS.map(t => <button key={t.id} onClick={() => { setTab(t.id); setStockQty({}); setDeliveryMode(false); }} style={{ padding: "10px 2px", borderRadius: 10, border: tab === t.id ? "2px solid #1a1a1a" : "1px solid #ddd", background: tab === t.id ? "#1a1a1a" : "#fff", color: tab === t.id ? "#fff" : "#666", fontSize: 12, fontWeight: tab === t.id ? 700 : 400, cursor: "pointer" }}>{t.l}</button>)}
       </div>
