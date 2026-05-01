@@ -24,3 +24,6 @@ cd sugarbistro-ops
 claude
 ```
 詳見 [SETUP-GUIDE.md](SETUP-GUIDE.md)
+
+---
+最後測試部署：2026-05-01（出國前演練）
