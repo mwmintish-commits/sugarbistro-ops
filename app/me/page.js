@@ -113,10 +113,13 @@ export default function MePanel() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employee_id: eid, type }),
       }).then(r => r.json());
-      if (r.error) { alert("❌ " + r.error); setClockinLoading(""); return; }
+      if (r.error) { alert("❌ " + r.error); return; }
+      if (!r.url) { alert("❌ 系統未回傳打卡連結，請稍後再試或聯繫主管"); return; }
       window.location.href = r.url;
     } catch (e) {
-      alert("❌ 連線失敗"); setClockinLoading("");
+      alert("❌ 連線失敗：" + (e?.message || ""));
+    } finally {
+      setClockinLoading("");
     }
   };
 
