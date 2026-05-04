@@ -32,36 +32,29 @@ export default function ClockInPage() {
   async function getLocation() {
     setGpsLoading(true); setError(null);
     try {
-      // 使用 watchPosition 持續取最佳定位（最多 8 秒）
-      let bestPos = null;
-      const watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          if (!bestPos || pos.coords.accuracy < bestPos.coords.accuracy) {
-            bestPos = pos;
-            const c = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) };
-            setPosition(c);
-            if (info?.store?.latitude && info?.store?.longitude) {
-              setDistance(calcDist(c.lat, c.lng, info.store.latitude, info.store.longitude));
-            }
-          }
-        },
-        () => {},
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-      // 8 秒後停止
-      await new Promise(res => setTimeout(res, 8000));
-      navigator.geolocation.clearWatch(watchId);
-      if (!bestPos) {
-        // fallback 單次
-        const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }));
-        const c = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) };
-        setPosition(c);
-        if (info?.store?.latitude && info?.store?.longitude) {
-          setDistance(calcDist(c.lat, c.lng, info.store.latitude, info.store.longitude));
-        }
+      const pos = await Promise.race([
+        new Promise((res, rej) => navigator.geolocation.getCurrentPosition(
+          res,
+          (err) => rej(new Error(
+            err.code === 1 ? "請開啟位置權限（LINE → 設定 → 位置 → 允許）" :
+            err.code === 2 ? "無法取得位置，請確認 GPS 已開啟" :
+            err.code === 3 ? "定位逾時，請到戶外或重試" :
+            "定位失敗"
+          )),
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        )),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("定位逾時 20 秒，請重試或在外部瀏覽器開啟")), 20000)),
+      ]);
+      const c = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) };
+      setPosition(c);
+      if (info?.store?.latitude && info?.store?.longitude) {
+        setDistance(calcDist(c.lat, c.lng, info.store.latitude, info.store.longitude));
       }
-    } catch { setError("無法定位，請開啟 GPS 並允許位置權限"); }
-    setGpsLoading(false);
+    } catch (e) {
+      setError(e?.message || "無法定位，請開啟 GPS 並允許位置權限");
+    } finally {
+      setGpsLoading(false);
+    }
   }
 
   async function submit() {
@@ -112,7 +105,17 @@ export default function ClockInPage() {
         <p style={{ fontSize: 12, color: "#999" }}>👤 {info?.employee_name}｜🏠 {info?.store?.name || ""}</p>
       </div>
 
-      {error && <div style={{ background: "#fde8e8", color: "#b91c1c", padding: 8, borderRadius: 6, fontSize: 12, marginBottom: 10 }}>{error}</div>}
+      {error && (
+        <div style={{ background: "#fde8e8", color: "#b91c1c", padding: 10, borderRadius: 6, fontSize: 12, marginBottom: 10 }}>
+          <div>{error}</div>
+          {(error.includes("定位") || error.includes("位置") || error.includes("逾時")) && (
+            <a href={typeof window !== "undefined" ? window.location.href : "#"} target="_blank" rel="noreferrer"
+               style={{ display: "block", marginTop: 8, padding: "8px 10px", background: "#fff", color: "#b91c1c", borderRadius: 6, textDecoration: "none", textAlign: "center", border: "1px solid #b91c1c", fontWeight: 600 }}>
+              🌐 用 Safari/Chrome 開啟（推薦）
+            </a>
+          )}
+        </div>
+      )}
 
       {/* 排班檢查 */}
       {!hasSchedule && (
@@ -126,7 +129,7 @@ export default function ClockInPage() {
       {hasSchedule && (
         <>
           <div style={{ background: "#e6f1fb", borderRadius: 8, padding: 10, marginBottom: 12, textAlign: "center" }}>
-            <p style={{ fontSize: 13, color: "#185fa5" }}>📅 今日排班：{info.schedule.shift_name} {info.schedule.start_time}~{info.schedule.end_time}</p>
+            <p style={{ fontSize: 13, color: "#185fa5" }}>📅 今日排班：{info.schedule.shift_name}{(info.schedule.shift_name || "").includes("~") ? "" : ` ${(info.schedule.start_time || "").slice(0, 5)}~${(info.schedule.end_time || "").slice(0, 5)}`}</p>
           </div>
 
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: 14, marginBottom: 10 }}>
