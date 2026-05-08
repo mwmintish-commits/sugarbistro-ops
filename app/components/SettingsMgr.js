@@ -110,6 +110,38 @@ export default function SettingsMgr({ stores, load, month, auth }) {
         </div>
       </div>
 
+      {/* iCHEF 自動同步區塊 */}
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+        <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🍽️ iCHEF 自動同步（從會員系統拉日結）</h4>
+        <div style={{ fontSize: 10, color: "#888", marginBottom: 8, lineHeight: 1.6 }}>
+          • 每日 04:00 自動執行（需設定 cron-job.org）<br/>
+          • 來源：sugarbistro-member（會員系統 03:10 抓 iCHEF）<br/>
+          • 已對應 ichef_code 的門市才會匯入；已連結存款的日期會跳過<br/>
+          • 自動端點：<code style={{ background: "#f0f0f0", padding: "1px 4px", borderRadius: 3, fontSize: 10 }}>/api/cron/ichef-pull?key=&lt;CRON_SECRET&gt;</code>
+        </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 100 }}>
+            <label style={{ fontSize: 9, color: "#888" }}>起始日</label>
+            <input type="date" id="ichef-start" style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 100 }}>
+            <label style={{ fontSize: 9, color: "#888" }}>結束日（留空=同起始日）</label>
+            <input type="date" id="ichef-end" style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+          </div>
+          <button onClick={async () => {
+            const start = document.getElementById("ichef-start")?.value;
+            const end = document.getElementById("ichef-end")?.value;
+            if (!confirm(`從會員系統補抓日結${start ? `\n${start} ~ ${end || start}` : "（昨天）"}？`)) return;
+            const btn = document.getElementById("ichef-pull-btn");
+            if (btn) { btn.textContent = "⏳ 同步中..."; btn.disabled = true; }
+            const r = await ap("/api/admin/ichef-pull", { start: start || null, end: end || null });
+            if (btn) { btn.textContent = "🔄 立即補抓"; btn.disabled = false; }
+            if (r.error) { alert("❌ " + r.error + (r.detail ? "\n\n" + r.detail : "")); return; }
+            alert(`✅ ${r.message}\n\n抓回 ${r.fetched} 筆${r.unmapped_codes?.length ? "\n\n⚠️ 未對應的 storeCode：" + r.unmapped_codes.join(", ") : ""}${r.errors?.length ? "\n\n⚠️ 錯誤：\n" + r.errors.slice(0,3).join("\n") : ""}`);
+          }} id="ichef-pull-btn" style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#b45309", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔄 立即補抓</button>
+        </div>
+      </div>
+
       {/* 門市管理（含定位、目標、預算） */}
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🏠 門市管理</h4>
@@ -175,6 +207,11 @@ export default function SettingsMgr({ stores, load, month, auth }) {
               <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>日營收目標</label><input type="number" id={"dt-"+s.id} defaultValue={s.daily_target||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} /></div>
               <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>月費用預算</label><input type="number" id={"eb-"+s.id} defaultValue={s.monthly_expense_budget||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} /></div>
             </div>
+            {/* iCHEF 對應碼（會員系統 storeCode → 自動匯入日結用） */}
+            <div style={{ marginBottom: 6 }}>
+              <label style={{ fontSize: 9, color: "#888" }}>iCHEF 對應碼（YK / PT / SKM_ZY / SKM_OUTLET，留空=不自動匯入）</label>
+              <input id={"ic-"+s.id} defaultValue={s.ichef_code||""} placeholder="例：YK" style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+            </div>
             <button onClick={async () => {
               try {
                 const lat = document.getElementById("lat-"+s.id)?.value;
@@ -182,10 +219,11 @@ export default function SettingsMgr({ stores, load, month, auth }) {
                 const rad = document.getElementById("rad-"+s.id)?.value;
                 const dt = document.getElementById("dt-"+s.id)?.value;
                 const eb = document.getElementById("eb-"+s.id)?.value;
+                const ic = document.getElementById("ic-"+s.id)?.value?.trim().toUpperCase();
                 const name = document.getElementById("sn-"+s.id)?.value;
                 const addr = document.getElementById("sa-"+s.id)?.value;
                 if (!name) { alert("請輸入門市名稱"); return; }
-                const r = await ap("/api/admin/stores", { action: "update_targets", store_id: s.id, name, address: addr || "", latitude: lat ? Number(lat) : null, longitude: lng ? Number(lng) : null, radius_m: Number(rad) || 200, daily_target: Number(dt) || 0, monthly_expense_budget: Number(eb) || 0 });
+                const r = await ap("/api/admin/stores", { action: "update_targets", store_id: s.id, name, address: addr || "", latitude: lat ? Number(lat) : null, longitude: lng ? Number(lng) : null, radius_m: Number(rad) || 200, daily_target: Number(dt) || 0, monthly_expense_budget: Number(eb) || 0, ichef_code: ic || null });
                 if (r.error) { alert("❌ 儲存失敗：" + r.error); return; }
                 alert("✅ " + name + " 已儲存");
                 load();
