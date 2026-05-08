@@ -114,18 +114,35 @@ UPDATE stores SET ichef_code = 'SKM_OUTLET' WHERE name = 'SKM Outlet';
 }
 ```
 
-## 欄位對應
+## 欄位對應（v2，會員系統 API 擴充後）
 
-| 會員系統欄位 | 我們系統欄位 | 說明 |
+| 會員系統 API 欄位 | daily_settlements 欄位 | 說明 |
 |------------|------------|------|
-| `storeCode` | 透過 `stores.ichef_code` 對應到 `store_id` | YK / PT / SKM_ZY / SKM_OUTLET |
+| `storeCode` | 透過 `stores.ichef_code` → `store_id` | YK / PT / SKM_ZY / SKM_OUTLET |
 | `reportDate` | `date` | YYYY-MM-DD |
 | `totalAmount` | `net_sales` | 營業淨額 |
-| `cancelledCount` | `void_invoice_count` | 作廢張數 |
+| `discountTotal` | `discount_total` | 折扣總額（iCHEF 折扣資料來自 GraphQL，目前固定 0） |
+| `cashAmount` | `cash_amount` | 現金 |
+| `creditCardAmount` | `credit_card_amount` | 信用卡 |
+| `linePayAmount` | `line_pay_amount` | LINE Pay |
+| `twqrAmount` | `twqr_amount` | TWQR |
+| `uberEatAmount` | `uber_eat_amount` | Uber Eats |
+| `easyCardAmount` | `easy_card_amount` | 悠遊卡 |
+| `mealVoucherAmount` | `meal_voucher_amount` | 餐券 / 振興券 |
+| `linePointsAmount` | `line_credit_amount` | LINE Points |
+| `drinkVoucherAmount` | `drink_voucher_amount` | 飲料券（自家券） |
+| `otherPaymentAmount` | `other_payment_amount` | 其他付款方式總和 |
+| `invoiceCount` | `invoice_count` | 發票張數 |
+| `invoiceStart` | `invoice_start` | 發票起號 |
+| `invoiceEnd` | `invoice_end` | 發票迄號 |
+| `voidInvoiceCount` (fallback `cancelledCount`) | `void_invoice_count` | 作廢張數 |
+| `voidInvoiceAmount` | `void_invoice_amount` | 作廢金額 |
+| `cashierName` | `cashier_name` | 收銀員 |
 | `shortAmount` | `ichef_short_amount` | 短少金額 |
-| - | `ichef_synced_at` | 最後同步時間 |
+| - | `ichef_synced_at` | 最後同步時間（自動填） |
 
-⚠️ 會員系統目前**沒給支付方式拆分**（cash / line_pay / twqr 等不會自動填），這些欄位需手動填，或請會員系統 API 增加細項。
+**已連結存款的記錄**（`daily_settlements.deposit_id` 不為空）會跳過完整覆蓋，
+僅更新 `ichef_synced_at` 與 `ichef_short_amount`，避免改動已對帳的數字。
 
 ## 安全規則
 
