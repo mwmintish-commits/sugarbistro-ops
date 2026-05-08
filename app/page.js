@@ -1466,8 +1466,8 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 日結 ("+stl.length+"筆)"}
               <button onClick={()=>{
-                exportCSV("日結_"+month+".csv",["日期","門市","營收","現金","LINE Pay","TWQR","UberEat","悠遊卡","餐券","應存"],
-                  stl.map(s=>[s.date,s.stores?.name,s.net_sales,s.cash_amount,s.line_pay_amount,s.twqr_amount,s.uber_eat_amount,s.easy_card_amount,s.meal_voucher_amount,s.cash_to_deposit]));
+                exportCSV("日結_"+month+".csv",["日期","門市","營收","現金","信用卡","LINE Pay","TWQR","匯款","UberEat","悠遊卡","餐券","飲料券","LINE儲值","其他","應存"],
+                  stl.map(s=>[s.date,s.stores?.name,s.net_sales,s.cash_amount,s.credit_card_amount,s.line_pay_amount,s.twqr_amount,s.remittance_amount,s.uber_eat_amount,s.easy_card_amount,s.meal_voucher_amount,s.drink_voucher_amount,s.line_credit_amount,s.other_payment_amount,s.cash_to_deposit]));
               }} style={{marginLeft:8,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
               <label style={{marginLeft:6,padding:"2px 8px",borderRadius:4,border:"1px solid #4361ee",background:"#fff",color:"#4361ee",fontSize:10,cursor:"pointer",display:"inline-block"}}>
                 📤 匯入iChef CSV
@@ -1536,7 +1536,7 @@ export default function AdminPage() {
             {(() => {
               const alerts = [];
               stl.forEach(s => {
-                const paySum = [s.cash_amount,s.twqr_amount,s.uber_eat_amount,s.remittance_amount,s.line_pay_amount,s.easy_card_amount,s.meal_voucher_amount,s.drink_voucher_amount,s.line_credit_amount].reduce((a,v)=>a+Number(v||0),0);
+                const paySum = [s.cash_amount,s.credit_card_amount,s.line_pay_amount,s.twqr_amount,s.remittance_amount,s.uber_eat_amount,s.easy_card_amount,s.meal_voucher_amount,s.drink_voucher_amount,s.line_credit_amount,s.other_payment_amount].reduce((a,v)=>a+Number(v||0),0);
                 const diff = Number(s.net_sales||0)-paySum;
                 if (Math.abs(diff)>100) alerts.push({icon:"💰",store:s.stores?.name||"",date:s.date?.slice(5),msg:"營收"+fmt(s.net_sales)+" 但各收款方式合計僅"+fmt(paySum)+"，差額"+fmt(diff),tip:"→ 請核對收據照片，可能有漏登的支付方式",level:"high"});
                 if ((s.void_invoice_count||0)>0) alerts.push({icon:"🚨",store:s.stores?.name||"",date:s.date?.slice(5),msg:"發票作廢"+s.void_invoice_count+"張，金額$"+(s.void_invoice_amount||0),tip:"→ 請確認作廢原因是否合理",level:s.void_invoice_amount>1000?"high":"mid"});
@@ -1558,9 +1558,9 @@ export default function AdminPage() {
             })()}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:700}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","營收","現金","TWQR","匯款","Uber","餐券","飲料券","LINE儲值","發票","作廢","應存","📸","操作"].map(h=><th key={h} style={{padding:"4px 3px",textAlign:"right",fontWeight:500,color:"#666",fontSize:9}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","營收","現金","信用卡","LINE Pay","TWQR","匯款","Uber","悠遊卡","餐券","飲料券","LINE儲值","其他","發票","作廢","應存","📸","操作"].map(h=><th key={h} style={{padding:"4px 3px",textAlign:"right",fontWeight:500,color:"#666",fontSize:9}}>{h}</th>)}</tr></thead>
                 <tbody>{stl.map(s=>{
-                  const paySum = [s.cash_amount,s.twqr_amount,s.uber_eat_amount,s.remittance_amount,s.line_pay_amount,s.easy_card_amount,s.meal_voucher_amount,s.drink_voucher_amount,s.line_credit_amount].reduce((a,v)=>a+Number(v||0),0);
+                  const paySum = [s.cash_amount,s.credit_card_amount,s.line_pay_amount,s.twqr_amount,s.remittance_amount,s.uber_eat_amount,s.easy_card_amount,s.meal_voucher_amount,s.drink_voucher_amount,s.line_credit_amount,s.other_payment_amount].reduce((a,v)=>a+Number(v||0),0);
                   const mismatch = Math.abs(Number(s.net_sales||0) - paySum) > 100;
                   const hasVoid = (s.void_invoice_count||0) > 0;
                   const flags = [];
@@ -1581,12 +1581,16 @@ export default function AdminPage() {
                     <td style={{padding:"4px 3px",textAlign:"right",fontWeight:500,fontSize:10}}>{s.stores?s.stores.name:""}</td>
                     <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("net_sales",s.net_sales):<span style={{fontWeight:700,color:"#0a7c42",fontSize:10}}>{fmt(s.net_sales)}</span>}</td>
                     <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("cash_amount",s.cash_amount):<span style={{fontSize:10}}>{fmt(s.cash_amount)}</span>}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("credit_card_amount",s.credit_card_amount):cv(s.credit_card_amount,"#185fa5")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("line_pay_amount",s.line_pay_amount):cv(s.line_pay_amount,"#0a7c42")}</td>
                     <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("twqr_amount",s.twqr_amount):cv(s.twqr_amount,"#0a7c42")}</td>
                     <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("remittance_amount",s.remittance_amount):cv(s.remittance_amount,"#185fa5")}</td>
                     <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("uber_eat_amount",s.uber_eat_amount):cv(s.uber_eat_amount,"#0a7c42")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("easy_card_amount",s.easy_card_amount):cv(s.easy_card_amount,"#b45309")}</td>
                     <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("meal_voucher_amount",s.meal_voucher_amount):cv(s.meal_voucher_amount,"#b45309")}</td>
                     <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("drink_voucher_amount",s.drink_voucher_amount):cv(s.drink_voucher_amount,"#b45309")}</td>
                     <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("line_credit_amount",s.line_credit_amount):cv(s.line_credit_amount,"#4361ee")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("other_payment_amount",s.other_payment_amount):cv(s.other_payment_amount,"#888")}</td>
                     <td style={{padding:"4px 3px",textAlign:"right",fontSize:9}}>{s.invoice_count||"-"}</td>
                     <td style={{padding:"4px 3px",textAlign:"right",color:s.void_invoice_count>0?"#b91c1c":"#ccc",fontSize:9}}>{s.void_invoice_count>0?s.void_invoice_count+"張":"-"}</td>
                     <td style={{padding:"4px 3px",textAlign:"right",fontWeight:600,color:"#b45309",fontSize:10}}>{fmt(s.cash_to_deposit)}</td>
@@ -1595,7 +1599,7 @@ export default function AdminPage() {
                       {isEdit ? <>
                         <button onClick={async()=>{
                           const g=f=>Number(document.getElementById("stl-"+s.id+"-"+f)?.value||0);
-                          const updates={net_sales:g("net_sales"),cash_amount:g("cash_amount"),twqr_amount:g("twqr_amount"),remittance_amount:g("remittance_amount"),uber_eat_amount:g("uber_eat_amount"),meal_voucher_amount:g("meal_voucher_amount"),drink_voucher_amount:g("drink_voucher_amount"),line_credit_amount:g("line_credit_amount")};
+                          const updates={net_sales:g("net_sales"),cash_amount:g("cash_amount"),credit_card_amount:g("credit_card_amount"),line_pay_amount:g("line_pay_amount"),twqr_amount:g("twqr_amount"),remittance_amount:g("remittance_amount"),uber_eat_amount:g("uber_eat_amount"),easy_card_amount:g("easy_card_amount"),meal_voucher_amount:g("meal_voucher_amount"),drink_voucher_amount:g("drink_voucher_amount"),line_credit_amount:g("line_credit_amount"),other_payment_amount:g("other_payment_amount")};
                           updates.cash_to_deposit=updates.cash_amount-(s.petty_cash_reserved||0);
                           const r=await sap("/api/admin/settlements",{action:"update",settlement_id:s.id,...updates});
                           if(r){setEditStl(null);load();}
