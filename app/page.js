@@ -983,7 +983,27 @@ export default function AdminPage() {
                       <td style={{padding:6}}>{a.type==="clock_in"?"上班":"下班"}</td>
                       <td style={{padding:6}}>{a.distance_meters?a.distance_meters+"m":"-"}</td>
                       <td style={{padding:6,color:a.late_minutes>0?"#b91c1c":"#0a7c42"}}>{a.late_minutes>0?a.late_minutes+"分":"準時"}</td>
-                      <td style={{padding:6}}>
+                      <td style={{padding:6,display:"flex",gap:4,flexWrap:"wrap"}}>
+                        <button onClick={async()=>{
+                          const orig = a.timestamp ? new Date(a.timestamp) : new Date();
+                          const dateStr = orig.toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});
+                          const timeStr = orig.toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei",hour12:false}).slice(0,5);
+                          const typeLabel = a.type==="clock_in"?"上班":"下班";
+                          const newDate = prompt(`編輯打卡時間（${typeLabel}）\n\n日期 (YYYY-MM-DD)：`, dateStr);
+                          if (!newDate) return;
+                          const newTime = prompt(`時間 (HH:MM)：`, timeStr);
+                          if (!newTime) return;
+                          if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { alert("日期格式錯誤，請用 YYYY-MM-DD"); return; }
+                          if (!/^\d{2}:\d{2}$/.test(newTime)) { alert("時間格式錯誤，請用 HH:MM（24 小時制）"); return; }
+                          const iso = `${newDate}T${newTime}:00+08:00`;
+                          if (!confirm(`確定改為 ${newDate} ${newTime}？\n\n會自動重算遲到/早退分鐘。\n（員工：${a.employees?.name || "?"}，類型：${typeLabel}）`)) return;
+                          const r = await sap("/api/admin/attendance",{
+                            action:"update", attendance_id:a.id, timestamp:iso,
+                            edited_by:auth?.id, edited_by_name:auth?.name,
+                          });
+                          if (r) load();
+                        }}
+                          style={{padding:"4px 8px",borderRadius:4,border:"1px solid #4361ee",background:"#fff",fontSize:11,cursor:"pointer",color:"#4361ee"}}>✏編輯</button>
                         <button onClick={async()=>{if(!confirm("確定刪除此打卡紀錄？"))return;await sap("/api/admin/attendance",{action:"delete",attendance_id:a.id});load();}}
                           style={{padding:"4px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer",color:"#b91c1c"}}>🗑刪除</button>
                       </td>
