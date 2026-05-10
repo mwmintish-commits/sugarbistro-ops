@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import MarkdownView from "../components/MarkdownView";
 
 const webUrl = (path, eid) => `${path}?eid=${eid}`;
 
@@ -199,14 +200,39 @@ export default function MePanel() {
                     <span style={{ fontSize: 12, color: "#aaa", marginLeft: 4 }}>{isExpanded ? "▲" : "▼"}</span>
                   </button>
                   {isExpanded && (
-                    <div style={{ borderTop: "1px solid #f0ede8", padding: "12px 14px 14px" }}>
-                      <div style={{ fontSize: 13, color: "#444", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{ann.content}</div>
-                      {ann.tag && <div style={{ marginTop: 8, display: "inline-block", fontSize: 11, color: "#6b7280", background: "#f3f4f6", padding: "2px 8px", borderRadius: 99 }}>#{ann.tag}</div>}
+                    <div style={{ borderTop: "1px solid #f0ede8", padding: "16px 18px 18px" }}>
+                      <MarkdownView content={ann.content} />
+                      {Array.isArray(ann.attachments) && ann.attachments.length > 0 && (
+                        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                          {ann.attachments.map((att, ai) => {
+                            if (att.type === "image") {
+                              return (
+                                <a key={ai} href={att.url} target="_blank" rel="noreferrer" style={{ display: "block" }}>
+                                  <img src={att.url} alt={att.name || ""} style={{ width: "100%", borderRadius: 8, border: "1px solid #eee" }} />
+                                  {att.name && <div style={{ fontSize: 11, color: "#888", marginTop: 4, textAlign: "center" }}>{att.name}</div>}
+                                </a>
+                              );
+                            }
+                            return (
+                              <a key={ai} href={att.url} target="_blank" rel="noreferrer"
+                                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#faf5e8", border: "1px solid #e8dfc4", borderRadius: 8, textDecoration: "none", color: "#222" }}>
+                                <span style={{ fontSize: 22 }}>📎</span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{att.name || "附件"}</div>
+                                  <div style={{ fontSize: 11, color: "#888" }}>點擊開啟 / 下載</div>
+                                </div>
+                                <span style={{ fontSize: 16, color: "#888" }}>↗</span>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {ann.tag && <div style={{ marginTop: 12, display: "inline-block", fontSize: 11, color: "#6b7280", background: "#f3f4f6", padding: "2px 8px", borderRadius: 99 }}>#{ann.tag}</div>}
                       {!ann.is_read && (
                         <button
                           onClick={() => markRead(ann.id)}
                           disabled={markingRead === ann.id}
-                          style={{ marginTop: 14, width: "100%", padding: "10px 0", background: "#22c55e", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: markingRead === ann.id ? "wait" : "pointer", opacity: markingRead === ann.id ? 0.6 : 1 }}>
+                          style={{ marginTop: 16, width: "100%", padding: "12px 0", background: "#22c55e", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: markingRead === ann.id ? "wait" : "pointer", opacity: markingRead === ann.id ? 0.6 : 1 }}>
                           {markingRead === ann.id ? "處理中..." : "✓ 閱讀完畢"}
                         </button>
                       )}
