@@ -1,4 +1,4 @@
-import { supabase, eom } from "@/lib/supabase";
+import { supabase, eom, auditLog } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
 export async function GET(request) {
@@ -86,6 +86,70 @@ export async function POST(request) {
       .delete().eq("id", body.attendance_id);
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ success: true });
+  }
+
+  // 後台直接編輯打卡時間（不走補登流程，自動重算遲到/早退）
+  if (body.action === "update") {
+    const { attendance_id, timestamp, type, edited_by, edited_by_name } = body;
+    if (!attendance_id || !timestamp) {
+      return Response.json({ error: "缺少 attendance_id 或 timestamp" }, { status: 400 });
+    }
+
+    // 取原紀錄 + 排班（用來重算）
+    const { data: orig, error: e1 } = await supabase.from("attendances")
+      .select("*, schedules:schedule_id(*, shifts(start_time, end_time))")
+      .eq("id", attendance_id).single();
+    if (e1 || !orig) return Response.json({ error: "找不到打卡紀錄" }, { status: 404 });
+
+    // 解析新時間（取台北時區的 HH:MM）
+    const t = new Date(timestamp);
+    if (isNaN(t.getTime())) return Response.json({ error: "時間格式錯誤" }, { status: 400 });
+    const tpHHMM = new Date(t.getTime() + 8 * 3600 * 1000).toISOString().slice(11, 16);
+
+    // 重算 late / early_leave
+    const { data: settings } = await supabase.from("attendance_settings").select("*").limit(1).single();
+    const lateGrace = settings?.late_grace_minutes ?? 5;
+    const earlyThr = settings?.early_leave_minutes ?? 5;
+    const recType = type || orig.type;
+    const shift = orig.schedules?.shifts;
+    let late_minutes = 0, early_leave_minutes = 0;
+    if (shift) {
+      const [ch, cm] = tpHHMM.split(":").map(Number);
+      if (recType === "clock_in" && shift.start_time) {
+        const [sh, sm] = shift.start_time.split(":").map(Number);
+        const diff = (ch * 60 + cm) - (sh * 60 + sm);
+        late_minutes = diff > lateGrace ? diff : 0;
+      }
+      if (recType === "clock_out" && shift.end_time) {
+        const [eh, em] = shift.end_time.split(":").map(Number);
+        const diff = (eh * 60 + em) - (ch * 60 + cm);
+        early_leave_minutes = diff > earlyThr ? diff : 0;
+      }
+    }
+
+    const updates = {
+      timestamp,
+      is_amendment: true,
+      late_minutes,
+      early_leave_minutes,
+      notes: (orig.notes ? orig.notes + " | " : "") +
+        `後台編輯 by ${edited_by_name || edited_by || "管理員"} @${new Date().toISOString().slice(0,16).replace("T"," ")}`,
+    };
+    if (type && type !== orig.type) updates.type = type;
+
+    const { data, error } = await supabase.from("attendances")
+      .update(updates).eq("id", attendance_id).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+
+    await auditLog(edited_by, edited_by_name, "attendance_edit", "attendance", String(attendance_id), {
+      old_timestamp: orig.timestamp,
+      new_timestamp: timestamp,
+      old_type: orig.type,
+      new_type: type || orig.type,
+      late_minutes, early_leave_minutes,
+    });
+
+    return Response.json({ data });
   }
 
   // ✦13 補登審核

@@ -30,7 +30,7 @@ export async function GET(request) {
 export async function POST(request) {
   const body = await request.json();
   if (body.action === "create") {
-    const { title, content, store_id, priority, created_by, starts_at, expires_at, tag, push_line } = body;
+    const { title, content, store_id, priority, created_by, starts_at, expires_at, tag, push_line, attachments } = body;
     const { data, error: insErr } = await supabase.from("announcements").insert({
       title, content,
       store_id: store_id || null,
@@ -39,6 +39,7 @@ export async function POST(request) {
       starts_at: starts_at || null,
       expires_at: expires_at || null,
       tag: tag || null,
+      attachments: Array.isArray(attachments) ? attachments : [],
     }).select().single();
     if (insErr) return Response.json({ error: insErr.message }, { status: 500 });
 
@@ -58,7 +59,7 @@ export async function POST(request) {
     return Response.json({ data });
   }
   if (body.action === "update") {
-    const { announcement_id, title, content, store_id, priority, starts_at, expires_at, tag } = body;
+    const { announcement_id, title, content, store_id, priority, starts_at, expires_at, tag, attachments } = body;
     const patch = {};
     if (title !== undefined) patch.title = title;
     if (content !== undefined) patch.content = content;
@@ -67,6 +68,7 @@ export async function POST(request) {
     if (starts_at !== undefined) patch.starts_at = starts_at || null;
     if (expires_at !== undefined) patch.expires_at = expires_at || null;
     if (tag !== undefined) patch.tag = tag || null;
+    if (attachments !== undefined) patch.attachments = Array.isArray(attachments) ? attachments : [];
     const { data, error } = await supabase.from("announcements").update(patch).eq("id", announcement_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });

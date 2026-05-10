@@ -89,3 +89,15 @@ git add . && git commit -m "描述" && git push
 - 日期格式：`YYYY-MM-DD`
 - 時區：`Asia/Taipei`
 - 民國年轉換：民國年 + 1911 = 西元年
+
+## 開發工具偏好
+- **Playwright MCP 已安裝**（`@playwright/mcp@latest`，project scope）
+  需要驗證網頁／UI／Zeabur dashboard／API response 時，**主動用 Playwright 開瀏覽器**操作，不要叫使用者手動截圖。常用情境：
+  - API 端點 debug：navigate 看 JSON
+  - 後台 UI 改動驗證：navigate + screenshot 比對
+  - 登入流程：自動填表測 golden path
+  - Zeabur env var 檢查：使用者首次登入後 cookie 留著，之後自動操作
+  - Console / Network 錯誤：用 evaluate 抓
+- **整合系統**：與 `sugarbistro-member`（會員系統）透過 pull-based API 整合 iCHEF 日結
+  - 文件：`docs/integrations/ichef-import.md`
+  - 兩邊共用 `CRON_SECRET` 環境變數做 Bearer 認證

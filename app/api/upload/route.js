@@ -4,14 +4,24 @@ import { analyzeDailySettlement, analyzeDepositSlip, analyzeExpenseReceipt } fro
 export async function POST(request) {
   const body = await request.json();
 
-  // 單張上傳到 Storage
+  // 單張上傳到 Storage（支援 jpg/png/pdf/doc/xls 等任意檔案）
   if (!body.action) {
-    const { base64, folder, filename } = body;
+    const { base64, folder, filename, ext, mimeType } = body;
     if (!base64) return Response.json({ error: "Missing base64" }, { status: 400 });
     const buf = Buffer.from(base64, "base64");
     const safeFn = (filename || Date.now().toString()).replace(/[^a-zA-Z0-9_-]/g, "");
-    const path = `${folder || "uploads"}/${safeFn}.jpg`;
-    await supabase.storage.from("receipts").upload(path, buf, { contentType: "image/jpeg", upsert: true });
+    const fileExt = (ext || "jpg").replace(/[^a-zA-Z0-9]/g, "").toLowerCase().slice(0, 10);
+    const ct = mimeType || (fileExt === "pdf" ? "application/pdf"
+      : fileExt === "png" ? "image/png"
+      : fileExt === "webp" ? "image/webp"
+      : fileExt === "gif" ? "image/gif"
+      : fileExt === "doc" ? "application/msword"
+      : fileExt === "docx" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      : fileExt === "xls" ? "application/vnd.ms-excel"
+      : fileExt === "xlsx" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      : "image/jpeg");
+    const path = `${folder || "uploads"}/${safeFn}.${fileExt}`;
+    await supabase.storage.from("receipts").upload(path, buf, { contentType: ct, upsert: true });
     const url = supabase.storage.from("receipts").getPublicUrl(path).data.publicUrl;
     return Response.json({ url });
   }

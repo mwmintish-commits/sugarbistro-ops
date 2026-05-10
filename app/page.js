@@ -8,6 +8,7 @@ const SettingsMgr = dynamic(() => import("./components/SettingsMgr"), { ssr: fal
 const BonusFormulaEditor = dynamic(() => import("./components/SettingsMgr").then(m => ({ default: m.BonusFormulaEditor })), { ssr: false });
 const WorklogSettings = dynamic(() => import("./components/SettingsMgr").then(m => ({ default: m.WorklogSettings })), { ssr: false });
 const WorklogMgr = dynamic(() => import("./components/WorklogMgr"), { ssr: false });
+const MarkdownView = dynamic(() => import("./components/MarkdownView"), { ssr: false });
 const LeavesMgr = dynamic(() => import("./components/LeavesMgr"), { ssr: false });
 
 const ROLE_TABS = {
@@ -983,7 +984,27 @@ export default function AdminPage() {
                       <td style={{padding:6}}>{a.type==="clock_in"?"上班":"下班"}</td>
                       <td style={{padding:6}}>{a.distance_meters?a.distance_meters+"m":"-"}</td>
                       <td style={{padding:6,color:a.late_minutes>0?"#b91c1c":"#0a7c42"}}>{a.late_minutes>0?a.late_minutes+"分":"準時"}</td>
-                      <td style={{padding:6}}>
+                      <td style={{padding:6,display:"flex",gap:4,flexWrap:"wrap"}}>
+                        <button onClick={async()=>{
+                          const orig = a.timestamp ? new Date(a.timestamp) : new Date();
+                          const dateStr = orig.toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});
+                          const timeStr = orig.toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei",hour12:false}).slice(0,5);
+                          const typeLabel = a.type==="clock_in"?"上班":"下班";
+                          const newDate = prompt(`編輯打卡時間（${typeLabel}）\n\n日期 (YYYY-MM-DD)：`, dateStr);
+                          if (!newDate) return;
+                          const newTime = prompt(`時間 (HH:MM)：`, timeStr);
+                          if (!newTime) return;
+                          if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { alert("日期格式錯誤，請用 YYYY-MM-DD"); return; }
+                          if (!/^\d{2}:\d{2}$/.test(newTime)) { alert("時間格式錯誤，請用 HH:MM（24 小時制）"); return; }
+                          const iso = `${newDate}T${newTime}:00+08:00`;
+                          if (!confirm(`確定改為 ${newDate} ${newTime}？\n\n會自動重算遲到/早退分鐘。\n（員工：${a.employees?.name || "?"}，類型：${typeLabel}）`)) return;
+                          const r = await sap("/api/admin/attendance",{
+                            action:"update", attendance_id:a.id, timestamp:iso,
+                            edited_by:auth?.id, edited_by_name:auth?.name,
+                          });
+                          if (r) load();
+                        }}
+                          style={{padding:"4px 8px",borderRadius:4,border:"1px solid #4361ee",background:"#fff",fontSize:11,cursor:"pointer",color:"#4361ee"}}>✏編輯</button>
                         <button onClick={async()=>{if(!confirm("確定刪除此打卡紀錄？"))return;await sap("/api/admin/attendance",{action:"delete",attendance_id:a.id});load();}}
                           style={{padding:"4px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer",color:"#b91c1c"}}>🗑刪除</button>
                       </td>
@@ -2686,7 +2707,7 @@ export default function AdminPage() {
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
               <h3 style={{fontSize:14,fontWeight:600,margin:0}}>📢 公告</h3>
               {auth.role !== "store_manager" && (
-                <button onClick={()=>setAnnForm({title:"",content:"",tag:"",store_id:sf||"",priority:"normal",starts_at:today,expires_at:"",push_line:false})}
+                <button onClick={()=>setAnnForm({title:"",content:"",tag:"",store_id:sf||"",priority:"normal",starts_at:today,expires_at:"",push_line:false,attachments:[]})}
                   style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增公告</button>
               )}
             </div>
@@ -2710,15 +2731,26 @@ export default function AdminPage() {
                     </div>
                     {auth.role !== "store_manager" && (
                       <div style={{display:"flex",gap:4}}>
-                        <button onClick={()=>setAnnForm({id:a.id,title:a.title,content:a.content,tag:a.tag||"",store_id:a.store_id||"",priority:a.priority||"normal",starts_at:a.starts_at||"",expires_at:a.expires_at||"",push_line:false})}
+                        <button onClick={()=>setAnnForm({id:a.id,title:a.title,content:a.content,tag:a.tag||"",store_id:a.store_id||"",priority:a.priority||"normal",starts_at:a.starts_at||"",expires_at:a.expires_at||"",push_line:false,attachments:Array.isArray(a.attachments)?a.attachments:[]})}
                           style={{fontSize:10,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️</button>
                         <button onClick={async()=>{if(!confirm("確定刪除公告？"))return;await ap("/api/admin/announcements",{action:"delete",announcement_id:a.id});load();}}
                           style={{fontSize:10,color:"#b91c1c",background:"none",border:"none",cursor:"pointer"}}>🗑</button>
                       </div>
                     )}
                   </div>
-                  <div style={{fontSize:12,color:"#666",marginTop:6,whiteSpace:"pre-wrap"}}>{a.content}</div>
-                  <div style={{fontSize:10,color:"#aaa",marginTop:6,display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <div style={{marginTop:8,padding:"8px 12px",background:"#fafaf8",borderRadius:6,border:"1px solid #f0eeea"}}>
+                    <MarkdownView content={a.content} dense={true} />
+                  </div>
+                  {Array.isArray(a.attachments) && a.attachments.length>0 && (
+                    <div style={{marginTop:6,display:"flex",gap:6,flexWrap:"wrap"}}>
+                      {a.attachments.map((att,ai)=>(
+                        <a key={ai} href={att.url} target="_blank" rel="noreferrer" style={{fontSize:10,padding:"2px 8px",borderRadius:4,background:"#faf5e8",border:"1px solid #e8dfc4",textDecoration:"none",color:"#666"}}>
+                          {att.type==="image"?"🖼":"📄"} {att.name||"附件"}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{fontSize:10,color:"#aaa",marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}>
                     <span>{a.created_at?new Date(a.created_at).toLocaleDateString():""}</span>
                     {(a.starts_at||a.expires_at) && <span>📅 {a.starts_at||"—"} ~ {a.expires_at||"長期"}</span>}
                     {a.store_id && <span>🏠 {stores.find(s=>s.id===a.store_id)?.name||""}</span>}
@@ -2739,8 +2771,64 @@ export default function AdminPage() {
                       <input value={annForm.title} onChange={e=>setAnnForm({...annForm,title:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}/>
                     </label>
                     <label style={{fontSize:11,color:"#666"}}>內容 *
-                      <textarea value={annForm.content} onChange={e=>setAnnForm({...annForm,content:e.target.value})} rows={4} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4,resize:"vertical",fontFamily:"inherit"}}/>
+                      <textarea value={annForm.content} onChange={e=>setAnnForm({...annForm,content:e.target.value})} rows={10} placeholder={`支援 Markdown 排版，例如：\n\n# 大標題\n## 中標題\n### 小標題\n\n**粗體** 內文連結 https://example.com\n\n- 列表第一項\n- 列表第二項\n\n1. 第一步\n2. 第二步\n\n> 重點提示框（米色背景）\n\n| 標題1 | 標題2 |\n|------|------|\n| 內容 | 內容 |\n\n---（橫線分隔）`}
+                        style={{width:"100%",padding:"8px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4,resize:"vertical",fontFamily:"ui-monospace, monospace",lineHeight:1.6}}/>
                     </label>
+                    <div style={{fontSize:10,color:"#888",marginTop:-6,padding:"6px 10px",background:"#faf5e8",borderRadius:6,border:"1px solid #e8dfc4"}}>
+                      💡 內容支援 Markdown：<code>#</code> 標題、<code>**粗體**</code>、<code>- 列表</code>、<code>{">"}</code> 提示框、<code>| 表格 |</code>、<code>---</code> 分隔線、URL 自動連結
+                    </div>
+                    {/* 附件 */}
+                    <div>
+                      <div style={{fontSize:11,color:"#666",marginBottom:4}}>附件（圖片或檔案）</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+                        <label style={{padding:"4px 10px",borderRadius:6,border:"1px dashed #4361ee",background:"#fff",color:"#4361ee",fontSize:11,cursor:"pointer"}}>
+                          📷 加圖片
+                          <input type="file" accept="image/*" style={{display:"none"}} onChange={async(ev)=>{
+                            const f = ev.target.files?.[0]; if (!f) return;
+                            const reader = new FileReader();
+                            reader.onload = async () => {
+                              const base64 = reader.result.split(",")[1];
+                              const ext = (f.name.split(".").pop()||"jpg").toLowerCase();
+                              const r = await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({base64,folder:"announcements",filename:"ann_"+Date.now(),ext,mimeType:f.type})}).then(r=>r.json());
+                              if (r.error||!r.url){alert("上傳失敗："+(r.error||"unknown"));return;}
+                              setAnnForm(prev=>({...prev,attachments:[...(prev.attachments||[]),{type:"image",url:r.url,name:f.name}]}));
+                            };
+                            reader.readAsDataURL(f);
+                            ev.target.value = "";
+                          }}/>
+                        </label>
+                        <label style={{padding:"4px 10px",borderRadius:6,border:"1px dashed #b45309",background:"#fff",color:"#b45309",fontSize:11,cursor:"pointer"}}>
+                          📎 加檔案
+                          <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:"none"}} onChange={async(ev)=>{
+                            const f = ev.target.files?.[0]; if (!f) return;
+                            if (f.size > 10*1024*1024) { alert("檔案過大（>10MB）"); return; }
+                            const reader = new FileReader();
+                            reader.onload = async () => {
+                              const base64 = reader.result.split(",")[1];
+                              const ext = (f.name.split(".").pop()||"pdf").toLowerCase();
+                              const r = await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({base64,folder:"announcements",filename:"ann_"+Date.now(),ext,mimeType:f.type})}).then(r=>r.json());
+                              if (r.error||!r.url){alert("上傳失敗："+(r.error||"unknown"));return;}
+                              setAnnForm(prev=>({...prev,attachments:[...(prev.attachments||[]),{type:"file",url:r.url,name:f.name,mime:f.type}]}));
+                            };
+                            reader.readAsDataURL(f);
+                            ev.target.value = "";
+                          }}/>
+                        </label>
+                      </div>
+                      {(annForm.attachments||[]).length>0 && (
+                        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {(annForm.attachments||[]).map((att,ai)=>(
+                            <div key={ai} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",background:"#faf8f5",borderRadius:4,border:"1px solid #eee",fontSize:11}}>
+                              <span>{att.type==="image"?"🖼":"📄"}</span>
+                              <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{att.name||"附件"}</span>
+                              <a href={att.url} target="_blank" rel="noreferrer" style={{color:"#4361ee",fontSize:10,textDecoration:"none"}}>預覽</a>
+                              <button type="button" onClick={()=>setAnnForm(prev=>({...prev,attachments:prev.attachments.filter((_,i)=>i!==ai)}))}
+                                style={{background:"none",border:"none",color:"#b91c1c",fontSize:13,cursor:"pointer"}}>✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <label style={{fontSize:11,color:"#666"}}>標籤
                       <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
                         {TAGS.map(t=>(
@@ -2780,8 +2868,8 @@ export default function AdminPage() {
                       if(!annForm.title||!annForm.content){alert("請填寫標題與內容");return;}
                       if(annForm.starts_at&&annForm.expires_at&&annForm.starts_at>annForm.expires_at){alert("開始日期不可晚於結束日期");return;}
                       const payload = annForm.id
-                        ? {action:"update",announcement_id:annForm.id,title:annForm.title,content:annForm.content,tag:annForm.tag,store_id:annForm.store_id,priority:annForm.priority,starts_at:annForm.starts_at,expires_at:annForm.expires_at}
-                        : {action:"create",title:annForm.title,content:annForm.content,tag:annForm.tag,store_id:annForm.store_id,priority:annForm.priority,starts_at:annForm.starts_at,expires_at:annForm.expires_at,push_line:annForm.push_line,created_by:auth.employee_id};
+                        ? {action:"update",announcement_id:annForm.id,title:annForm.title,content:annForm.content,tag:annForm.tag,store_id:annForm.store_id,priority:annForm.priority,starts_at:annForm.starts_at,expires_at:annForm.expires_at,attachments:annForm.attachments||[]}
+                        : {action:"create",title:annForm.title,content:annForm.content,tag:annForm.tag,store_id:annForm.store_id,priority:annForm.priority,starts_at:annForm.starts_at,expires_at:annForm.expires_at,push_line:annForm.push_line,created_by:auth.employee_id,attachments:annForm.attachments||[]};
                       const r = await ap("/api/admin/announcements",payload);
                       if(r.error){alert("錯誤："+r.error);return;}
                       if(r.line_sent)alert("已建立，LINE 推送 "+r.line_sent+" 位");
