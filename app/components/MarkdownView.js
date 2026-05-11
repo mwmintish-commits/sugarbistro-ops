@@ -93,7 +93,7 @@ function parseBlocks(md) {
     const h = trimmed.match(/^(#{1,3})\s+(.+)$/);
     if (h) { blocks.push({ type: "h", level: h[1].length, text: h[2] }); i++; continue; }
 
-    // 表格
+    // 表格（必須是 |xxx| 後一行 |---|...）
     if (trimmed.startsWith("|") && i + 1 < lines.length && /^\s*\|[-: |]+\|\s*$/.test(lines[i + 1])) {
       const tableRows = [];
       tableRows.push(line.split("|").slice(1, -1).map(c => c.trim()));
@@ -139,19 +139,26 @@ function parseBlocks(md) {
       continue;
     }
 
-    // 段落（連續非空行）
+    // 段落（連續非空行）— 含 | 但不是表格的行也算段落
+    const startI = i;
     const para = [];
     while (i < lines.length && lines[i].trim() &&
       !/^#{1,3}\s/.test(lines[i].trim()) &&
       !lines[i].trim().startsWith(">") &&
       !/^[-*]\s+/.test(lines[i].trim()) &&
       !/^\d+\.\s+/.test(lines[i].trim()) &&
-      !lines[i].trim().startsWith("|") &&
       !/^---+$/.test(lines[i].trim())) {
+      // 表格起始才停（| 開頭 + 下一行是分隔）
+      if (lines[i].trim().startsWith("|") && i + 1 < lines.length && /^\s*\|[-: |]+\|\s*$/.test(lines[i + 1])) break;
       para.push(lines[i]);
       i++;
     }
-    if (para.length) blocks.push({ type: "p", text: para.join("\n") });
+    if (para.length) {
+      blocks.push({ type: "p", text: para.join("\n") });
+    } else if (i === startI) {
+      // 防呆：無論如何 i 一定要前進，避免無限迴圈
+      i++;
+    }
   }
   return blocks;
 }
