@@ -14,7 +14,7 @@ export async function GET() {
 export async function POST(request) {
   const body = await request.json();
   if (body.action === "update_targets") {
-    const { store_id, daily_target, monthly_target, latitude, longitude, radius_m, name, address, monthly_expense_budget, ichef_code } = body;
+    const { store_id, daily_target, monthly_target, latitude, longitude, radius_m, name, address, monthly_expense_budget, ichef_code, custom_payment_methods } = body;
     const updates = {};
     if (daily_target !== undefined) updates.daily_target = daily_target;
     if (monthly_target !== undefined) updates.monthly_target = monthly_target;
@@ -25,6 +25,7 @@ export async function POST(request) {
     if (address !== undefined) updates.address = address;
     if (monthly_expense_budget !== undefined) updates.monthly_expense_budget = monthly_expense_budget;
     if (ichef_code !== undefined) updates.ichef_code = ichef_code || null;
+    if (custom_payment_methods !== undefined) updates.custom_payment_methods = Array.isArray(custom_payment_methods) ? custom_payment_methods : [];
     const { data, error } = await supabase.from("stores").update(updates).eq("id", store_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ data });

@@ -212,6 +212,11 @@ export default function SettingsMgr({ stores, load, month, auth }) {
               <label style={{ fontSize: 9, color: "#888" }}>iCHEF 對應碼（YK / PT / SKM_ZY / SKM_OUTLET，留空=不自動匯入）</label>
               <input id={"ic-"+s.id} defaultValue={s.ichef_code||""} placeholder="例：YK" style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
             </div>
+            {/* 自定義結帳方式（用逗號分隔，後台拆分日結時當快速選單） */}
+            <div style={{ marginBottom: 6 }}>
+              <label style={{ fontSize: 9, color: "#888" }}>常用自定義結帳方式（逗號分隔，例：匯款,SKMpay,百貨點數）</label>
+              <input id={"cpm-"+s.id} defaultValue={(s.custom_payment_methods||[]).join(",")} placeholder="匯款,SKMpay,百貨點數" style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+            </div>
             <button onClick={async () => {
               try {
                 const lat = document.getElementById("lat-"+s.id)?.value;
@@ -220,10 +225,11 @@ export default function SettingsMgr({ stores, load, month, auth }) {
                 const dt = document.getElementById("dt-"+s.id)?.value;
                 const eb = document.getElementById("eb-"+s.id)?.value;
                 const ic = document.getElementById("ic-"+s.id)?.value?.trim().toUpperCase();
+                const cpm = (document.getElementById("cpm-"+s.id)?.value || "").split(",").map(x => x.trim()).filter(Boolean);
                 const name = document.getElementById("sn-"+s.id)?.value;
                 const addr = document.getElementById("sa-"+s.id)?.value;
                 if (!name) { alert("請輸入門市名稱"); return; }
-                const r = await ap("/api/admin/stores", { action: "update_targets", store_id: s.id, name, address: addr || "", latitude: lat ? Number(lat) : null, longitude: lng ? Number(lng) : null, radius_m: Number(rad) || 200, daily_target: Number(dt) || 0, monthly_expense_budget: Number(eb) || 0, ichef_code: ic || null });
+                const r = await ap("/api/admin/stores", { action: "update_targets", store_id: s.id, name, address: addr || "", latitude: lat ? Number(lat) : null, longitude: lng ? Number(lng) : null, radius_m: Number(rad) || 200, daily_target: Number(dt) || 0, monthly_expense_budget: Number(eb) || 0, ichef_code: ic || null, custom_payment_methods: cpm });
                 if (r.error) { alert("❌ 儲存失敗：" + r.error); return; }
                 alert("✅ " + name + " 已儲存");
                 load();
