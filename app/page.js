@@ -2,6 +2,13 @@
 import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, LABOR_SELF, HEALTH_SELF } from "./components/utils";
+import { routePaymentMethod } from "../lib/payment-router";
+
+const COL_LABELS = {
+  cash_amount: "現金", credit_card_amount: "信用卡", line_pay_amount: "LINE Pay",
+  twqr_amount: "TWQR", uber_eat_amount: "Uber Eats", easy_card_amount: "悠遊卡",
+  meal_voucher_amount: "餐券", remittance_amount: "匯款",
+};
 
 const EmpDetail = dynamic(() => import("./components/EmpDetail"), { ssr: false });
 const SettingsMgr = dynamic(() => import("./components/SettingsMgr"), { ssr: false });
@@ -1700,13 +1707,20 @@ export default function AdminPage() {
                     {/* 明細列表 */}
                     <div style={{marginBottom:10}}>
                       {splitStl.entries.length===0 && <div style={{padding:14,textAlign:"center",color:"#aaa",fontSize:12}}>尚無明細，點上方按鈕或「+ 新增空白項」</div>}
-                      {splitStl.entries.map((e,i)=>(
+                      {splitStl.entries.map((e,i)=>{
+                        const routed = routePaymentMethod(e.method);
+                        return (
                         <div key={i} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
-                          <input value={e.method||""} onChange={ev=>updateEntry(i,"method",ev.target.value)} placeholder="付款方式" style={{flex:1,padding:"4px 8px",borderRadius:4,border:"1px solid #ddd",fontSize:12}} />
+                          <div style={{flex:1,display:"flex",flexDirection:"column",gap:2}}>
+                            <input value={e.method||""} onChange={ev=>updateEntry(i,"method",ev.target.value)} placeholder="付款方式" style={{padding:"4px 8px",borderRadius:4,border:"1px solid "+(routed?"#0a7c42":"#ddd"),fontSize:12}} />
+                            {routed
+                              ? <span style={{fontSize:9,color:"#0a7c42"}}>→ 自動歸到「{COL_LABELS[routed]}」欄</span>
+                              : e.method ? <span style={{fontSize:9,color:"#b45309"}}>→ 保留在「其他/自定義」明細</span> : null}
+                          </div>
                           <input type="number" value={e.amount||0} onChange={ev=>updateEntry(i,"amount",ev.target.value)} style={{width:90,padding:"4px 8px",borderRadius:4,border:"1px solid #ddd",fontSize:12,textAlign:"right"}} />
                           <button onClick={()=>setSplitStl({...splitStl,entries:splitStl.entries.filter((_,x)=>x!==i)})} style={{background:"none",border:"none",color:"#b91c1c",fontSize:14,cursor:"pointer"}}>✕</button>
-                        </div>
-                      ))}
+                        </div>);
+                      })}
                       <button onClick={()=>setSplitStl({...splitStl,entries:[...splitStl.entries,{method:"",amount:0}]})}
                         style={{width:"100%",padding:6,borderRadius:4,border:"1px dashed #ccc",background:"transparent",color:"#888",fontSize:11,cursor:"pointer"}}>+ 新增空白項</button>
                     </div>

@@ -1,4 +1,5 @@
 import { supabase, eom, auditLog } from "@/lib/supabase";
+import { routeCustomPayments } from "@/lib/payment-router";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -62,6 +63,28 @@ export async function POST(request) {
   if (body.action === "update") {
     const { settlement_id, ...updates } = body;
     delete updates.action;
+
+    // 若傳入 custom_payments，跑 router：能對應到標準欄位的（匯款/信用卡...）
+    // 自動加到對應欄位，剩下的（SKMpay/百貨點數...）保留在 custom_payments
+    if (Array.isArray(updates.custom_payments)) {
+      const { standardExtras, customEntries } = routeCustomPayments(updates.custom_payments);
+      // 先抓現有的標準欄位金額（避免覆蓋）
+      const { data: cur } = await supabase.from("daily_settlements")
+        .select("cash_amount,credit_card_amount,line_pay_amount,twqr_amount,uber_eat_amount,easy_card_amount,meal_voucher_amount,remittance_amount,custom_payments")
+        .eq("id", settlement_id).maybeSingle();
+      const oldRouted = routeCustomPayments(cur?.custom_payments || []).standardExtras;
+      // 對每個 router 影響到的欄位：減去舊路由值、加上新路由值
+      const cols = ["cash_amount","credit_card_amount","line_pay_amount","twqr_amount","uber_eat_amount","easy_card_amount","meal_voucher_amount","remittance_amount"];
+      for (const col of cols) {
+        const delta = (standardExtras[col] || 0) - (oldRouted[col] || 0);
+        if (delta !== 0) {
+          updates[col] = (Number(cur?.[col] || 0)) + delta;
+        }
+      }
+      updates.custom_payments = customEntries;
+      updates.other_payment_amount = customEntries.reduce((a, e) => a + e.amount, 0);
+    }
+
     const { data, error } = await supabase.from("daily_settlements")
       .update(updates).eq("id", settlement_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
