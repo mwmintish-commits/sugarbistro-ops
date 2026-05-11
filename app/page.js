@@ -1487,9 +1487,15 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 日結 ("+stl.length+"筆)"}
               <button onClick={()=>{
+                if (!sf) { alert("請先在上方選擇門市篩選"); return; }
+                const store = stores.find(s=>s.id===sf);
+                const params = new URLSearchParams({type:"settlement",store_id:sf,store_name:store?.name||"",employee_id:auth?.employee_id||"",employee_name:auth?.name||""});
+                window.open("/upload?"+params.toString(),"_blank");
+              }} style={{marginLeft:8,padding:"2px 10px",borderRadius:4,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:10,cursor:"pointer",fontWeight:600}}>📷 後台上傳日結單</button>
+              <button onClick={()=>{
                 exportCSV("日結_"+month+".csv",["日期","門市","營收","現金","信用卡","LINE Pay","TWQR","匯款","UberEat","悠遊卡","餐券","其他","應存"],
                   stl.map(s=>[s.date,s.stores?.name,s.net_sales,s.cash_amount,s.credit_card_amount,s.line_pay_amount,s.twqr_amount,s.remittance_amount,s.uber_eat_amount,s.easy_card_amount,s.meal_voucher_amount,s.other_payment_amount,s.cash_to_deposit]));
-              }} style={{marginLeft:8,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
+              }} style={{marginLeft:6,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
               <label style={{marginLeft:6,padding:"2px 8px",borderRadius:4,border:"1px solid #4361ee",background:"#fff",color:"#4361ee",fontSize:10,cursor:"pointer",display:"inline-block"}}>
                 📤 匯入iChef CSV
                 <input type="file" accept=".csv,text/csv" style={{display:"none"}} onChange={async e=>{
@@ -1639,7 +1645,14 @@ export default function AdminPage() {
         {/* DEPOSITS */}
         {!ld && tab === "deposits" && (
           <div>
-            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"🏦 "+month+" 存款"}</h3>
+            <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"🏦 "+month+" 存款"}
+              <button onClick={()=>{
+                if (!sf) { alert("請先在上方選擇門市篩選"); return; }
+                const store = stores.find(s=>s.id===sf);
+                const params = new URLSearchParams({type:"deposit",store_id:sf,store_name:store?.name||"",employee_id:auth?.employee_id||"",employee_name:auth?.name||""});
+                window.open("/upload?"+params.toString(),"_blank");
+              }} style={{marginLeft:8,padding:"2px 10px",borderRadius:4,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:10,cursor:"pointer",fontWeight:600}}>📷 後台上傳存款單</button>
+            </h3>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:700}}>
                 <thead><tr style={{background:"#faf8f5"}}>{["存款日","門市","對帳區間","金額","應存","差異","說明","狀態","📸","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666",fontSize:10}}>{h}</th>)}</tr></thead>
@@ -1671,12 +1684,25 @@ export default function AdminPage() {
         {/* EXPENSES */}
         {!ld && tab === "expenses" && (
           <div>
-            <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap"}}>
+            <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
               {[["all","全部"],["petty_cash","💰零用金"],["vendor","📦月結"],["hq_advance","🏢代付"]].map(([k,l])=>(
                 <button key={k} onClick={()=>setExpType(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:expType===k?"#1a1a1a":"#fff",color:expType===k?"#fff":"#666",fontSize:11,cursor:"pointer"}}>{l}</button>
               ))}
               <input value={expSearch} onChange={e=>setExpSearch(e.target.value)} placeholder="搜尋廠商..."
                 style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11,width:120}} />
+              {/* 後台上傳：費用 3 種類型（hq_advance 可不選門市＝總部均攤） */}
+              <span style={{marginLeft:8,fontSize:10,color:"#888"}}>📷 後台上傳：</span>
+              {[["vendor","廠商月結",true],["petty_cash","零用金",true],["hq_advance","總部代付",false]].map(([t,l,reqStore])=>(
+                <button key={t} onClick={()=>{
+                  if (reqStore && !sf) { alert("請先在上方選擇門市篩選（"+l+"需指定門市）"); return; }
+                  if (!reqStore && !sf) {
+                    if (!confirm("未選門市，將以「總部均攤」上傳，確定？")) return;
+                  }
+                  const store = stores.find(s=>s.id===sf);
+                  const params = new URLSearchParams({type:"expense",expense_type:t,store_id:sf||"",store_name:store?.name||"",employee_id:auth?.employee_id||"",employee_name:auth?.name||""});
+                  window.open("/upload?"+params.toString(),"_blank");
+                }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:11,fontWeight:600,cursor:"pointer"}}>{l}</button>
+              ))}
               <button onClick={()=>{
                 const filtered = exps.filter(e=>(expType==="all"||e.expense_type===expType)&&(!expSearch||(e.vendor_name||"").includes(expSearch)));
                 const csv = "\uFEFF日期,門市,類型,廠商,提交人,金額,狀態\n" + filtered.map(e=>[e.date,e.stores?e.stores.name:"",e.expense_type,e.vendor_name||"",e.submitted_by_name||"",e.amount,e.status].join(",")).join("\n");

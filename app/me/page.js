@@ -4,17 +4,20 @@ import MarkdownView from "../components/MarkdownView";
 
 const webUrl = (path, eid) => `${path}?eid=${eid}`;
 
-const uploadUrl = (expenseType, emp, eid) => {
+const uploadUrl = (type, emp, eid, expenseType = null) => {
   const params = new URLSearchParams({
-    type: "expense",
-    expense_type: expenseType,
+    type,
     store_id: emp?.store_id || "",
     store_name: emp?.stores?.name || "",
     employee_id: eid || "",
     employee_name: emp?.name || "",
   });
+  if (expenseType) params.set("expense_type", expenseType);
   return `/upload?${params.toString()}`;
 };
+
+// 給費用上傳用的 helper（沿用原命名相容性）
+const expenseUploadUrl = (expenseType, emp, eid) => uploadUrl("expense", emp, eid, expenseType);
 
 const worklogUrl = (emp, eid) => {
   const params = new URLSearchParams({
@@ -43,16 +46,17 @@ const personalItems = (eid, emp) => [
 
 // 採購上傳入口（店長/管理 共用）
 const purchaseItems = (emp, eid) => [
-  { icon: "📦", label: "月結單據", desc: "廠商單據上傳", href: uploadUrl("vendor", emp, eid),      bg: "#dbeafe", color: "#1d4ed8" },
-  { icon: "🪙", label: "零用金",   desc: "費用收據上傳", href: uploadUrl("petty_cash", emp, eid),  bg: "#fef9c3", color: "#854d0e" },
-  { icon: "🏢", label: "總部代付", desc: "總部代付上傳", href: uploadUrl("hq_advance", emp, eid),  bg: "#e0e7ff", color: "#4338ca" },
+  { icon: "📦", label: "月結單據", desc: "廠商單據上傳", href: expenseUploadUrl("vendor", emp, eid),      bg: "#dbeafe", color: "#1d4ed8" },
+  { icon: "🪙", label: "零用金",   desc: "費用收據上傳", href: expenseUploadUrl("petty_cash", emp, eid),  bg: "#fef9c3", color: "#854d0e" },
+  { icon: "🏢", label: "總部代付", desc: "總部代付上傳", href: expenseUploadUrl("hq_advance", emp, eid),  bg: "#e0e7ff", color: "#4338ca" },
 ];
 
 // 稽核捷徑（admin/manager 共用）
 const auditShortcuts = (eid, emp) => [
   { icon: "📊", label: "今日總覽",   desc: "各店即時狀態", href: "/?tab=dashboard",     bg: "#e0f2fe", color: "#075985" },
   { icon: "⚠️", label: "待審事項",   desc: "請假/補卡",   href: "/?tab=leaves",        bg: "#fef3c7", color: "#92400e" },
-  { icon: "💰", label: "日結存款",   desc: "回報狀態",    href: "/?tab=settlements",   bg: "#fef9c3", color: "#854d0e" },
+  { icon: "🏦", label: "存款上傳",   desc: "拍存款單上傳", href: uploadUrl("deposit", emp, eid),  bg: "#fef9c3", color: "#854d0e" },
+  { icon: "📊", label: "日結上傳",   desc: "拍 POS 日結單", href: uploadUrl("settlement", emp, eid), bg: "#fef3c7", color: "#92400e" },
   { icon: "🚨", label: "出勤異常",   desc: "遲到/缺勤",   href: "/?tab=attendance",    bg: "#fde8e8", color: "#b91c1c" },
   { icon: "📋", label: "日誌完成度", desc: "各店完成率",  href: "/?tab=worklogs",      bg: "#e6f9f0", color: "#0a7c42" },
   { icon: "🗑", label: "報廢稽核",   desc: "待核准/觀察",  href: "/?tab=worklogs&worklog_view=waste", bg: "#fef2f2", color: "#b91c1c" },
