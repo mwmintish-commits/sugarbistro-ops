@@ -60,6 +60,47 @@ export async function GET(request) {
 export async function POST(request) {
   const body = await request.json();
 
+  // 批次把指定範圍內 daily_settlements.other_payment_amount 重新分流到指定欄位
+  // 用於：舊資料 / 會員系統 API 尚未支援 customPayments 時的修正
+  if (body.action === "batch_reroute_other") {
+    const { store_id, month, target_column, method_label } = body;
+    if (!store_id || !month || !target_column) {
+      return Response.json({ error: "缺少 store_id / month / target_column" }, { status: 400 });
+    }
+    const ALLOWED = ["cash_amount","credit_card_amount","line_pay_amount","twqr_amount","uber_eat_amount","easy_card_amount","meal_voucher_amount","remittance_amount"];
+    if (!ALLOWED.includes(target_column)) {
+      return Response.json({ error: "target_column 不允許" }, { status: 400 });
+    }
+    const startD = month + "-01";
+    const endD = eom(month);
+    // 找出本月該店 other_payment_amount > 0 且 custom_payments 還沒拆過的紀錄
+    const { data: rows, error: fetchErr } = await supabase.from("daily_settlements")
+      .select("id, date, other_payment_amount, custom_payments, " + target_column)
+      .eq("store_id", store_id)
+      .gte("date", startD).lte("date", endD)
+      .gt("other_payment_amount", 0);
+    if (fetchErr) return Response.json({ error: fetchErr.message }, { status: 500 });
+
+    const toUpdate = (rows || []).filter(r => !Array.isArray(r.custom_payments) || r.custom_payments.length === 0);
+    let updated = 0, total = 0;
+    for (const r of toUpdate) {
+      const amt = Number(r.other_payment_amount || 0);
+      const newColVal = Number(r[target_column] || 0) + amt;
+      const customEntry = method_label ? [{ method: method_label, amount: amt }] : [];
+      const { error: ue } = await supabase.from("daily_settlements")
+        .update({
+          [target_column]: newColVal,
+          other_payment_amount: 0,
+          custom_payments: customEntry, // 留下審計痕跡
+        }).eq("id", r.id);
+      if (!ue) { updated++; total += amt; }
+    }
+    await auditLog(null, null, "settlement_batch_reroute", "settlement", null, {
+      store_id, month, target_column, method_label, updated, total,
+    });
+    return Response.json({ success: true, updated, total, skipped: (rows?.length || 0) - toUpdate.length });
+  }
+
   if (body.action === "update") {
     const { settlement_id, ...updates } = body;
     delete updates.action;

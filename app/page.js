@@ -1491,8 +1491,43 @@ export default function AdminPage() {
           </div>
         )}
 
-        {!ld && tab === "settlements" && (
+        {!ld && tab === "settlements" && (() => {
+          const sfStore = sf ? stores.find(s=>s.id===sf) : null;
+          const sfMethods = sfStore?.custom_payment_methods || [];
+          // 該店有 other_payment_amount > 0 且 custom_payments 空的筆數（可批次修正）
+          const fixable = sf ? stl.filter(s => Number(s.other_payment_amount||0) > 0 && (!Array.isArray(s.custom_payments)||s.custom_payments.length===0)) : [];
+          const fixableTotal = fixable.reduce((a,s)=>a+Number(s.other_payment_amount||0),0);
+          const oneMethod = sfMethods.length === 1 ? sfMethods[0] : null;
+          const routeFor = oneMethod ? routePaymentMethod(oneMethod) : null;
+          return (
           <div>
+            {/* 批次修正提示（單一自定義方式的店 → 一鍵歸位） */}
+            {sf && fixable.length > 0 && routeFor && (
+              <div style={{background:"#fff8e6",border:"1px solid #f0e6c8",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
+                <div style={{fontSize:12,marginBottom:6}}>
+                  💡 偵測到 <b>{sfStore.name}</b> 本月有 <b>{fixable.length}</b> 筆「其他」金額 <b>{fmt(fixableTotal)}</b> 尚未拆分。
+                  此店只設一個自定義方式「{oneMethod}」，可一鍵全部歸到「{COL_LABELS[routeFor]||routeFor}」欄。
+                </div>
+                <button onClick={async()=>{
+                  if (!confirm(`確定把 ${sfStore.name} ${month} 月共 ${fixable.length} 筆「其他」總額 ${fmt(fixableTotal)} 全部歸為「${oneMethod}」？\n\n此操作可逆（用拆分 modal 改回來），但會直接修改本月所有未拆分的日結。`)) return;
+                  const r = await ap("/api/admin/settlements",{action:"batch_reroute_other",store_id:sf,month,target_column:routeFor,method_label:oneMethod});
+                  if (r.error) { alert("❌ "+r.error); return; }
+                  alert(`✅ 已修正 ${r.updated} 筆，共 ${fmt(r.total)} 已歸到「${oneMethod}」欄`);
+                  load();
+                }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"#b45309",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                  🔄 一鍵全部歸為「{oneMethod}」（{fixable.length} 筆 / {fmt(fixableTotal)}）
+                </button>
+              </div>
+            )}
+            {sf && fixable.length > 0 && !routeFor && (
+              <div style={{background:"#fef2f2",border:"1px solid #f0c8c8",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12}}>
+                ⚠️ <b>{sfStore.name}</b> 本月有 <b>{fixable.length}</b> 筆「其他」金額 <b>{fmt(fixableTotal)}</b> 尚未拆分。
+                {sfMethods.length === 0
+                  ? <>請先到「設定 → 門市」填寫常用自定義結帳方式，或逐筆點「📝拆分」修正。</>
+                  : <>此店有多種自定義方式（{sfMethods.join("、")}），無法一鍵還原，請逐筆點「📝拆分」修正。</>}
+              </div>
+            )}
+
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 日結 ("+stl.length+"筆)"}
               <button onClick={()=>{
                 if (!sf) { alert("請先在上方選擇門市篩選"); return; }
@@ -1748,7 +1783,8 @@ export default function AdminPage() {
               );
             })()}
           </div>
-        )}
+          );
+        })()}
 
         {/* DEPOSITS */}
         {!ld && tab === "deposits" && (
