@@ -974,8 +974,54 @@ export default function AdminPage() {
               ))}
             </div>
 
-            {attView === "records" && (
+            {attView === "records" && (() => {
+              // 偵測重複打卡：相同 (employee_id, date, type) 出現 2 次以上（不含補登）
+              const groups = {};
+              for (const a of att) {
+                if (a.is_amendment) continue;
+                const date = a.timestamp ? new Date(a.timestamp).toLocaleDateString("sv-SE", {timeZone:"Asia/Taipei"}) : "";
+                if (!date) continue;
+                const key = a.employee_id + "|" + date + "|" + a.type;
+                if (!groups[key]) groups[key] = { emp_id: a.employee_id, emp_name: a.employees?.name, date, type: a.type, ids: [] };
+                groups[key].ids.push(a.id);
+              }
+              const dupes = Object.values(groups).filter(g => g.ids.length > 1);
+              // 同員工同日去重組合（不論 type）
+              const byEmpDate = {};
+              for (const d of dupes) {
+                const k = d.emp_id + "|" + d.date;
+                if (!byEmpDate[k]) byEmpDate[k] = { emp_id: d.emp_id, emp_name: d.emp_name, date: d.date, extra: 0 };
+                byEmpDate[k].extra += d.ids.length - 1;
+              }
+              const dupeList = Object.values(byEmpDate);
+              return (
               <div>
+                {/* 重複打卡警示與清理 */}
+                {dupeList.length > 0 && (
+                  <div style={{background:"#fef3c7",border:"1px solid #f0e6c8",borderRadius:8,padding:10,marginBottom:10}}>
+                    <div style={{fontSize:12,fontWeight:600,color:"#8a6d00",marginBottom:6}}>
+                      ⚠️ 偵測到 {dupeList.length} 個員工/日期有重複打卡共 {dupeList.reduce((a,d)=>a+d.extra,0)} 筆多餘紀錄
+                    </div>
+                    <div style={{maxHeight:120,overflow:"auto",marginBottom:6}}>
+                      {dupeList.slice(0,20).map((d,i)=>(
+                        <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"3px 0",fontSize:11}}>
+                          <span>👤 {d.emp_name} · {d.date} · 多 {d.extra} 筆</span>
+                          <button onClick={async()=>{
+                            const store = stores.find(s=>s.id===emps.find(e=>e.id===d.emp_id)?.store_id);
+                            const keepCount = store?.shift_mode === "double" ? 2 : 1;
+                            if (!confirm(`清理 ${d.emp_name} ${d.date} 的重複打卡？\n\n保留：${keepCount} 筆上班（最早）+ ${keepCount} 筆下班（最晚）\n刪除：其餘 ${d.extra} 筆\n\n此操作不可逆。`)) return;
+                            const r = await ap("/api/admin/attendance",{action:"dedupe_day",employee_id:d.emp_id,date:d.date,keep_count:keepCount,edited_by:auth?.id,edited_by_name:auth?.name});
+                            if (r.error) { alert("❌ "+r.error); return; }
+                            alert(`✅ 已清理：刪除 ${r.deleted} 筆、保留 ${r.kept} 筆`);
+                            load();
+                          }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:10,cursor:"pointer"}}>🧹 清理此日</button>
+                        </div>
+                      ))}
+                      {dupeList.length > 20 && <div style={{fontSize:10,color:"#888"}}>...還有 {dupeList.length - 20} 個未顯示</div>}
+                    </div>
+                    <div style={{fontSize:10,color:"#666"}}>規則：單班店家保留 1 上 + 1 下；雙班店家保留 2 上 + 2 下。clock_in 取最早，clock_out 取最晚。</div>
+                  </div>
+                )}
               {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
                 const storeAtt = att.filter(a => { const emp = emps.find(e=>e.id===a.employee_id); return emp && (store.id==="__hq__" ? (!emp.store_id || !stores.some(st=>st.id===emp.store_id)) : emp.store_id === store.id); });
                 if (storeAtt.length === 0 && !sf) return null;
@@ -1023,7 +1069,8 @@ export default function AdminPage() {
                 </div>);
               })}
               </div>
-            )}
+              );
+            })()}
 
             {attView === "amendments" && (
               <div>

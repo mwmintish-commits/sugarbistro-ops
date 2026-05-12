@@ -58,6 +58,41 @@ export async function POST(request) {
 
   // 位置異常不可打卡
   if (distance !== null && !isValid) return Response.json({ error: `位置異常（距門市${distance}m，超出${store.radius_m || 200}m），無法打卡。` }, { status: 403 });
+
+  // 防呆：重複打卡偵測
+  // 1) 5 分鐘內已有同類型紀錄 → 直接拒絕（避免員工連點）
+  // 2) 達當日上限（單班=1次，雙班=2次）→ 拒絕，請走補打卡流程
+  {
+    const typeLabel = t.type === "clock_in" ? "上班" : "下班";
+    const todayStart = today + "T00:00:00+08:00";
+    const todayEnd = today + "T23:59:59+08:00";
+    const { data: todayRecs } = await supabase.from("attendances")
+      .select("id, timestamp, is_amendment")
+      .eq("employee_id", t.employee_id)
+      .eq("type", t.type)
+      .gte("timestamp", todayStart).lte("timestamp", todayEnd)
+      .order("timestamp", { ascending: false });
+    const normalRecs = (todayRecs || []).filter(r => !r.is_amendment);
+
+    if (normalRecs[0]) {
+      const lastTs = new Date(normalRecs[0].timestamp);
+      const lastHHMM = lastTs.toLocaleTimeString("zh-TW", { timeZone: "Asia/Taipei", hour12: false }).slice(0, 5);
+      const minutesAgo = (Date.now() - lastTs.getTime()) / 60000;
+      if (minutesAgo < 5) {
+        return Response.json({
+          error: `已於 ${lastHHMM} 完成${typeLabel}打卡（${Math.round(minutesAgo)} 分鐘前），請勿重複按。如要修正請走「補打卡」`,
+        }, { status: 409 });
+      }
+    }
+
+    const maxPerType = store?.shift_mode === "double" ? 2 : 1;
+    if (normalRecs.length >= maxPerType) {
+      const allTimes = normalRecs.map(r => new Date(r.timestamp).toLocaleTimeString("zh-TW", { timeZone: "Asia/Taipei", hour12: false }).slice(0, 5)).join("、");
+      return Response.json({
+        error: `今日${typeLabel}打卡已達上限 ${maxPerType} 次（${allTimes}）。如要修正請聯絡主管或走「補打卡」`,
+      }, { status: 409 });
+    }
+  }
   const { data: settings } = await supabase.from("attendance_settings").select("*").limit(1).single();
 
   // 自動矯正：下班超過 end_time 但未達加班起算門檻 → 視為準時下班（記錄為排班 end_time）
