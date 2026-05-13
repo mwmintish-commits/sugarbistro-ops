@@ -16,6 +16,7 @@ const BonusFormulaEditor = dynamic(() => import("./components/SettingsMgr").then
 const WorklogSettings = dynamic(() => import("./components/SettingsMgr").then(m => ({ default: m.WorklogSettings })), { ssr: false });
 const WorklogMgr = dynamic(() => import("./components/WorklogMgr"), { ssr: false });
 const MarkdownView = dynamic(() => import("./components/MarkdownView"), { ssr: false });
+const OrderSuggestionsView = dynamic(() => import("./components/OrderSuggestionsView"), { ssr: false });
 const LeavesMgr = dynamic(() => import("./components/LeavesMgr"), { ssr: false });
 
 const ROLE_TABS = {
@@ -140,6 +141,7 @@ export default function AdminPage() {
   const [si, setSi] = useState(null);
   const [editStl, setEditStl] = useState(null);
   const [splitStl, setSplitStl] = useState(null); // 自定義結帳明細編輯 modal
+  const [invSubview, setInvSubview] = useState("items"); // 庫存子分頁: items / suggestions
   const [schPop, setSchPop] = useState(null); // {date, storeId, storeName}
   const [attView, setAttView] = useState("records");
   const [amendments, setAmendments] = useState([]);
@@ -520,6 +522,20 @@ export default function AdminPage() {
                   {otRecords.filter(r=>r.status==="pending").length>0&&<div onClick={()=>setTab("overtime")} style={{...liStyle,color:"#b45309"}}>{"⏱ 待審加班 "+otRecords.filter(r=>r.status==="pending").length+" 筆"}</div>}
                   {amendments.filter(a=>a.status==="pending").length>0&&<div style={{...liStyle,color:"#b45309"}}>{"🔧 待審補登 "+amendments.filter(a=>a.status==="pending").length+" 筆"}</div>}
                   {dep.filter(d=>d.status==="anomaly").length>0&&<div onClick={()=>setTab("deposits")} style={{...liStyle,color:"#b91c1c"}}>{"🚨 存款異常 "+dep.filter(d=>d.status==="anomaly").length+" 筆"}</div>}
+                  {(()=>{
+                    // 偵測「閉店盤點未完成」：所有 active 店中、本日 stock_counts evening 缺漏的
+                    const today = new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});
+                    const yesterday = new Date(Date.now() - 86400000).toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});
+                    // 若 invItems 有資料、且某些店所有品項 last_count_at 都 < 24hr 前 → 警示
+                    const missingStores = stores.filter(s=>{
+                      const storeItems = (invItems||[]).filter(i=>i.store_id===s.id && i.is_active);
+                      if (storeItems.length===0) return false;
+                      const recent = storeItems.filter(i=>i.last_count_at && new Date(i.last_count_at).toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"})===yesterday);
+                      // 昨晚應該要有閉店盤點 → 找不到任何 last_count_at 在昨天 = 未完成
+                      return recent.length === 0;
+                    });
+                    return missingStores.length>0 ? <div onClick={()=>setTab("inventory")} style={{...liStyle,color:"#b91c1c"}}>{"🌙 昨晚閉店盤點未完成 "+missingStores.length+" 店（點此前往）"}</div> : null;
+                  })()}
                   {pendingEmps.length===0&&pl.length===0&&exps.filter(e=>e.status==="pending").length===0&&otRecords.filter(r=>r.status==="pending").length===0&&amendments.filter(a=>a.status==="pending").length===0&&dep.filter(d=>d.status==="anomaly").length===0&&<div style={{fontSize:10,color:"#ccc",textAlign:"center",padding:8}}>✅ 無待辦</div>}
                 </div>
                 );
@@ -974,8 +990,54 @@ export default function AdminPage() {
               ))}
             </div>
 
-            {attView === "records" && (
+            {attView === "records" && (() => {
+              // 偵測重複打卡：相同 (employee_id, date, type) 出現 2 次以上（不含補登）
+              const groups = {};
+              for (const a of att) {
+                if (a.is_amendment) continue;
+                const date = a.timestamp ? new Date(a.timestamp).toLocaleDateString("sv-SE", {timeZone:"Asia/Taipei"}) : "";
+                if (!date) continue;
+                const key = a.employee_id + "|" + date + "|" + a.type;
+                if (!groups[key]) groups[key] = { emp_id: a.employee_id, emp_name: a.employees?.name, date, type: a.type, ids: [] };
+                groups[key].ids.push(a.id);
+              }
+              const dupes = Object.values(groups).filter(g => g.ids.length > 1);
+              // 同員工同日去重組合（不論 type）
+              const byEmpDate = {};
+              for (const d of dupes) {
+                const k = d.emp_id + "|" + d.date;
+                if (!byEmpDate[k]) byEmpDate[k] = { emp_id: d.emp_id, emp_name: d.emp_name, date: d.date, extra: 0 };
+                byEmpDate[k].extra += d.ids.length - 1;
+              }
+              const dupeList = Object.values(byEmpDate);
+              return (
               <div>
+                {/* 重複打卡警示與清理 */}
+                {dupeList.length > 0 && (
+                  <div style={{background:"#fef3c7",border:"1px solid #f0e6c8",borderRadius:8,padding:10,marginBottom:10}}>
+                    <div style={{fontSize:12,fontWeight:600,color:"#8a6d00",marginBottom:6}}>
+                      ⚠️ 偵測到 {dupeList.length} 個員工/日期有重複打卡共 {dupeList.reduce((a,d)=>a+d.extra,0)} 筆多餘紀錄
+                    </div>
+                    <div style={{maxHeight:120,overflow:"auto",marginBottom:6}}>
+                      {dupeList.slice(0,20).map((d,i)=>(
+                        <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"3px 0",fontSize:11}}>
+                          <span>👤 {d.emp_name} · {d.date} · 多 {d.extra} 筆</span>
+                          <button onClick={async()=>{
+                            const store = stores.find(s=>s.id===emps.find(e=>e.id===d.emp_id)?.store_id);
+                            const keepCount = store?.shift_mode === "double" ? 2 : 1;
+                            if (!confirm(`清理 ${d.emp_name} ${d.date} 的重複打卡？\n\n保留：${keepCount} 筆上班（最早）+ ${keepCount} 筆下班（最晚）\n刪除：其餘 ${d.extra} 筆\n\n此操作不可逆。`)) return;
+                            const r = await ap("/api/admin/attendance",{action:"dedupe_day",employee_id:d.emp_id,date:d.date,keep_count:keepCount,edited_by:auth?.id,edited_by_name:auth?.name});
+                            if (r.error) { alert("❌ "+r.error); return; }
+                            alert(`✅ 已清理：刪除 ${r.deleted} 筆、保留 ${r.kept} 筆`);
+                            load();
+                          }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:10,cursor:"pointer"}}>🧹 清理此日</button>
+                        </div>
+                      ))}
+                      {dupeList.length > 20 && <div style={{fontSize:10,color:"#888"}}>...還有 {dupeList.length - 20} 個未顯示</div>}
+                    </div>
+                    <div style={{fontSize:10,color:"#666"}}>規則：單班店家保留 1 上 + 1 下；雙班店家保留 2 上 + 2 下。clock_in 取最早，clock_out 取最晚。</div>
+                  </div>
+                )}
               {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
                 const storeAtt = att.filter(a => { const emp = emps.find(e=>e.id===a.employee_id); return emp && (store.id==="__hq__" ? (!emp.store_id || !stores.some(st=>st.id===emp.store_id)) : emp.store_id === store.id); });
                 if (storeAtt.length === 0 && !sf) return null;
@@ -1023,7 +1085,8 @@ export default function AdminPage() {
                 </div>);
               })}
               </div>
-            )}
+              );
+            })()}
 
             {attView === "amendments" && (
               <div>
@@ -1491,8 +1554,43 @@ export default function AdminPage() {
           </div>
         )}
 
-        {!ld && tab === "settlements" && (
+        {!ld && tab === "settlements" && (() => {
+          const sfStore = sf ? stores.find(s=>s.id===sf) : null;
+          const sfMethods = sfStore?.custom_payment_methods || [];
+          // 該店有 other_payment_amount > 0 且 custom_payments 空的筆數（可批次修正）
+          const fixable = sf ? stl.filter(s => Number(s.other_payment_amount||0) > 0 && (!Array.isArray(s.custom_payments)||s.custom_payments.length===0)) : [];
+          const fixableTotal = fixable.reduce((a,s)=>a+Number(s.other_payment_amount||0),0);
+          const oneMethod = sfMethods.length === 1 ? sfMethods[0] : null;
+          const routeFor = oneMethod ? routePaymentMethod(oneMethod) : null;
+          return (
           <div>
+            {/* 批次修正提示（單一自定義方式的店 → 一鍵歸位） */}
+            {sf && fixable.length > 0 && routeFor && (
+              <div style={{background:"#fff8e6",border:"1px solid #f0e6c8",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
+                <div style={{fontSize:12,marginBottom:6}}>
+                  💡 偵測到 <b>{sfStore.name}</b> 本月有 <b>{fixable.length}</b> 筆「其他」金額 <b>{fmt(fixableTotal)}</b> 尚未拆分。
+                  此店只設一個自定義方式「{oneMethod}」，可一鍵全部歸到「{COL_LABELS[routeFor]||routeFor}」欄。
+                </div>
+                <button onClick={async()=>{
+                  if (!confirm(`確定把 ${sfStore.name} ${month} 月共 ${fixable.length} 筆「其他」總額 ${fmt(fixableTotal)} 全部歸為「${oneMethod}」？\n\n此操作可逆（用拆分 modal 改回來），但會直接修改本月所有未拆分的日結。`)) return;
+                  const r = await ap("/api/admin/settlements",{action:"batch_reroute_other",store_id:sf,month,target_column:routeFor,method_label:oneMethod});
+                  if (r.error) { alert("❌ "+r.error); return; }
+                  alert(`✅ 已修正 ${r.updated} 筆，共 ${fmt(r.total)} 已歸到「${oneMethod}」欄`);
+                  load();
+                }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"#b45309",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                  🔄 一鍵全部歸為「{oneMethod}」（{fixable.length} 筆 / {fmt(fixableTotal)}）
+                </button>
+              </div>
+            )}
+            {sf && fixable.length > 0 && !routeFor && (
+              <div style={{background:"#fef2f2",border:"1px solid #f0c8c8",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12}}>
+                ⚠️ <b>{sfStore.name}</b> 本月有 <b>{fixable.length}</b> 筆「其他」金額 <b>{fmt(fixableTotal)}</b> 尚未拆分。
+                {sfMethods.length === 0
+                  ? <>請先到「設定 → 門市」填寫常用自定義結帳方式，或逐筆點「📝拆分」修正。</>
+                  : <>此店有多種自定義方式（{sfMethods.join("、")}），無法一鍵還原，請逐筆點「📝拆分」修正。</>}
+              </div>
+            )}
+
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 日結 ("+stl.length+"筆)"}
               <button onClick={()=>{
                 if (!sf) { alert("請先在上方選擇門市篩選"); return; }
@@ -1748,7 +1846,8 @@ export default function AdminPage() {
               );
             })()}
           </div>
-        )}
+          );
+        })()}
 
         {/* DEPOSITS */}
         {!ld && tab === "deposits" && (
@@ -2140,8 +2239,19 @@ export default function AdminPage() {
         {!ld && tab === "inventory" && (
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📊 庫存管理</h3>
+            {/* 子分頁切換 */}
+            <div style={{display:"flex",gap:4,marginBottom:10}}>
+              {[["items","品項清單"],["suggestions","📋 明日建議"]].map(([k,l])=>(
+                <button key={k} onClick={()=>setInvSubview(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:invSubview===k?"#1a1a1a":"#fff",color:invSubview===k?"#fff":"#666",fontSize:11,cursor:"pointer",fontWeight:600}}>{l}</button>
+              ))}
+            </div>
+
+            {/* === 明日出貨/備料建議 === */}
+            {invSubview === "suggestions" && <OrderSuggestionsView sf={sf} stores={stores} auth={auth} />}
+
+            {invSubview === "items" && <>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
-              <button onClick={async()=>{const n=prompt("品項名稱：");if(!n)return;const t=prompt("類型(raw_material/finished/packaging)：","raw_material");const u=prompt("單位：","個");const c=prompt("單位成本：","0");const ss=prompt("安全庫存：","0");const par=prompt("標準存量(par_level)：","0");const z=prompt("區域(refrig=冷藏 / freezer=冷凍 / ambient=常溫 / display=展示櫃，留空=不分區)：","");const cat=prompt("分類（可留空，例：原物料/包材/麵包/甜點）：","");const ki=confirm("是否為「重點品項」（高風險/高成本）？\n按確定=是、取消=否");await ap("/api/admin/inventory",{action:"create",name:n,type:t,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss),par_level:Number(par)||null,zone:z||null,category:cat||null,is_key_item:ki});load();}}
+              <button onClick={async()=>{const n=prompt("品項名稱：");if(!n)return;const t=prompt("類型(raw_material/finished/packaging)：","raw_material");const u=prompt("單位：","個");const c=prompt("單位成本：","0");const ss=prompt("安全庫存：","0");const par=prompt("標準存量(par_level)：","0");const z=prompt("區域(refrig=冷藏 / freezer=冷凍 / ambient=常溫 / display=展示櫃，留空=不分區)：","");const cat=prompt("分類（可留空，例：原物料/包材/麵包/甜點）：","");const ki=confirm("是否為「重點品項」（高風險/高成本）？\n按確定=是、取消=否");const ip=confirm("是否為「現場製作類」（要總部備半成品/麵糊等）？\n按確定=是、取消=否（一般進貨原物料）");await ap("/api/admin/inventory",{action:"create",name:n,type:t,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss),par_level:Number(par)||null,zone:z||null,category:cat||null,is_key_item:ki,is_production:ip});load();}}
                 style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增品項</button>
               <button onClick={async()=>{const from=prompt("來源門市ID：");const to=prompt("目標門市ID：");const item=prompt("品項ID：");const qty=prompt("數量：");if(!from||!to||!item||!qty)return;await ap("/api/admin/inventory",{action:"movement",item_id:item,store_id:from,type:"transfer_out",quantity:-Number(qty),notes:"調撥至其他門市"});await ap("/api/admin/inventory",{action:"movement",item_id:item,store_id:to,type:"transfer_in",quantity:Number(qty),notes:"從其他門市調入"});alert("調撥完成");load();}}
                 style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"transparent",color:"#4361ee",fontSize:11,cursor:"pointer"}}>🔄 門市調撥</button>
@@ -2248,6 +2358,7 @@ export default function AdminPage() {
                 })()}
               </table>
             </div>
+            </>}
           </div>
         )}
 

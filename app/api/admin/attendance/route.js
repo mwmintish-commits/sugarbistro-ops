@@ -88,6 +88,41 @@ export async function POST(request) {
     return Response.json({ success: true });
   }
 
+  // 清理某員工某天的重複打卡（保留每種類型「最早 1 筆 clock_in、最晚 1 筆 clock_out」，其餘刪除）
+  // 雙班店家可選 keep_count=2，預設 1
+  if (body.action === "dedupe_day") {
+    const { employee_id, date, keep_count = 1, edited_by, edited_by_name } = body;
+    if (!employee_id || !date) return Response.json({ error: "缺少 employee_id 或 date" }, { status: 400 });
+    const { data: recs, error: e1 } = await supabase.from("attendances")
+      .select("*").eq("employee_id", employee_id)
+      .gte("timestamp", date + "T00:00:00+08:00")
+      .lte("timestamp", date + "T23:59:59+08:00")
+      .order("timestamp", { ascending: true });
+    if (e1) return Response.json({ error: e1.message }, { status: 500 });
+
+    const result = { clock_in_kept: [], clock_in_deleted: [], clock_out_kept: [], clock_out_deleted: [] };
+    for (const type of ["clock_in", "clock_out"]) {
+      const same = (recs || []).filter(r => r.type === type && !r.is_amendment);
+      // clock_in 取最早；clock_out 取最晚
+      const sorted = type === "clock_in" ? same : [...same].reverse();
+      const keep = sorted.slice(0, keep_count).map(r => r.id);
+      const del = sorted.slice(keep_count).map(r => r.id);
+      result[type + "_kept"] = keep;
+      result[type + "_deleted"] = del;
+      if (del.length > 0) {
+        await supabase.from("attendances").delete().in("id", del);
+      }
+    }
+    await auditLog(edited_by, edited_by_name, "attendance_dedupe", "attendance", null, {
+      employee_id, date, keep_count, ...result,
+    });
+    return Response.json({
+      success: true,
+      deleted: result.clock_in_deleted.length + result.clock_out_deleted.length,
+      kept: result.clock_in_kept.length + result.clock_out_kept.length,
+    });
+  }
+
   // 後台直接編輯打卡時間（不走補登流程，自動重算遲到/早退）
   if (body.action === "update") {
     const { attendance_id, timestamp, type, edited_by, edited_by_name } = body;

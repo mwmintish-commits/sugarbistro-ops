@@ -19,11 +19,30 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
   const [wasteStatus, setWasteStatus] = useState("pending");
   const [wasteStats, setWasteStats] = useState(null);
   const [wasteAuditNote, setWasteAuditNote] = useState({});
+  const [wasteSubview, setWasteSubview] = useState("audit"); // audit / collection / trends
+  const [collectionData, setCollectionData] = useState([]);
+  const [collectionTotals, setCollectionTotals] = useState({ totalItems: 0, totalCost: 0 });
+  const [collectionPicked, setCollectionPicked] = useState({}); // {movement_id: true}
+  const [trendData, setTrendData] = useState({ itemAlerts: [], empAlerts: [] });
 
   const LOC_LABEL = { refrig: "🧊 冷藏", freezer: "❄️ 冷凍", ambient: "🌡 常溫", display: "🪟 展示櫃" };
 
   const loadWaste = () => {
     setLoading(true);
+    if (wasteSubview === "collection") {
+      ap("/api/admin/waste?type=collection_queue" + (sf ? "&store_id=" + sf : ""))
+        .then(r => {
+          setCollectionData(r.data || []);
+          setCollectionTotals({ totalItems: r.totalItems || 0, totalCost: r.totalCost || 0 });
+          setLoading(false);
+        });
+      return;
+    }
+    if (wasteSubview === "trends") {
+      ap("/api/admin/waste?type=trends&month=" + month)
+        .then(r => { setTrendData(r.data || { itemAlerts: [], empAlerts: [] }); setLoading(false); });
+      return;
+    }
     Promise.all([
       ap("/api/admin/waste?type=queue&status=" + wasteStatus + (sf ? "&store_id=" + sf : "")),
       ap("/api/admin/waste?type=stats&month=" + month + (sf ? "&store_id=" + sf : "")),
@@ -32,6 +51,37 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
       setWasteStats(s.data || null);
       setLoading(false);
     });
+  };
+
+  const markCollected = async (movement_ids, status = "collected") => {
+    if (!movement_ids || movement_ids.length === 0) return;
+    const r = await fetch("/api/admin/waste", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "mark_collected", movement_ids, collection_status: status, collected_by: auth?.id, collected_by_name: auth?.name }),
+    }).then(r => r.json());
+    if (r.error) { alert("❌ " + r.error); return; }
+    alert("✅ 已標記 " + r.updated + " 筆為「" + (status === "collected" ? "已回收" : status === "disposed" ? "店家自行銷毀" : "待回收") + "」");
+    setCollectionPicked({});
+    loadWaste();
+  };
+
+  const exportCollectionCSV = () => {
+    const rows = [["門市", "地址", "品項", "數量", "單位", "位置", "原因", "成本", "登記人", "核准日"]];
+    for (const grp of collectionData) {
+      for (const it of grp.items) {
+        rows.push([
+          grp.store_name, grp.address, it.item_name, it.quantity, it.unit,
+          LOC_LABEL[it.patrol_location] || it.patrol_location || "",
+          it.waste_reason || "", it.cost, it.submitted_by || "",
+          it.audit_at ? new Date(it.audit_at).toLocaleDateString("zh-TW") : "",
+        ]);
+      }
+    }
+    const csv = "﻿" + rows.map(r => r.map(c => '"' + String(c || "").replace(/"/g, '""') + '"').join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "回收清單_" + new Date().toLocaleDateString("sv-SE") + ".csv";
+    a.click();
   };
 
   const auditWaste = async (id, decision) => {
@@ -76,7 +126,7 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
     if (view === "completion") loadCompletion();
     else if (view === "inventory") loadInventory();
     else if (view === "waste") loadWaste();
-  }, [view, month, sf, invDate, wasteStatus]);
+  }, [view, month, sf, invDate, wasteStatus, wasteSubview]);
 
   return (
     <div>
@@ -279,6 +329,108 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
       {/* 報廢稽核 */}
       {!loading && view === "waste" && (
         <div>
+          {/* 子分頁：稽核 / 待回收 / 趨勢 */}
+          <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+            {[["audit","📋 稽核"],["collection","📦 待回收"],["trends","📊 趨勢警示"]].map(([k,l]) => (
+              <button key={k} onClick={()=>setWasteSubview(k)} style={{ padding:"4px 10px", borderRadius:5, border:"1px solid #ddd", background: wasteSubview===k?"#b91c1c":"#fff", color: wasteSubview===k?"#fff":"#666", fontSize:11, cursor:"pointer", fontWeight:600 }}>{l}</button>
+            ))}
+          </div>
+
+          {/* === 子分頁：待回收 === */}
+          {wasteSubview === "collection" && (
+            <div>
+              <div style={{ background:"#fff8e6", border:"1px solid #f0e6c8", borderRadius:8, padding:"8px 12px", marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
+                <div style={{ fontSize:12, fontWeight:600, color:"#8a6d00" }}>
+                  📦 待回收清單共 {collectionTotals.totalItems} 筆，估計成本 ${collectionTotals.totalCost.toLocaleString()}
+                </div>
+                <button onClick={exportCollectionCSV} disabled={collectionData.length===0} style={{ padding:"4px 12px", borderRadius:5, border:"1px solid #b45309", background:"#fff", color:"#b45309", fontSize:11, cursor:"pointer", fontWeight:600 }}>📥 匯出 CSV</button>
+              </div>
+              {collectionData.length === 0 && <div style={{ background:"#fff", borderRadius:8, padding:30, textAlign:"center", color:"#aaa" }}>沒有待回收項目（所有核准的報廢都已處理）</div>}
+              {collectionData.map(grp => {
+                const allIds = grp.items.map(i=>i.id);
+                const allChecked = allIds.every(id => collectionPicked[id]);
+                return (
+                <div key={grp.store_name} style={{ background:"#fff", borderRadius:8, border:"1px solid #e8e6e1", marginBottom:10, overflow:"hidden" }}>
+                  <div style={{ background:"#faf8f5", padding:"8px 12px", display:"flex", alignItems:"center", gap:8 }}>
+                    <input type="checkbox" checked={allChecked} onChange={e=>{
+                      const next = { ...collectionPicked };
+                      for (const id of allIds) next[id] = e.target.checked;
+                      setCollectionPicked(next);
+                    }} />
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:600 }}>🏠 {grp.store_name} <span style={{ fontSize:10, color:"#888", fontWeight:400, marginLeft:4 }}>{grp.items.length} 筆</span></div>
+                      {grp.address && <div style={{ fontSize:10, color:"#666" }}>📍 {grp.address}</div>}
+                    </div>
+                    <button onClick={()=>markCollected(allIds, "collected")} style={{ padding:"3px 10px", borderRadius:4, border:"none", background:"#0a7c42", color:"#fff", fontSize:11, fontWeight:600, cursor:"pointer" }}>✅ 整店已收</button>
+                  </div>
+                  <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
+                    <tbody>{grp.items.map(it => (
+                      <tr key={it.id} style={{ borderTop:"1px solid #f0eeea" }}>
+                        <td style={{ padding:"6px 12px", width:30 }}>
+                          <input type="checkbox" checked={!!collectionPicked[it.id]} onChange={e=>setCollectionPicked({ ...collectionPicked, [it.id]: e.target.checked })} />
+                        </td>
+                        <td style={{ padding:6 }}>
+                          {it.photo && <a href={it.photo} target="_blank" rel="noreferrer"><img src={it.photo} alt="" style={{ width:44, height:44, objectFit:"cover", borderRadius:4, verticalAlign:"middle" }} /></a>}
+                        </td>
+                        <td style={{ padding:6 }}>
+                          <div style={{ fontWeight:500 }}>{(LOC_LABEL[it.patrol_location] || "")} {it.item_name}</div>
+                          <div style={{ fontSize:9, color:"#888" }}>{it.waste_reason} · {it.submitted_by || "—"}</div>
+                        </td>
+                        <td style={{ padding:6, textAlign:"right", fontWeight:600 }}>{it.quantity}{it.unit}</td>
+                        <td style={{ padding:6, textAlign:"right", color:"#b91c1c" }}>${it.cost.toLocaleString()}</td>
+                        <td style={{ padding:6, whiteSpace:"nowrap" }}>
+                          <button onClick={()=>markCollected([it.id], "collected")} style={{ padding:"2px 6px", borderRadius:3, border:"1px solid #0a7c42", background:"#fff", color:"#0a7c42", fontSize:9, cursor:"pointer" }}>已收</button>
+                          <button onClick={()=>markCollected([it.id], "disposed")} style={{ marginLeft:3, padding:"2px 6px", borderRadius:3, border:"1px solid #b45309", background:"#fff", color:"#b45309", fontSize:9, cursor:"pointer" }}>店家自處</button>
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>);
+              })}
+              {Object.values(collectionPicked).some(v=>v) && (
+                <div style={{ position:"sticky", bottom:0, background:"#fff", padding:10, borderTop:"2px solid #0a7c42", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <span style={{ fontSize:12, fontWeight:600 }}>已勾選 {Object.values(collectionPicked).filter(v=>v).length} 筆</span>
+                  <div style={{ display:"flex", gap:6 }}>
+                    <button onClick={()=>markCollected(Object.keys(collectionPicked).filter(k=>collectionPicked[k]), "collected")} style={{ padding:"6px 14px", borderRadius:5, border:"none", background:"#0a7c42", color:"#fff", fontSize:12, fontWeight:600, cursor:"pointer" }}>✅ 標記為已回收</button>
+                    <button onClick={()=>setCollectionPicked({})} style={{ padding:"6px 14px", borderRadius:5, border:"1px solid #ddd", background:"#fff", fontSize:12, cursor:"pointer" }}>取消</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* === 子分頁：趨勢警示 === */}
+          {wasteSubview === "trends" && (
+            <div>
+              <div style={{ fontSize:11, color:"#666", marginBottom:10 }}>📅 {month}　偵測本月異常：同品項同店 ≥ 3 次、單一員工總成本 ≥ $5,000</div>
+
+              <div style={{ background:"#fff", borderRadius:8, border:"1px solid #eee", padding:10, marginBottom:10 }}>
+                <h4 style={{ fontSize:12, fontWeight:600, marginBottom:6 }}>🔁 高頻品項報廢（同店 ≥ 3 次）</h4>
+                {trendData.itemAlerts.length === 0 && <div style={{ fontSize:11, color:"#aaa", padding:10, textAlign:"center" }}>本月無異常</div>}
+                {trendData.itemAlerts.map((a,i)=>(
+                  <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"4px 0", borderBottom: i<trendData.itemAlerts.length-1?"1px solid #f0eeea":"none", fontSize:11 }}>
+                    <span>{a.store_name} · {a.item_name}</span>
+                    <span><b style={{ color:"#b91c1c" }}>{a.count} 次</b> · ${Math.round(a.total_cost).toLocaleString()}</span>
+                  </div>
+                ))}
+                {trendData.itemAlerts.length > 0 && <div style={{ fontSize:10, color:"#666", marginTop:6, padding:6, background:"#fffbeb", borderRadius:4 }}>💡 建議檢討訂貨量或品質供應商</div>}
+              </div>
+
+              <div style={{ background:"#fff", borderRadius:8, border:"1px solid #eee", padding:10 }}>
+                <h4 style={{ fontSize:12, fontWeight:600, marginBottom:6 }}>👤 個人報廢成本警示（≥ $5,000）</h4>
+                {trendData.empAlerts.length === 0 && <div style={{ fontSize:11, color:"#aaa", padding:10, textAlign:"center" }}>本月無異常</div>}
+                {trendData.empAlerts.map((a,i)=>(
+                  <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"4px 0", borderBottom: i<trendData.empAlerts.length-1?"1px solid #f0eeea":"none", fontSize:11 }}>
+                    <span>{a.name}</span>
+                    <span>{a.count} 筆 · <b style={{ color:"#b91c1c" }}>${Math.round(a.total_cost).toLocaleString()}</b></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* === 子分頁：稽核（原邏輯） === */}
+          {wasteSubview === "audit" && <>
           {/* 統計卡 */}
           {wasteStats && <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 10 }}>
             <div style={{ background: "#fff", borderRadius: 8, padding: 10, border: "1px solid #eee" }}>
@@ -331,6 +483,7 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
               </div>
             </div>
           ))}
+          </>}
         </div>
       )}
 

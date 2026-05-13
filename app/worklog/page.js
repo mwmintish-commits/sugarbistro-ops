@@ -25,7 +25,7 @@ export default function WorkLogPage() {
   const [invItems, setInvItems] = useState([]); // 庫存品項（叫貨用）
   const [shiftMode, setShiftMode] = useState("single");
   const [wasteMode, setWasteMode] = useState(false);
-  const [wasteForm, setWasteForm] = useState({ item_id: "", quantity: "", patrol_location: "", waste_reason: "", note: "" });
+  const [wasteForm, setWasteForm] = useState({ item_id: "", quantity: "", patrol_location: "", waste_reason: "過期", note: "" });
   const [wastePhoto, setWastePhoto] = useState(null); // dataURL with watermark
   const [wasteUploading, setWasteUploading] = useState(false);
   const [wasteAnalyzing, setWasteAnalyzing] = useState(false);
@@ -217,7 +217,7 @@ export default function WorkLogPage() {
       }) }).then(r => r.json());
       if (r.error) { alert("提交失敗：" + r.error); return; }
       alert("✅ 已送出，待主管稽核");
-      setWasteForm({ item_id: "", quantity: "", patrol_location: "", waste_reason: "", note: "" });
+      setWasteForm({ item_id: "", quantity: "", patrol_location: "", waste_reason: "過期", note: "" });
       setWastePhoto(null); setWasteMode(false);
       loadWasteToday();
     } finally { setWasteUploading(false); }
@@ -375,33 +375,23 @@ export default function WorkLogPage() {
               <button onClick={confirmNoWaste} disabled={wasteToday.no_waste} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid " + (wasteToday.no_waste ? "#ccc" : "#0a7c42"), background: wasteToday.no_waste ? "#eee" : "#e6f9f0", color: wasteToday.no_waste ? "#999" : "#0a7c42", fontSize: 12, fontWeight: 600, cursor: wasteToday.no_waste ? "default" : "pointer" }}>{wasteToday.no_waste ? "✅ 已確認" : "本日無報廢"}</button>
             </div>}
             {wasteMode && <div style={{ marginTop: 4 }}>
-              <select value={wasteForm.patrol_location} onChange={e => setWasteForm({ ...wasteForm, patrol_location: e.target.value, item_id: "" })} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, marginBottom: 6 }}>
-                <option value="">📍 巡邏位置...</option>
-                <option value="refrig">🧊 冷藏</option>
-                <option value="freezer">❄️ 冷凍</option>
-                <option value="ambient">🌡 常溫</option>
-                <option value="display">🪟 展示櫃</option>
-              </select>
+              {/* 簡化 UX：直接選品項（依 zone 分組顯示），選擇後自動帶位置 */}
               {(() => {
                 const zoneLabel = { refrig: "🧊 冷藏", freezer: "❄️ 冷凍", ambient: "🌡 常溫", display: "🪟 展示櫃" };
-                const filtered = wasteForm.patrol_location
-                  ? wasteItems.filter(i => i.zone === wasteForm.patrol_location)
-                  : wasteItems;
-                // 未選位置時依 zone 分組顯示；選了位置就只顯示該區
                 const groups = {};
-                for (const i of filtered) { const z = i.zone || "unzoned"; if (!groups[z]) groups[z] = []; groups[z].push(i); }
+                for (const i of wasteItems) { const z = i.zone || "unzoned"; if (!groups[z]) groups[z] = []; groups[z].push(i); }
                 const order = ["refrig", "freezer", "ambient", "display", "unzoned"];
                 return (
-                  <select value={wasteForm.item_id} onChange={e => setWasteForm({ ...wasteForm, item_id: e.target.value })} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, marginBottom: 6 }}>
-                    <option value="">{filtered.length === 0 ? (wasteForm.patrol_location ? "（此區無品項，請至後台分類）" : "（此門市無報廢品項，請聯絡管理員）") : "選擇品項..."}</option>
-                    {wasteForm.patrol_location
-                      ? filtered.map(i => <option key={i.id} value={i.id}>{i.name + " (" + (i.unit || "") + ")"}</option>)
-                      : order.filter(z => groups[z]).map(z => (
-                          <optgroup key={z} label={zoneLabel[z] || "未分區"}>
-                            {groups[z].map(i => <option key={i.id} value={i.id}>{i.name + " (" + (i.unit || "") + ")"}</option>)}
-                          </optgroup>
-                        ))
-                    }
+                  <select value={wasteForm.item_id} onChange={e => {
+                    const it = wasteItems.find(x => x.id === e.target.value);
+                    setWasteForm({ ...wasteForm, item_id: e.target.value, patrol_location: it?.zone || "ambient" });
+                  }} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, marginBottom: 6 }}>
+                    <option value="">{wasteItems.length === 0 ? "（此門市無報廢品項，請聯絡管理員）" : "📦 選擇品項..."}</option>
+                    {order.filter(z => groups[z]).map(z => (
+                      <optgroup key={z} label={zoneLabel[z] || "未分區"}>
+                        {groups[z].map(i => <option key={i.id} value={i.id}>{i.name + " (" + (i.unit || "") + ")"}</option>)}
+                      </optgroup>
+                    ))}
                   </select>
                 );
               })()}
@@ -426,7 +416,7 @@ export default function WorkLogPage() {
               {wasteAiHint && <div style={{ padding: "6px 8px", borderRadius: 6, background: "#fff8e6", color: "#92400e", fontSize: 11, marginBottom: 6 }}>{wasteAiHint}</div>}
               <div style={{ display: "flex", gap: 6 }}>
                 <button onClick={submitWaste} disabled={wasteUploading} style={{ flex: 2, padding: 10, borderRadius: 8, border: "none", background: wasteUploading ? "#ccc" : "#b91c1c", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{wasteUploading ? "送出中..." : "送出報廢"}</button>
-                <button onClick={() => { setWasteMode(false); setWastePhoto(null); setWasteForm({ item_id: "", quantity: "", patrol_location: "", waste_reason: "", note: "" }); }} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ddd", background: "#fff", fontSize: 12, cursor: "pointer" }}>取消</button>
+                <button onClick={() => { setWasteMode(false); setWastePhoto(null); setWasteForm({ item_id: "", quantity: "", patrol_location: "", waste_reason: "過期", note: "" }); }} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ddd", background: "#fff", fontSize: 12, cursor: "pointer" }}>取消</button>
               </div>
             </div>}
             {wasteToday.wastes?.length > 0 && <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0eeea" }}>
