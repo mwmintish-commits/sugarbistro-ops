@@ -5,6 +5,43 @@ export async function GET(request) {
   const type = searchParams.get("type");
   const store_id = searchParams.get("store_id");
 
+  // 缺口檢核：iChef 賣過但 inventory_items 找不到對應 type='finished' 的品項
+  if (type === "sales_gap") {
+    const days = Number(searchParams.get("days") || 7);
+    const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+
+    const { data: sales } = await supabase.from("daily_sales_items")
+      .select("store_id, item_name, quantity, revenue, date, stores(name)")
+      .gte("date", since);
+
+    let { data: items } = await supabase.from("inventory_items")
+      .select("name, store_id").eq("is_active", true).eq("type", "finished");
+    if (store_id) items = items?.filter(i => i.store_id === store_id);
+    const itemSet = new Set((items || []).map(i => i.store_id + "|" + String(i.name || "").trim()));
+
+    // 聚合「沒對應」的銷售品項
+    const gapMap = {};
+    for (const s of sales || []) {
+      if (store_id && s.store_id !== store_id) continue;
+      const name = String(s.item_name || "").trim();
+      if (itemSet.has(s.store_id + "|" + name)) continue;
+      // 忽略折抵類（如「指定飲品 無限續杯」revenue 為負）
+      if (Number(s.quantity || 0) <= 0 || Number(s.revenue || 0) < 0) continue;
+      const k = s.store_id + "|" + name;
+      if (!gapMap[k]) gapMap[k] = {
+        store_id: s.store_id, store_name: s.stores?.name || "?",
+        name, total_qty: 0, total_revenue: 0, days_seen: new Set(),
+      };
+      gapMap[k].total_qty += Number(s.quantity || 0);
+      gapMap[k].total_revenue += Number(s.revenue || 0);
+      gapMap[k].days_seen.add(s.date);
+    }
+    const result = Object.values(gapMap)
+      .map(g => ({ ...g, days_seen: g.days_seen.size }))
+      .sort((a, b) => b.total_revenue - a.total_revenue);
+    return Response.json({ data: result, range_days: days });
+  }
+
   // 明日出貨/備料建議（依閉店盤點 + 過去 7 天銷量預估）
   if (type === "order_suggestions") {
     const targetDate = searchParams.get("date") || (() => {
