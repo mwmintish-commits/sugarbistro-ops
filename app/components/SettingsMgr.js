@@ -142,6 +142,42 @@ export default function SettingsMgr({ stores, load, month, auth }) {
         </div>
       </div>
 
+      {/* iCHEF 品項銷售匯入 */}
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+        <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🍰 iCHEF 品項銷售匯入（從會員系統拉每筆品項）</h4>
+        <div style={{ fontSize: 10, color: "#888", marginBottom: 8, lineHeight: 1.6 }}>
+          • 來源：sugarbistro-member /api/admin/ichef/sales-items（需對方先實作）<br/>
+          • 解鎖：品項銷售排行、自動扣原料、進銷存核對、毛利分析<br/>
+          • 對方未實作前可勾「使用 mock 來源」測試結構是否正確<br/>
+          • 自動端點：<code style={{ background: "#f0f0f0", padding: "1px 4px", borderRadius: 3, fontSize: 10 }}>/api/cron/ichef-sales-pull?key=&lt;CRON_SECRET&gt;</code>
+        </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 100 }}>
+            <label style={{ fontSize: 9, color: "#888" }}>起始日</label>
+            <input type="date" id="sales-start" style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 100 }}>
+            <label style={{ fontSize: 9, color: "#888" }}>結束日</label>
+            <input type="date" id="sales-end" style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+          </div>
+          <label style={{ fontSize: 10, color: "#666", display: "flex", alignItems: "center", gap: 4, paddingBottom: 6 }}>
+            <input type="checkbox" id="sales-mock" /> 使用 mock 來源（測試用）
+          </label>
+          <button onClick={async () => {
+            const start = document.getElementById("sales-start")?.value;
+            const end = document.getElementById("sales-end")?.value;
+            const useMock = document.getElementById("sales-mock")?.checked;
+            if (!confirm(`匯入品項銷售${start ? `\n${start} ~ ${end || start}` : "（昨天）"}${useMock ? "\n\n⚠️ 使用 mock 來源（不是真實資料）" : ""}？`)) return;
+            const btn = document.getElementById("sales-pull-btn");
+            if (btn) { btn.textContent = "⏳ 同步中..."; btn.disabled = true; }
+            const r = await ap("/api/admin/ichef-sales-pull", { start: start || null, end: end || null, useMock });
+            if (btn) { btn.textContent = "🔄 立即匯入", btn.disabled = false; }
+            if (r.error) { alert("❌ " + r.error + (r.detail ? "\n\n" + r.detail : "")); return; }
+            alert(`✅ ${r.message}\n\n來源：${r.source}${r.unmapped?.length ? "\n\n⚠️ 未對應的 storeCode：" + r.unmapped.join(", ") : ""}${r.errors?.length ? "\n\n⚠️ 錯誤：\n" + r.errors.slice(0,3).join("\n") : ""}`);
+          }} id="sales-pull-btn" style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#7c3aed", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔄 立即匯入</button>
+        </div>
+      </div>
+
       {/* 門市管理（含定位、目標、預算） */}
       <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🏠 門市管理</h4>
