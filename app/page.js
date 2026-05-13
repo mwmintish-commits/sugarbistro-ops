@@ -17,6 +17,7 @@ const WorklogSettings = dynamic(() => import("./components/SettingsMgr").then(m 
 const WorklogMgr = dynamic(() => import("./components/WorklogMgr"), { ssr: false });
 const MarkdownView = dynamic(() => import("./components/MarkdownView"), { ssr: false });
 const OrderSuggestionsView = dynamic(() => import("./components/OrderSuggestionsView"), { ssr: false });
+const SalesGapView = dynamic(() => import("./components/SalesGapView"), { ssr: false });
 const LeavesMgr = dynamic(() => import("./components/LeavesMgr"), { ssr: false });
 
 const ROLE_TABS = {
@@ -2241,13 +2242,16 @@ export default function AdminPage() {
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📊 庫存管理</h3>
             {/* 子分頁切換 */}
             <div style={{display:"flex",gap:4,marginBottom:10}}>
-              {[["items","品項清單"],["suggestions","📋 明日建議"]].map(([k,l])=>(
+              {[["items","品項清單"],["suggestions","📋 明日建議"],["gap","🔍 銷售缺口檢核"]].map(([k,l])=>(
                 <button key={k} onClick={()=>setInvSubview(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:invSubview===k?"#1a1a1a":"#fff",color:invSubview===k?"#fff":"#666",fontSize:11,cursor:"pointer",fontWeight:600}}>{l}</button>
               ))}
             </div>
 
             {/* === 明日出貨/備料建議 === */}
             {invSubview === "suggestions" && <OrderSuggestionsView sf={sf} stores={stores} auth={auth} />}
+
+            {/* === 銷售缺口檢核 === */}
+            {invSubview === "gap" && <SalesGapView sf={sf} stores={stores} auth={auth} load={load} />}
 
             {invSubview === "items" && <>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
