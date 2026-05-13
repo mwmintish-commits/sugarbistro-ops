@@ -5,6 +5,100 @@ export async function GET(request) {
   const type = searchParams.get("type");
   const store_id = searchParams.get("store_id");
 
+  // 明日出貨/備料建議（依閉店盤點 + 過去 7 天銷量預估）
+  if (type === "order_suggestions") {
+    const targetDate = searchParams.get("date") || (() => {
+      const t = new Date(Date.now() + 8 * 3600_000);
+      t.setUTCDate(t.getUTCDate() + 1);
+      return t.toISOString().slice(0, 10);
+    })();
+
+    // 1) 撈所有 active 品項
+    let q = supabase.from("inventory_items").select("*, stores(name)").eq("is_active", true);
+    if (store_id) q = q.eq("store_id", store_id);
+    const { data: items } = await q;
+
+    // 2) 過去 7 天銷量（用 daily_sales_items 聚合 by store_id + item_name）
+    const past7Start = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
+    const past7End = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+    const { data: salesData } = await supabase.from("daily_sales_items")
+      .select("store_id, item_name, quantity, date")
+      .gte("date", past7Start).lte("date", past7End);
+    const salesMap = {}; // {store_id|item_name → totalQty}
+    const daysSeen = {}; // {store_id|item_name → Set of dates}
+    for (const s of salesData || []) {
+      const k = s.store_id + "|" + s.item_name;
+      salesMap[k] = (salesMap[k] || 0) + Number(s.quantity || 0);
+      if (!daysSeen[k]) daysSeen[k] = new Set();
+      daysSeen[k].add(s.date);
+    }
+
+    // 3) 待收的叫貨單 / 待收的出貨單（避免重複建議）
+    const { data: pendingOrders } = await supabase.from("purchase_orders")
+      .select("item_id, store_id, quantity").eq("status", "pending");
+    const pendingMap = {};
+    for (const o of pendingOrders || []) {
+      const k = o.store_id + "|" + o.item_id;
+      pendingMap[k] = (pendingMap[k] || 0) + Number(o.quantity || 0);
+    }
+
+    // 4) 計算建議
+    const result = (items || []).map(it => {
+      const k = it.store_id + "|" + it.name;
+      const totalSales = salesMap[k] || 0;
+      const daysCount = (daysSeen[k]?.size) || 0;
+      // 預估明日銷量 = 過去 N 天平均（最多 7 天，N 是實際有資料天數）
+      const estimatedDemand = daysCount > 0 ? totalSales / daysCount : 0;
+      const pendingQty = pendingMap[(it.store_id + "|" + it.id)] || 0;
+      const par = Number(it.par_level || 0);
+      const safe = Number(it.safe_stock || 0);
+      const cur = Number(it.current_stock || 0);
+      // 建議 = par_level + 安全庫存 + 預估明日銷量 - 現有 - 已下單
+      const suggestion = Math.max(0, par + safe + estimatedDemand - cur - pendingQty);
+      const stale = !it.last_count_at || (Date.now() - new Date(it.last_count_at).getTime()) > 36 * 3600_000;
+      return {
+        id: it.id,
+        store_id: it.store_id,
+        store_name: it.stores?.name || "?",
+        name: it.name,
+        unit: it.unit,
+        category: it.category,
+        zone: it.zone,
+        is_production: !!it.is_production,
+        is_key_item: !!it.is_key_item,
+        cost_per_unit: Number(it.cost_per_unit || 0),
+        current_stock: cur,
+        par_level: par,
+        safe_stock: safe,
+        last_count_at: it.last_count_at,
+        last_count_source: it.last_count_source,
+        stale_count: stale,
+        estimated_demand: Math.round(estimatedDemand * 10) / 10,
+        sales_days_used: daysCount,
+        pending_qty: pendingQty,
+        suggestion: Math.round(suggestion * 10) / 10,
+        suggestion_cost: Math.round(suggestion * Number(it.cost_per_unit || 0)),
+      };
+    });
+
+    // 5) 分組（依 store_id）
+    const byStore = {};
+    for (const r of result) {
+      const sk = r.store_id;
+      if (!byStore[sk]) byStore[sk] = { store_id: sk, store_name: r.store_name, purchase: [], production: [], totalCost: 0, staleCount: 0 };
+      const bucket = r.is_production ? "production" : "purchase";
+      byStore[sk][bucket].push(r);
+      byStore[sk].totalCost += r.suggestion_cost;
+      if (r.stale_count) byStore[sk].staleCount += 1;
+    }
+    // 每組依 suggestion_cost 由大到小排序，且只留 suggestion > 0 的
+    for (const grp of Object.values(byStore)) {
+      grp.purchase = grp.purchase.filter(x => x.suggestion > 0).sort((a, b) => b.suggestion_cost - a.suggestion_cost);
+      grp.production = grp.production.filter(x => x.suggestion > 0).sort((a, b) => b.suggestion_cost - a.suggestion_cost);
+    }
+    return Response.json({ target_date: targetDate, data: Object.values(byStore) });
+  }
+
   if (type === "movements") {
     const item_id = searchParams.get("item_id");
     let q = supabase.from("inventory_movements").select("*").order("created_at", { ascending: false });
@@ -95,12 +189,13 @@ export async function POST(request) {
   const body = await request.json();
 
   if (body.action === "create") {
-    const { name, sku, type, category, unit, safe_stock, cost_per_unit, supplier_name, expiry_days, notes, zone, par_level, alert_threshold, is_key_item } = body;
+    const { name, sku, type, category, unit, safe_stock, cost_per_unit, supplier_name, expiry_days, notes, zone, par_level, alert_threshold, is_key_item, is_production } = body;
     // 全域品項：store_id 強制 NULL
     const { data, error } = await supabase.from("inventory_items").insert({
       name, sku, type: type || "raw_material", category, unit, safe_stock, cost_per_unit,
       store_id: null, supplier_name, expiry_days, notes, zone,
-      par_level, alert_threshold: alert_threshold || 2, is_key_item: !!is_key_item, is_active: true,
+      par_level, alert_threshold: alert_threshold || 2, is_key_item: !!is_key_item,
+      is_production: !!is_production, is_active: true,
     }).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
     // 為所有啟用門市建立 inventory_stock（若表存在）

@@ -16,6 +16,7 @@ const BonusFormulaEditor = dynamic(() => import("./components/SettingsMgr").then
 const WorklogSettings = dynamic(() => import("./components/SettingsMgr").then(m => ({ default: m.WorklogSettings })), { ssr: false });
 const WorklogMgr = dynamic(() => import("./components/WorklogMgr"), { ssr: false });
 const MarkdownView = dynamic(() => import("./components/MarkdownView"), { ssr: false });
+const OrderSuggestionsView = dynamic(() => import("./components/OrderSuggestionsView"), { ssr: false });
 const LeavesMgr = dynamic(() => import("./components/LeavesMgr"), { ssr: false });
 
 const ROLE_TABS = {
@@ -140,6 +141,7 @@ export default function AdminPage() {
   const [si, setSi] = useState(null);
   const [editStl, setEditStl] = useState(null);
   const [splitStl, setSplitStl] = useState(null); // 自定義結帳明細編輯 modal
+  const [invSubview, setInvSubview] = useState("items"); // 庫存子分頁: items / suggestions
   const [schPop, setSchPop] = useState(null); // {date, storeId, storeName}
   const [attView, setAttView] = useState("records");
   const [amendments, setAmendments] = useState([]);
@@ -520,6 +522,20 @@ export default function AdminPage() {
                   {otRecords.filter(r=>r.status==="pending").length>0&&<div onClick={()=>setTab("overtime")} style={{...liStyle,color:"#b45309"}}>{"⏱ 待審加班 "+otRecords.filter(r=>r.status==="pending").length+" 筆"}</div>}
                   {amendments.filter(a=>a.status==="pending").length>0&&<div style={{...liStyle,color:"#b45309"}}>{"🔧 待審補登 "+amendments.filter(a=>a.status==="pending").length+" 筆"}</div>}
                   {dep.filter(d=>d.status==="anomaly").length>0&&<div onClick={()=>setTab("deposits")} style={{...liStyle,color:"#b91c1c"}}>{"🚨 存款異常 "+dep.filter(d=>d.status==="anomaly").length+" 筆"}</div>}
+                  {(()=>{
+                    // 偵測「閉店盤點未完成」：所有 active 店中、本日 stock_counts evening 缺漏的
+                    const today = new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});
+                    const yesterday = new Date(Date.now() - 86400000).toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});
+                    // 若 invItems 有資料、且某些店所有品項 last_count_at 都 < 24hr 前 → 警示
+                    const missingStores = stores.filter(s=>{
+                      const storeItems = (invItems||[]).filter(i=>i.store_id===s.id && i.is_active);
+                      if (storeItems.length===0) return false;
+                      const recent = storeItems.filter(i=>i.last_count_at && new Date(i.last_count_at).toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"})===yesterday);
+                      // 昨晚應該要有閉店盤點 → 找不到任何 last_count_at 在昨天 = 未完成
+                      return recent.length === 0;
+                    });
+                    return missingStores.length>0 ? <div onClick={()=>setTab("inventory")} style={{...liStyle,color:"#b91c1c"}}>{"🌙 昨晚閉店盤點未完成 "+missingStores.length+" 店（點此前往）"}</div> : null;
+                  })()}
                   {pendingEmps.length===0&&pl.length===0&&exps.filter(e=>e.status==="pending").length===0&&otRecords.filter(r=>r.status==="pending").length===0&&amendments.filter(a=>a.status==="pending").length===0&&dep.filter(d=>d.status==="anomaly").length===0&&<div style={{fontSize:10,color:"#ccc",textAlign:"center",padding:8}}>✅ 無待辦</div>}
                 </div>
                 );
@@ -2223,8 +2239,19 @@ export default function AdminPage() {
         {!ld && tab === "inventory" && (
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📊 庫存管理</h3>
+            {/* 子分頁切換 */}
+            <div style={{display:"flex",gap:4,marginBottom:10}}>
+              {[["items","品項清單"],["suggestions","📋 明日建議"]].map(([k,l])=>(
+                <button key={k} onClick={()=>setInvSubview(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:invSubview===k?"#1a1a1a":"#fff",color:invSubview===k?"#fff":"#666",fontSize:11,cursor:"pointer",fontWeight:600}}>{l}</button>
+              ))}
+            </div>
+
+            {/* === 明日出貨/備料建議 === */}
+            {invSubview === "suggestions" && <OrderSuggestionsView sf={sf} stores={stores} auth={auth} />}
+
+            {invSubview === "items" && <>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
-              <button onClick={async()=>{const n=prompt("品項名稱：");if(!n)return;const t=prompt("類型(raw_material/finished/packaging)：","raw_material");const u=prompt("單位：","個");const c=prompt("單位成本：","0");const ss=prompt("安全庫存：","0");const par=prompt("標準存量(par_level)：","0");const z=prompt("區域(refrig=冷藏 / freezer=冷凍 / ambient=常溫 / display=展示櫃，留空=不分區)：","");const cat=prompt("分類（可留空，例：原物料/包材/麵包/甜點）：","");const ki=confirm("是否為「重點品項」（高風險/高成本）？\n按確定=是、取消=否");await ap("/api/admin/inventory",{action:"create",name:n,type:t,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss),par_level:Number(par)||null,zone:z||null,category:cat||null,is_key_item:ki});load();}}
+              <button onClick={async()=>{const n=prompt("品項名稱：");if(!n)return;const t=prompt("類型(raw_material/finished/packaging)：","raw_material");const u=prompt("單位：","個");const c=prompt("單位成本：","0");const ss=prompt("安全庫存：","0");const par=prompt("標準存量(par_level)：","0");const z=prompt("區域(refrig=冷藏 / freezer=冷凍 / ambient=常溫 / display=展示櫃，留空=不分區)：","");const cat=prompt("分類（可留空，例：原物料/包材/麵包/甜點）：","");const ki=confirm("是否為「重點品項」（高風險/高成本）？\n按確定=是、取消=否");const ip=confirm("是否為「現場製作類」（要總部備半成品/麵糊等）？\n按確定=是、取消=否（一般進貨原物料）");await ap("/api/admin/inventory",{action:"create",name:n,type:t,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss),par_level:Number(par)||null,zone:z||null,category:cat||null,is_key_item:ki,is_production:ip});load();}}
                 style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增品項</button>
               <button onClick={async()=>{const from=prompt("來源門市ID：");const to=prompt("目標門市ID：");const item=prompt("品項ID：");const qty=prompt("數量：");if(!from||!to||!item||!qty)return;await ap("/api/admin/inventory",{action:"movement",item_id:item,store_id:from,type:"transfer_out",quantity:-Number(qty),notes:"調撥至其他門市"});await ap("/api/admin/inventory",{action:"movement",item_id:item,store_id:to,type:"transfer_in",quantity:Number(qty),notes:"從其他門市調入"});alert("調撥完成");load();}}
                 style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"transparent",color:"#4361ee",fontSize:11,cursor:"pointer"}}>🔄 門市調撥</button>
@@ -2331,6 +2358,7 @@ export default function AdminPage() {
                 })()}
               </table>
             </div>
+            </>}
           </div>
         )}
 

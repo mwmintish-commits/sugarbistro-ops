@@ -217,15 +217,21 @@ export async function POST(request) {
 
     // 晚盤後同步 inventory_stock.current_stock = 盤點實際數
     if (period === "evening" && lineData.length) {
+      const nowIso = new Date().toISOString();
       for (const l of lineData) {
         try {
           await supabase.from("inventory_stock").upsert({
-            item_id: l.item_id, store_id, current_stock: Number(l.quantity || 0), updated_at: new Date().toISOString(),
+            item_id: l.item_id, store_id, current_stock: Number(l.quantity || 0), updated_at: nowIso,
           }, { onConflict: "item_id,store_id" });
         } catch (e) {
           // Fallback：表不存在時直接更新 inventory_items
-          await supabase.from("inventory_items").update({ current_stock: Number(l.quantity || 0) }).eq("id", l.item_id);
         }
+        // 不論 inventory_stock 是否存在，都要更新 inventory_items 的 current_stock + 盤點時間戳
+        await supabase.from("inventory_items").update({
+          current_stock: Number(l.quantity || 0),
+          last_count_at: nowIso,
+          last_count_source: "closing",
+        }).eq("id", l.item_id);
       }
 
       // 差異警示
