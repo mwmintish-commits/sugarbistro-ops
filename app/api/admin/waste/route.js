@@ -74,6 +74,76 @@ export async function GET(request) {
     return Response.json({ data: { totalCost, count: (data || []).length, byLoc, byReason, byStore } });
   }
 
+  // 待回收清單（已核准 + collection_status = pending）
+  if (type === "collection_queue") {
+    const store_id = searchParams.get("store_id");
+    let q = supabase.from("inventory_movements")
+      .select("id, store_id, item_id, quantity, patrol_location, waste_reason, waste_photo_url, submitted_by_name, audit_at, created_at, note, inventory_items(name, unit, cost_per_unit), stores(name, address)")
+      .eq("type", "waste")
+      .eq("audit_status", "approved")
+      .eq("collection_status", "pending")
+      .order("audit_at", { ascending: true });
+    if (store_id) q = q.eq("store_id", store_id);
+    const { data } = await q;
+    // 按店分組
+    const byStore = {};
+    let totalItems = 0, totalCost = 0;
+    for (const r of data || []) {
+      const k = r.stores?.name || r.store_id;
+      if (!byStore[k]) byStore[k] = { store_name: k, address: r.stores?.address || "", items: [] };
+      const qty = Math.abs(Number(r.quantity || 0));
+      const cost = (r.inventory_items?.cost_per_unit || 0) * qty;
+      byStore[k].items.push({
+        id: r.id, item_name: r.inventory_items?.name || "?", unit: r.inventory_items?.unit || "",
+        quantity: qty, patrol_location: r.patrol_location, waste_reason: r.waste_reason,
+        photo: r.waste_photo_url, submitted_by: r.submitted_by_name,
+        audit_at: r.audit_at, cost,
+      });
+      totalItems += 1;
+      totalCost += cost;
+    }
+    return Response.json({ data: Object.values(byStore), totalItems, totalCost });
+  }
+
+  // 趨勢警示：偵測本月異常
+  if (type === "trends") {
+    const month = searchParams.get("month") || new Date().toISOString().slice(0, 7);
+    const start = month + "-01T00:00:00+08:00";
+    const lastDay = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
+    const end = month + "-" + lastDay + "T23:59:59+08:00";
+    const { data } = await supabase.from("inventory_movements")
+      .select("id, store_id, item_id, quantity, submitted_by_name, created_at, inventory_items(name, cost_per_unit), stores(name)")
+      .eq("type", "waste")
+      .gte("created_at", start).lte("created_at", end);
+
+    // 同品項同店 >= 3 次（一個月）
+    const itemStoreMap = {};
+    // 同員工本月總成本
+    const empCost = {};
+    for (const r of data || []) {
+      const cost = (r.inventory_items?.cost_per_unit || 0) * Math.abs(Number(r.quantity || 0));
+      const isKey = r.item_id + "|" + r.store_id;
+      if (!itemStoreMap[isKey]) {
+        itemStoreMap[isKey] = {
+          item_name: r.inventory_items?.name || "?",
+          store_name: r.stores?.name || "?",
+          count: 0, total_cost: 0,
+        };
+      }
+      itemStoreMap[isKey].count += 1;
+      itemStoreMap[isKey].total_cost += cost;
+      const emp = r.submitted_by_name || "未知";
+      if (!empCost[emp]) empCost[emp] = { name: emp, count: 0, total_cost: 0 };
+      empCost[emp].count += 1;
+      empCost[emp].total_cost += cost;
+    }
+    const itemAlerts = Object.values(itemStoreMap).filter(x => x.count >= 3)
+      .sort((a, b) => b.count - a.count);
+    const empAlerts = Object.values(empCost).filter(x => x.total_cost >= 5000)
+      .sort((a, b) => b.total_cost - a.total_cost);
+    return Response.json({ data: { itemAlerts, empAlerts, month } });
+  }
+
   return Response.json({ error: "Unknown type" }, { status: 400 });
 }
 
@@ -205,6 +275,29 @@ export async function POST(request) {
       await supabase.from("inventory_items").update({ current_stock: next }).eq("id", data.item_id);
     }
     return Response.json({ data });
+  }
+
+  // 標記為「已回收」（HQ 取走後 / 店家自行處理）
+  if (body.action === "mark_collected") {
+    const { movement_ids, collection_status, collected_by, collected_by_name, collection_notes } = body;
+    if (!Array.isArray(movement_ids) || movement_ids.length === 0) {
+      return Response.json({ error: "缺少 movement_ids" }, { status: 400 });
+    }
+    const status = collection_status || "collected";
+    if (!["collected", "disposed", "pending"].includes(status)) {
+      return Response.json({ error: "collection_status 必須為 collected/disposed/pending" }, { status: 400 });
+    }
+    const updates = {
+      collection_status: status,
+      collected_at: status === "pending" ? null : new Date().toISOString(),
+      collected_by: status === "pending" ? null : (collected_by || null),
+      collected_by_name: status === "pending" ? null : (collected_by_name || null),
+      collection_notes: collection_notes || null,
+    };
+    const { data, error } = await supabase.from("inventory_movements")
+      .update(updates).in("id", movement_ids).select("id");
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ data, updated: data?.length || 0 });
   }
 
   return Response.json({ error: "Unknown action" }, { status: 400 });
