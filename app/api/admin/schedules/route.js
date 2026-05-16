@@ -53,8 +53,17 @@ export async function GET(request) {
     return Response.json({ data });
   }
 
-  let query = supabase.from("schedules").select("*, employees(name, line_uid), shifts(name, start_time, end_time, role, color), stores(name)").order("date");
+  const employee_id = searchParams.get("employee_id");
+  const slim = searchParams.get("slim") === "1";
+
+  // slim 模式（給員工 /my-schedule 用）：欄位精簡、不 join 員工/店家、降低 payload 體積
+  const selectFields = slim
+    ? "id, date, employee_id, shift_id, type, leave_type, half_day, day_type, note, published, shifts(name, start_time, end_time, role, color)"
+    : "*, employees(name, line_uid), shifts(name, start_time, end_time, role, color), stores(name)";
+
+  let query = supabase.from("schedules").select(selectFields).order("date");
   if (store_id) query = query.eq("store_id", store_id);
+  if (employee_id) query = query.eq("employee_id", employee_id);
   if (month) {
     const y = parseInt(month.split("-")[0]), m = parseInt(month.split("-")[1]);
     const firstDay = new Date(y, m - 1, 1);
