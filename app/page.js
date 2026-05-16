@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, LABOR_SELF, HEALTH_SELF } from "./components/utils";
 import { routePaymentMethod } from "../lib/payment-router";
+import { checkAppVersion, validateAuth, nukeCache } from "../lib/cache-buster";
 
 const COL_LABELS = {
   cash_amount: "現金", credit_card_amount: "信用卡", line_pay_amount: "LINE Pay",
@@ -155,8 +156,19 @@ export default function AdminPage() {
   const ae = emps.filter(e => e.is_active);
 
   useEffect(() => {
+    // 版本檢查（舊版本會自動清快取+reload，新版進來不影響）
+    checkAppVersion();
     const s = localStorage.getItem("sb_auth");
-    if (s) { try { setAuth(JSON.parse(s)); } catch(e) {} }
+    if (s) {
+      try {
+        const parsed = JSON.parse(s);
+        const valid = validateAuth(parsed);
+        if (valid) setAuth(valid);
+        else localStorage.removeItem("sb_auth");
+      } catch(e) {
+        localStorage.removeItem("sb_auth"); // 壞掉的 JSON 直接清掉
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -413,6 +425,15 @@ export default function AdminPage() {
             </div>
           )}
           {err && <p style={{color:"#b91c1c",fontSize:12,marginTop:8,textAlign:"center"}}>{err}</p>}
+          <div style={{marginTop:14,paddingTop:10,borderTop:"1px solid #eee",textAlign:"center"}}>
+            <button onClick={()=>{
+              if (!confirm("這會清掉本裝置所有快取（cookie / localStorage / Service Worker）並重新整理。\n用於排解「載入卡住、發送驗證碼沒反應」等異常。\n\n確定？")) return;
+              nukeCache();
+              setTimeout(()=>window.location.reload(true), 300);
+            }} style={{fontSize:10,color:"#888",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>
+              載入有問題？點此強制清快取重試
+            </button>
+          </div>
         </div>
       </div>
     );

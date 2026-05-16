@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import MarkdownView from "../components/MarkdownView";
+import { checkAppVersion, nukeCache } from "../../lib/cache-buster";
 
 const webUrl = (path, eid) => `${path}?eid=${eid}`;
 
@@ -96,6 +97,7 @@ export default function MePanel() {
   const eid = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("eid") : null;
 
   useEffect(() => {
+    checkAppVersion(); // 版本不符自動清快取+reload
     if (!eid) { setErr("缺少員工識別碼"); setLoading(false); return; }
     fetch("/api/admin/employees?id=" + eid)
       .then(r => r.json())
@@ -275,6 +277,15 @@ export default function MePanel() {
 
       <div style={{ marginTop: 18, textAlign: "center", fontSize: 11, color: "#888" }}>
         {isAuditRole ? "面板聚焦稽核與審核作業，個人事項請至後台查詢" : "打卡/補打卡/請假/班表/薪資 在網頁內完成，不消耗 LINE 訊息"}
+      </div>
+      <div style={{ marginTop: 8, textAlign: "center" }}>
+        <button onClick={() => {
+          if (!confirm("這會清掉本裝置所有快取並重新整理。\n用於排解「載入卡住、頁面異常」。確定？")) return;
+          nukeCache();
+          setTimeout(() => window.location.reload(true), 300);
+        }} style={{ fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+          載入有問題？點此強制清快取
+        </button>
       </div>
     </div>
   );
