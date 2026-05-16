@@ -56,9 +56,12 @@ export async function GET(request) {
   const employee_id = searchParams.get("employee_id");
   const slim = searchParams.get("slim") === "1";
 
-  // slim 模式（給員工 /my-schedule 用）：欄位精簡、不 join 員工/店家、降低 payload 體積
+  // slim 模式（給員工 /my-schedule 用）：欄位精簡、降低 payload
+  // 若沒指定 employee_id（員工要看全店班）→ 多 join employees(name, phone) 以便聯絡
   const selectFields = slim
-    ? "id, date, employee_id, shift_id, type, leave_type, half_day, day_type, note, published, shifts(name, start_time, end_time, role, color)"
+    ? (employee_id
+        ? "id, date, employee_id, shift_id, type, leave_type, half_day, day_type, note, published, shifts(name, start_time, end_time, role, color)"
+        : "id, date, employee_id, shift_id, type, leave_type, half_day, day_type, note, published, employees(name, phone), shifts(name, start_time, end_time, role, color)")
     : "*, employees(name, line_uid), shifts(name, start_time, end_time, role, color), stores(name)";
 
   let query = supabase.from("schedules").select(selectFields).order("date");

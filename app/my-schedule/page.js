@@ -16,6 +16,7 @@ export default function MySchedule() {
     return t.toLocaleDateString("sv-SE");
   });
   const [selectedDate, setSelectedDate] = useState(null);
+  const [scopeView, setScopeView] = useState("me"); // "me" | "store"
 
   const eid = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("eid") : null;
 
@@ -43,11 +44,13 @@ export default function MySchedule() {
       we = we2.toLocaleDateString("sv-SE");
     }
     const storeParam = emp.store_id ? `&store_id=${emp.store_id}` : "";
-    fetch(`/api/admin/schedules?week_start=${ws}&week_end=${we}${storeParam}&employee_id=${eid}&published_only=1&slim=1`).then(r => r.json()).then(r => {
+    // me 模式：只抓自己的班（快）；store 模式：抓整店所有同事的班（含 employees.name/phone）
+    const empParam = scopeView === "me" ? `&employee_id=${eid}` : "";
+    fetch(`/api/admin/schedules?week_start=${ws}&week_end=${we}${storeParam}${empParam}&published_only=1&slim=1`).then(r => r.json()).then(r => {
       setScheds(r.data || []);
       setLoading(false);
     });
-  }, [eid, month, emp, view, weekStart]);
+  }, [eid, month, emp, view, weekStart, scopeView]);
 
   const [y, m] = month.split("-").map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -76,7 +79,8 @@ export default function MySchedule() {
     const lt = isLeave ? (LT[sc.leave_type] || LT.off) : null;
     const isRestDay = sc.day_type === "rest_day";
     const isHoliday = sc.day_type === "national_holiday";
-    const name = sc.employees?.name || "";
+    const name = sc.employees?.name || (isMine ? emp?.name : "");
+    const phone = sc.employees?.phone || "";
     const timeStr = sc.shifts ? `${(sc.shifts.start_time || "").slice(0, 5)}～${(sc.shifts.end_time || "").slice(0, 5)}` : "";
     return (
       <div key={sc.id} style={{
@@ -95,6 +99,12 @@ export default function MySchedule() {
           {isRestDay && <div style={{ fontSize: 10, color: "#b45309", marginTop: 2 }}>休息日出勤</div>}
           {isHoliday && <div style={{ fontSize: 10, color: "#b91c1c", marginTop: 2 }}>國定假日</div>}
         </div>
+        {!isMine && phone && (
+          <a href={`tel:${phone}`} onClick={e => e.stopPropagation()}
+            style={{ padding: "6px 10px", background: "#4361ee", color: "#fff", borderRadius: 6, fontSize: 11, textDecoration: "none", whiteSpace: "nowrap" }}>
+            📞 撥打
+          </a>
+        )}
       </div>
     );
   };
@@ -106,6 +116,22 @@ export default function MySchedule() {
         <div style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>{emp?.name || "..."}</div>
         <div style={{ fontSize: 11, marginTop: 2, opacity: 0.85 }}>{emp?.stores?.name || ""}</div>
       </div>
+
+      {/* 我的/全店切換 */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 6, background: "#fff", padding: 3, borderRadius: 8, border: "1px solid #e8e6e1" }}>
+        {[{ k: "me", l: "👤 我的班" }, { k: "store", l: "👥 全店班" }].map(t => (
+          <button key={t.k} onClick={() => setScopeView(t.k)} style={{
+            flex: 1, padding: "6px 0", border: "none", borderRadius: 6,
+            background: scopeView === t.k ? "#4361ee" : "transparent",
+            color: scopeView === t.k ? "#fff" : "#666", fontSize: 12, fontWeight: 600, cursor: "pointer",
+          }}>{t.l}</button>
+        ))}
+      </div>
+      {scopeView === "store" && (
+        <div style={{ fontSize: 10, color: "#666", textAlign: "center", marginBottom: 8, padding: "4px 10px", background: "#fffbeb", borderRadius: 4 }}>
+          💡 點同事可看電話、緊急可直接撥打。請僅於工作所需聯絡。
+        </div>
+      )}
 
       {/* 月/週切換 */}
       <div style={{ display: "flex", gap: 4, marginBottom: 10, background: "#fff", padding: 3, borderRadius: 8, border: "1px solid #e8e6e1" }}>
