@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, LABOR_SELF, HEALTH_SELF } from "./components/utils";
 import { routePaymentMethod } from "../lib/payment-router";
@@ -187,7 +187,12 @@ export default function AdminPage() {
     }
   }, [auth]);
 
+  const loadingRef = useRef(false);
+  const pendingLoadRef = useRef(false);
   const load = useCallback(() => {
+    // 防止 load() 同時被觸發多次：上一次還沒跑完，先把這次需求記下來，跑完再 fire 一次
+    if (loadingRef.current) { pendingLoadRef.current = true; return; }
+    loadingRef.current = true;
     setLd(true);
     const p = new URLSearchParams();
     if (month) p.set("month", month);
@@ -247,6 +252,13 @@ export default function AdminPage() {
     }).catch(err => {
       console.error("dashboard load failed:", err);
       setLd(false); // 確保不會卡在「載入中」
+    }).finally(() => {
+      loadingRef.current = false;
+      // 若期間有 state 變化排隊，跑完再 fire 一次最新 state
+      if (pendingLoadRef.current) {
+        pendingLoadRef.current = false;
+        setTimeout(() => load(), 50);
+      }
     });
 
     if (need(["dashboard","overtime","payroll","reviews"]) && myTabs.includes("overtime")) {
@@ -307,7 +319,8 @@ export default function AdminPage() {
     }
   }, [month, sf, sv, ws, myTabs.join(","), expType, tab]);
 
-  useEffect(() => { if (auth) load(); }, [auth, load]);
+  // 等 tab 被設定後再 load（避免 tab="" 的空 load 觸發後又被真正的 load 蓋過去，造成 connection pool 大塞車）
+  useEffect(() => { if (auth && tab) load(); }, [auth, tab, load]);
 
   // 排班頁進入 週/雙週 視圖時自動載入不可出勤回報（顯示於對應日期格）
   useEffect(() => {
