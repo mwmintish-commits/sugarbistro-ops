@@ -41,6 +41,9 @@ export async function GET(request) {
   if (id) {
     const { data: emp } = await supabase.from("employees").select("*, stores!store_id(name)").eq("id", id).single();
     if (!emp) return Response.json({ error: "Not found" }, { status: 404 });
+    // 不外洩密碼 hash，改回傳布林
+    emp.has_password = !!emp.password_hash;
+    delete emp.password_hash;
 
     const months = calcServiceMonths(emp.hire_date);
     const annualLeave = calcAnnualLeave(months, emp.employment_type);
@@ -99,8 +102,10 @@ export async function GET(request) {
 
   const enriched = (data || []).map(emp => {
     const auto = calcAnnualLeave(calcServiceMonths(emp.hire_date), emp.employment_type);
+    const { password_hash, ...rest } = emp;
     return {
-      ...emp,
+      ...rest,
+      has_password: !!password_hash,
       service_months: calcServiceMonths(emp.hire_date),
       annual_leave_days: balMap[emp.id] || auto,
     };
