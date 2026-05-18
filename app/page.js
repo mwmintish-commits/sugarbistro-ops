@@ -74,7 +74,7 @@ export default function AdminPage() {
   const [tab, setTab] = useState("");
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [sf, setSf] = useState("");
-  const [ld, setLd] = useState(true);
+  const [ld, setLd] = useState(false); // 不再 block UI；資料邊抓邊顯示，避免「全部 API 完成才顯示」造成卡住
   const [stores, setStores] = useState([]);
   const [emps, setEmps] = useState([]);
   const [docMap, setDocMap] = useState({});
@@ -193,7 +193,7 @@ export default function AdminPage() {
     // 防止 load() 同時被觸發多次：上一次還沒跑完，先把這次需求記下來，跑完再 fire 一次
     if (loadingRef.current) { pendingLoadRef.current = true; return; }
     loadingRef.current = true;
-    setLd(true);
+    // 不 setLd(true)：保持頁面已渲染，資料邊到邊更新（避免 Promise.all 全部完成才顯示 = 卡 20-30 秒）
     const p = new URLSearchParams();
     if (month) p.set("month", month);
     if (sf) p.set("store_id", sf);
