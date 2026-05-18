@@ -338,16 +338,11 @@ export default function AdminPage() {
 
   const login = async () => {
     setErr("");
-    if (step === 1) {
-      const r = await ap("/api/auth", { action: "send_code", phone });
-      if (r.error) { setErr(r.error); return; }
-      setStep(2);
-    } else {
-      const r = await ap("/api/auth", { action: "verify", phone, code });
-      if (r.error) { setErr(r.error); return; }
-      setAuth(r);
-      localStorage.setItem("sb_auth", JSON.stringify(r));
-    }
+    if (!phone || !code) { setErr("請輸入手機號碼與密碼"); return; }
+    const r = await ap("/api/auth", { action: "login_password", phone, password: code });
+    if (r.error) { setErr(r.error); return; }
+    setAuth(r);
+    localStorage.setItem("sb_auth", JSON.stringify(r));
   };
 
   const logout = () => {
@@ -418,26 +413,18 @@ export default function AdminPage() {
             <div style={{fontSize:36}}>🍯</div>
             <h1 style={{fontSize:18,fontWeight:700}}>小食糖後台</h1>
           </div>
-          {step === 1 ? (
-            <div>
-              <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="手機號碼"
-                style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,marginBottom:10}} />
-              <button onClick={login}
-                style={{width:"100%",padding:12,borderRadius:8,border:"none",background:"#1a1a1a",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>
-                發送驗證碼
-              </button>
-            </div>
-          ) : (
-            <div>
-              <p style={{fontSize:12,color:"#888",marginBottom:8}}>驗證碼已發送到 LINE</p>
-              <input value={code} onChange={e=>setCode(e.target.value)} placeholder="輸入驗證碼" maxLength={6}
-                style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,marginBottom:10,textAlign:"center",letterSpacing:6}} />
-              <button onClick={login}
-                style={{width:"100%",padding:12,borderRadius:8,border:"none",background:"#1a1a1a",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>
-                登入
-              </button>
-            </div>
-          )}
+          <div>
+            <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="手機號碼" autoComplete="username"
+              onKeyDown={e=>{if(e.key==="Enter"&&phone&&code)login();}}
+              style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,marginBottom:8}} />
+            <input value={code} onChange={e=>setCode(e.target.value)} placeholder="密碼" type="password" autoComplete="current-password"
+              onKeyDown={e=>{if(e.key==="Enter"&&phone&&code)login();}}
+              style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,marginBottom:10}} />
+            <button onClick={login}
+              style={{width:"100%",padding:12,borderRadius:8,border:"none",background:"#1a1a1a",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>
+              登入
+            </button>
+          </div>
           {err && <p style={{color:"#b91c1c",fontSize:12,marginTop:8,textAlign:"center"}}>{err}</p>}
           <div style={{marginTop:14,paddingTop:10,borderTop:"1px solid #eee",textAlign:"center"}}>
             <button onClick={()=>{

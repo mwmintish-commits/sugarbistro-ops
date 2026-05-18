@@ -310,6 +310,10 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
               {(storesRef || []).map(s => <option key={s.id} value={s.id}>{"🏠 " + s.name}</option>)}
             </select>
           </div>
+          {/* 後台登入密碼設定（只對有後台權限的員工顯示） */}
+          {["admin","manager","store_manager"].includes(form.role) && (
+            <PasswordSection empId={empId} hasPassword={!!d?.data?.has_password} onChanged={reload} />
+          )}
         </div>
 
         <div style={{ ...sec, border: "2px solid #666" }}>
@@ -419,6 +423,47 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PasswordSection({ empId, hasPassword, onChanged }) {
+  const [pw, setPw] = useState("");
+  const [show, setShow] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const save = async () => {
+    if (!pw || pw.length < 4) { setMsg("❌ 密碼至少 4 個字元"); return; }
+    setSaving(true); setMsg("");
+    try {
+      const auth = JSON.parse(localStorage.getItem("sb_auth") || "{}");
+      const r = await fetch("/api/auth", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set_password", employee_id: empId, new_password: pw, admin_token: auth.token }),
+      }).then(r => r.json());
+      if (r.error) setMsg("❌ " + r.error);
+      else { setMsg("✅ 已更新密碼"); setPw(""); onChanged?.(); }
+    } catch (e) { setMsg("❌ " + e.message); }
+    setSaving(false);
+  };
+  return (
+    <div style={{ marginTop: 8, padding: 8, background: "#fff7ed", borderRadius: 6, border: "1px solid #fbbf24" }}>
+      <label style={{ fontSize: 10, color: "#92400e", fontWeight: 600 }}>
+        🔐 後台登入密碼 {hasPassword ? <span style={{ color: "#0a7c42" }}>（已設定）</span> : <span style={{ color: "#b91c1c" }}>（未設定）</span>}
+      </label>
+      <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+        <input type={show ? "text" : "password"} value={pw} onChange={e => setPw(e.target.value)} placeholder="輸入新密碼"
+          style={{ flex: 1, padding: "5px 8px", borderRadius: 5, border: "1px solid #ddd", fontSize: 12 }} />
+        <button onClick={() => setShow(s => !s)} title={show ? "隱藏" : "顯示"}
+          style={{ padding: "2px 8px", borderRadius: 5, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: 11 }}>
+          {show ? "🙈" : "👁"}
+        </button>
+        <button onClick={save} disabled={saving || !pw}
+          style={{ padding: "2px 10px", borderRadius: 5, border: "none", background: pw && !saving ? "#b45309" : "#ccc", color: "#fff", fontSize: 11, cursor: pw ? "pointer" : "not-allowed", fontWeight: 600 }}>
+          {saving ? "..." : "更新"}
+        </button>
+      </div>
+      {msg && <div style={{ fontSize: 10, marginTop: 4, color: msg.startsWith("✅") ? "#0a7c42" : "#b91c1c" }}>{msg}</div>}
     </div>
   );
 }
