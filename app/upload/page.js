@@ -115,18 +115,28 @@ export default function UploadPage() {
       <div style={{ fontSize: 48, textAlign: "center", marginBottom: 12 }}>✅</div>
       <div style={{ fontSize: 16, fontWeight: 600, textAlign: "center", marginBottom: 16 }}>{typeLabels[type]} 上傳完成</div>
       
-      {results.map((r, i) => (
-        <div key={i} style={{ background: r.success ? "#e6f9f0" : "#fde8e8", borderRadius: 8, padding: 10, marginBottom: 8, fontSize: 12 }}>
+      {results.map((r, i) => {
+        const hasWarning = r.requires_manual || r.date_warning;
+        const bg = !r.success ? "#fde8e8" : hasWarning ? "#fef3c7" : "#e6f9f0";
+        const reviewHref = type === "settlement" ? "/settlement-review?id=" + r.draft_id : "/expense-review?id=" + r.draft_id;
+        return (
+        <div key={i} style={{ background: bg, borderRadius: 8, padding: 10, marginBottom: 8, fontSize: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>
-            {r.imported !== undefined ? `📊 匯入 ${r.imported}/${r.total} 筆` : `第 ${r.index} 張 ${r.success ? "✅" : "❌"}`}
+            {r.imported !== undefined ? `📊 匯入 ${r.imported}/${r.total} 筆` : `第 ${r.index} 張 ${r.success ? (hasWarning ? "⚠️" : "✅") : "❌"}`}
           </div>
           {r.vendor_name && <div>🏢 {r.vendor_name}</div>}
           {r.amount > 0 && <div>💰 {fmt(r.amount)}</div>}
+          {r.date && <div>📅 {r.date}</div>}
           {r.invoice_number && <div>🧾 {r.invoice_number}</div>}
+          {r.requires_manual && <div style={{ color: "#b45309", marginTop: 4 }}>⚠️ AI 無法辨識金額，請點下方連結手動填寫</div>}
+          {r.date_warning && <div style={{ color: "#b45309", marginTop: 4 }}>⚠️ AI 日期辨識可疑，請點下方連結核對</div>}
           {r.error && <div style={{ color: "#b91c1c" }}>❌ {r.error}</div>}
-          {r.draft_id && <a href={"/expense-review?id=" + r.draft_id} style={{ color: "#4361ee", fontSize: 11 }}>📝 修改</a>}
+          {r.draft_id && (type === "settlement" || type === "expense") && (
+            <a href={reviewHref} style={{ color: "#4361ee", fontSize: 11, fontWeight: hasWarning ? 600 : 400 }}>📝 開啟核對頁</a>
+          )}
         </div>
-      ))}
+        );
+      })}
       <div style={{ textAlign: "center", marginTop: 12, fontSize: 12, color: "#888" }}>可關閉此頁面</div>
     </Box>
   );

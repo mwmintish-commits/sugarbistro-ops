@@ -80,7 +80,7 @@ export async function GET(request) {
     }
     if (store_id) q = q.eq("store_id", store_id);
     if (!include_inactive) q = q.or("is_active.eq.true,is_active.eq.false");
-    return q;
+    return q.limit(500);
   };
 
   let { data, error } = await buildQuery(true);

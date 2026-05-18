@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { analyzeDailySettlement, analyzeDepositSlip, analyzeExpenseReceipt } from "@/lib/anthropic";
+import { normalizeRocDate, todayTaipei } from "@/lib/date-utils";
+import { computeDepositReconciliation } from "@/lib/deposit-utils";
 
 export async function POST(request) {
   const body = await request.json();
@@ -40,10 +42,9 @@ export async function POST(request) {
       if (type === "settlement") {
         const r = await analyzeDailySettlement(base64);
         if (!r) return Response.json({ error: "辨識失敗" });
-        let dt = r.date || today;
-        const dtYear = parseInt(dt.split("-")[0]);
-        if (dtYear > 100 && dtYear < 200) dt = (dtYear + 1911) + dt.slice(3);
-        else if (dtYear < 2024) dt = today;
+        const normalized = normalizeRocDate(r.date);
+        const dateNormalizeFailed = !normalized;
+        const dt = normalized || today;
 
         const { data: draft } = await supabase.from("daily_settlements").upsert({
           store_id, date: dt, cashier_name: r.cashier_name,
@@ -57,22 +58,57 @@ export async function POST(request) {
           void_invoice_amount: r.void_invoice_amount || 0,
           cash_in_register: r.cash_in_register || 0, petty_cash_reserved: r.petty_cash_reserved || 0,
           cash_to_deposit: r.cash_amount || 0,
-          image_url: imgUrl, ai_raw_data: r,
+          image_url: imgUrl,
+          ai_raw_data: { ...r, _ai_date_raw: r.date, _date_normalize_failed: dateNormalizeFailed },
           submitted_by: employee_id, status: "draft",
         }, { onConflict: "store_id,date" }).select().single();
-        return Response.json({ success: true, draft_id: draft?.id, redirect: `${SITE}/settlement-review?id=${draft?.id}` });
+        return Response.json({
+          success: true, draft_id: draft?.id, date: dt, date_warning: dateNormalizeFailed,
+          redirect: `${SITE}/settlement-review?id=${draft?.id}`,
+        });
       }
 
       if (type === "deposit") {
         const r = await analyzeDepositSlip(base64);
-        const depDate = r?.deposit_date || today;
+        const normalizedDate = r ? normalizeRocDate(r.deposit_date) : null;
+        const depDate = normalizedDate || today;
+        const amount = Number(r?.amount) || 0;
+        const requiresManual = amount <= 0;
+
+        // 推算對帳區間：上次存款的隔天 ~ 本次存款日
+        let periodStart = depDate;
+        if (store_id) {
+          const { data: last } = await supabase.from("deposits")
+            .select("deposit_date")
+            .eq("store_id", store_id)
+            .order("deposit_date", { ascending: false })
+            .limit(1).maybeSingle();
+          if (last?.deposit_date) {
+            const next = new Date(new Date(last.deposit_date).getTime() + 86400000);
+            periodStart = next.toLocaleDateString("sv-SE");
+          }
+        }
+
+        // 對帳：撈區間內所有日結現金加總
+        const { expected, status, difference } = await computeDepositReconciliation({
+          store_id, amount, period_start: periodStart, period_end: depDate,
+        });
+
         const { data: draft } = await supabase.from("deposits").insert({
-          store_id, deposit_date: depDate, amount: r?.amount || 0,
+          store_id, deposit_date: depDate, amount,
           bank_name: r?.bank_name || "", depositor_name: employee_name,
-          period_start: depDate, period_end: depDate,
-          image_url: imgUrl, submitted_by: employee_id, status: "draft",
+          period_start: periodStart, period_end: depDate,
+          expected_cash: expected, difference, status,
+          image_url: imgUrl, submitted_by: employee_id,
+          ai_raw_data: r ? { ...r, _ai_date_raw: r.deposit_date, _requires_manual: requiresManual } : null,
         }).select().single();
-        return Response.json({ success: true, draft_id: draft?.id, amount: r?.amount });
+        return Response.json({
+          success: true, draft_id: draft?.id, amount,
+          expected_cash: expected, difference, match_status: status,
+          requires_manual: requiresManual,
+          date_warning: !normalizedDate,
+          message: requiresManual ? "⚠️ AI 無法辨識金額，請至後台手動填寫" : null,
+        });
       }
 
       if (type === "expense") {

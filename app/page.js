@@ -141,6 +141,7 @@ export default function AdminPage() {
   const [prodList, setProdList] = useState([]);
   const [prodSum, setProdSum] = useState({});
   const [si, setSi] = useState(null);
+  const [editDep, setEditDep] = useState(null); // 存款手動編輯：{id, amount, period_start, period_end, deposit_date}
   const [editStl, setEditStl] = useState(null);
   const [splitStl, setSplitStl] = useState(null); // 自定義結帳明細編輯 modal
   const [invSubview, setInvSubview] = useState("items"); // 庫存子分頁: items / suggestions
@@ -1872,7 +1873,9 @@ export default function AdminPage() {
         })()}
 
         {/* DEPOSITS */}
-        {!ld && tab === "deposits" && (
+        {!ld && tab === "deposits" && (() => {
+          const missingAmount = dep.filter(d => Number(d.amount || 0) <= 0).length;
+          return (
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"🏦 "+month+" 存款"}
               <button onClick={()=>{
@@ -1882,17 +1885,49 @@ export default function AdminPage() {
                 window.open("/upload?"+params.toString(),"_blank");
               }} style={{marginLeft:8,padding:"2px 10px",borderRadius:4,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:10,cursor:"pointer",fontWeight:600}}>📷 後台上傳存款單</button>
             </h3>
+            {missingAmount > 0 && (
+              <div style={{background:"#fef3c7",border:"1px solid #f59e0b",borderRadius:6,padding:8,marginBottom:8,fontSize:11,color:"#92400e"}}>
+                ⚠️ 共 <strong>{missingAmount}</strong> 筆存款金額為 0（AI 辨識失敗），請點 ✏️ 手動補填金額
+              </div>
+            )}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:700}}>
                 <thead><tr style={{background:"#faf8f5"}}>{["存款日","門市","對帳區間","金額","應存","差異","說明","狀態","📸","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666",fontSize:10}}>{h}</th>)}</tr></thead>
-                <tbody>{dep.map(d=>{const diffAbs=Math.abs(d.difference||0);return(
-                  <tr key={d.id} style={{borderBottom:"1px solid #f0eeea",background:diffAbs>2000?"#fef2f2":diffAbs>500?"#fffbeb":"transparent"}}>
-                    <td style={{padding:6,fontWeight:500}}>{d.deposit_date}</td>
+                <tbody>{dep.map(d=>{
+                  const diffAbs=Math.abs(d.difference||0);
+                  const amtMissing=Number(d.amount||0)<=0;
+                  const isEdit = editDep?.id === d.id;
+                  const saveEdit = async () => {
+                    const updates = {
+                      amount: Number(editDep.amount) || 0,
+                      deposit_date: editDep.deposit_date || d.deposit_date,
+                      period_start: editDep.period_start || d.period_start,
+                      period_end: editDep.period_end || d.period_end,
+                    };
+                    await sap("/api/admin/deposits", { action: "update", deposit_id: d.id, ...updates });
+                    setEditDep(null);
+                    load();
+                  };
+                  return(
+                  <tr key={d.id} style={{borderBottom:"1px solid #f0eeea",background:isEdit?"#e0e7ff":amtMissing?"#fef3c7":diffAbs>2000?"#fef2f2":diffAbs>500?"#fffbeb":"transparent"}}>
+                    <td style={{padding:6,fontWeight:500}}>
+                      {isEdit ? <input type="date" value={editDep.deposit_date||""} onChange={e=>setEditDep({...editDep,deposit_date:e.target.value})} style={{padding:2,fontSize:10,border:"1px solid #4361ee",borderRadius:3,width:110}} /> : d.deposit_date}
+                    </td>
                     <td style={{padding:6}}>{d.stores?d.stores.name:""}</td>
-                    <td style={{padding:6,fontSize:9,color:"#666"}}>{d.period_start&&d.period_end?(d.period_start+"~"+d.period_end):"-"}</td>
-                    <td style={{padding:6,fontWeight:600}}>{fmt(d.amount)}</td>
+                    <td style={{padding:6,fontSize:9,color:"#666"}}>
+                      {isEdit ? (
+                        <div style={{display:"flex",gap:2,alignItems:"center"}}>
+                          <input type="date" value={editDep.period_start||""} onChange={e=>setEditDep({...editDep,period_start:e.target.value})} style={{padding:1,fontSize:9,border:"1px solid #4361ee",borderRadius:3,width:100}} />
+                          <span>~</span>
+                          <input type="date" value={editDep.period_end||""} onChange={e=>setEditDep({...editDep,period_end:e.target.value})} style={{padding:1,fontSize:9,border:"1px solid #4361ee",borderRadius:3,width:100}} />
+                        </div>
+                      ) : (d.period_start&&d.period_end?(d.period_start+"~"+d.period_end):"-")}
+                    </td>
+                    <td style={{padding:6,fontWeight:600,color:amtMissing&&!isEdit?"#b91c1c":"inherit"}}>
+                      {isEdit ? <input type="number" value={editDep.amount} onChange={e=>setEditDep({...editDep,amount:e.target.value})} placeholder="存款金額" autoFocus style={{padding:2,fontSize:11,border:"1px solid #4361ee",borderRadius:3,width:80,fontWeight:600}} /> : (amtMissing?"⚠️ 請補填":fmt(d.amount))}
+                    </td>
                     <td style={{padding:6}}>{fmt(d.expected_cash)}</td>
-                    <td style={{padding:6,color:diffAbs>500?"#b91c1c":"#0a7c42",fontWeight:600}}>{fmt(d.difference)}</td>
+                    <td style={{padding:6,color:diffAbs>500?"#b91c1c":"#0a7c42",fontWeight:600}}>{isEdit?"(存檔後重算)":fmt(d.difference)}</td>
                     <td style={{padding:6}}>
                       <input defaultValue={d.difference_explanation||""} placeholder={diffAbs>500?"請說明差異原因":"-"}
                         onBlur={e=>{if(e.target.value!==( d.difference_explanation||""))ap("/api/admin/deposits",{action:"update",deposit_id:d.id,difference_explanation:e.target.value});}}
@@ -1901,14 +1936,24 @@ export default function AdminPage() {
                     <td style={{padding:6}}><Badge status={d.status} /></td>
                     <td style={{padding:6}}>{d.image_url?<button onClick={()=>setSi(d.image_url)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>📸</button>:<span style={{color:"#ccc"}}>-</span>}</td>
                     <td style={{padding:6,whiteSpace:"nowrap"}}>
-                      <button onClick={async()=>{const amt=prompt("修改存款金額：",d.amount);if(!amt)return;const ps=prompt("對帳起始日：",d.period_start||"");const pe=prompt("對帳結束日：",d.period_end||"");const updates={amount:Number(amt)};if(ps)updates.period_start=ps;if(pe)updates.period_end=pe;await sap("/api/admin/deposits",{action:"update",deposit_id:d.id,...updates});load();}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10}}>✏️</button>
-                      <button onClick={async()=>{if(!confirm("刪除此筆存款紀錄？"))return;await sap("/api/admin/deposits",{action:"delete",deposit_id:d.id});load();}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
+                      {isEdit ? (
+                        <>
+                          <button onClick={saveEdit} title="儲存" style={{background:"#0a7c42",border:"none",color:"#fff",cursor:"pointer",fontSize:10,padding:"2px 6px",borderRadius:3,marginRight:2}}>💾</button>
+                          <button onClick={()=>setEditDep(null)} title="取消" style={{background:"none",border:"1px solid #ddd",cursor:"pointer",fontSize:10,padding:"2px 6px",borderRadius:3}}>✕</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={()=>setEditDep({id:d.id,amount:d.amount||"",deposit_date:d.deposit_date||"",period_start:d.period_start||"",period_end:d.period_end||""})} title="手動修正" style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>✏️</button>
+                          <button onClick={async()=>{if(!confirm("刪除此筆存款紀錄？"))return;await sap("/api/admin/deposits",{action:"delete",deposit_id:d.id});load();}} title="刪除" style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
+                        </>
+                      )}
                     </td>
                   </tr>);})}</tbody>
               </table>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* EXPENSES */}
         {!ld && tab === "expenses" && (
