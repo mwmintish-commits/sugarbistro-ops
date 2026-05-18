@@ -99,18 +99,20 @@ export default function MePanel() {
   useEffect(() => {
     checkAppVersion(); // 版本不符自動清快取+reload
     if (!eid) { setErr("缺少員工識別碼"); setLoading(false); return; }
-    fetch("/api/admin/employees?id=" + eid)
-      .then(r => r.json())
-      .then(r => {
-        if (r.error || !r.data) { setErr("找不到員工資料"); setLoading(false); return; }
-        setEmp(r.data); setLoading(false);
-        // admin/manager 抓稽核摘要
-        if (["admin", "manager"].includes(r.data.role)) {
-          fetch("/api/admin/audit-summary").then(x => x.json()).then(setAuditSum).catch(() => {});
-        }
-        fetch("/api/employee/announcements?eid=" + eid).then(x => x.json()).then(x => setAnns(x.data || [])).catch(() => {});
-      })
-      .catch(() => { setErr("載入失敗"); setLoading(false); });
+    // 員工本人資料先抓（後續 UI 依賴），公告與稽核摘要並行
+    Promise.all([
+      fetch("/api/admin/employees?id=" + eid).then(r => r.json()),
+      fetch("/api/employee/announcements?eid=" + eid).then(x => x.json()).catch(() => ({ data: [] })),
+    ]).then(([emp, ann]) => {
+      if (emp.error || !emp.data) { setErr("找不到員工資料"); setLoading(false); return; }
+      setEmp(emp.data);
+      setAnns(ann.data || []);
+      setLoading(false);
+      // admin/manager 才需要稽核摘要，非阻擋主畫面
+      if (["admin", "manager"].includes(emp.data.role)) {
+        fetch("/api/admin/audit-summary").then(x => x.json()).then(setAuditSum).catch(() => {});
+      }
+    }).catch(() => { setErr("載入失敗"); setLoading(false); });
   }, []);
 
   const handleClockin = async (type) => {

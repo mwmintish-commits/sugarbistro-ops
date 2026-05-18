@@ -582,117 +582,13 @@ async function queryRevenue(rt){const today=new Date().toLocaleDateString("sv-SE
 async function handleEvent(event) {
   const userId = event.source.userId, emp = await getEmployee(userId), state = await getUserState(userId);
 
+  // 圖片訊息：webhook 不處理（serverless 10s timeout 風險），請走網頁 /upload
   if (event.type === "message" && event.message.type === "image") {
     return;
-    if (!emp) return replyText(event.replyToken, "❌ 請先綁定");
-    if (state?.current_flow === "settlement_photo") return handleSettlementImg(event, emp, state);
-    if (state?.current_flow === "deposit_photo") return handleDepImg(event, emp, state);
-    if (state?.current_flow?.startsWith("receipt_")) return handleReceiptImg(event, state);
-    if (state?.current_flow === "expense_photo") {
-      const uid2 = event.source.userId;
-      const d = state.flow_data;
-      const isHq = d.store_id === "__hq__";
-      const today2 = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
-      const typeLabel = d.expense_type === "vendor" ? "📦 月結" : d.expense_type === "hq_advance" ? "🏢 代付" : "💰 零用金";
-      
-      try {
-        const b64 = await downloadImageAsBase64(event.message.id);
-        let imgUrl = "";
-        try { imgUrl = await uploadImage(b64, "expenses", `${d.expense_type}_${Date.now()}`); } catch {}
-        
-        let draftId = d.draft_id || null;
-        try {
-          if (draftId) { await supabase.from("expenses").update({ image_url: imgUrl }).eq("id", draftId); }
-          else { const { data: dr } = await supabase.from("expenses").insert({ store_id: isHq ? null : d.store_id, expense_type: d.expense_type, date: today2, amount: 0, vendor_name: "", image_url: imgUrl, submitted_by: d.employee_id, month_key: today2.slice(0, 7), status: "draft" }).select("id").single(); draftId = dr?.id; }
-        } catch (ie) { console.error("expense insert:", ie); }
-
-        const reviewUrl = `${SITE}/expense-review?id=${draftId || ""}`;
-
-        // 同步跑 AI（典型 3-6 秒），完成後一次回覆完整結果
-        let aiData = null;
-        let aiErr = null;
-        try {
-          aiData = await analyzeExpenseReceipt(b64);
-        } catch (e) {
-          aiErr = e?.message || "AI 失敗";
-          console.error("expense AI:", e);
-        }
-
-        let expDate = today2;
-        let dupNote = "";
-        if (aiData) {
-          expDate = aiData?.date || today2;
-          await supabase.from("expenses").update({
-            amount: aiData?.total_amount || 0, vendor_name: aiData?.vendor_name || "",
-            description: aiData?.description || "", category_suggestion: aiData?.category_suggestion || "其他",
-            invoice_number: aiData?.invoice_number || null,
-            date: expDate, month_key: expDate.slice(0, 7),
-          }).eq("id", draftId);
-
-          if (aiData?.invoice_number) {
-            const { data: existing } = await supabase.from("expenses")
-              .select("id, date, vendor_name").eq("invoice_number", aiData.invoice_number)
-              .neq("id", draftId).in("status", ["draft", "pending", "approved"])
-              .limit(1).maybeSingle();
-            if (existing) dupNote = `\n\n⚠️ 此發票已存在（${existing.date} ${existing.vendor_name || ""}），請至網頁確認`;
-          }
-        }
-
-        const expData = { ...d, image_url: imgUrl, draft_id: draftId, amount: aiData?.total_amount || 0, date: expDate, vendor_name: aiData?.vendor_name || "", invoice_number: aiData?.invoice_number || null, category_suggestion: aiData?.category_suggestion || "其他" };
-        await setUserState(uid2, "expense_confirm", expData);
-
-        const replyText2 = aiData
-          ? typeLabel + " ✅ 辨識完成\n" +
-            "🏪 " + (aiData?.vendor_name || "(未辨識)") + "\n" +
-            "💰 " + fmt(aiData?.total_amount || 0) + "\n" +
-            "📆 " + expDate + "\n" +
-            (aiData?.invoice_number ? "🧾 " + aiData.invoice_number + "\n" : "") +
-            "📋 " + (aiData?.category_suggestion || "其他") + dupNote
-          : typeLabel + " 📸 已儲存\n⚠️ AI 辨識失敗" + (aiErr ? "（" + aiErr + "）" : "") + "，請手動填寫";
-
-        await lineClient.replyMessage({ replyToken: event.replyToken, messages: [{
-          type: "text",
-          text: replyText2,
-          quickReply: { items: [
-            { type: "action", action: { type: "uri", label: "📝 確認送出", uri: reviewUrl } },
-            { type: "action", action: { type: "message", label: "✏️ 修改金額", text: "修改金額" } },
-            { type: "action", action: { type: "message", label: "✏️ 修改廠商", text: "修改廠商" } },
-            { type: "action", action: { type: "message", label: "📸 重拍", text: "重新拍照" } },
-            { type: "action", action: { type: "message", label: "🔙 取消", text: "取消" } },
-          ]}
-        }] });
-      } catch (err) {
-        console.error("expense_photo:", err);
-        try { await replyText(event.replyToken, "❌ " + (err?.message || "處理失敗")); } catch {}
-      }
-      return;
-    }
-    // 銷售回報照片
-    if (state?.current_flow === "sales_photo") {
-      const uid2 = event.source.userId;
-      await replyText(event.replyToken, "📊 AI 辨識 POS 銷售中...");
-      try {
-        const b64 = await downloadImageAsBase64(event.message.id);
-        const { analyzePosSales } = await import("@/lib/anthropic");
-        const r = await analyzePosSales(b64);
-        if (!r || !r.items?.length) { await pushText(uid2, "❌ 辨識失敗，請確保拍到品項名稱和數量"); return; }
-        const d = state.flow_data;
-        // 匹配品名 → stock_items
-        const res = await fetch(new URL("/api/admin/stock", SITE), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "import_sales", store_id: d.store_id, date: r.date || new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }), items: r.items, source: "photo", submitted_by: d.employee_id }) }).then(x => x.json());
-        let msg = `📊 POS 銷售已匯入\n🏠 ${d.store_name}\n━━━━━━━━━━━━━━\n`;
-        msg += `✅ 匹配 ${res.matched||0} 項 / 共 ${res.total||0} 項\n`;
-        if (res.unmatched?.length) msg += `\n⚠️ 未匹配（盤點品項中找不到）：\n${res.unmatched.join("、")}\n\n這些品項需先在後台「盤點品項設定」中新增`;
-        msg += `\n\n銷售數據已用於庫存差異計算`;
-        await pushText(uid2, msg);
-        await clearUserState(uid2);
-      } catch (e) { try { await pushText(uid2, "❌ " + (e?.message || String(e))); } catch {} }
-      return;
-    }
-    return replyText(event.replyToken, "📷 請先選功能再拍照");
   }
+
   // Postback 事件（LINE 日期選擇器回傳）
   if (event.type === "postback") {
-    return;
     const pb = event.postback;
     const rt = event.replyToken;
 

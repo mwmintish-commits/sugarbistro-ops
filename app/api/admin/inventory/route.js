@@ -53,7 +53,7 @@ export async function GET(request) {
     // 1) 撈所有 active 品項
     let q = supabase.from("inventory_items").select("*, stores(name)").eq("is_active", true);
     if (store_id) q = q.eq("store_id", store_id);
-    const { data: items } = await q;
+    const { data: items } = await q.limit(2000);
 
     // 2) 過去 7 天銷量（用 daily_sales_items 聚合 by store_id + item_name）
     const past7Start = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);

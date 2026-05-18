@@ -81,7 +81,7 @@ export async function GET(request) {
   // 員工檢視：只回傳已發布的班表（或預假本人申請）
   if (searchParams.get("published_only") === "1") query = query.or("published.eq.true,leave_type.eq.advance");
 
-  const { data, error } = await query;
+  const { data, error } = await query.limit(2000);
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ data });
 }

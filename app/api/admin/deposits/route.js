@@ -1,4 +1,5 @@
 import { supabase, eom } from "@/lib/supabase";
+import { computeDepositReconciliation } from "@/lib/deposit-utils";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -30,6 +31,27 @@ export async function POST(request) {
     delete rest.action;
     const updates = {};
     ["difference_explanation","amount","period_start","period_end","deposit_date","status"].forEach(k=>{if(rest[k]!==undefined)updates[k]=rest[k];});
+
+    // 若金額或對帳區間有變動 → 自動重算 expected_cash / difference / status
+    const needsRecompute = ["amount","period_start","period_end"].some(k => rest[k] !== undefined);
+    if (needsRecompute) {
+      const { data: cur } = await supabase.from("deposits")
+        .select("store_id, amount, period_start, period_end")
+        .eq("id", deposit_id).single();
+      if (cur) {
+        const recon = await computeDepositReconciliation({
+          store_id: cur.store_id,
+          amount: updates.amount ?? cur.amount,
+          period_start: updates.period_start ?? cur.period_start,
+          period_end: updates.period_end ?? cur.period_end,
+        });
+        updates.expected_cash = recon.expected;
+        updates.difference = recon.difference;
+        // 使用者沒明確傳 status 才覆蓋；尊重手動標記
+        if (rest.status === undefined) updates.status = recon.status;
+      }
+    }
+
     const { data, error } = await supabase.from("deposits")
       .update(updates).eq("id", deposit_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });

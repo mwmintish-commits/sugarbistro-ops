@@ -823,8 +823,23 @@ export function WorklogSettings({ stores }) {
                 style={{ padding: "3px 8px", borderRadius: 6, border: on ? "none" : "1px solid #ddd", background: on ? "#0a7c42" : "#fff", color: on ? "#fff" : "#666", fontSize: 11, cursor: "pointer" }}>{c.l}</button>;
             })}
           </div>}
+          {wlNew.frequency === "daily" && wlNew.item.includes("盤點") && (
+            <div style={{ fontSize: 10, color: "#92400e", background: "#fef3c7", borderRadius: 4, padding: "4px 6px", marginBottom: 6 }}>
+              💡 盤點項目建議只勾「{isDouble ? "🌙晚下" : "🌙閉店"}」，避免早班同事重複盤
+            </div>
+          )}
           <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
-            <input value={wlNew.item} onChange={e => setWlNew({ ...wlNew, item: e.target.value })} placeholder="工作項目名稱" onKeyDown={e => { if (e.key === "Enter") addNew(); }} style={{ flex: 1, padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12 }} />
+            <input value={wlNew.item} onChange={e => {
+              const val = e.target.value;
+              const isInventory = val.includes("盤點");
+              const wasInventory = wlNew.item.includes("盤點");
+              // 第一次輸入「盤點」時，自動預設只勾「晚下/閉店」時段
+              if (isInventory && !wasInventory && wlNew.frequency === "daily") {
+                setWlNew({ ...wlNew, item: val, checkpoints: [isDouble ? "evening_end" : "closing"] });
+              } else {
+                setWlNew({ ...wlNew, item: val });
+              }
+            }} placeholder="工作項目名稱（輸入「盤點」會自動建議晚班）" onKeyDown={e => { if (e.key === "Enter") addNew(); }} style={{ flex: 1, padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12 }} />
             <button onClick={addNew} disabled={!wlNew.item} style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: wlNew.item ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 12, cursor: "pointer" }}>新增</button>
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, cursor: "pointer" }}>
