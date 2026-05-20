@@ -99,10 +99,18 @@ export default function MePanel() {
   useEffect(() => {
     checkAppVersion(); // 版本不符自動清快取+reload
     if (!eid) { setErr("缺少員工識別碼"); setLoading(false); return; }
+    // 用 AbortController + timeout 防 LIFF 環境偶發 hang（之前無 timeout，曾遇到永久 loading）
+    const fetchWithTimeout = (url, ms = 8000) => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), ms);
+      return fetch(url, { signal: ctrl.signal })
+        .then(r => r.json())
+        .finally(() => clearTimeout(t));
+    };
     // 員工本人資料先抓（後續 UI 依賴），公告與稽核摘要並行
     Promise.all([
-      fetch("/api/admin/employees?id=" + eid).then(r => r.json()),
-      fetch("/api/employee/announcements?eid=" + eid).then(x => x.json()).catch(() => ({ data: [] })),
+      fetchWithTimeout("/api/admin/employees?id=" + eid),
+      fetchWithTimeout("/api/employee/announcements?eid=" + eid).catch(() => ({ data: [] })),
     ]).then(([emp, ann]) => {
       if (emp.error || !emp.data) { setErr("找不到員工資料"); setLoading(false); return; }
       setEmp(emp.data);
@@ -110,9 +118,12 @@ export default function MePanel() {
       setLoading(false);
       // admin/manager 才需要稽核摘要，非阻擋主畫面
       if (["admin", "manager"].includes(emp.data.role)) {
-        fetch("/api/admin/audit-summary").then(x => x.json()).then(setAuditSum).catch(() => {});
+        fetchWithTimeout("/api/admin/audit-summary").then(setAuditSum).catch(() => {});
       }
-    }).catch(() => { setErr("載入失敗"); setLoading(false); });
+    }).catch(e => {
+      setErr(e?.name === "AbortError" ? "載入逾時，請重新整理（網路不穩）" : "載入失敗");
+      setLoading(false);
+    });
   }, []);
 
   const handleClockin = async (type) => {
