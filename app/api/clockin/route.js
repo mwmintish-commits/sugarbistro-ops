@@ -30,34 +30,58 @@ export async function GET(request) {
 
 export async function POST(request) {
   const { token, latitude, longitude } = await request.json();
-  if (!token || !latitude || !longitude) return Response.json({ error: "Missing data" }, { status: 400 });
+  // 0 是合法緯度（赤道），所以用 == null 判斷而不是 falsy
+  if (!token || latitude == null || longitude == null) return Response.json({ error: "Missing data" }, { status: 400 });
+  if (typeof latitude !== "number" || typeof longitude !== "number") return Response.json({ error: "Invalid coordinates" }, { status: 400 });
 
-  const { data: t } = await supabase.from("clockin_tokens").select("*").eq("token", token).single();
-  if (!t) return Response.json({ error: "Invalid token" }, { status: 404 });
-  if (t.used) return Response.json({ error: "Already clocked" }, { status: 400 });
-  if (new Date(t.expires_at) < new Date()) return Response.json({ error: "Expired" }, { status: 400 });
+  // 原子鎖定 token：把 used=false 的那筆改成 used=true，select 拿回原本資料；
+  // 若回不到資料代表 token 不存在 / 已用過 / 已過期（無 row 符合條件）→ 直接擋
+  const { data: t, error: lockErr } = await supabase.from("clockin_tokens")
+    .update({ used: true })
+    .eq("token", token).eq("used", false).gt("expires_at", new Date().toISOString())
+    .select("token, employee_id, type, expires_at").maybeSingle();
+  if (lockErr) return Response.json({ error: "Token 鎖定失敗：" + lockErr.message }, { status: 500 });
+  if (!t) {
+    // 區分原因給更明確錯誤
+    const { data: existing } = await supabase.from("clockin_tokens").select("used, expires_at").eq("token", token).maybeSingle();
+    if (!existing) return Response.json({ error: "打卡連結無效，請從 LINE 重新開啟" }, { status: 404 });
+    if (existing.used) return Response.json({ error: "此打卡連結已使用，請重新從 LINE 取得新連結" }, { status: 400 });
+    return Response.json({ error: "打卡連結已過期（10 分鐘），請重新開啟" }, { status: 400 });
+  }
 
-  const { data: emp } = await supabase.from("employees").select("name, line_uid, store_id, hourly_rate, monthly_salary, stores!store_id(*)").eq("id", t.employee_id).single();
-  if (!emp) return Response.json({ error: "找不到員工資料" }, { status: 404 });
+  // 並行抓員工 + 今日排班，加快 cold start 場景
+  const now = new Date();
+  const taipeiNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
+  const today = taipeiNow.toLocaleDateString("sv-SE");
+  const [{ data: emp }, { data: schedule }] = await Promise.all([
+    supabase.from("employees").select("name, line_uid, store_id, hourly_rate, monthly_salary, stores!store_id(*)").eq("id", t.employee_id).maybeSingle(),
+    supabase.from("schedules").select("*, shifts(*)").eq("employee_id", t.employee_id).eq("date", today).maybeSingle(),
+  ]);
+  if (!emp) {
+    // 取消已鎖定的 token（恢復 used=false）讓使用者可再試
+    await supabase.from("clockin_tokens").update({ used: false }).eq("token", token);
+    return Response.json({ error: "找不到員工資料" }, { status: 404 });
+  }
   const store = emp?.stores;
 
   const distance = store?.latitude ? Math.round(calcDistance(latitude, longitude, store.latitude, store.longitude)) : null;
   const isValid = distance !== null ? distance <= (store.radius_m || 200) : true;
 
-  const now = new Date();
-  const taipeiNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
-  const today = taipeiNow.toLocaleDateString("sv-SE");
   let currentTime = taipeiNow.toTimeString().slice(0, 5);
   let recordedTimestamp = now.toISOString();
   let autoCorrected = false;
 
-  const { data: schedule } = await supabase.from("schedules").select("*, shifts(*)").eq("employee_id", t.employee_id).eq("date", today).single();
+  // 無排班不可打卡（同時釋放 token 讓員工可再試）
+  if (!schedule) {
+    await supabase.from("clockin_tokens").update({ used: false }).eq("token", token);
+    return Response.json({ error: "今日無排班，無法打卡。請聯繫主管確認排班是否已發布。" }, { status: 403 });
+  }
 
-  // 無排班不可打卡
-  if (!schedule) return Response.json({ error: "今日無排班，無法打卡。請確認排班表。" }, { status: 403 });
-
-  // 位置異常不可打卡
-  if (distance !== null && !isValid) return Response.json({ error: `位置異常（距門市${distance}m，超出${store.radius_m || 200}m），無法打卡。` }, { status: 403 });
+  // 位置異常不可打卡（釋放 token 讓員工移動位置後可再試）
+  if (distance !== null && !isValid) {
+    await supabase.from("clockin_tokens").update({ used: false }).eq("token", token);
+    return Response.json({ error: `位置異常（距門市${distance}m，超出${store.radius_m || 200}m），無法打卡。` }, { status: 403 });
+  }
 
   // 防呆：重複打卡偵測
   // 1) 5 分鐘內已有同類型紀錄 → 直接拒絕（避免員工連點）
@@ -93,7 +117,8 @@ export async function POST(request) {
       }, { status: 409 });
     }
   }
-  const { data: settings } = await supabase.from("attendance_settings").select("*").limit(1).single();
+  // maybeSingle 防 0 row 時 throw（attendance_settings 沒設定時整個 API 會 crash）
+  const { data: settings } = await supabase.from("attendance_settings").select("*").limit(1).maybeSingle();
 
   // 自動矯正：下班超過 end_time 但未達加班起算門檻 → 視為準時下班（記錄為排班 end_time）
   if (t.type === "clock_out" && schedule?.shifts?.end_time) {
@@ -140,17 +165,28 @@ export async function POST(request) {
     late_minutes: lateMinutes, early_leave_minutes: earlyLeaveMinutes,
     schedule_id: schedule?.id, shift_id: schedule?.shift_id, clock_in_token: token,
   };
-  let attErr = null;
+  // 嘗試含 work_type 寫入；schema 缺欄位則降級重試
+  let insertOk = false;
+  let lastErrMsg = "";
   try {
     const r = await supabase.from("attendances").insert({ ...baseAtt, work_type: workType });
-    if (r.error) attErr = r.error;
-  } catch (e) { attErr = e; }
-  if (attErr) {
-    // 二次嘗試：去掉 work_type
-    try { await supabase.from("attendances").insert(baseAtt); } catch {}
+    if (!r.error) insertOk = true;
+    else lastErrMsg = r.error.message || "";
+  } catch (e) { lastErrMsg = e?.message || String(e); }
+  if (!insertOk) {
+    try {
+      const r = await supabase.from("attendances").insert(baseAtt);
+      if (!r.error) insertOk = true;
+      else lastErrMsg = r.error.message || lastErrMsg;
+    } catch (e) { lastErrMsg = e?.message || lastErrMsg; }
   }
-
-  try { await supabase.from("clockin_tokens").update({ used: true }).eq("token", token); } catch {}
+  if (!insertOk) {
+    // 寫入完全失敗 → 釋放 token、回傳具體錯誤（不要靜默讓員工以為成功）
+    await supabase.from("clockin_tokens").update({ used: false }).eq("token", token);
+    console.error("attendance insert failed:", lastErrMsg);
+    return Response.json({ error: "打卡寫入失敗，請重試或聯繫主管：" + (lastErrMsg || "未知錯誤") }, { status: 500 });
+  }
+  // token 鎖定已在最前面完成，不需再次 update
 
   const label = t.type === "clock_in" ? "上班" : "下班";
   let msg = `✅ ${label}打卡成功！\n\n👤 ${emp?.name}\n🏠 ${store?.name || "?"}\n⏰ ${currentTime}${autoCorrected ? "（依排班結束時間記錄，未達加班門檻）" : ""}\n📍 距門市 ${distance ?? "?"}m`;

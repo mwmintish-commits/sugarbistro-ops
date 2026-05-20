@@ -12,15 +12,31 @@ export default function ClockInPage() {
   const [result, setResult] = useState(null);
   const [distance, setDistance] = useState(null);
 
+  // 打卡成功後 3 秒自動跳轉工作日誌（用 useEffect 避免每次 render 都重排定時器）
+  useEffect(() => {
+    if (!result) return;
+    const wlUrl = `/worklog?eid=${info?.employee_id||""}&sid=${info?.store?.id||""}&name=${encodeURIComponent(info?.employee_name||"")}`;
+    const t = setTimeout(() => { window.location.href = wlUrl; }, 3000);
+    return () => clearTimeout(t);
+  }, [result, info?.employee_id, info?.employee_name, info?.store?.id]);
+
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("token");
     if (!t) { setError("缺少打卡 Token"); setLoading(false); return; }
     setToken(t);
-    fetch("/api/clockin?token=" + t).then(r => r.json()).then(data => {
-      if (data.error) setError(data.error === "Token already used" ? "已打卡過" : data.error === "Token expired" ? "連結已過期" : data.error);
-      else setInfo(data);
-      setLoading(false);
-    }).catch(() => { setError("載入失敗"); setLoading(false); });
+    // 加 10 秒 timeout，避免 LIFF 偶發 hang
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    fetch("/api/clockin?token=" + t, { signal: ctrl.signal })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) setError(data.error === "Token already used" ? "已打卡過" : data.error === "Token expired" ? "連結已過期" : data.error);
+        else setInfo(data);
+        setLoading(false);
+      })
+      .catch(e => { setError(e?.name === "AbortError" ? "載入逾時，請重新整理或從 LINE 重新開啟" : "載入失敗"); setLoading(false); })
+      .finally(() => clearTimeout(timer));
+    return () => { clearTimeout(timer); ctrl.abort(); };
   }, []);
 
   function calcDist(lat1, lon1, lat2, lon2) {
@@ -29,42 +45,77 @@ export default function ClockInPage() {
     return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   }
 
+  // 兩段式定位：先 high-accuracy 8 秒；若超時或失敗，降級為 low-accuracy 再試 8 秒
+  // （LINE 內建瀏覽器/室內訊號弱時 high-accuracy 常超時，降級可救回大多數打卡）
+  function tryGetPosition(highAccuracy, timeoutMs) {
+    return Promise.race([
+      new Promise((res, rej) => navigator.geolocation.getCurrentPosition(
+        res,
+        (err) => rej(Object.assign(new Error(
+          err.code === 1 ? "請開啟位置權限（LINE → 設定 → 位置 → 允許）" :
+          err.code === 2 ? "無法取得位置，請確認 GPS 已開啟" :
+          err.code === 3 ? "定位逾時" :
+          "定位失敗"
+        ), { code: err.code })),
+        { enableHighAccuracy: highAccuracy, timeout: timeoutMs, maximumAge: highAccuracy ? 0 : 30000 }
+      )),
+      new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error("定位逾時"), { code: 3 })), timeoutMs + 2000)),
+    ]);
+  }
+
   async function getLocation() {
     setGpsLoading(true); setError(null);
+    let pos;
     try {
-      const pos = await Promise.race([
-        new Promise((res, rej) => navigator.geolocation.getCurrentPosition(
-          res,
-          (err) => rej(new Error(
-            err.code === 1 ? "請開啟位置權限（LINE → 設定 → 位置 → 允許）" :
-            err.code === 2 ? "無法取得位置，請確認 GPS 已開啟" :
-            err.code === 3 ? "定位逾時，請到戶外或重試" :
-            "定位失敗"
-          )),
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-        )),
-        new Promise((_, rej) => setTimeout(() => rej(new Error("定位逾時 20 秒，請重試或在外部瀏覽器開啟")), 20000)),
-      ]);
-      const c = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) };
-      setPosition(c);
-      if (info?.store?.latitude && info?.store?.longitude) {
-        setDistance(calcDist(c.lat, c.lng, info.store.latitude, info.store.longitude));
-      }
+      pos = await tryGetPosition(true, 8000);
     } catch (e) {
-      setError(e?.message || "無法定位，請開啟 GPS 並允許位置權限");
-    } finally {
-      setGpsLoading(false);
+      // 權限錯誤直接顯示（重試也沒用）；其他錯誤降級重試
+      if (e.code === 1) { setError(e.message); setGpsLoading(false); return; }
+      try {
+        pos = await tryGetPosition(false, 8000);
+      } catch (e2) {
+        setError((e2.message || "無法定位") + "。請到戶外或開啟 GPS 後重試；若一直失敗請點右上角「⋯」用 Safari/Chrome 開啟。");
+        setGpsLoading(false);
+        return;
+      }
     }
+    const c = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) };
+    setPosition(c);
+    if (info?.store?.latitude && info?.store?.longitude) {
+      setDistance(calcDist(c.lat, c.lng, info.store.latitude, info.store.longitude));
+    }
+    setGpsLoading(false);
   }
 
   async function submit() {
     if (!position) return;
     setSubmitting(true); setError(null);
+    // 加 15 秒 timeout 防 hang；失敗自動重試一次
+    const doFetch = () => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 15000);
+      return fetch("/api/clockin", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, latitude: position.lat, longitude: position.lng }),
+        signal: ctrl.signal,
+      }).finally(() => clearTimeout(t));
+    };
+    let data;
     try {
-      const res = await fetch("/api/clockin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, latitude: position.lat, longitude: position.lng }) });
-      const data = await res.json();
-      if (data.error) setError(data.error); else setResult(data);
-    } catch { setError("提交失敗，請重試"); }
+      const res = await doFetch();
+      data = await res.json();
+    } catch (e1) {
+      // 第一次失敗（網路抖動 / timeout）→ 自動重試一次
+      try {
+        const res2 = await doFetch();
+        data = await res2.json();
+      } catch (e2) {
+        setError("網路不穩，提交失敗，請稍後重試（" + (e2?.name === "AbortError" ? "逾時 15 秒" : e2?.message || "未知") + "）");
+        setSubmitting(false);
+        return;
+      }
+    }
+    if (data?.error) setError(data.error); else setResult(data);
     setSubmitting(false);
   }
 
@@ -79,8 +130,6 @@ export default function ClockInPage() {
 
   if (result) {
     const wlUrl = `/worklog?eid=${info?.employee_id||""}&sid=${info?.store?.id||""}&name=${encodeURIComponent(info?.employee_name||"")}`;
-    // 3 秒後自動跳轉工作日誌
-    setTimeout(() => { window.location.href = wlUrl; }, 3000);
     return (
     <Box><C>
       <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
