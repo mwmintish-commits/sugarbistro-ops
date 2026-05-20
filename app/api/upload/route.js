@@ -30,7 +30,9 @@ export async function POST(request) {
 
   // AI 辨識 + 建立草稿記錄（每張照片一筆）
   if (body.action === "analyze") {
-    const { type, base64, store_id: rawStoreId, store_name, employee_id: rawEmpId, employee_name, image_url, image_urls, expense_type } = body;
+    const { type, base64, store_id: rawStoreId, store_name, employee_id: rawEmpId, employee_name, image_url, image_urls, expense_type,
+      // 預選的廠商/類別（月結與代付流程用：使用者先選好再上傳，AI 不需重辨）
+      preset_vendor_name, preset_category } = body;
     const SITE = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
     const imgUrl = image_url || image_urls?.[0] || "";
     const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
@@ -138,11 +140,15 @@ export async function POST(request) {
           }
         }
 
+        // 若使用者已預選廠商/類別（月結 / 代付），覆蓋 AI 結果
+        const finalVendor = preset_vendor_name || r?.vendor_name || "";
+        const finalCategory = preset_category || r?.category_suggestion || "其他";
+
         const { data: draft, error: insErr } = await supabase.from("expenses").insert({
           store_id: normalizedStore, expense_type: expense_type || "vendor",
           date: expDate, amount: r?.total_amount || 0,
-          vendor_name: r?.vendor_name || "", description: r?.description || "",
-          category_suggestion: r?.category_suggestion || "其他",
+          vendor_name: finalVendor, description: r?.description || "",
+          category_suggestion: finalCategory,
           invoice_number: r?.invoice_number || null,
           image_url: imgUrl, submitted_by: employee_id,
           month_key: expDate.slice(0, 7), status: "draft",
@@ -153,8 +159,11 @@ export async function POST(request) {
         }
         return Response.json({
           success: true, draft_id: draft?.id,
-          vendor_name: r?.vendor_name, amount: r?.total_amount,
+          vendor_name: finalVendor, amount: r?.total_amount,
           invoice_number: r?.invoice_number, date: expDate,
+          category_suggestion: finalCategory,
+          description: r?.description || "",
+          requires_manual: !r?.total_amount || r.total_amount <= 0,
           ai_error: aiError,
           redirect: `${SITE}/expense-review?id=${draft?.id}`,
         });
@@ -164,6 +173,34 @@ export async function POST(request) {
     } catch (e) {
       return Response.json({ error: e.message });
     }
+  }
+
+  // 上傳頁面內聯修正（不必跳到 expense-review）
+  if (body.action === "quick_update_expense") {
+    const { draft_id, amount, vendor_name, date, invoice_number, category_suggestion, description } = body;
+    if (!draft_id) return Response.json({ error: "缺少 draft_id" }, { status: 400 });
+    const updates = {};
+    if (amount !== undefined) updates.amount = Number(amount) || 0;
+    if (vendor_name !== undefined) updates.vendor_name = vendor_name;
+    if (date !== undefined) { updates.date = date; updates.month_key = (date || "").slice(0, 7); }
+    if (invoice_number !== undefined) updates.invoice_number = invoice_number || null;
+    if (category_suggestion !== undefined) updates.category_suggestion = category_suggestion;
+    if (description !== undefined) updates.description = description;
+    const { data, error } = await supabase.from("expenses").update(updates).eq("id", draft_id).select().maybeSingle();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ success: true, data });
+  }
+
+  // 上傳頁面直接送審（把 draft 改成 pending）
+  if (body.action === "finalize_expense") {
+    const { draft_id } = body;
+    if (!draft_id) return Response.json({ error: "缺少 draft_id" }, { status: 400 });
+    const { data: cur } = await supabase.from("expenses").select("amount").eq("id", draft_id).maybeSingle();
+    if (!cur) return Response.json({ error: "找不到草稿" }, { status: 404 });
+    if (!cur.amount || Number(cur.amount) <= 0) return Response.json({ error: "請先填寫金額" }, { status: 400 });
+    const { error } = await supabase.from("expenses").update({ status: "pending" }).eq("id", draft_id);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ success: true });
   }
 
   // CSV/Excel 匯入費用

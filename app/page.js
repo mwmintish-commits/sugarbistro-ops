@@ -1884,6 +1884,20 @@ export default function AdminPage() {
                 const params = new URLSearchParams({type:"deposit",store_id:sf,store_name:store?.name||"",employee_id:auth?.employee_id||"",employee_name:auth?.name||""});
                 window.open("/upload?"+params.toString(),"_blank");
               }} style={{marginLeft:8,padding:"2px 10px",borderRadius:4,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:10,cursor:"pointer",fontWeight:600}}>📷 後台上傳存款單</button>
+              <button onClick={()=>{
+                exportCSV(
+                  month+"_存款.csv",
+                  ["存款日","門市","對帳區間起","對帳區間迄","金額","應存現金","差異","狀態","差異說明","建立時間","圖片連結"],
+                  dep.map(d=>[
+                    d.deposit_date||"", d.stores?d.stores.name:"",
+                    d.period_start||"", d.period_end||"",
+                    d.amount||0, d.expected_cash||0, d.difference||0,
+                    d.status||"", (d.difference_explanation||"").replace(/[\r\n]+/g," "),
+                    d.created_at ? new Date(d.created_at).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}) : "",
+                    d.image_url||""
+                  ])
+                );
+              }} style={{marginLeft:6,padding:"2px 10px",borderRadius:4,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:10,cursor:"pointer"}}>📥 匯出 Excel</button>
             </h3>
             {missingAmount > 0 && (
               <div style={{background:"#fef3c7",border:"1px solid #f59e0b",borderRadius:6,padding:8,marginBottom:8,fontSize:11,color:"#92400e"}}>
@@ -1979,9 +1993,22 @@ export default function AdminPage() {
               ))}
               <button onClick={()=>{
                 const filtered = exps.filter(e=>(expType==="all"||e.expense_type===expType)&&(!expSearch||(e.vendor_name||"").includes(expSearch)));
-                const csv = "\uFEFF日期,門市,類型,廠商,提交人,金額,狀態\n" + filtered.map(e=>[e.date,e.stores?e.stores.name:"",e.expense_type,e.vendor_name||"",e.submitted_by_name||"",e.amount,e.status].join(",")).join("\n");
-                const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download = month+"_費用.csv"; a.click();
-              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:11,cursor:"pointer"}}>📥CSV</button>
+                const typeMap = { vendor: "月結", petty_cash: "零用金", hq_advance: "總部代付" };
+                exportCSV(
+                  month+"_費用_"+(expType==="all"?"全部":(typeMap[expType]||expType))+".csv",
+                  ["日期","門市","類型","廠商","發票號碼","分類","說明","提交人","金額","狀態","建立時間","圖片連結"],
+                  filtered.map(e=>[
+                    e.date||"", e.stores?e.stores.name:"總部均攤",
+                    typeMap[e.expense_type]||e.expense_type,
+                    e.vendor_name||"", e.invoice_number||"", e.category_suggestion||"",
+                    (e.description||"").replace(/[\r\n]+/g," "),
+                    e.employees?.name||e.submitted_by_name||"",
+                    e.amount||0, e.status||"",
+                    e.created_at ? new Date(e.created_at).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}) : "",
+                    e.image_url||""
+                  ])
+                );
+              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:11,cursor:"pointer"}}>📥 匯出 Excel</button>
             </div>
             {/* 統計卡片 */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
