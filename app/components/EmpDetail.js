@@ -385,39 +385,9 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
             {"📱 換手機"}
           </button>
 
-          <button onClick={async () => {
-            const lastDay = prompt("離職日期（YYYY-MM-DD）：");
-            if (!lastDay) return;
-            const reason = prompt("離職原因（選填）：") || "";
-            const r = await ap("/api/admin/leave-balances?employee_id=" + empId + "&year=" + new Date().getFullYear());
-            const remaining = r.data ? r.data.annual_remaining || 0 : 0;
-            const dailyPay = e.monthly_salary ? Math.round(e.monthly_salary / 30) : (e.hourly_rate ? e.hourly_rate * 8 : 0);
-            const settlement = remaining * dailyPay;
-            const months = d.service_months || 0;
-            const notice = months < 3 ? 0 : months < 12 ? 10 : months < 36 ? 20 : 30;
-            if (!confirm(
-              e.name + " 離職作業\n\n" +
-              "📅 離職日：" + lastDay + "\n" +
-              "⏰ 預告期：" + notice + "天\n" +
-              "🏖 未休特休：" + remaining + "天\n" +
-              "💰 折算：$" + settlement.toLocaleString() + "\n\n確定？"
-            )) return;
-            await ap("/api/admin/employees", {
-              action: "update", employee_id: empId,
-              resignation_date: lastDay, resignation_reason: reason,
-              last_working_date: lastDay, line_uid: null, is_active: false
-            });
-            if (settlement > 0) {
-              await ap("/api/admin/payments", {
-                action: "create", type: "leave_settlement",
-                employee_id: empId, amount: settlement,
-                recipient: e.name,
-                notes: "離職特休結算 " + remaining + "天",
-                month_key: lastDay.slice(0, 7)
-              });
-            }
-            alert("離職完成，特休$" + settlement.toLocaleString() + "已入撥款");
-            onClose();
+          <button onClick={() => {
+            // 開新分頁進入完整離職同意書流程（含員工 LINE 簽署）
+            window.open("/resignation-create?eid=" + empId, "_blank");
           }} style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #b91c1c", background: "transparent", color: "#b91c1c", fontSize: 10, cursor: "pointer" }}>
             {"🚪 離職作業"}
           </button>
