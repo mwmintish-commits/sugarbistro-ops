@@ -39,7 +39,7 @@ export async function GET(request) {
 
   // 單一員工詳情
   if (id) {
-    const { data: emp } = await supabase.from("employees").select("*, stores!store_id(name)").eq("id", id).single();
+    const { data: emp } = await supabase.from("employees").select("*, stores!store_id(name)").eq("id", id).maybeSingle();
     if (!emp) return Response.json({ error: "Not found" }, { status: 404 });
     // 不外洩密碼 hash，改回傳布林
     emp.has_password = !!emp.password_hash;
@@ -47,28 +47,26 @@ export async function GET(request) {
 
     const months = calcServiceMonths(emp.hire_date);
     const annualLeave = calcAnnualLeave(months, emp.employment_type);
-
-    // 取勞保級距
-    let laborIns = null;
-    if (emp.labor_tier) {
-      const { data } = await supabase.from("insurance_tiers").select("*").eq("tier_level", emp.labor_tier).eq("employment_type", emp.employment_type).single();
-      laborIns = data;
-    }
-    // 取健保級距
-    let healthIns = null;
-    if (emp.health_tier) {
-      const { data } = await supabase.from("insurance_tiers").select("*").eq("tier_level", emp.health_tier).eq("employment_type", emp.employment_type).single();
-      healthIns = data;
-    }
-
-    const { data: onboarding } = await supabase.from("onboarding_records").select("*").eq("auto_employee_id", id).single();
     const year = new Date().getFullYear();
-    const { data: leaveBalance } = await supabase.from("leave_balances").select("*").eq("employee_id", id).eq("year", year).single();
+
+    // 4 個查詢並行（原本 sequential 慢 4 倍）+ maybeSingle 容忍 0 row
+    const [laborInsRes, healthInsRes, onboardingRes, leaveBalanceRes] = await Promise.all([
+      emp.labor_tier
+        ? supabase.from("insurance_tiers").select("*").eq("tier_level", emp.labor_tier).eq("employment_type", emp.employment_type).maybeSingle()
+        : Promise.resolve({ data: null }),
+      emp.health_tier
+        ? supabase.from("insurance_tiers").select("*").eq("tier_level", emp.health_tier).eq("employment_type", emp.employment_type).maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase.from("onboarding_records").select("*").eq("auto_employee_id", id).maybeSingle(),
+      supabase.from("leave_balances").select("*").eq("employee_id", id).eq("year", year).maybeSingle(),
+    ]);
 
     return Response.json({
       data: emp, service_months: months, annual_leave_days: annualLeave,
-      labor_insurance: laborIns, health_insurance: healthIns,
-      onboarding, leave_balance: leaveBalance,
+      labor_insurance: laborInsRes?.data || null,
+      health_insurance: healthInsRes?.data || null,
+      onboarding: onboardingRes?.data || null,
+      leave_balance: leaveBalanceRes?.data || null,
     });
   }
 

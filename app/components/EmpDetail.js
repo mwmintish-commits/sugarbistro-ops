@@ -33,9 +33,21 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
   });
 
   const reload = () => {
-    ap("/api/admin/employees?id=" + empId).then(r => {
+    // 兩個 fetch 並行 + 8 秒 timeout，避免「載入中」卡住
+    const withTimeout = (p, ms) => Promise.race([
+      p,
+      new Promise(res => setTimeout(() => res({ error: "載入逾時 " + (ms/1000) + " 秒（網路不穩，請重試）" }), ms)),
+    ]);
+    setLd(true);
+    setMsg("");
+    Promise.all([
+      withTimeout(ap("/api/admin/employees?id=" + empId), 8000),
+      withTimeout(ap("/api/admin/documents?employee_id=" + empId), 8000).catch(() => ({ data: [] })),
+    ]).then(([r, docsRes]) => {
       setD(r);
-      if (r.data) {
+      if (r?.error) {
+        setMsg("❌ " + r.error);
+      } else if (r?.data) {
         setForm({
           role: r.data.role || "staff",
           employment_type: r.data.employment_type || "regular",
@@ -56,9 +68,9 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
           name: r.data.name || "",
         });
       }
+      setDocs(docsRes?.data || []);
       setLd(false);
     });
-    ap("/api/admin/documents?employee_id=" + empId).then(r => setDocs(r.data || [])).catch(() => {});
   };
 
   useEffect(() => { reload(); }, [empId]);
@@ -96,11 +108,27 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
     reload();
   };
 
-  if (ld || !d?.data) {
+  if (ld) {
     return (
       <div style={modal}>
         <div style={mbox}>
           <p style={{ textAlign: "center", color: "#aaa" }}>載入中...</p>
+        </div>
+      </div>
+    );
+  }
+  if (!d?.data) {
+    return (
+      <div style={modal}>
+        <div style={mbox}>
+          <div style={{ textAlign: "center", padding: "20px 10px" }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+            <p style={{ color: "#b91c1c", marginBottom: 12 }}>{msg || (d?.error ? "❌ " + d.error : "❌ 找不到員工資料")}</p>
+            <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+              <button onClick={reload} style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 13, cursor: "pointer" }}>🔄 重試</button>
+              <button onClick={onClose} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", fontSize: 13, cursor: "pointer" }}>關閉</button>
+            </div>
+          </div>
         </div>
       </div>
     );
