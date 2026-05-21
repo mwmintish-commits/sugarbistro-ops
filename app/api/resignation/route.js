@@ -42,7 +42,9 @@ export async function POST(request) {
 
   const signerIp = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "";
 
-  // 更新 resignation
+  // 更新 resignation：只記錄簽名，**不動 employees、不建撥款**
+  // 員工權限解除留待 /api/cron/process-resignations 在離職日次日 00:00 處理；
+  // 薪資與特休結算為獨立流程，由 admin 走撥款 / 薪資 Tab 處理
   const { error: upErr } = await supabase.from("resignations").update({
     status: "signed",
     signed_at: new Date().toISOString(),
@@ -51,30 +53,13 @@ export async function POST(request) {
   }).eq("id", r.id);
   if (upErr) return Response.json({ error: upErr.message }, { status: 500 });
 
-  // 連動：停用員工帳號 + 清 LINE 綁定 + 寫 resignation_date / last_working_date
-  await supabase.from("employees").update({
-    is_active: false,
-    line_uid: null,
-    resignation_date: r.last_working_date,
-    last_working_date: r.last_working_date,
-  }).eq("id", r.employee_id);
-
-  // 建立特休結算撥款（若 settlement_amount > 0 且還沒建過）
-  if (r.settlement_amount > 0) {
-    try {
-      const { data: pm } = await supabase.from("payments").insert({
-        type: "leave_settlement",
-        employee_id: r.employee_id,
-        amount: r.settlement_amount,
-        recipient: r.employee_name,
-        notes: "離職特休結算 " + r.annual_leave_remaining_days + " 天（簽署完成）",
-        month_key: r.last_working_date.slice(0, 7),
-      }).select().single();
-      if (pm) {
-        await supabase.from("resignations").update({ settlement_payment_id: pm.id }).eq("id", r.id);
-      }
-    } catch (e) { console.error("payment create on resignation sign failed:", e?.message); }
-  }
+  // 員工 resignation_date 寫一下方便後台查看（不停用、不清 line_uid）
+  try {
+    await supabase.from("employees").update({
+      resignation_date: r.last_working_date,
+      last_working_date: r.last_working_date,
+    }).eq("id", r.employee_id);
+  } catch {}
 
   // 通知 admin
   try {
@@ -83,7 +68,7 @@ export async function POST(request) {
     for (const a of adm || []) {
       if (a.line_uid) {
         await pushText(a.line_uid,
-          `✅ 離職同意書已簽署\n👤 ${r.employee_name}（${r.store_name || ""}）\n📅 離職日：${r.last_working_date}\n💰 特休結算：$${(r.settlement_amount || 0).toLocaleString()}`
+          `✅ 離職同意書已簽署\n👤 ${r.employee_name}（${r.store_name || ""}）\n📅 預計最後工作日：${r.last_working_date}\n⏳ 系統將於該日次日 00:00 自動解除 LINE 權限`
         ).catch(() => {});
       }
     }

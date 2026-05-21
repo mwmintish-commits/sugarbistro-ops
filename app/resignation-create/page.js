@@ -244,7 +244,9 @@ export default function ResignationCreatePage() {
         {submitting ? "送出中…" : "📤 發送離職同意書給員工簽署"}
       </button>
       <p style={{ fontSize: 10, color: "#888", textAlign: "center", marginTop: 6 }}>
-        發送後員工會在 LINE 收到簽署連結。簽署完成後系統自動：停用帳號、建立特休結算撥款。
+        發送後員工會在 LINE 收到簽署連結。員工簽完只存簽名留底；
+        系統將於「最後工作日」次日 00:00 自動解除其 LINE 綁定與系統登入權限。
+        薪資與特休結算為獨立流程，請至「薪資 / 撥款」Tab 處理。
       </p>
     </Box>
   );

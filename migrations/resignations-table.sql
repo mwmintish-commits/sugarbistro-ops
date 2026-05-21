@@ -35,10 +35,14 @@ CREATE TABLE IF NOT EXISTS resignations (
   cancelled_by UUID REFERENCES employees(id),
   cancel_reason TEXT,
   settlement_payment_id UUID,                           -- 對應的撥款記錄
+  processed_at TIMESTAMPTZ,                             -- cron 解除權限的時間（離職日次日）
 
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 已有此表時補欄位
+ALTER TABLE resignations ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_resignations_employee_id ON resignations(employee_id);
 CREATE INDEX IF NOT EXISTS idx_resignations_status ON resignations(status);

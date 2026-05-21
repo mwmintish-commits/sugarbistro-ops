@@ -149,17 +149,19 @@ export default function ResignationPreviewPage() {
              "退休"}
             ，雙方同意條款如下：</p>
           <ol style={{ paddingLeft: 22, margin: "8px 0" }}>
-            <li>本人之最後工作日為 <b>{info.last_working_date}</b>，自次日起終止勞動契約。</li>
+            <li>本人之最後工作日為 <b>{info.last_working_date}</b>，自次日起終止勞動契約。在此之前本人仍依正常班表上班、領取薪資。</li>
             {info.reason && <li>離職原因說明：{info.reason}</li>}
             {info.annual_leave_remaining_days > 0 && (
               <li>本人之未休特別休假尚餘 <b>{info.annual_leave_remaining_days} 天</b>，
-                雙方同意折算工資新台幣 <b>{fmt(info.settlement_amount)}</b> 元整，
-                於離職日後 30 日內隨末次薪資結算發放。</li>
+                將依公司薪資作業流程於離職日後隨末次薪資結算發放（試算金額 <b>{fmt(info.settlement_amount)}</b> 元整，實際以公司結算為準）。</li>
             )}
             <li>本人於任職期間應遵守之保密義務、競業禁止、智慧財產等條款，仍依雙方原訂約定繼續履行。</li>
-            <li>本人確認與公司間之薪資、加班費、勞退提撥、勞健保等事項皆已（或將依本書約定）結清，無其他爭議。</li>
+            <li style={{ background: "#fef3c7", padding: "6px 8px", borderRadius: 4, margin: "6px 0", border: "1px solid #f59e0b" }}>
+              <b>關於在職期間薪資數額經雙方依出勤資料核對無誤發放，勞方同意日後不再提出請求。</b>
+            </li>
+            <li>本人確認與公司間之加班費、勞退提撥、勞健保等事項皆已（或將依本書約定）結清，無其他爭議。</li>
             {info.additional_notes && <li>其他約定：{info.additional_notes}</li>}
-            <li>本同意書一式兩份，雙方各執一份為憑（電子簽署副本將以系統存檔，並寄送員工 LINE）。</li>
+            <li>本同意書經電子簽署即為雙方合意。系統將於最後工作日次日 00:00 解除本人之 LINE 綁定與系統登入權限。</li>
           </ol>
         </div>
 
