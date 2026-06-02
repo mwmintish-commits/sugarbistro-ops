@@ -1,6 +1,76 @@
 import { supabase, eom, auditLog } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 
+// 重算某員工某日的加班紀錄（含休假日/國定假日出勤）
+// 用於：後台編輯打卡、補登核准、手動觸發 — 補上 GPS 即時打卡才會建的加班紀錄
+// 規則：
+//   - 一般工作日：下班超過排班 end_time 達門檻 → 加班
+//   - 休息日(rest_day) / 國定假日(national_holiday)：當日工時全部算加班（依勞基法加給）
+//   - 只取代「自動產生」的紀錄（notes 以 [自動] 開頭），不動主管手動建立/核准的
+async function recomputeDayOT(employee_id, date) {
+  // 1) 排班（含 shift 時間與 day_type）
+  const { data: sched } = await supabase.from("schedules")
+    .select("*, shifts(start_time, end_time)").eq("employee_id", employee_id).eq("date", date).maybeSingle();
+  if (!sched) return { ok: false, reason: "無排班" };
+
+  // 2) 當日打卡（取最早 clock_in、最晚 clock_out）
+  const { data: atts } = await supabase.from("attendances")
+    .select("type, timestamp").eq("employee_id", employee_id)
+    .gte("timestamp", date + "T00:00:00+08:00").lte("timestamp", date + "T23:59:59+08:00")
+    .order("timestamp", { ascending: true });
+  const ins = (atts || []).filter(a => a.type === "clock_in");
+  const outs = (atts || []).filter(a => a.type === "clock_out");
+  if (ins.length === 0 || outs.length === 0) return { ok: false, reason: "缺上班或下班打卡" };
+  const toHHMM = (ts) => new Date(new Date(ts).getTime() + 8 * 3600 * 1000).toISOString().slice(11, 16);
+  const inHHMM = toHHMM(ins[0].timestamp);
+  const outHHMM = toHHMM(outs[outs.length - 1].timestamp);
+  const mins = (hhmm) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+
+  const { data: settings } = await supabase.from("attendance_settings").select("*").limit(1).single();
+  const minOt = settings?.overtime_min_minutes || 30;
+  const dt = sched.day_type || "work";
+  const { data: emp } = await supabase.from("employees").select("hourly_rate, monthly_salary, store_id").eq("id", employee_id).single();
+  const hourlyRate = emp?.hourly_rate || (emp?.monthly_salary ? Math.round(emp.monthly_salary / 30 / 8) : 190);
+
+  let otMinutes = 0, otType = null, rate = 1.34;
+  if (dt === "rest_day" || dt === "national_holiday") {
+    // 休息日/國定假日：全部工時算加班
+    otMinutes = mins(outHHMM) - mins(inHHMM);
+    if (dt === "national_holiday") { otType = "holiday"; rate = 2.0; }
+    else { otType = otMinutes <= 120 ? "rest_1" : "rest_2"; rate = otMinutes <= 120 ? 1.34 : 1.67; }
+  } else {
+    // 一般工作日：超過排班 end_time 才算
+    if (!sched.shifts?.end_time) return { ok: false, reason: "排班無 end_time" };
+    otMinutes = mins(outHHMM) - mins(sched.shifts.end_time.slice(0, 5));
+    if (otMinutes < minOt) {
+      // 不足門檻 → 清掉舊的自動加班紀錄（若有）
+      await supabase.from("overtime_records").delete().eq("employee_id", employee_id).eq("date", date).ilike("notes", "[自動]%");
+      return { ok: false, reason: `加班 ${otMinutes} 分未達門檻 ${minOt}` };
+    }
+    otType = otMinutes <= 120 ? "weekday_1" : "weekday_2";
+    rate = otMinutes <= 120 ? 1.34 : 1.67;
+  }
+  if (otMinutes < minOt && dt !== "rest_day" && dt !== "national_holiday") return { ok: false, reason: "未達門檻" };
+
+  const amount = Math.round(hourlyRate * (otMinutes / 60) * rate);
+
+  // 3) 取代自動產生的紀錄（保留手動的）
+  await supabase.from("overtime_records").delete().eq("employee_id", employee_id).eq("date", date).ilike("notes", "[自動]%");
+  // 若該日已有「手動/已核准」紀錄就不重複建（避免雙算）
+  const { data: manual } = await supabase.from("overtime_records")
+    .select("id").eq("employee_id", employee_id).eq("date", date).not("notes", "ilike", "[自動]%").maybeSingle();
+  if (manual) return { ok: false, reason: "已有手動加班紀錄，不覆蓋" };
+
+  await supabase.from("overtime_records").insert({
+    employee_id, store_id: emp?.store_id || sched.store_id || null, date,
+    scheduled_end: sched.shifts?.end_time || null, actual_end: outHHMM,
+    overtime_minutes: otMinutes, overtime_type: otType, rate, amount,
+    status: "pending", is_pre_approved: false, comp_type: "pending",
+    notes: `[自動] ${dt === "rest_day" ? "休息日出勤" : dt === "national_holiday" ? "國定假日出勤" : "平日加班"}（後台重算）`,
+  });
+  return { ok: true, otMinutes, otType, amount, day_type: dt };
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
@@ -184,7 +254,22 @@ export async function POST(request) {
       late_minutes, early_leave_minutes,
     });
 
-    return Response.json({ data });
+    // 編輯下班時間 → 自動重算加班（補上 GPS 即時打卡才會建的加班紀錄）
+    let otResult = null;
+    if (recType === "clock_out") {
+      const dateStr = new Date(new Date(timestamp).getTime() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+      try { otResult = await recomputeDayOT(orig.employee_id, dateStr); } catch (e) { otResult = { ok: false, reason: e.message }; }
+    }
+
+    return Response.json({ data, overtime: otResult });
+  }
+
+  // 手動重算某員工某日加班（後台「重算加班」按鈕用）
+  if (body.action === "recompute_ot") {
+    const { employee_id, date } = body;
+    if (!employee_id || !date) return Response.json({ error: "缺少 employee_id 或 date" }, { status: 400 });
+    const r = await recomputeDayOT(employee_id, date);
+    return Response.json({ success: true, result: r });
   }
 
   // ✦13 補登審核
@@ -213,6 +298,10 @@ export async function POST(request) {
           "✅ 補打卡已核准\n📅 " + data.date + " " +
           (data.type === "clock_in" ? "上班" : "下班") + " " + data.amended_time
         ).catch(() => {});
+      }
+      // 補登下班 → 自動重算加班
+      if (data.type === "clock_out") {
+        try { await recomputeDayOT(data.employee_id, data.date); } catch {}
       }
     }
     return Response.json({ data });

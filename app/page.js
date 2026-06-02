@@ -147,6 +147,7 @@ export default function AdminPage() {
   const [invSubview, setInvSubview] = useState("items"); // 庫存子分頁: items / suggestions
   const [schPop, setSchPop] = useState(null); // {date, storeId, storeName}
   const [attView, setAttView] = useState("records");
+  const [attEmpFilter, setAttEmpFilter] = useState("");
   const [amendments, setAmendments] = useState([]);
   const [monthlyReport, setMonthlyReport] = useState([]);
   const [reminders, setReminders] = useState([]);
@@ -1037,6 +1038,19 @@ export default function AdminPage() {
               const dupeList = Object.values(byEmpDate);
               return (
               <div>
+                {/* 員工篩選（門市用上方全域 sf） */}
+                <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
+                  <span style={{fontSize:11,color:"#666"}}>篩選員工：</span>
+                  <select value={attEmpFilter} onChange={e=>setAttEmpFilter(e.target.value)}
+                    style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11,minWidth:120}}>
+                    <option value="">全部員工</option>
+                    {emps.filter(e=>!sf||e.store_id===sf).sort((a,b)=>(a.name||"").localeCompare(b.name||"")).map(e=>(
+                      <option key={e.id} value={e.id}>{e.name}</option>
+                    ))}
+                  </select>
+                  {attEmpFilter && <button onClick={()=>setAttEmpFilter("")} style={{padding:"3px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>✕ 清除</button>}
+                  <span style={{fontSize:10,color:"#888"}}>（門市用上方篩選器）</span>
+                </div>
                 {/* 重複打卡警示與清理 */}
                 {dupeList.length > 0 && (
                   <div style={{background:"#fef3c7",border:"1px solid #f0e6c8",borderRadius:8,padding:10,marginBottom:10}}>
@@ -1064,8 +1078,8 @@ export default function AdminPage() {
                   </div>
                 )}
               {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
-                const storeAtt = att.filter(a => { const emp = emps.find(e=>e.id===a.employee_id); return emp && (store.id==="__hq__" ? (!emp.store_id || !stores.some(st=>st.id===emp.store_id)) : emp.store_id === store.id); });
-                if (storeAtt.length === 0 && !sf) return null;
+                const storeAtt = att.filter(a => { if (attEmpFilter && a.employee_id !== attEmpFilter) return false; const emp = emps.find(e=>e.id===a.employee_id); return emp && (store.id==="__hq__" ? (!emp.store_id || !stores.some(st=>st.id===emp.store_id)) : emp.store_id === store.id); });
+                if (storeAtt.length === 0 && (!sf || attEmpFilter)) return null;
                 return (
                 <div key={store.id} style={{marginBottom:10}}>
                   <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeAtt.length+"筆）"}</h4>
@@ -1100,6 +1114,12 @@ export default function AdminPage() {
                           if (r) load();
                         }}
                           style={{padding:"4px 8px",borderRadius:4,border:"1px solid #4361ee",background:"#fff",fontSize:11,cursor:"pointer",color:"#4361ee"}}>✏編輯</button>
+                        {a.type==="clock_out" && <button onClick={async()=>{
+                          const dateStr = new Date(a.timestamp).toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});
+                          if(!confirm(`重算 ${a.employees?.name||""} ${dateStr} 的加班？\n\n會依排班 day_type 判斷：\n• 一般日：超過下班時間達門檻才算\n• 休息日/國定假日：當日工時全算加班`))return;
+                          const r = await sap("/api/admin/attendance",{action:"recompute_ot",employee_id:a.employee_id,date:dateStr});
+                          if(r){const res=r.result;alert(res?.ok?`✅ 已建立加班：${res.otMinutes}分（${res.day_type}）金額$${res.amount}`:`未建立：${res?.reason||"無"}`);load();}
+                        }} style={{padding:"4px 8px",borderRadius:4,border:"1px solid #b45309",background:"#fff",fontSize:11,cursor:"pointer",color:"#b45309"}}>⏱重算加班</button>}
                         <button onClick={async()=>{if(!confirm("確定刪除此打卡紀錄？"))return;await sap("/api/admin/attendance",{action:"delete",attendance_id:a.id});load();}}
                           style={{padding:"4px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer",color:"#b91c1c"}}>🗑刪除</button>
                       </td>
@@ -1154,6 +1174,21 @@ export default function AdminPage() {
                   loadMonthlyReport(); alert("月報表已產生");
                 }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
                   {"📊 產生 "+month+" 月報表"}
+                </button>
+                <button onClick={()=>{
+                  const rows = (monthlyReport||[]);
+                  if(rows.length===0){alert("請先產生月報表");return;}
+                  const header=["員工","出勤天數","遲到次數","遲到分鐘","請假天數","加班hr","補休hr","加班費","補登筆數"];
+                  const csv="﻿"+[header.join(",")].concat(rows.map(r=>[
+                    r.employees?.name||"", r.work_days||0, r.late_count||0, r.late_total_minutes||0,
+                    r.leave_days||0, r.overtime_hours||0, r.overtime_comp_hours||0, r.overtime_pay_amount||0, r.amendment_count||0
+                  ].join(","))).join("\n");
+                  const a=document.createElement("a");
+                  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+                  a.download="出勤月報_"+month+(sf?"_"+(stores.find(s=>s.id===sf)?.name||""):"")+".csv";
+                  a.click();
+                }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #0a7c42",background:"#fff",color:"#0a7c42",fontSize:11,cursor:"pointer",marginBottom:8,marginLeft:6,fontWeight:600}}>
+                  {"📥 下載 CSV"}
                 </button>
                 <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
