@@ -173,8 +173,10 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
+    // stores 只在登入後抓（登入畫面不打 API，避免冷啟動拖慢登入頁）
+    if (!auth) return;
     ap("/api/admin/stores").then(d => setStores(d.data || []));
-  }, []);
+  }, [auth]);
 
   const effectiveRoleTabs = auth?.role === "admin" ? ROLE_TABS : { ...ROLE_TABS, ...(customRoleTabs || {}) };
   const myTabs = auth ? (effectiveRoleTabs[auth.role] || ROLE_TABS[auth.role] || []) : [];
