@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { ap, fmt, Row, ROLES, RB, TIERS_R, TIERS_P, tierLabel } from "./utils";
+import { ap, fmt, Row, ROLES, RB, TIERS_R, TIERS_P, tierLabel, pickLaborSelf, pickHealthSelf } from "./utils";
 
 const modal = {
   position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
@@ -25,6 +25,7 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
   const [form, setForm] = useState({
     role: "", employment_type: "", store_id: "",
     labor_tier: "", health_tier: "",
+    labor_self_override: "", health_self_override: "", health_insured_here: true,
     labor_start_date: "", health_start_date: "", hourly_rate: "", monthly_salary: "",
     hire_date: "", annual_leave_override: "",
     phone: "", email: "", birthday: "", id_number: "", address: "",
@@ -54,6 +55,9 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
           store_id: r.data.store_id || "",
           labor_tier: r.data.labor_tier || "",
           health_tier: r.data.health_tier || "",
+          labor_self_override: r.data.labor_self_override ?? "",
+          health_self_override: r.data.health_self_override ?? "",
+          health_insured_here: r.data.health_insured_here !== false,
           labor_start_date: r.data.labor_start_date || "",
           health_start_date: r.data.health_start_date || "",
           hourly_rate: r.data.hourly_rate || "",
@@ -91,6 +95,9 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
       bank_name: form.bank_name || null, bank_account: form.bank_account || null,
       labor_tier: form.labor_tier ? Number(form.labor_tier) : null,
       health_tier: form.health_tier ? Number(form.health_tier) : null,
+      labor_self_override: form.labor_self_override === "" ? null : Number(form.labor_self_override),
+      health_self_override: form.health_self_override === "" ? null : Number(form.health_self_override),
+      health_insured_here: form.health_insured_here !== false,
       labor_start_date: form.labor_start_date || null,
       health_start_date: form.health_start_date || null,
       hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : null,
@@ -135,8 +142,17 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
   }
 
   const e = d.data;
-  const laborSelf = e.labor_self_amount || 0;
-  const healthSelf = e.health_self_amount || 0;
+  // 即時依 form（含手動覆寫 + 兼職健保旗標）計算，所見即所得
+  const formForCalc = {
+    employment_type: form.employment_type,
+    labor_tier: form.labor_tier ? Number(form.labor_tier) : null,
+    health_tier: form.health_tier ? Number(form.health_tier) : null,
+    labor_self_override: form.labor_self_override,
+    health_self_override: form.health_self_override,
+    health_insured_here: form.health_insured_here,
+  };
+  const laborSelf = pickLaborSelf(formForCalc);
+  const healthSelf = pickHealthSelf(formForCalc);
 
   return (
     <div style={modal} onClick={onClose}>
@@ -361,31 +377,58 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
         <div style={{ ...sec, border: "2px solid #b45309" }}>
           <h3 style={{ ...sh, color: "#b45309" }}>🛡️ 勞健保設定</h3>
           {(() => {
-            const tiers = form.employment_type === "parttime" ? TIERS_P : TIERS_R;
-            const tierLabelPrefix = form.employment_type === "parttime" ? "兼職" : "正職";
+            const isPT = form.employment_type === "parttime";
+            const laborTiers = isPT ? TIERS_P : TIERS_R;
             return <>
-            <div style={{ fontSize: 10, color: "#888", marginBottom: 6 }}>
-              目前依「{tierLabelPrefix}」級距顯示（依上方「僱用類型」自動切換）
+            <div style={{ fontSize: 10, color: "#666", marginBottom: 6, padding: 6, background: "#fef9c3", borderRadius: 4 }}>
+              💡 勞保依「{isPT ? "兼職" : "正職"}」級距；健保一律用正職級距（健保最低 = 基本工資）。
+              {isPT && " 兼職若另有加保（家屬/他司）請勾下方「不在此加保健保」。"}
+              <br/>實際金額以勞健保事務所核定為準，可在下方手動覆寫。
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
               <div>
-                <label style={{ fontSize: 10, color: "#888" }}>勞保級距</label>
+                <label style={{ fontSize: 10, color: "#888" }}>勞保級距（{isPT ? "兼職表" : "正職表"}）</label>
                 <select value={form.labor_tier} onChange={ev => setForm({...form, labor_tier: ev.target.value})} style={inp}>
                   <option value="">未設定</option>
-                  {tiers.map(([i, r]) => <option key={i} value={i}>{tierLabel(i, r)}</option>)}
+                  {laborTiers.map(([i, r]) => <option key={i} value={i}>{tierLabel(i, r)}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 10, color: "#888" }}>健保級距</label>
-                <select value={form.health_tier} onChange={ev => setForm({...form, health_tier: ev.target.value})} style={inp}>
+                <label style={{ fontSize: 10, color: "#888" }}>健保級距（正職表）</label>
+                <select value={form.health_tier} onChange={ev => setForm({...form, health_tier: ev.target.value})}
+                  disabled={isPT && !form.health_insured_here}
+                  style={{...inp, opacity: (isPT && !form.health_insured_here) ? 0.4 : 1}}>
                   <option value="">未設定</option>
-                  {tiers.map(([i, r]) => <option key={i} value={i}>{tierLabel(i, r)}</option>)}
+                  {TIERS_R.map(([i, r]) => <option key={i} value={i}>{tierLabel(i, r)}</option>)}
                 </select>
               </div>
             </div>
+            {isPT && (
+              <label style={{ marginTop: 8, fontSize: 11, color: "#333", display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                <input type="checkbox" checked={!form.health_insured_here}
+                  onChange={ev => setForm({...form, health_insured_here: !ev.target.checked})} />
+                不在此加保健保（員工另由家屬/他司加保）
+              </label>
+            )}
+            <div style={{ marginTop: 8, padding: 6, background: "#faf8f5", borderRadius: 4 }}>
+              <div style={{ fontSize: 10, color: "#888", marginBottom: 4 }}>📋 自付額手動覆寫（事務所核定為準，留空則查表估算）</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                <div>
+                  <label style={{ fontSize: 9, color: "#888" }}>勞保自付額</label>
+                  <input type="number" placeholder="留空＝查表" value={form.labor_self_override}
+                    onChange={ev => setForm({...form, labor_self_override: ev.target.value})} style={inp} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 9, color: "#888" }}>健保自付額</label>
+                  <input type="number" placeholder="留空＝查表" value={form.health_self_override}
+                    onChange={ev => setForm({...form, health_self_override: ev.target.value})} style={inp} />
+                </div>
+              </div>
+            </div>
             {(laborSelf > 0 || healthSelf > 0) && (
-              <div style={{ marginTop: 6, fontSize: 10, color: "#666" }}>
-                {"自付額：勞保 $" + laborSelf + " / 健保 $" + healthSelf}
+              <div style={{ marginTop: 6, fontSize: 11, color: "#0a7c42", fontWeight: 600 }}>
+                💰 目前用於計算：勞保 ${laborSelf} / 健保 ${healthSelf}
+                {(form.labor_self_override !== "" || form.health_self_override !== "") && <span style={{ color: "#b45309", marginLeft: 6 }}>（含手動覆寫）</span>}
               </div>
             )}
             </>;

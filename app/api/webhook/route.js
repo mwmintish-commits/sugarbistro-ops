@@ -894,8 +894,13 @@ async function handleEvent(event) {
       .gte("date", mk + "-01").lte("date", mk + "-31");
     const otPay = (ot || []).reduce((s, r) => s + Number(r.amount || 0), 0);
     const isPT = emp.employment_type === "parttime";
-    const ls = emp.labor_tier ? (isPT ? LABOR_SELF_PT : LABOR_SELF)[emp.labor_tier - 1] || 0 : 0;
-    const hs = emp.health_tier ? (isPT ? HEALTH_SELF_PT : HEALTH_SELF)[emp.health_tier - 1] || 0 : 0;
+    const ls = (emp.labor_self_override != null)
+      ? Number(emp.labor_self_override) || 0
+      : (emp.labor_tier ? (isPT ? LABOR_SELF_PT : LABOR_SELF)[emp.labor_tier - 1] || 0 : 0);
+    const hs = (emp.health_self_override != null)
+      ? Number(emp.health_self_override) || 0
+      : ((isPT && emp.health_insured_here === false) ? 0
+          : (emp.health_tier ? HEALTH_SELF[emp.health_tier - 1] || 0 : 0));
     const net = base + otPay - ls - hs;
     return replyText(rt, "💰 " + emp.name + " " + mk + " 預估薪資\n━━━━━━━━━━━━━━\n📅 出勤 " + wd + " 天\n💵 底薪 " + fmt(base) + (otPay > 0 ? "\n⏱ 加班費 +" + fmt(otPay) : "") + (ls > 0 ? "\n🛡 勞保 -" + fmt(ls) : "") + (hs > 0 ? "\n🏥 健保 -" + fmt(hs) : "") + "\n━━━━━━━━━━━━━━\n💰 預估實發 " + fmt(net) + "\n\n⚠️ 此為預估，實際以月底結算為準");
   }

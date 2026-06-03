@@ -172,29 +172,52 @@ export const INSURANCE_TIERS = [
 export const LABOR_SELF = INSURANCE_TIERS.map(t => t[1]);
 export const HEALTH_SELF = INSURANCE_TIERS.map(t => t[2]);
 
-// 兼職（部分工時）投保級距（2026年/民國115年）
-// 級距：[投保薪資, 勞保自付, 健保自付(本人)]
+// 兼職（部分工時）勞保投保級距（2026年/民國115年）
+// ⚠️ 健保不在此表 — 台灣健保最低 = 基本工資（約 28,590），兼職若由本公司加保也用正職最低級起算；
+//    若兼職員工另有加保（配偶/家屬/他司），本公司不替其加保健保。
 export const INSURANCE_TIERS_PT = [
-  [11100, 278, 172],   // 1
-  [12540, 314, 194],   // 2
-  [13500, 338, 209],   // 3
-  [15840, 397, 246],   // 4
-  [16500, 414, 256],   // 5
-  [17280, 433, 268],   // 6
-  [17880, 448, 277],   // 7
-  [19047, 478, 296],   // 8
-  [20008, 502, 310],   // 9
-  [21009, 527, 326],   // 10
-  [22000, 552, 341],   // 11
-  [23100, 579, 358],   // 12
-  [24000, 602, 372],   // 13
-  [25250, 633, 392],   // 14
-  [26400, 662, 410],   // 15
-  [27600, 692, 428],   // 16
-  [28590, 717, 443],   // 17
-  [29500, 738, 458],   // 18 接上正職最低級距
-  [30300, 758, 470],   // 19
-  [31800, 795, 493],   // 20
+  [11100, 278],   // 1
+  [12540, 314],   // 2
+  [13500, 338],   // 3
+  [15840, 397],   // 4
+  [16500, 414],   // 5
+  [17280, 433],   // 6
+  [17880, 448],   // 7
+  [19047, 478],   // 8
+  [20008, 502],   // 9
+  [21009, 527],   // 10
+  [22000, 552],   // 11
+  [23100, 579],   // 12
+  [24000, 602],   // 13
+  [25250, 633],   // 14
+  [26400, 662],   // 15
+  [27600, 692],   // 16
+  [28590, 717],   // 17 基本工資邊界
+  [29500, 738],   // 18 接上正職最低級距
+  [30300, 758],   // 19
+  [31800, 795],   // 20
 ];
 export const LABOR_SELF_PT = INSURANCE_TIERS_PT.map(t => t[1]);
-export const HEALTH_SELF_PT = INSURANCE_TIERS_PT.map(t => t[2]);
+
+// 統一介面：依員工狀態挑出真實自付額
+// 1. 若員工有 labor_self_override / health_self_override 手動覆寫 → 直接用該值（事務所核定為準）
+// 2. 勞保：兼職用 PT 表，正職用正職表
+// 3. 健保：一律用正職表（健保無兼職低級距）；若 employment_type=parttime AND health_insured_here=false → 自付 0
+export function pickLaborSelf(emp) {
+  if (!emp) return 0;
+  const o = emp.labor_self_override;
+  if (o != null && o !== "" && !isNaN(Number(o))) return Number(o);
+  const tier = emp.labor_tier;
+  if (!tier) return 0;
+  const isPT = emp.employment_type === "parttime";
+  return (isPT ? LABOR_SELF_PT : LABOR_SELF)[tier - 1] || 0;
+}
+export function pickHealthSelf(emp) {
+  if (!emp) return 0;
+  const o = emp.health_self_override;
+  if (o != null && o !== "" && !isNaN(Number(o))) return Number(o);
+  if (emp.employment_type === "parttime" && emp.health_insured_here === false) return 0;
+  const tier = emp.health_tier;
+  if (!tier) return 0;
+  return HEALTH_SELF[tier - 1] || 0;
+}
