@@ -1,7 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, LABOR_SELF, HEALTH_SELF } from "./components/utils";
+import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, LABOR_SELF, HEALTH_SELF, LABOR_SELF_PT, HEALTH_SELF_PT } from "./components/utils";
+// 依僱用類型選對的自付額表（兼職 = parttime，否則用正職）
+const laborSelfFor = (emp, tier) => { if (!tier) return 0; const arr = emp?.employment_type === "parttime" ? LABOR_SELF_PT : LABOR_SELF; return arr[tier - 1] || 0; };
+const healthSelfFor = (emp, tier) => { if (!tier) return 0; const arr = emp?.employment_type === "parttime" ? HEALTH_SELF_PT : HEALTH_SELF; return arr[tier - 1] || 0; };
 import { routePaymentMethod } from "../lib/payment-router";
 import { checkAppVersion, validateAuth, nukeCache } from "../lib/cache-buster";
 
@@ -1377,7 +1380,7 @@ export default function AdminPage() {
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 薪資"}
               <button onClick={()=>{
                 exportCSV("薪資_"+month+".csv",["員工","出勤天","底薪","加班費","勞保","健保","補充保費","加項","扣項","實發"],
-                  ae.map(e=>{const wd=att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;const bp=e.monthly_salary?Number(e.monthly_salary):(e.hourly_rate?Number(e.hourly_rate)*wd*8:0);const ot=otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);const ls=e.labor_tier?LABOR_SELF[e.labor_tier-1]||0:0;const hs=e.health_tier?HEALTH_SELF[e.health_tier-1]||0:0;const suppH=e.employment_type==="parttime"&&bp>29500?Math.round(bp*0.0211):0;const da=Number(e.default_allowance||0);const dd=Number(e.default_deduction||0);return[e.name,wd,bp,ot,ls,hs,suppH,da,dd,bp+ot-ls-hs-suppH+da-dd];}));
+                  ae.map(e=>{const wd=att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;const bp=e.monthly_salary?Number(e.monthly_salary):(e.hourly_rate?Number(e.hourly_rate)*wd*8:0);const ot=otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);const ls=laborSelfFor(e,e.labor_tier);const hs=healthSelfFor(e,e.health_tier);const suppH=e.employment_type==="parttime"&&bp>29500?Math.round(bp*0.0211):0;const da=Number(e.default_allowance||0);const dd=Number(e.default_deduction||0);return[e.name,wd,bp,ot,ls,hs,suppH,da,dd,bp+ot-ls-hs-suppH+da-dd];}));
               }} style={{marginLeft:8,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
             </h3>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
@@ -1421,8 +1424,8 @@ export default function AdminPage() {
                     const dr = Number(e.monthly_salary)/30;
                     eLv.forEach(l => { const days = l.half_day?0.5:(Math.ceil((new Date(l.end_date)-new Date(l.start_date))/86400000)+1); const rate=deductRates[l.leave_type]||0; if(rate>0)lvDeduct+=Math.round(dr*days*rate); });
                   }
-                  const ls = e.labor_tier ? LABOR_SELF[e.labor_tier-1]||0 : 0;
-                  const hs = e.health_tier ? HEALTH_SELF[e.health_tier-1]||0 : 0;
+                  const ls = laborSelfFor(e, e.labor_tier);
+                  const hs = healthSelfFor(e, e.health_tier);
                   const suppH = e.employment_type==="parttime"&&bp>29500?Math.round(bp*0.0211):0;
                   const da = Number(e.default_allowance||0);
                   const dd = Number(e.default_deduction||0);

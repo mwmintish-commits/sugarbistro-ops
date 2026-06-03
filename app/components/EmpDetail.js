@@ -360,27 +360,36 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
 
         <div style={{ ...sec, border: "2px solid #b45309" }}>
           <h3 style={{ ...sh, color: "#b45309" }}>🛡️ 勞健保設定</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-            <div>
-              <label style={{ fontSize: 10, color: "#888" }}>勞保級距</label>
-              <select value={form.labor_tier} onChange={ev => setForm({...form, labor_tier: ev.target.value})} style={inp}>
-                <option value="">未設定</option>
-                {TIERS_R.map(([i, r]) => <option key={i} value={i}>{tierLabel(i, r)}</option>)}
-              </select>
+          {(() => {
+            const tiers = form.employment_type === "parttime" ? TIERS_P : TIERS_R;
+            const tierLabelPrefix = form.employment_type === "parttime" ? "兼職" : "正職";
+            return <>
+            <div style={{ fontSize: 10, color: "#888", marginBottom: 6 }}>
+              目前依「{tierLabelPrefix}」級距顯示（依上方「僱用類型」自動切換）
             </div>
-            <div>
-              <label style={{ fontSize: 10, color: "#888" }}>健保級距</label>
-              <select value={form.health_tier} onChange={ev => setForm({...form, health_tier: ev.target.value})} style={inp}>
-                <option value="">未設定</option>
-                {TIERS_R.map(([i, r]) => <option key={i} value={i}>{tierLabel(i, r)}</option>)}
-              </select>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <div>
+                <label style={{ fontSize: 10, color: "#888" }}>勞保級距</label>
+                <select value={form.labor_tier} onChange={ev => setForm({...form, labor_tier: ev.target.value})} style={inp}>
+                  <option value="">未設定</option>
+                  {tiers.map(([i, r]) => <option key={i} value={i}>{tierLabel(i, r)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: "#888" }}>健保級距</label>
+                <select value={form.health_tier} onChange={ev => setForm({...form, health_tier: ev.target.value})} style={inp}>
+                  <option value="">未設定</option>
+                  {tiers.map(([i, r]) => <option key={i} value={i}>{tierLabel(i, r)}</option>)}
+                </select>
+              </div>
             </div>
-          </div>
-          {(laborSelf > 0 || healthSelf > 0) && (
-            <div style={{ marginTop: 6, fontSize: 10, color: "#666" }}>
-              {"自付額：勞保 $" + laborSelf + " / 健保 $" + healthSelf}
-            </div>
-          )}
+            {(laborSelf > 0 || healthSelf > 0) && (
+              <div style={{ marginTop: 6, fontSize: 10, color: "#666" }}>
+                {"自付額：勞保 $" + laborSelf + " / 健保 $" + healthSelf}
+              </div>
+            )}
+            </>;
+          })()}
         </div>
 
         <button onClick={save} disabled={saving} style={{

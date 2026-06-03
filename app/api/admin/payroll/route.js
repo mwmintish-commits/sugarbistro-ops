@@ -2,8 +2,12 @@ import { supabase, eom, auditLog } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
 import { calcHourlyRate, calcDailyRate, calcShiftHours, calcRestDayOTPremium, fmt } from "@/lib/hr-utils";
 
+// 正職勞健保自付額
 const LABOR_SELF = [738,758,795,833,870,908,955,1002,1050,1098,1145,1145,1145,1145,1145,1145,1145,1145,1145,1145];
 const HEALTH_SELF = [458,470,493,516,540,563,592,622,651,681,710,748,785,822,859,896,943,990,1036,1083];
+// 兼職勞健保自付額（第 1 級 11100 起）
+const LABOR_SELF_PT = [278,314,338,397,414,433,448,478,502,527,552,579,602,633,662,692,717,738,758,795];
+const HEALTH_SELF_PT = [172,194,209,246,256,268,277,296,310,326,341,358,372,392,410,428,443,458,470,493];
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -79,8 +83,9 @@ export async function POST(request) {
         .reduce((s, r) => s + Number(r.comp_hours || 0), 0);
 
       // 勞健保
-      const ls = emp.labor_tier ? LABOR_SELF[emp.labor_tier - 1] || 0 : 0;
-      const hs = emp.health_tier ? HEALTH_SELF[emp.health_tier - 1] || 0 : 0;
+      const isPT = emp.employment_type === "parttime";
+      const ls = emp.labor_tier ? (isPT ? LABOR_SELF_PT : LABOR_SELF)[emp.labor_tier - 1] || 0 : 0;
+      const hs = emp.health_tier ? (isPT ? HEALTH_SELF_PT : HEALTH_SELF)[emp.health_tier - 1] || 0 : 0;
       const suppHealth = emp.employment_type === "parttime" && base > 29500 ? Math.round(base * 0.0211) : 0;
 
       // 加扣項
