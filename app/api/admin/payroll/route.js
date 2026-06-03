@@ -83,9 +83,16 @@ export async function POST(request) {
         .reduce((s, r) => s + Number(r.comp_hours || 0), 0);
 
       // 勞健保
+      // 自付額：有手動覆寫優先；無則查表（勞保依僱用類型，健保一律正職表；
+      // 兼職且不在此加保健保 → 健保自付 0）
       const isPT = emp.employment_type === "parttime";
-      const ls = emp.labor_tier ? (isPT ? LABOR_SELF_PT : LABOR_SELF)[emp.labor_tier - 1] || 0 : 0;
-      const hs = emp.health_tier ? (isPT ? HEALTH_SELF_PT : HEALTH_SELF)[emp.health_tier - 1] || 0 : 0;
+      const ls = (emp.labor_self_override != null)
+        ? Number(emp.labor_self_override) || 0
+        : (emp.labor_tier ? (isPT ? LABOR_SELF_PT : LABOR_SELF)[emp.labor_tier - 1] || 0 : 0);
+      const hs = (emp.health_self_override != null)
+        ? Number(emp.health_self_override) || 0
+        : ((isPT && emp.health_insured_here === false) ? 0
+            : (emp.health_tier ? HEALTH_SELF[emp.health_tier - 1] || 0 : 0));
       const suppHealth = emp.employment_type === "parttime" && base > 29500 ? Math.round(base * 0.0211) : 0;
 
       // 加扣項
