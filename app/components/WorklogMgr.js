@@ -13,8 +13,12 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
   const [loading, setLoading] = useState(false);
   const [detailStore, setDetailStore] = useState(null);
   const [detailDate, setDetailDate] = useState(new Date().toLocaleDateString("sv-SE"));
+  const [detailFreq, setDetailFreq] = useState("daily"); // daily | weekly | monthly
   const [detailItems, setDetailItems] = useState([]);
   const [detailSummary, setDetailSummary] = useState({});
+  const [cleaningContribStore, setCleaningContribStore] = useState(null);
+  const [cleaningContribMonth, setCleaningContribMonth] = useState(new Date().toLocaleDateString("sv-SE").slice(0, 7));
+  const [cleaningContrib, setCleaningContrib] = useState([]);
   const [wasteQueue, setWasteQueue] = useState([]);
   const [wasteStatus, setWasteStatus] = useState("pending");
   const [wasteStats, setWasteStats] = useState(null);
@@ -114,29 +118,40 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
       .catch(() => setLoading(false));
   };
 
-  const loadDetail = (storeId, date) => {
+  const loadDetail = (storeId, date, freq) => {
     setDetailStore(storeId);
     setDetailDate(date || new Date().toLocaleDateString("sv-SE"));
+    const f = freq || detailFreq;
     setLoading(true);
-    ap("/api/admin/worklogs?type=collab&store_id=" + storeId + "&date=" + (date || detailDate) + "&frequency=daily")
+    ap("/api/admin/worklogs?type=collab&store_id=" + storeId + "&date=" + (date || detailDate) + "&frequency=" + f)
       .then(r => { setDetailItems(r.data || []); setDetailSummary(r.summary || {}); setLoading(false); });
+  };
+
+  const loadCleaningContrib = (storeId, m) => {
+    const s = storeId || cleaningContribStore || sf;
+    if (!s) { setCleaningContrib([]); return; }
+    setLoading(true);
+    ap("/api/admin/worklogs?type=monthly_contrib&store_id=" + s + "&month=" + (m || cleaningContribMonth))
+      .then(r => { setCleaningContrib(r.data || []); setLoading(false); });
   };
 
   useEffect(() => {
     if (view === "completion") loadCompletion();
     else if (view === "inventory") loadInventory();
     else if (view === "waste") loadWaste();
-  }, [view, month, sf, invDate, wasteStatus, wasteSubview]);
+    else if (view === "cleaning") loadCleaningContrib(cleaningContribStore || sf, cleaningContribMonth);
+  }, [view, month, sf, invDate, wasteStatus, wasteSubview, cleaningContribStore, cleaningContribMonth]);
 
   return (
     <div>
       <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap" }}>
-        {["completion", "detail", "inventory", "waste", ...((auth?.role === "admin" || auth?.role === "store_manager") ? ["settings"] : [])].map(v => {
-          const labels = { completion: "📊 各店完成度", detail: "📋 每日明細", inventory: "📦 盤點回報", waste: "🗑 報廢稽核", settings: "⚙️ 日誌設定" };
+        {["completion", "detail", "cleaning", "inventory", "waste", ...((auth?.role === "admin" || auth?.role === "store_manager") ? ["settings"] : [])].map(v => {
+          const labels = { completion: "📊 各店完成度", detail: "📋 每日明細", cleaning: "🧹 清潔貢獻", inventory: "📦 盤點回報", waste: "🗑 報廢稽核", settings: "⚙️ 日誌設定" };
           return (
             <button key={v} onClick={() => {
               setView(v);
               if (v === "detail" && sf) loadDetail(sf, detailDate);
+              if (v === "cleaning" && sf) { setCleaningContribStore(sf); loadCleaningContrib(sf, cleaningContribMonth); }
             }} style={{
               padding: "4px 10px", borderRadius: 5, border: "1px solid #ddd",
               background: view === v ? "#1a1a1a" : "#fff",
@@ -187,14 +202,20 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
       {/* 每日明細（可編輯） */}
       {!loading && view === "detail" && (
         <div>
-          <div style={{ display: "flex", gap: 4, marginBottom: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 4, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
             {!sf && <select value={detailStore || ""} onChange={e => { setDetailStore(e.target.value); loadDetail(e.target.value, detailDate); }}
               style={{ padding: "4px 8px", borderRadius: 5, border: "1px solid #ddd", fontSize: 11 }}>
               <option value="">選擇門市</option>
               {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>}
-            <input type="date" value={detailDate} onChange={e => { setDetailDate(e.target.value); if (detailStore) loadDetail(detailStore, e.target.value); }}
+            <input type="date" value={detailDate} onChange={e => { setDetailDate(e.target.value); if (detailStore) loadDetail(detailStore, e.target.value, detailFreq); }}
               style={{ padding: "4px 8px", borderRadius: 5, border: "1px solid #ddd", fontSize: 11 }} />
+            <div style={{ display: "flex", gap: 0, border: "1px solid #ddd", borderRadius: 5, overflow: "hidden" }}>
+              {[["daily", "日"], ["weekly", "週"], ["monthly", "月"]].map(([k, l]) => (
+                <button key={k} onClick={() => { setDetailFreq(k); if (detailStore) loadDetail(detailStore, detailDate, k); }}
+                  style={{ padding: "4px 10px", border: "none", background: detailFreq === k ? "#155e75" : "#fff", color: detailFreq === k ? "#fff" : "#666", fontSize: 11, cursor: "pointer", fontWeight: detailFreq === k ? 600 : 400 }}>{l}</button>
+              ))}
+            </div>
             <span style={{ fontSize: 11, color: "#888" }}>
               {detailSummary.done || 0}/{detailSummary.total || 0} 項 ({detailSummary.percent || 0}%)
             </span>
@@ -250,12 +271,16 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
                             <td style={{ padding: 5, textAlign: "center" }}>
                               {canEdit ? (
                                 <input type="checkbox" checked={!!item.completed} onChange={async () => {
+                                  const isBackfill = !item.completed && detailDate < new Date().toLocaleDateString("sv-SE");
+                                  if (isBackfill && !confirm("補勾歷史日期項目？備註會自動標記「補勾 by " + (auth?.name || "主管") + "」")) return;
                                   await ap("/api/admin/worklogs", {
                                     action: "toggle_item", item_id: item.id,
                                     completed: !item.completed,
                                     employee_id: auth?.id, employee_name: auth?.name,
+                                    edited_by_admin: isBackfill,
+                                    admin_name: auth?.name,
                                   });
-                                  loadDetail(detailStore, detailDate);
+                                  loadDetail(detailStore, detailDate, detailFreq);
                                 }} style={{ width: 16, height: 16, cursor: "pointer" }} />
                               ) : (
                                 <span>{item.completed ? "✅" : "⬜"}</span>
@@ -273,7 +298,7 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
                                   const note = prompt("備註：", item.notes || "");
                                   if (note === null) return;
                                   await ap("/api/admin/worklogs", { action: "add_note", item_id: item.id, notes: note });
-                                  loadDetail(detailStore, detailDate);
+                                  loadDetail(detailStore, detailDate, detailFreq);
                                 }} style={{ fontSize: 9, color: "#4361ee", background: "none", border: "none", cursor: "pointer" }}>
                                   {item.notes ? "📝" : "✏️"}
                                 </button>
@@ -323,6 +348,53 @@ export default function WorklogMgr({ stores, sf, month, auth }) {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* 清潔貢獻：本月每位員工的週/月清潔完成數排行 */}
+      {!loading && view === "cleaning" && (
+        <div>
+          <div style={{ display: "flex", gap: 4, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {!sf && <select value={cleaningContribStore || ""} onChange={e => { setCleaningContribStore(e.target.value); loadCleaningContrib(e.target.value, cleaningContribMonth); }}
+              style={{ padding: "4px 8px", borderRadius: 5, border: "1px solid #ddd", fontSize: 11 }}>
+              <option value="">選擇門市</option>
+              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>}
+            <input type="month" value={cleaningContribMonth} onChange={e => { setCleaningContribMonth(e.target.value); loadCleaningContrib(cleaningContribStore || sf, e.target.value); }}
+              style={{ padding: "4px 8px", borderRadius: 5, border: "1px solid #ddd", fontSize: 11 }} />
+            <span style={{ fontSize: 11, color: "#888" }}>共 {cleaningContrib.reduce((s, c) => s + c.total, 0)} 筆完成</span>
+          </div>
+          {(!cleaningContribStore && !sf) ? (
+            <div style={{ background: "#fff", borderRadius: 8, padding: 30, textAlign: "center", color: "#ccc" }}>請選擇門市</div>
+          ) : cleaningContrib.length === 0 ? (
+            <div style={{ background: "#fff", borderRadius: 8, padding: 30, textAlign: "center", color: "#ccc" }}>{cleaningContribMonth} 無紀錄</div>
+          ) : (
+            <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", overflow: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead><tr style={{ background: "#faf8f5" }}>
+                  <th style={{ padding: 8, width: 40, textAlign: "center", fontWeight: 500, color: "#666" }}>名次</th>
+                  <th style={{ padding: 8, textAlign: "left", fontWeight: 500, color: "#666" }}>員工</th>
+                  <th style={{ padding: 8, textAlign: "right", fontWeight: 500, color: "#666", width: 70 }}>週清潔</th>
+                  <th style={{ padding: 8, textAlign: "right", fontWeight: 500, color: "#666", width: 70 }}>月清潔</th>
+                  <th style={{ padding: 8, textAlign: "right", fontWeight: 500, color: "#666", width: 70 }}>合計</th>
+                  <th style={{ padding: 8, textAlign: "right", fontWeight: 500, color: "#666", width: 80 }}>佔比</th>
+                </tr></thead>
+                <tbody>{(() => {
+                  const total = cleaningContrib.reduce((s, c) => s + c.total, 0);
+                  return cleaningContrib.map((c, i) => (
+                    <tr key={c.name + i} style={{ borderTop: "1px solid #f0eeea" }}>
+                      <td style={{ padding: 8, textAlign: "center", fontSize: 14 }}>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</td>
+                      <td style={{ padding: 8, fontWeight: 500 }}>{c.name}</td>
+                      <td style={{ padding: 8, textAlign: "right", color: "#b45309" }}>{c.weekly}</td>
+                      <td style={{ padding: 8, textAlign: "right", color: "#4361ee" }}>{c.monthly}</td>
+                      <td style={{ padding: 8, textAlign: "right", fontWeight: 700, color: "#155e75" }}>{c.total}</td>
+                      <td style={{ padding: 8, textAlign: "right", fontSize: 11, color: "#888" }}>{total > 0 ? Math.round(c.total / total * 100) + "%" : "—"}</td>
+                    </tr>
+                  ));
+                })()}</tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
