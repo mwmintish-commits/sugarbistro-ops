@@ -3555,6 +3555,7 @@ export default function AdminPage() {
           <EmpDetail
             empId={detailId}
             storesRef={stores}
+            auth={auth}
             onClose={() => { setDetailId(null); load(); }}
           />
         )}

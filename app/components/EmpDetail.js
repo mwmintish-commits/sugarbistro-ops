@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { ap, fmt, Row, ROLES, RB, TIERS_R, TIERS_P, tierLabel, pickLaborSelf, pickHealthSelf } from "./utils";
+import { ap, fmt, Row, ROLES, RB, TIERS_R, TIERS_P, tierLabel, pickLaborSelf, pickHealthSelf, INSURANCE_TIERS, INSURANCE_TIERS_PT } from "./utils";
 
 const modal = {
   position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
@@ -15,7 +15,7 @@ const sec = { marginBottom: 14, padding: "10px 12px", background: "#faf8f5", bor
 const sh = { fontSize: 12, fontWeight: 600, marginBottom: 6, color: "#444" };
 const inp = { width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid #ddd", fontSize: 12 };
 
-export default function EmpDetail({ empId, onClose, storesRef }) {
+export default function EmpDetail({ empId, onClose, storesRef, auth }) {
   const [d, setD] = useState(null);
   const [ld, setLd] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -101,7 +101,8 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
       labor_start_date: form.labor_start_date || null,
       health_start_date: form.health_start_date || null,
       hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : null,
-      monthly_salary: form.monthly_salary ? Number(form.monthly_salary) : null
+      monthly_salary: form.monthly_salary ? Number(form.monthly_salary) : null,
+      _admin_name: auth?.name || null,
     });
     // 手動調整特休天數
     if (form.annual_leave_override !== "" && form.annual_leave_override !== null) {
@@ -432,6 +433,51 @@ export default function EmpDetail({ empId, onClose, storesRef }) {
               </div>
             )}
             </>;
+          })()}
+        </div>
+
+        {/* 📜 投保金額異動歷史 */}
+        <div style={sec}>
+          <h3 style={sh}>📜 投保金額異動歷史</h3>
+          {(() => {
+            const history = d?.insurance_history || [];
+            if (history.length === 0) {
+              return <p style={{ fontSize: 11, color: "#999", padding: "8px 0" }}>尚無異動紀錄（自部署日起會自動記錄勞健保級距/自付額/投保身份的每次變動）</p>;
+            }
+            return (
+              <div style={{ background: "#fff", borderRadius: 6, border: "1px solid #e8e6e1", overflow: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+                  <thead><tr style={{ background: "#faf8f5" }}>
+                    {["日期", "身份", "勞保", "健保", "覆寫", "異動人", "備註"].map(h =>
+                      <th key={h} style={{ padding: 5, textAlign: "left", fontWeight: 500, color: "#666" }}>{h}</th>
+                    )}
+                  </tr></thead>
+                  <tbody>
+                    {history.map((h, i) => {
+                      const isPT = h.employment_type === "parttime";
+                      const ls = h.labor_tier ? (isPT ? INSURANCE_TIERS_PT : INSURANCE_TIERS)[h.labor_tier - 1]?.[0] : null;
+                      const hs = h.health_tier ? INSURANCE_TIERS[h.health_tier - 1]?.[0] : null;
+                      const overrides = [];
+                      if (h.labor_self_override != null) overrides.push("勞" + h.labor_self_override);
+                      if (h.health_self_override != null) overrides.push("健" + h.health_self_override);
+                      return (
+                        <tr key={h.id || i} style={{ borderTop: "1px solid #f0eeea" }}>
+                          <td style={{ padding: 5, whiteSpace: "nowrap" }}>{h.change_date}</td>
+                          <td style={{ padding: 5 }}>{isPT ? "兼職" : "正職"}</td>
+                          <td style={{ padding: 5, color: ls ? "#185fa5" : "#aaa" }}>{ls ? "$" + ls.toLocaleString() + " (L" + h.labor_tier + ")" : "—"}</td>
+                          <td style={{ padding: 5, color: h.health_insured_here === false ? "#b45309" : (hs ? "#0a7c42" : "#aaa") }}>
+                            {h.health_insured_here === false ? "他司" : (hs ? "$" + hs.toLocaleString() + " (H" + h.health_tier + ")" : "—")}
+                          </td>
+                          <td style={{ padding: 5, color: "#b45309" }}>{overrides.length > 0 ? overrides.join(" / ") : "—"}</td>
+                          <td style={{ padding: 5 }}>{h.changed_by || "—"}</td>
+                          <td style={{ padding: 5, color: "#666" }}>{h.note || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
           })()}
         </div>
 
