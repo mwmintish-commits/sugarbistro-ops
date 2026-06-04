@@ -312,5 +312,38 @@ export async function POST(request) {
     return Response.json({ data });
   }
 
+  // 補登歷史投保紀錄（手動填入過去某日的投保狀態）
+  if (body.action === "backfill_insurance_history") {
+    const { employee_id, change_date, employment_type, labor_tier, health_tier,
+            labor_self_override, health_self_override, health_insured_here,
+            changed_by, note } = body;
+    if (!employee_id || !change_date) {
+      return Response.json({ error: "需指定員工與變動日期" }, { status: 400 });
+    }
+    const { data, error } = await supabase.from("insurance_history").insert({
+      employee_id,
+      change_date,
+      employment_type: employment_type || null,
+      labor_tier: labor_tier ? Number(labor_tier) : null,
+      labor_self_override: labor_self_override === "" || labor_self_override == null ? null : Number(labor_self_override),
+      health_tier: health_tier ? Number(health_tier) : null,
+      health_self_override: health_self_override === "" || health_self_override == null ? null : Number(health_self_override),
+      health_insured_here: health_insured_here === false ? false : true,
+      changed_by: changed_by || null,
+      note: "[補登] " + (note || ""),
+    }).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ data });
+  }
+
+  // 刪除歷史紀錄（萬一補登錯誤）
+  if (body.action === "delete_insurance_history") {
+    const { history_id } = body;
+    if (!history_id) return Response.json({ error: "需指定紀錄 ID" }, { status: 400 });
+    const { error } = await supabase.from("insurance_history").delete().eq("id", history_id);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ success: true });
+  }
+
   return Response.json({ error: "Unknown action" }, { status: 400 });
 }
