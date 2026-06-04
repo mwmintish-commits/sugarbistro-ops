@@ -49,8 +49,8 @@ export async function GET(request) {
     const annualLeave = calcAnnualLeave(months, emp.employment_type);
     const year = new Date().getFullYear();
 
-    // 4 個查詢並行（原本 sequential 慢 4 倍）+ maybeSingle 容忍 0 row
-    const [laborInsRes, healthInsRes, onboardingRes, leaveBalanceRes] = await Promise.all([
+    // 5 個查詢並行（原本 sequential 慢 4 倍）+ maybeSingle 容忍 0 row
+    const [laborInsRes, healthInsRes, onboardingRes, leaveBalanceRes, insHistoryRes] = await Promise.all([
       emp.labor_tier
         ? supabase.from("insurance_tiers").select("*").eq("tier_level", emp.labor_tier).eq("employment_type", emp.employment_type).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -59,6 +59,7 @@ export async function GET(request) {
         : Promise.resolve({ data: null }),
       supabase.from("onboarding_records").select("*").eq("auto_employee_id", id).maybeSingle(),
       supabase.from("leave_balances").select("*").eq("employee_id", id).eq("year", year).maybeSingle(),
+      supabase.from("insurance_history").select("*").eq("employee_id", id).order("change_date", { ascending: false }).order("created_at", { ascending: false }).limit(50).then(r => r).catch(() => ({ data: [] })),
     ]);
 
     return Response.json({
@@ -67,6 +68,7 @@ export async function GET(request) {
       health_insurance: healthInsRes?.data || null,
       onboarding: onboardingRes?.data || null,
       leave_balance: leaveBalanceRes?.data || null,
+      insurance_history: insHistoryRes?.data || [],
     });
   }
 
@@ -272,12 +274,75 @@ export async function POST(request) {
 
   // 更新員工（保險、薪資設定等）
   if (body.action === "update") {
-    const { employee_id, ...updates } = body;
+    const { employee_id, _admin_name, _change_note, ...updates } = body;
     delete updates.action;
+
+    // 抓變更前的投保相關欄位以判斷是否需寫歷史
+    const INS_FIELDS = ["labor_tier","health_tier","labor_self_override","health_self_override","health_insured_here","employment_type"];
+    const { data: before } = await supabase.from("employees")
+      .select(INS_FIELDS.join(","))
+      .eq("id", employee_id).maybeSingle();
+
     const { data, error } = await supabase.from("employees").update(updates).eq("id", employee_id).select("*, stores!store_id(name)").single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
+
+    // 若投保相關欄位實際變動 → 寫一筆歷史
+    const norm = (v) => v === null || v === undefined || v === "" ? null : v;
+    const insChanged = before && INS_FIELDS.some(k => k in updates && String(norm(before[k])) !== String(norm(updates[k])));
+    if (insChanged) {
+      try {
+        await supabase.from("insurance_history").insert({
+          employee_id,
+          change_date: new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" }),
+          employment_type: data.employment_type || null,
+          labor_tier: data.labor_tier || null,
+          labor_self_override: data.labor_self_override ?? null,
+          health_tier: data.health_tier || null,
+          health_self_override: data.health_self_override ?? null,
+          health_insured_here: data.health_insured_here,
+          changed_by: _admin_name || null,
+          note: _change_note || null,
+        });
+      } catch (e) {
+        // 表還沒建（migration 未跑）就靜默忽略
+      }
+    }
+
     await auditLog(null, null, "employee_update", "employee", employee_id, updates);
     return Response.json({ data });
+  }
+
+  // 補登歷史投保紀錄（手動填入過去某日的投保狀態）
+  if (body.action === "backfill_insurance_history") {
+    const { employee_id, change_date, employment_type, labor_tier, health_tier,
+            labor_self_override, health_self_override, health_insured_here,
+            changed_by, note } = body;
+    if (!employee_id || !change_date) {
+      return Response.json({ error: "需指定員工與變動日期" }, { status: 400 });
+    }
+    const { data, error } = await supabase.from("insurance_history").insert({
+      employee_id,
+      change_date,
+      employment_type: employment_type || null,
+      labor_tier: labor_tier ? Number(labor_tier) : null,
+      labor_self_override: labor_self_override === "" || labor_self_override == null ? null : Number(labor_self_override),
+      health_tier: health_tier ? Number(health_tier) : null,
+      health_self_override: health_self_override === "" || health_self_override == null ? null : Number(health_self_override),
+      health_insured_here: health_insured_here === false ? false : true,
+      changed_by: changed_by || null,
+      note: "[補登] " + (note || ""),
+    }).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ data });
+  }
+
+  // 刪除歷史紀錄（萬一補登錯誤）
+  if (body.action === "delete_insurance_history") {
+    const { history_id } = body;
+    if (!history_id) return Response.json({ error: "需指定紀錄 ID" }, { status: 400 });
+    const { error } = await supabase.from("insurance_history").delete().eq("id", history_id);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ success: true });
   }
 
   return Response.json({ error: "Unknown action" }, { status: 400 });

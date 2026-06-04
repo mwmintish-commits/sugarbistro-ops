@@ -29,6 +29,15 @@ const worklogUrl = (emp, eid) => {
   return `/worklog?${params.toString()}`;
 };
 
+const cleaningUrl = (emp, eid) => {
+  const params = new URLSearchParams({
+    eid: eid || "",
+    sid: emp?.store_id || "",
+    name: emp?.name || "",
+  });
+  return `/cleaning?${params.toString()}`;
+};
+
 // 個人出缺勤項目（員工/店長/管理 共用）
 const personalItems = (eid, emp) => [
   { icon: "🟢", label: "上班打卡", desc: "GPS 定位", action: "clockin", type: "clock_in", bg: "#e6f9f0", color: "#0a7c42" },
@@ -41,6 +50,7 @@ const personalItems = (eid, emp) => [
   { icon: "💰", label: "我的薪資", desc: "薪資明細",    href: webUrl("/my-salary", eid),      bg: "#fef3c7", color: "#a16207" },
   { icon: "📝", label: "我的考核", desc: "績效分數",    href: webUrl("/my-review", eid),      bg: "#e8f5e9", color: "#1b5e20" },
   { icon: "📋", label: "工作日誌", desc: "每日任務回報", href: worklogUrl(emp, eid),          bg: "#e0f2fe", color: "#075985" },
+  { icon: "🧹", label: "清潔紀錄", desc: "週/月清潔查詢", href: cleaningUrl(emp, eid),         bg: "#ecfeff", color: "#0e7490" },
   { icon: "🗑", label: "報廢登記", desc: "閉店巡邏丟棄",  href: worklogUrl(emp, eid) + "&tab=closing&waste=1", bg: "#fef2f2", color: "#b91c1c" },
   { icon: "📖", label: "員工守則", desc: "規範查閱",    href: webUrl("/employee-handbook", eid), bg: "#fce4ec", color: "#880e4f" },
 ];

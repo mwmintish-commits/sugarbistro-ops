@@ -90,10 +90,56 @@ export async function GET(request) {
     return Response.json({ data });
   }
 
-  // 清潔狀態：週/月清潔項目 + 本週/本月是否完成
+  // 最近 N 天的清潔完成紀錄（週/月清潔），給時間線用
+  if (type === "recent_cleanings") {
+    const days = Number(searchParams.get("days") || 30);
+    const ref = date ? new Date(date) : new Date();
+    const end = ref.toLocaleDateString("sv-SE");
+    const start = new Date(ref.getTime() - (days - 1) * 86400000).toLocaleDateString("sv-SE");
+    let q = supabase.from("work_log_items")
+      .select("id, date, item_name, frequency, completed_by_name, completed_at, notes")
+      .eq("completed", true)
+      .in("frequency", ["weekly", "monthly"])
+      .gte("date", start).lte("date", end)
+      .order("completed_at", { ascending: false });
+    if (store_id) q = q.eq("store_id", store_id);
+    const { data } = await q.limit(200);
+    return Response.json({ data: data || [], range: { start, end } });
+  }
+
+  // 月度貢獻度排行：某店某月每位員工的週/月清潔完成數
+  if (type === "monthly_contrib") {
+    const month = searchParams.get("month") || new Date().toLocaleDateString("sv-SE").slice(0, 7);
+    const mStart = month + "-01";
+    const mEnd = eom(month);
+    let q = supabase.from("work_log_items")
+      .select("completed_by, completed_by_name, frequency")
+      .eq("completed", true)
+      .in("frequency", ["weekly", "monthly"])
+      .gte("date", mStart).lte("date", mEnd);
+    if (store_id) q = q.eq("store_id", store_id);
+    const { data } = await q.limit(2000);
+    const byEmp = {};
+    for (const r of data || []) {
+      if (!r.completed_by_name) continue;
+      const k = r.completed_by || r.completed_by_name;
+      if (!byEmp[k]) byEmp[k] = { employee_id: r.completed_by, name: r.completed_by_name, weekly: 0, monthly: 0, total: 0 };
+      if (r.frequency === "weekly") byEmp[k].weekly++;
+      else if (r.frequency === "monthly") byEmp[k].monthly++;
+      byEmp[k].total++;
+    }
+    const list = Object.values(byEmp).sort((a, b) => b.total - a.total);
+    return Response.json({ data: list, range: { start: mStart, end: mEnd } });
+  }
+
+  // 清潔狀態：週/月清潔項目 + 本週/本月是否完成（可指定參考日期 + 過濾 frequency）
   if (type === "cleaning_status") {
-    const { data: templates } = await supabase.from("work_log_templates").select("*").eq("store_id", store_id).eq("is_active", true).in("frequency", ["weekly", "monthly"]).order("sort_order");
-    
+    const onlyFreq = searchParams.get("frequency"); // weekly | monthly | (all)
+    let tq = supabase.from("work_log_templates").select("*").eq("store_id", store_id).eq("is_active", true).order("sort_order");
+    if (onlyFreq === "weekly" || onlyFreq === "monthly") tq = tq.eq("frequency", onlyFreq);
+    else tq = tq.in("frequency", ["weekly", "monthly"]);
+    const { data: templates } = await tq;
+
     // 本週範圍
     const d = new Date(date);
     const dayOfWeek = d.getDay();
@@ -106,19 +152,25 @@ export async function GET(request) {
     const result = [];
     for (const t of templates || []) {
       const range = t.frequency === "weekly" ? [weekStart, weekEnd] : [monthStart, monthEnd];
-      const { data: done } = await supabase.from("work_log_items").select("id, completed_by_name, completed_at").eq("store_id", store_id).eq("template_id", t.id).eq("completed", true).gte("date", range[0]).lte("date", range[1]).limit(1);
+      const { data: done } = await supabase.from("work_log_items").select("id, completed_by, completed_by_name, completed_at, notes").eq("store_id", store_id).eq("template_id", t.id).eq("completed", true).gte("date", range[0]).lte("date", range[1]).order("completed_at", { ascending: false }).limit(1);
       result.push({
         id: t.id + "_" + t.frequency,
         template_id: t.id,
         item_name: t.item,
         category: t.category,
         frequency: t.frequency,
+        weekday: t.weekday,
+        month_day: t.month_day,
         completed_this_period: done && done.length > 0,
         last_done_by: done?.[0]?.completed_by_name || null,
+        last_done_by_id: done?.[0]?.completed_by || null,
         last_done_at: done?.[0]?.completed_at || null,
+        last_notes: done?.[0]?.notes || null,
+        period_start: range[0],
+        period_end: range[1],
       });
     }
-    return Response.json({ data: result });
+    return Response.json({ data: result, week: [weekStart, weekEnd], month: [monthStart, monthEnd] });
   }
 
   // 盤點回報查詢
@@ -164,7 +216,7 @@ export async function POST(request) {
 
   // 協作：勾選/取消勾選單一項目
   if (body.action === "toggle_item") {
-    const { item_id, employee_id, employee_name, completed, value } = body;
+    const { item_id, employee_id, employee_name, completed, value, edited_by_admin, admin_name } = body;
     const updates = { completed };
     if (completed) { updates.completed_by = employee_id; updates.completed_by_name = employee_name; updates.completed_at = new Date().toISOString(); }
     else { updates.completed_by = null; updates.completed_by_name = null; updates.completed_at = null; }
@@ -178,6 +230,12 @@ export async function POST(request) {
           updates.is_abnormal = (tpl.value_min !== null && value < tpl.value_min) || (tpl.value_max !== null && value > tpl.value_max);
         }
       }
+    }
+    // 後台補勾：加 audit 標記到 notes
+    if (edited_by_admin && completed) {
+      const { data: cur } = await supabase.from("work_log_items").select("notes").eq("id", item_id).maybeSingle();
+      const stamp = "[補勾 by " + (admin_name || "主管") + " @ " + new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false }) + "]";
+      updates.notes = stamp + (cur?.notes ? "\n" + cur.notes : "");
     }
     const { data, error } = await supabase.from("work_log_items").update(updates).eq("id", item_id).select().single();
     if (error) return Response.json({ error: error.message }, { status: 500 });
@@ -283,15 +341,19 @@ export async function POST(request) {
 
   // 清潔項目完成/取消
   if (body.action === "toggle_cleaning") {
-    const { item_id, store_id, employee_id, employee_name, completed, frequency, date } = body;
+    const { item_id, store_id, employee_id, employee_name, completed, frequency, date, edited_by_admin, admin_name } = body;
     if (completed) {
       // 新增一筆完成記錄
-      await supabase.from("work_log_items").insert({
+      const payload = {
         store_id, date, template_id: item_id, item_name: body.item_name || "",
         category: "清潔", shift_type: "during", frequency,
         completed: true, completed_by: employee_id, completed_by_name: employee_name,
         completed_at: new Date().toISOString(),
-      });
+      };
+      if (edited_by_admin) {
+        payload.notes = "[補勾 by " + (admin_name || "主管") + " @ " + new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false }) + "]";
+      }
+      await supabase.from("work_log_items").insert(payload);
     } else {
       // 取消：刪除本週/月的完成記錄
       const d = new Date(date);

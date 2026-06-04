@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, pickLaborSelf, pickHealthSelf } from "./components/utils";
+import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, pickLaborSelf, pickHealthSelf, INSURANCE_TIERS, INSURANCE_TIERS_PT } from "./components/utils";
 // 兼容舊呼叫：以 employee 物件為主（含 override / health_insured_here）
 const laborSelfFor = (emp) => pickLaborSelf(emp);
 const healthSelfFor = (emp) => pickHealthSelf(emp);
@@ -684,7 +684,7 @@ export default function AdminPage() {
                   <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
                   <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                      <thead><tr style={{background:"#faf8f5"}}>{["順序","姓名","角色","年資","特休","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{background:"#faf8f5"}}>{["順序","姓名","角色","年資","特休","薪資","勞健保","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                       <tbody>{storeEmps.map((e,idx)=>(
                         <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
                           <td style={{padding:4,whiteSpace:"nowrap"}}>
@@ -697,6 +697,34 @@ export default function AdminPage() {
                           <td style={{padding:6}}><RB role={e.role} /></td>
                           <td style={{padding:6}}>{(e.service_months||0)+"月"}</td>
                           <td style={{padding:6}}>{(e.annual_leave_days||0)+"hr"}</td>
+                          <td style={{padding:6,fontSize:10,lineHeight:1.4}}>{(()=>{
+                            const ms = Number(e.monthly_salary||0);
+                            const hr = Number(e.hourly_rate||0);
+                            if (!ms && !hr) return <span style={{color:"#aaa"}}>未設定</span>;
+                            return (
+                              <div>
+                                {ms > 0 && <div style={{color:"#0a7c42",fontWeight:600}}>月 ${ms.toLocaleString()}</div>}
+                                {hr > 0 && <div style={{color:"#185fa5"}}>時 ${hr.toLocaleString()}</div>}
+                              </div>
+                            );
+                          })()}</td>
+                          <td style={{padding:6,fontSize:10,lineHeight:1.4}}>{(()=>{
+                            const isPT = e.employment_type === "parttime";
+                            const laborSalary = e.labor_tier ? (isPT ? INSURANCE_TIERS_PT : INSURANCE_TIERS)[e.labor_tier-1]?.[0] : null;
+                            const healthSalary = e.health_tier ? INSURANCE_TIERS[e.health_tier-1]?.[0] : null;
+                            const healthElsewhere = isPT && e.health_insured_here === false;
+                            return (
+                              <div>
+                                <div style={{color: laborSalary ? "#185fa5" : "#aaa"}}>
+                                  🛡 {laborSalary ? "$" + laborSalary.toLocaleString() : "未投保"}
+                                </div>
+                                <div style={{color: healthElsewhere ? "#b45309" : (healthSalary ? "#0a7c42" : "#aaa")}}>
+                                  🏥 {healthElsewhere ? "他司" : (healthSalary ? "$" + healthSalary.toLocaleString() : "未投保")}
+                                </div>
+                                {e.insurance_start_date && <div style={{color:"#888",fontSize:9}}>起 {e.insurance_start_date.slice(2,10).replace(/-/g,"/")}</div>}
+                              </div>
+                            );
+                          })()}</td>
                           <td style={{padding:6}}>{e.line_uid?"✅":"❌"}</td>
                           <td style={{padding:6,whiteSpace:"nowrap"}}>
                             <button onClick={async()=>{if(!confirm("停用"+e.name+"？"))return;const r=await sap("/api/admin/employees",{action:"deactivate",employee_id:e.id});if(r)load();}}
@@ -3538,6 +3566,7 @@ export default function AdminPage() {
           <EmpDetail
             empId={detailId}
             storesRef={stores}
+            auth={auth}
             onClose={() => { setDetailId(null); load(); }}
           />
         )}

@@ -47,7 +47,7 @@ export async function POST(request) {
         .in("employee_id", empIds).gte("date", dateFrom).lte("date", dateTo)
         .then(r => r.data || []),
       supabase.from("overtime_records")
-        .select("employee_id, amount, comp_type, comp_hours, comp_converted, comp_used")
+        .select("employee_id, date, amount, comp_type, comp_hours, comp_converted, comp_used")
         .in("employee_id", empIds).eq("status", "approved")
         .gte("date", dateFrom).lte("date", dateTo)
         .then(r => r.data || []),
@@ -67,16 +67,22 @@ export async function POST(request) {
 
       const allScheds = schedMap[emp.id] || [];
 
-      // 出勤天數（有排班且不是整天請假）
+      // 出勤天數（含休息/國假出勤，用於對帳）
       const workScheds = allScheds.filter(s => ["work","rest_day","national_holiday"].includes(s.day_type));
       const workDays = workScheds.length;
+      // 底薪天數：只算「正常工作日」— 休息日/國假改由 restDayPay/holidayPay 給付，不能再算進底薪
+      const baseDays = workScheds.filter(s => s.day_type === "work").length;
 
-      // 底薪
+      // 底薪（時薪：只乘正常工作日，避免休假日重複給付）
       const base = emp.monthly_salary ? Number(emp.monthly_salary)
-        : (emp.hourly_rate ? Number(emp.hourly_rate) * workDays * 8 : 0);
+        : (emp.hourly_rate ? Number(emp.hourly_rate) * baseDays * 8 : 0);
 
-      // 加班費（overtime_records 仍用，因為是打卡自動產生的超時紀錄）
-      const ot = otMap[emp.id] || [];
+      // 加班費（overtime_records）— 排除休息日/國定假日，因為這兩種日子的工資由 restDayPay/holidayPay 計算，
+      // 否則同一天會被算兩次（overtime_records.amount 已含本薪+加給）
+      const premiumDays = new Set(
+        allScheds.filter(s => s.day_type === "rest_day" || s.day_type === "national_holiday").map(s => s.date)
+      );
+      const ot = (otMap[emp.id] || []).filter(r => !premiumDays.has(r.date));
       const otPay = ot.filter(r => r.comp_type === "pay" || r.comp_converted)
         .reduce((s, r) => s + Number(r.amount || 0), 0);
       const compH = ot.filter(r => r.comp_type === "comp" && !r.comp_used && !r.comp_converted)
