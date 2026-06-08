@@ -107,6 +107,7 @@ export default function AdminPage() {
   const [avReports, setAvReports] = useState([]);
   const [avView, setAvView] = useState("employee"); // "employee"|"day"
   const [showAvail, setShowAvail] = useState(true);
+  const [showAnalytics, setShowAnalytics] = useState(false); // 總覽分析區塊預設摺疊（加速首屏）
   const [ws, setWs] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - d.getDay());
@@ -533,7 +534,7 @@ export default function AdminPage() {
             </div>
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-              {/* 門市營收達成率 */}
+              {/* 門市營收達成率 — 留在精簡版（用已載入的資料，無額外 API） */}
               <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10}}>
                 <h4 style={{fontSize:11,fontWeight:600,marginBottom:6}}>📊 門市營收達成率</h4>
                 {stores.map(s => {
@@ -584,6 +585,12 @@ export default function AdminPage() {
               })()}
             </div>
 
+            {/* 📊 詳細統計（預設摺疊以加速首屏） */}
+            <button onClick={()=>setShowAnalytics(!showAnalytics)} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid #e8e6e1",background:showAnalytics?"#faf8f5":"#fff",cursor:"pointer",fontSize:12,fontWeight:600,color:"#555",textAlign:"left",marginBottom:8}}>
+              {showAnalytics?"▼":"▶"} 📊 詳細統計（系統提醒、員工KPI、門市人效）
+            </button>
+
+            {showAnalytics && <>
             {/* 🔔 系統提醒 */}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10,marginBottom:10}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
@@ -636,6 +643,7 @@ export default function AdminPage() {
                 })}
               </div>
             </div>
+            </>}
           </div>
         )}
         {!ld && (tab === "employees" || tab === "store_staff") && (
