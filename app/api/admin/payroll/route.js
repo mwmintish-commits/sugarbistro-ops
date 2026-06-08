@@ -43,7 +43,7 @@ export async function POST(request) {
     const dateFrom = mk + "-01", dateTo = eom(mk);
     const [schedsAll, otAll, clockInsAll] = empIds.length === 0 ? [[],[],[]] : await Promise.all([
       supabase.from("schedules")
-        .select("employee_id, date, day_type, leave_type, leave_hours, shift_id, shifts(start_time, end_time)")
+        .select("employee_id, date, day_type, leave_type, leave_hours, shift_id, shifts(start_time, end_time, break_minutes)")
         .in("employee_id", empIds).gte("date", dateFrom).lte("date", dateTo)
         .then(r => r.data || []),
       supabase.from("overtime_records")

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import dynamic from "next/dynamic";
 import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, pickLaborSelf, pickHealthSelf, INSURANCE_TIERS, INSURANCE_TIERS_PT } from "./components/utils";
 // 兼容舊呼叫：以 employee 物件為主（含 override / health_insured_here）
@@ -103,6 +103,7 @@ export default function AdminPage() {
   const [annTagFilter, setAnnTagFilter] = useState("");
   const [pubForm, setPubForm] = useState(null); // {store_id, start, end}
   const [detailId, setDetailId] = useState(null);
+  const [expandedAttId, setExpandedAttId] = useState(null); // 薪資頁出勤展開的員工 id
   const [sv, setSv] = useState("week");
   const [avReports, setAvReports] = useState([]);
   const [avView, setAvView] = useState("employee"); // "employee"|"day"
@@ -1531,8 +1532,13 @@ export default function AdminPage() {
                   // 假日加班 hover 公式
                   const holFormula = [];
                   if (holDays > 0) {
-                    const each = monthlySalary ? Math.round(monthlySalary/30) : (hourlyRate*8*2);
-                    holFormula.push(`國假 ${holDays}天 × ${monthlySalary?"日薪":"8hr × $"+hourlyRate+" × 2倍"} ≈ +$${(holDays*each).toLocaleString()}`);
+                    if (monthlySalary) {
+                      holFormula.push(`國假 ${holDays}天 × 日薪 ≈ +$${hPay.toLocaleString()}`);
+                    } else {
+                      // 時薪：實際工時可能因班別而異（已扣休息），直接顯示總額
+                      const avgHr = hPay > 0 && hourlyRate > 0 ? (hPay / (hourlyRate * 2)).toFixed(1) : 0;
+                      holFormula.push(`國假 ${holDays}天 × ${avgHr}hr × $${hourlyRate} × 2倍 = +$${hPay.toLocaleString()}`);
+                    }
                   }
                   if (restDays > 0) {
                     holFormula.push(`休息日 ${restDays}天（勞基法24-1階梯加給）= +$${restPay.toLocaleString()}`);
@@ -1543,15 +1549,28 @@ export default function AdminPage() {
                   const attDisplay = isPT && baseHrs > 0 ? `${baseHrs}時` : `${wd}天`;
                   const attSubtitle = isPT && baseHrs > 0 ? `(${baseDays}天)` : (monthlySalary ? "" : "");
 
+                  // 出勤展開明細：當月該員工的排班逐日資訊
+                  const empScheds = scheds.filter(s=>s.employee_id===e.id && s.date>=month+"-01" && s.date<=month+"-31" && s.shifts).sort((a,b)=>a.date.localeCompare(b.date));
+                  const totalSpanMin = empScheds.reduce((sum,s)=>{
+                    const st=s.shifts?.start_time, et=s.shifts?.end_time; if(!st||!et)return sum;
+                    const[sh,sm]=st.split(":").map(Number); const[eh,em]=et.split(":").map(Number);
+                    return sum + Math.max(0, eh*60+em - sh*60-sm);
+                  },0);
+                  const totalBreakMin = empScheds.reduce((sum,s)=>sum + Number(s.shifts?.break_minutes||0), 0);
+                  const totalWorkHr = (totalSpanMin - totalBreakMin) / 60;
+                  const isExpanded = expandedAttId === e.id;
                   return (
-                    <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                    <Fragment key={e.id}>
+                    <tr style={{borderBottom:isExpanded?"none":"1px solid #f0eeea"}}>
                       <td style={{padding:"5px 4px",fontWeight:500,textAlign:"left"}}>
                         {e.name}
                         <span style={{ fontSize:8, color:isPT?"#b45309":"#0a7c42", marginLeft:4, background:isPT?"#fef3c7":"#e6f9f0", padding:"1px 3px", borderRadius:2 }}>{isPT?"兼":"正"}</span>
                         {!settled && <span style={{ fontSize:8, color:"#b91c1c", marginLeft:3, background:"#fee2e2", padding:"1px 3px", borderRadius:2 }}>未結算</span>}
                       </td>
-                      <td style={{padding:"5px 4px",textAlign:"right"}} title={isPT?`排班工時 ${baseHrs}hr（${baseDays}天）`:`工作天數 ${wd}天`}>
-                        {attDisplay}
+                      <td style={{padding:"5px 4px",textAlign:"right",cursor:"pointer",userSelect:"none"}}
+                          onClick={()=>setExpandedAttId(isExpanded?null:e.id)}
+                          title={isPT?`排班工時 ${baseHrs}hr（${baseDays}天）。點擊展開逐日明細`:`工作天數 ${wd}天。點擊展開逐日明細`}>
+                        {isExpanded?"▼ ":"▶ "}{attDisplay}
                         {attSubtitle && <div style={{fontSize:8,color:"#999"}}>{attSubtitle}</div>}
                       </td>
                       <td style={{padding:"5px 4px",textAlign:"right"}} title={baseSubtitle}>
@@ -1595,6 +1614,53 @@ export default function AdminPage() {
                         }} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:8,cursor:"pointer"}}>💾</button>
                       </td>
                     </tr>
+                    {isExpanded && (
+                      <tr style={{borderBottom:"1px solid #f0eeea",background:"#fafafa"}}>
+                        <td colSpan={14} style={{padding:"6px 10px"}}>
+                          <div style={{display:"flex",gap:12,fontSize:10,color:"#666",marginBottom:6,flexWrap:"wrap"}}>
+                            <span><b>當月排班：</b>{empScheds.length} 天</span>
+                            <span>排班時段合計 {(totalSpanMin/60).toFixed(1)} hr</span>
+                            <span>休息時數 {(totalBreakMin/60).toFixed(1)} hr</span>
+                            <span style={{color:"#0a7c42",fontWeight:600}}>實際工時 {totalWorkHr.toFixed(1)} hr</span>
+                          </div>
+                          {empScheds.length === 0 ? (
+                            <div style={{fontSize:10,color:"#999"}}>當月無排班資料</div>
+                          ) : (
+                            <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
+                              <thead><tr style={{background:"#f0eeea"}}>
+                                {["日期","星期","班別","上班","下班","休息","工時","類型"].map(h=>
+                                  <th key={h} style={{padding:"3px 6px",textAlign:"left",fontWeight:500,color:"#555"}}>{h}</th>
+                                )}
+                              </tr></thead>
+                              <tbody>{empScheds.map(s=>{
+                                const st=s.shifts?.start_time||""; const et=s.shifts?.end_time||"";
+                                const brk=Number(s.shifts?.break_minutes||0);
+                                const[sh,sm]=st?st.split(":").map(Number):[0,0];
+                                const[eh,em]=et?et.split(":").map(Number):[0,0];
+                                const spanMin=st&&et?Math.max(0,eh*60+em-sh*60-sm):0;
+                                const workHr=((spanMin-brk)/60).toFixed(1);
+                                const w=new Date(s.date).getDay();
+                                const wDay=["日","一","二","三","四","五","六"][w];
+                                const dtLabel={work:"正常",rest_day:"休息日",national_holiday:"國假",regular_off:"例假",unpaid_leave:"無薪假",half_pay_leave:"半薪假"}[s.day_type]||(s.day_type||"-");
+                                return (
+                                  <tr key={s.id} style={{borderBottom:"1px solid #eee"}}>
+                                    <td style={{padding:"3px 6px"}}>{s.date.slice(5)}</td>
+                                    <td style={{padding:"3px 6px",color:w===0||w===6?"#b91c1c":"#666"}}>{wDay}</td>
+                                    <td style={{padding:"3px 6px"}}>{s.shifts?.name||"-"}</td>
+                                    <td style={{padding:"3px 6px"}}>{st.slice(0,5)}</td>
+                                    <td style={{padding:"3px 6px"}}>{et.slice(0,5)}</td>
+                                    <td style={{padding:"3px 6px",color:"#888"}}>{brk?brk+"min":"-"}</td>
+                                    <td style={{padding:"3px 6px",fontWeight:500,color:"#0a7c42"}}>{workHr}hr</td>
+                                    <td style={{padding:"3px 6px",fontSize:9,color:s.day_type==="national_holiday"?"#b91c1c":s.day_type==="rest_day"?"#b45309":"#666"}}>{dtLabel}</td>
+                                  </tr>
+                                );
+                              })}</tbody>
+                            </table>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}</tbody>
               </table>
