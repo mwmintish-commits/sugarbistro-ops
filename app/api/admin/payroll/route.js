@@ -70,12 +70,15 @@ export async function POST(request) {
       // 出勤天數（含休息/國假出勤，用於對帳）
       const workScheds = allScheds.filter(s => ["work","rest_day","national_holiday"].includes(s.day_type));
       const workDays = workScheds.length;
-      // 底薪天數：只算「正常工作日」— 休息日/國假改由 restDayPay/holidayPay 給付，不能再算進底薪
-      const baseDays = workScheds.filter(s => s.day_type === "work").length;
+      // 底薪天數/時數：只算「正常工作日」— 休息日/國假改由 restDayPay/holidayPay 給付，不能再算進底薪
+      const baseDayScheds = workScheds.filter(s => s.day_type === "work");
+      const baseDays = baseDayScheds.length;
+      // 底薪實際工時（每一班次的「end − start − break」加總）
+      const baseHours = baseDayScheds.reduce((sum, s) => sum + calcShiftHours(s.shifts), 0);
 
-      // 底薪（時薪：只乘正常工作日，避免休假日重複給付）
+      // 底薪：月薪固定；時薪按「每班實際工時（已扣休息）」加總計算
       const base = emp.monthly_salary ? Number(emp.monthly_salary)
-        : (emp.hourly_rate ? Number(emp.hourly_rate) * baseDays * 8 : 0);
+        : (emp.hourly_rate ? Math.round(Number(emp.hourly_rate) * baseHours) : 0);
 
       // 加班費（overtime_records）— 排除休息日/國定假日，因為這兩種日子的工資由 restDayPay/holidayPay 計算，
       // 否則同一天會被算兩次（overtime_records.amount 已含本薪+加給）

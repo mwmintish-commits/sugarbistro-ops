@@ -1468,11 +1468,11 @@ export default function AdminPage() {
             <details style={{marginBottom:8,background:"#fff8e6",border:"1px solid #f0e6c8",borderRadius:6,padding:"6px 10px",fontSize:11}}>
               <summary style={{cursor:"pointer",fontWeight:600,color:"#854d0e"}}>💡 點此查看計算公式（出勤/底薪/加班/假日加班）</summary>
               <div style={{marginTop:8,color:"#555",lineHeight:1.7}}>
-                <div><b>出勤：</b> 正職顯示「天」、兼職顯示「時」（= 排班 work 天數 × 8hr）</div>
-                <div><b>底薪：</b> 月薪 = 固定 monthly_salary；時薪 = 時薪 × 工作時數（休息日/國假不算進底薪）</div>
+                <div><b>出勤：</b> 正職顯示「天」、兼職顯示「時」（= 每班次的 end−start−break_minutes 加總）</div>
+                <div><b>底薪：</b> 月薪 = 固定 monthly_salary；時薪 = 時薪 × 每班次實際工時（已扣休息；休息日/國假另計）</div>
                 <div><b>平日加班：</b> 超過排班 end_time 部分。前 2 小時 × 1.34，2 小時以後 × 1.67</div>
                 <div><b>假日加班：</b></div>
-                <div style={{marginLeft:14}}>• <span style={{color:"#b91c1c"}}>國定假日</span>：當天工時 ×（月薪日薪 或 時薪 × 8hr × 2.0 倍）</div>
+                <div style={{marginLeft:14}}>• <span style={{color:"#b91c1c"}}>國定假日</span>：時薪 × 當天實際工時（已扣休息）× 2.0 倍</div>
                 <div style={{marginLeft:14}}>• <span style={{color:"#b91c1c"}}>休息日</span>（勞基法 24-1 階梯）：前 2hr × 1.34 + 2~8hr × 1.67 + 8~12hr × 1.67 + 本薪</div>
                 <div><b>勞保自付：</b> 依勞保級距表（正/兼職不同）；可手動覆寫（員工詳情頁）</div>
                 <div><b>健保自付：</b> 一律正職表（健保最低 = 基本工資）；兼職若在他司加保則為 0</div>
@@ -1499,10 +1499,12 @@ export default function AdminPage() {
                   const hourlyRate = settled && pr.hourly_rate > 0 ? Number(pr.hourly_rate) : Number(e.hourly_rate || 0);
                   const monthlySalary = Number(e.monthly_salary || 0);
                   const wd = settled ? (pr.work_days || 0) : att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;
-                  const bp = settled ? Number(pr.base_salary||0) : (monthlySalary ? monthlySalary : (hourlyRate ? hourlyRate*wd*8 : 0));
-                  // 從 base_salary 反推時數（兼職時薪制）— 用於「出勤時數」顯示
+                  // 兼職正常工作日：從 schedules 直接數（day_type=work），不再用 hours/8 反推
+                  const baseDayCount = scheds.filter(s=>s.employee_id===e.id && s.date>=month+"-01" && s.date<=month+"-31" && s.day_type==="work").length;
+                  const bp = settled ? Number(pr.base_salary||0) : (monthlySalary ? monthlySalary : (hourlyRate ? hourlyRate*baseDayCount*8 : 0));
+                  // 從 base_salary 反推實際工時（兼職時薪制，已扣休息）
                   const baseHrs = (!monthlySalary && hourlyRate > 0) ? Math.round(bp / hourlyRate) : 0;
-                  const baseDays = baseHrs > 0 ? Math.round(baseHrs / 8 * 10) / 10 : 0;
+                  const baseDays = baseDayCount;
                   const ot = settled ? Number(pr.overtime_pay||0) : otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);
                   const compH = settled ? Number(pr.comp_hours||0) : otRecords.filter(r=>r.employee_id===e.id&&r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted).reduce((s,r)=>s+Number(r.comp_hours||0),0);
                   // 平日加班時數（從 OT records 推算）
