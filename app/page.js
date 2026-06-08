@@ -1553,12 +1553,14 @@ export default function AdminPage() {
 
                   // 出勤展開明細：當月該員工的排班逐日資訊
                   const empScheds = scheds.filter(s=>s.employee_id===e.id && s.date>=month+"-01" && s.date<=month+"-31" && s.shifts).sort((a,b)=>a.date.localeCompare(b.date));
+                  // 有效休息分鐘：schedule.break_minutes 覆寫優先，否則用班別 shifts.break_minutes
+                  const effBreak = (s) => s.break_minutes != null ? Number(s.break_minutes) : Number(s.shifts?.break_minutes||0);
                   const totalSpanMin = empScheds.reduce((sum,s)=>{
                     const st=s.shifts?.start_time, et=s.shifts?.end_time; if(!st||!et)return sum;
                     const[sh,sm]=st.split(":").map(Number); const[eh,em]=et.split(":").map(Number);
                     return sum + Math.max(0, eh*60+em - sh*60-sm);
                   },0);
-                  const totalBreakMin = empScheds.reduce((sum,s)=>sum + Number(s.shifts?.break_minutes||0), 0);
+                  const totalBreakMin = empScheds.reduce((sum,s)=>sum + effBreak(s), 0);
                   const totalWorkHr = (totalSpanMin - totalBreakMin) / 60;
                   const isExpanded = expandedAttId === e.id;
                   return (
@@ -1636,7 +1638,9 @@ export default function AdminPage() {
                               </tr></thead>
                               <tbody>{empScheds.map(s=>{
                                 const st=s.shifts?.start_time||""; const et=s.shifts?.end_time||"";
-                                const brk=Number(s.shifts?.break_minutes||0);
+                                const shiftBrk=Number(s.shifts?.break_minutes||0);
+                                const brk=effBreak(s); // 含覆寫
+                                const overridden = s.break_minutes != null && Number(s.break_minutes) !== shiftBrk;
                                 const[sh,sm]=st?st.split(":").map(Number):[0,0];
                                 const[eh,em]=et?et.split(":").map(Number):[0,0];
                                 const spanMin=st&&et?Math.max(0,eh*60+em-sh*60-sm):0;
@@ -1651,7 +1655,20 @@ export default function AdminPage() {
                                     <td style={{padding:"3px 6px"}}>{s.shifts?.name||"-"}</td>
                                     <td style={{padding:"3px 6px"}}>{st.slice(0,5)}</td>
                                     <td style={{padding:"3px 6px"}}>{et.slice(0,5)}</td>
-                                    <td style={{padding:"3px 6px",color:"#888"}}>{brk?brk+"min":"-"}</td>
+                                    <td style={{padding:"3px 6px"}}>
+                                      <input type="number" min="0" max="480" defaultValue={brk}
+                                        title={overridden?`覆寫值（班別預設 ${shiftBrk}min）。清空 → 回到預設`:`班別預設 ${shiftBrk}min。修改後即覆寫此筆`}
+                                        onBlur={async ev=>{
+                                          const raw=ev.target.value.trim();
+                                          const newVal=raw===""?null:Number(raw);
+                                          if(newVal===brk||(newVal===null&&s.break_minutes==null))return;
+                                          const r=await ap("/api/admin/schedules",{action:"update_break",schedule_id:s.id,break_minutes:newVal});
+                                          if(r.error){alert(r.error);ev.target.value=brk;return;}
+                                          load();
+                                        }}
+                                        style={{width:42,padding:"1px 3px",borderRadius:3,border:overridden?"1px solid #b45309":"1px solid #ddd",fontSize:10,textAlign:"right",background:overridden?"#fff8e6":"#fff"}} />
+                                      <span style={{fontSize:8,color:"#999",marginLeft:2}}>min</span>
+                                    </td>
                                     <td style={{padding:"3px 6px",fontWeight:500,color:"#0a7c42"}}>{workHr}hr</td>
                                     <td style={{padding:"3px 6px",fontSize:9,color:s.day_type==="national_holiday"?"#b91c1c":s.day_type==="rest_day"?"#b45309":"#666"}}>{dtLabel}</td>
                                   </tr>

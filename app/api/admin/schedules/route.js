@@ -1,5 +1,6 @@
 import { supabase, auditLog } from "@/lib/supabase";
 import { pushText } from "@/lib/line";
+import { regeneratePayroll } from "@/lib/payroll-calc";
 
 // 依最新班表重新計算該班 attendances 的遲到/早退分鐘
 async function recalcAttendance(scheduleId) {
@@ -316,6 +317,33 @@ export async function POST(request) {
 
     await auditLog(null, null, "schedule_publish", "schedule", null, { week_start, week_end, store_id, count: schedules.length, notified, consentSent });
     return Response.json({ published: schedules.length, notified, consentSent, message: consentSent > 0 ? `已推送 ${consentSent} 份休息日加班同意書` : undefined });
+  }
+
+  // 逐天覆寫休息分鐘（薪資頁出勤明細用）
+  // 改完後若該員工該月已有 payroll_records → 自動重算該員工的薪資
+  if (action === "update_break") {
+    const { schedule_id, break_minutes } = body;
+    if (!schedule_id) return Response.json({ error: "缺 schedule_id" }, { status: 400 });
+    const val = break_minutes === null || break_minutes === "" ? null : Number(break_minutes);
+    if (val !== null && (isNaN(val) || val < 0)) return Response.json({ error: "休息分鐘需為非負數" }, { status: 400 });
+    // 先撈出該排班的員工/日期，以便重算
+    const { data: sched } = await supabase.from("schedules")
+      .select("id, employee_id, date").eq("id", schedule_id).single();
+    const { error } = await supabase.from("schedules").update({ break_minutes: val }).eq("id", schedule_id);
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+
+    // 若該員工該月已結算過 → 自動重算
+    let payrollUpdated = false;
+    if (sched?.employee_id && sched?.date) {
+      const [y, m] = sched.date.split("-").map(Number);
+      const { data: pr } = await supabase.from("payroll_records")
+        .select("id").eq("employee_id", sched.employee_id).eq("year", y).eq("month", m).maybeSingle();
+      if (pr) {
+        await regeneratePayroll(y, m, { employee_ids: [sched.employee_id] });
+        payrollUpdated = true;
+      }
+    }
+    return Response.json({ ok: true, payroll_updated: payrollUpdated });
   }
 
   if (action === "delete") {
