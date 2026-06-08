@@ -123,6 +123,7 @@ export default function AdminPage() {
   const [expType, setExpType] = useState("all");
   const [expSearch, setExpSearch] = useState("");
   const [otRecords, setOtRecords] = useState([]);
+  const [payrollMap, setPayrollMap] = useState({}); // {employee_id: payroll_record}
   const [otSum, setOtSum] = useState({});
   const [otYearly, setOtYearly] = useState([]);
   const [pmtRecords, setPmtRecords] = useState([]);
@@ -274,6 +275,15 @@ export default function AdminPage() {
         ap("/api/admin/overtime?year=" + month.slice(0,4) + (sf ? "&store_id=" + sf : ""))
           .then(r => setOtYearly(r.data||[])).catch(() => {});
       }
+    }
+    // 薪資頁：讀已結算的 payroll_records（後端正確邏輯計算的權威值）
+    if (T === "payroll") {
+      ap("/api/admin/payroll?month=" + month + (sf ? "&store_id=" + sf : ""))
+        .then(r => {
+          const map = {};
+          for (const rec of (r.data || [])) map[rec.employee_id] = rec;
+          setPayrollMap(map);
+        }).catch(() => setPayrollMap({}));
     }
     if (need(["dashboard","payments"]) && myTabs.includes("payments")) {
       ap("/api/admin/payments")
@@ -1407,8 +1417,21 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💰 "+month+" 薪資"}
               <button onClick={()=>{
-                exportCSV("薪資_"+month+".csv",["員工","出勤天","底薪","加班費","勞保","健保","補充保費","加項","扣項","實發"],
-                  ae.map(e=>{const wd=att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;const bp=e.monthly_salary?Number(e.monthly_salary):(e.hourly_rate?Number(e.hourly_rate)*wd*8:0);const ot=otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);const ls=laborSelfFor(e);const hs=healthSelfFor(e);const suppH=e.employment_type==="parttime"&&bp>29500?Math.round(bp*0.0211):0;const da=Number(e.default_allowance||0);const dd=Number(e.default_deduction||0);return[e.name,wd,bp,ot,ls,hs,suppH,da,dd,bp+ot-ls-hs-suppH+da-dd];}));
+                exportCSV("薪資_"+month+".csv",["員工","出勤天","底薪","加班費","假日加班","勞保","健保","補充保費","加項","扣項","請假扣","實發"],
+                  ae.map(e=>{
+                    const pr = payrollMap[e.id];
+                    if (pr) {
+                      return [e.name, pr.work_days||0, pr.base_salary||0, pr.overtime_pay||0, (pr.holiday_pay||0)+(pr.rest_day_pay||0), pr.labor_self||0, pr.health_self||0, pr.supplementary_health||0, pr.allowance||0, pr.other_deduction||0, pr.leave_deduction||0, pr.net_salary||0];
+                    }
+                    // 未結算 — fallback 估算
+                    const wd=att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;
+                    const bp=e.monthly_salary?Number(e.monthly_salary):(e.hourly_rate?Number(e.hourly_rate)*wd*8:0);
+                    const ot=otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);
+                    const ls=laborSelfFor(e);const hs=healthSelfFor(e);
+                    const suppH=e.employment_type==="parttime"&&bp>29500?Math.round(bp*0.0211):0;
+                    const da=Number(e.default_allowance||0);const dd=Number(e.default_deduction||0);
+                    return [e.name+"(未結算)",wd,bp,ot,0,ls,hs,suppH,da,dd,0,bp+ot-ls-hs-suppH+da-dd];
+                  }));
               }} style={{marginLeft:8,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
             </h3>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
@@ -1438,37 +1461,44 @@ export default function AdminPage() {
                   <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:750}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","國假","請假扣","勞保","健保","補充保費","加項","扣項","實發","存"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","假日加班","請假扣","勞保","健保","補充保費","加項","扣項","實發","存"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{storeEmps.map(e=>{
-                  const wd = att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;
-                  const bp = e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate)*wd*8 : 0);
-                  const ot = otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);
-                  const compH = otRecords.filter(r=>r.employee_id===e.id&&r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted).reduce((s,r)=>s+Number(r.comp_hours||0),0);
+                  // 優先讀 payroll_records（後端正確結算的權威值）；無紀錄時顯示「未結算」
+                  const pr = payrollMap[e.id];
+                  const settled = !!pr;
+                  const wd = settled ? (pr.work_days || 0) : att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;
+                  const bp = settled ? Number(pr.base_salary||0) : (e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate)*wd*8 : 0));
+                  const ot = settled ? Number(pr.overtime_pay||0) : otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);
+                  const compH = settled ? Number(pr.comp_hours||0) : otRecords.filter(r=>r.employee_id===e.id&&r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted).reduce((s,r)=>s+Number(r.comp_hours||0),0);
                   // 請假扣款（月薪制）
                   const deductRates = {sick:0.5,personal:1,menstrual:0.5,family_care:1};
                   const eLv = lr.filter(l=>l.employee_id===e.id&&l.status==="approved"&&l.start_date>=month+"-01"&&l.start_date<=month+"-31");
-                  let lvDeduct = 0;
+                  let lvDeductCalc = 0;
                   if (e.monthly_salary) {
                     const dr = Number(e.monthly_salary)/30;
-                    eLv.forEach(l => { const days = l.half_day?0.5:(Math.ceil((new Date(l.end_date)-new Date(l.start_date))/86400000)+1); const rate=deductRates[l.leave_type]||0; if(rate>0)lvDeduct+=Math.round(dr*days*rate); });
+                    eLv.forEach(l => { const days = l.half_day?0.5:(Math.ceil((new Date(l.end_date)-new Date(l.start_date))/86400000)+1); const rate=deductRates[l.leave_type]||0; if(rate>0)lvDeductCalc+=Math.round(dr*days*rate); });
                   }
-                  const ls = laborSelfFor(e);
-                  const hs = healthSelfFor(e);
-                  const suppH = e.employment_type==="parttime"&&bp>29500?Math.round(bp*0.0211):0;
-                  const da = Number(e.default_allowance||0);
-                  const dd = Number(e.default_deduction||0);
-                  // 國定假日加班費
-                  const holWork = scheds.filter(s=>s.employee_id===e.id&&s.type==="shift"&&s.date>=month+"-01"&&s.date<=month+"-31"&&s.notes&&s.notes.includes("國定假日出勤"));
-                  const hPay = Math.round((e.monthly_salary?Number(e.monthly_salary)/30:(e.hourly_rate?Number(e.hourly_rate)*8:0))*holWork.length);
-                  const net = bp+ot+hPay-ls-hs-suppH+da-dd-lvDeduct;
+                  const lvDeduct = settled ? Number(pr.leave_deduction||0) : lvDeductCalc;
+                  const ls = settled ? Number(pr.labor_self||0) : laborSelfFor(e);
+                  const hs = settled ? Number(pr.health_self||0) : healthSelfFor(e);
+                  const suppH = settled ? Number(pr.supplementary_health||0) : (e.employment_type==="parttime"&&bp>29500?Math.round(bp*0.0211):0);
+                  const da = settled ? Number(pr.allowance||0) : Number(e.default_allowance||0);
+                  const dd = settled ? Number(pr.other_deduction||0) : Number(e.default_deduction||0);
+                  // 國定假日 + 休息日加班費（結算後讀資料庫；未結算用舊估算）
+                  const holDays = settled ? Number(pr.holiday_days||0) : scheds.filter(s=>s.employee_id===e.id&&s.type==="shift"&&s.date>=month+"-01"&&s.date<=month+"-31"&&s.notes&&s.notes.includes("國定假日出勤")).length;
+                  const hPay = settled ? Number(pr.holiday_pay||0) : Math.round((e.monthly_salary?Number(e.monthly_salary)/30:(e.hourly_rate?Number(e.hourly_rate)*8:0))*holDays);
+                  const restPay = settled ? Number(pr.rest_day_pay||0) : 0;
+                  const restDays = settled ? Number(pr.rest_day_count||0) : 0;
+                  const net = settled ? Number(pr.net_salary||0) : (bp+ot+hPay-ls-hs-suppH+da-dd-lvDeduct);
+                  const holWork = { length: holDays };
                   return (
                     <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                      <td style={{padding:"5px 4px",fontWeight:500,textAlign:"left"}}>{e.name}</td>
+                      <td style={{padding:"5px 4px",fontWeight:500,textAlign:"left"}}>{e.name}{!settled && <span style={{ fontSize:8, color:"#b45309", marginLeft:4, background:"#fef3c7", padding:"1px 3px", borderRadius:2 }}>未結算</span>}</td>
                       <td style={{padding:"5px 4px",textAlign:"right"}}>{wd+"天"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right"}}>{fmt(bp)}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:ot>0?"#b45309":"#ccc"}}>{ot>0?"+"+fmt(ot):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:compH>0?"#4361ee":"#ccc"}}>{compH>0?compH+"hr":"-"}</td>
-                      <td style={{padding:"5px 4px",textAlign:"right",color:hPay>0?"#b91c1c":"#ccc"}}>{hPay>0?"+"+fmt(hPay)+"("+holWork.length+"天)":"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:(hPay+restPay)>0?"#b91c1c":"#ccc"}}>{(hPay+restPay)>0?"+"+fmt(hPay+restPay)+(holDays>0||restDays>0?"("+(holDays>0?holDays+"國":"")+(holDays>0&&restDays>0?"+":"")+(restDays>0?restDays+"休":"")+")":""):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:lvDeduct>0?"#b91c1c":"#ccc"}}>{lvDeduct>0?"-"+fmt(lvDeduct):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}}>{ls>0?"-"+fmt(ls):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}}>{hs>0?"-"+fmt(hs):"-"}</td>
