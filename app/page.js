@@ -214,16 +214,20 @@ export default function AdminPage() {
     const monthStart = (ymd) => ymd.slice(0,7) + "-01";
     const monthEnd = (ymd) => { const [y,m] = ymd.split("-").map(Number); const last = new Date(y, m, 0).getDate(); return `${ymd.slice(0,7)}-${String(last).padStart(2,"0")}`; };
     const expandForCounts = tab === "schedules" && (sv === "week" || sv === "biweek");
+    // 薪資 / 考核 / 獎金 tab 的排班資料要依員工算（後端已用 employee_id），不能依 store_id 過濾，
+    // 否則員工被排到別店的班會抓不到（會造成「出勤展開 0 天」的 bug）
+    const empCentricTab = ["payroll","reviews","bonus","attendance"].includes(tab);
+    const schedStoreParam = (sf && !empCentricTab) ? "&store_id=" + sf : "";
     const sp = (sv === "week" || sv === "biweek")
-      ? "week_start=" + (expandForCounts ? monthStart(ws) : ws) + "&week_end=" + (expandForCounts ? monthEnd(we2) : we2) + (sf ? "&store_id=" + sf : "")
-      : "month=" + month + (sf ? "&store_id=" + sf : "");
+      ? "week_start=" + (expandForCounts ? monthStart(ws) : ws) + "&week_end=" + (expandForCounts ? monthEnd(we2) : we2) + schedStoreParam
+      : "month=" + month + schedStoreParam;
 
     // 以目前 tab 決定要抓哪些資料（未開啟的 tab 不抓）
     const T = tab || "";
     const need = (list) => list.includes(T);
     const needSettle = need(["dashboard","settlements","pnl","bonus"]) && myTabs.includes("settlements");
     const needDep    = need(["dashboard","deposits"]) && myTabs.includes("deposits");
-    const needSched  = need(["dashboard","schedules","payroll","reviews","bonus"]);
+    const needSched  = need(["dashboard","schedules","payroll","reviews","bonus","attendance"]);
     const needAtt    = need(["dashboard","attendance","payroll","reviews"]);
     const needLv     = need(["dashboard","leaves","payroll","reviews"]);
     const needShifts = need(["dashboard","schedules","settings","attendance","payroll","reviews","bonus"]);
@@ -1131,53 +1135,121 @@ export default function AdminPage() {
                   </div>
                 )}
               {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
-                const storeAtt = att.filter(a => { if (attEmpFilter && a.employee_id !== attEmpFilter) return false; const emp = emps.find(e=>e.id===a.employee_id); return emp && (store.id==="__hq__" ? (!emp.store_id || !stores.some(st=>st.id===emp.store_id)) : emp.store_id === store.id); });
-                if (storeAtt.length === 0 && (!sf || attEmpFilter)) return null;
+                // 整合：以 (員工, 日期) 分組，每組顯示排班+實際打卡+休息+工時+狀態
+                const inStore = (eid) => { const emp = emps.find(e=>e.id===eid); return emp && (store.id==="__hq__" ? (!emp.store_id || !stores.some(st=>st.id===emp.store_id)) : emp.store_id === store.id); };
+                const dayMap = {};
+                for (const a of att) {
+                  if (attEmpFilter && a.employee_id !== attEmpFilter) continue;
+                  if (!inStore(a.employee_id)) continue;
+                  const date = a.timestamp ? new Date(a.timestamp).toLocaleDateString("sv-SE", {timeZone:"Asia/Taipei"}) : "";
+                  if (!date) continue;
+                  const k = a.employee_id + "|" + date;
+                  if (!dayMap[k]) dayMap[k] = { emp_id: a.employee_id, emp_name: a.employees?.name||"", date, ins: [], outs: [] };
+                  if (a.type === "clock_in") dayMap[k].ins.push(a);
+                  else if (a.type === "clock_out") dayMap[k].outs.push(a);
+                }
+                // 把有排班但沒打卡的日子也補進來（曠職可見）
+                for (const s of scheds) {
+                  if (attEmpFilter && s.employee_id !== attEmpFilter) continue;
+                  if (!inStore(s.employee_id)) continue;
+                  if (!["work","rest_day","national_holiday"].includes(s.day_type)) continue;
+                  const k = s.employee_id + "|" + s.date;
+                  if (!dayMap[k]) dayMap[k] = { emp_id: s.employee_id, emp_name: s.employees?.name||emps.find(e=>e.id===s.employee_id)?.name||"", date: s.date, ins: [], outs: [] };
+                }
+                // 補上排班資訊
+                for (const k in dayMap) {
+                  const d = dayMap[k];
+                  d.sched = scheds.find(s => s.employee_id === d.emp_id && s.date === d.date);
+                }
+                const days = Object.values(dayMap).sort((a,b)=>b.date.localeCompare(a.date) || (a.emp_name||"").localeCompare(b.emp_name||""));
+                if (days.length === 0 && (!sf || attEmpFilter)) return null;
+                const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei",hour:"2-digit",minute:"2-digit",hour12:false}) : "";
+                const minDiff = (h1m1, h2m2) => { const [h1,m1]=h1m1.split(":").map(Number); const [h2,m2]=h2m2.split(":").map(Number); return (h2*60+m2)-(h1*60+m1); };
                 return (
                 <div key={store.id} style={{marginBottom:10}}>
-                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeAtt.length+"筆）"}</h4>
+                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+days.length+"日次）"}</h4>
               <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                  <thead><tr style={{background:"#faf8f5"}}>{["時間","員工","類型","距離","遲到","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
-                  <tbody>{storeAtt.map(a=>(
-                    <tr key={a.id} style={{borderBottom:"1px solid #f0eeea",background:a.is_amendment?"#f0f8ff":"transparent"}}>
-                      <td style={{padding:6,fontSize:10}}>{a.timestamp?new Date(a.timestamp).toLocaleString("zh-TW",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):""}{a.is_amendment&&<span style={{fontSize:8,color:"#4361ee",marginLeft:2}}>補</span>}</td>
-                      <td style={{padding:6,fontWeight:500}}>{a.employees?a.employees.name:""}</td>
-                      <td style={{padding:6}}>{a.type==="clock_in"?"上班":"下班"}</td>
-                      <td style={{padding:6}}>{a.distance_meters?a.distance_meters+"m":"-"}</td>
-                      <td style={{padding:6,color:a.late_minutes>0?"#b91c1c":"#0a7c42"}}>{a.late_minutes>0?a.late_minutes+"分":"準時"}</td>
-                      <td style={{padding:6,display:"flex",gap:4,flexWrap:"wrap"}}>
-                        <button onClick={async()=>{
-                          const orig = a.timestamp ? new Date(a.timestamp) : new Date();
-                          const dateStr = orig.toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});
-                          const timeStr = orig.toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei",hour12:false}).slice(0,5);
-                          const typeLabel = a.type==="clock_in"?"上班":"下班";
-                          const newDate = prompt(`編輯打卡時間（${typeLabel}）\n\n日期 (YYYY-MM-DD)：`, dateStr);
-                          if (!newDate) return;
-                          const newTime = prompt(`時間 (HH:MM)：`, timeStr);
-                          if (!newTime) return;
-                          if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { alert("日期格式錯誤，請用 YYYY-MM-DD"); return; }
-                          if (!/^\d{2}:\d{2}$/.test(newTime)) { alert("時間格式錯誤，請用 HH:MM（24 小時制）"); return; }
-                          const iso = `${newDate}T${newTime}:00+08:00`;
-                          if (!confirm(`確定改為 ${newDate} ${newTime}？\n\n會自動重算遲到/早退分鐘。\n（員工：${a.employees?.name || "?"}，類型：${typeLabel}）`)) return;
-                          const r = await sap("/api/admin/attendance",{
-                            action:"update", attendance_id:a.id, timestamp:iso,
-                            edited_by:auth?.id, edited_by_name:auth?.name,
-                          });
-                          if (r) load();
-                        }}
-                          style={{padding:"4px 8px",borderRadius:4,border:"1px solid #4361ee",background:"#fff",fontSize:11,cursor:"pointer",color:"#4361ee"}}>✏編輯</button>
-                        {a.type==="clock_out" && <button onClick={async()=>{
-                          const dateStr = new Date(a.timestamp).toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});
-                          if(!confirm(`重算 ${a.employees?.name||""} ${dateStr} 的加班？\n\n會依排班 day_type 判斷：\n• 一般日：超過下班時間達門檻才算\n• 休息日/國定假日：當日工時全算加班`))return;
-                          const r = await sap("/api/admin/attendance",{action:"recompute_ot",employee_id:a.employee_id,date:dateStr});
-                          if(r){const res=r.result;alert(res?.ok?`✅ 已建立加班：${res.otMinutes}分（${res.day_type}）金額$${res.amount}`:`未建立：${res?.reason||"無"}`);load();}
-                        }} style={{padding:"4px 8px",borderRadius:4,border:"1px solid #b45309",background:"#fff",fontSize:11,cursor:"pointer",color:"#b45309"}}>⏱重算加班</button>}
-                        <button onClick={async()=>{if(!confirm("確定刪除此打卡紀錄？"))return;await sap("/api/admin/attendance",{action:"delete",attendance_id:a.id});load();}}
-                          style={{padding:"4px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer",color:"#b91c1c"}}>🗑刪除</button>
-                      </td>
-                    </tr>
-                  ))}</tbody>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:880}}>
+                  <thead><tr style={{background:"#faf8f5"}}>{["日期","員工","班別","排班","實際上班","實際下班","休息","工時","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                  <tbody>{days.map(d=>{
+                    const sch = d.sched;
+                    const shiftBrk = Number(sch?.shifts?.break_minutes||0);
+                    const brk = sch?.break_minutes != null ? Number(sch.break_minutes) : shiftBrk;
+                    const schStart = sch?.shifts?.start_time?.slice(0,5) || "";
+                    const schEnd = sch?.shifts?.end_time?.slice(0,5) || "";
+                    // 實際取最早上班 / 最晚下班
+                    const earliestIn = d.ins.length ? d.ins.reduce((m,a)=>!m||new Date(a.timestamp)<new Date(m.timestamp)?a:m, null) : null;
+                    const latestOut = d.outs.length ? d.outs.reduce((m,a)=>!m||new Date(a.timestamp)>new Date(m.timestamp)?a:m, null) : null;
+                    const inT = earliestIn ? fmtTime(earliestIn.timestamp) : "";
+                    const outT = latestOut ? fmtTime(latestOut.timestamp) : "";
+                    // 工時：用實際打卡（若雙缺則用排班）
+                    let workMin = 0;
+                    if (inT && outT) workMin = Math.max(0, minDiff(inT, outT) - brk);
+                    else if (schStart && schEnd) workMin = Math.max(0, minDiff(schStart, schEnd) - brk);
+                    const workHr = (workMin/60).toFixed(1);
+                    // 狀態
+                    const late = earliestIn?.late_minutes || 0;
+                    const early = latestOut?.early_leave_minutes || 0;
+                    let status = "", statusColor = "#0a7c42";
+                    if (!sch) { status = "無排班"; statusColor = "#888"; }
+                    else if (!earliestIn && !latestOut) { status = "未出勤"; statusColor = "#b91c1c"; }
+                    else if (!earliestIn) { status = "缺上班"; statusColor = "#b91c1c"; }
+                    else if (!latestOut) { status = "缺下班"; statusColor = "#b45309"; }
+                    else if (late > 0 && early > 0) { status = `遲${late}/早${early}`; statusColor = "#b91c1c"; }
+                    else if (late > 0) { status = `遲${late}分`; statusColor = "#b91c1c"; }
+                    else if (early > 0) { status = `早退${early}分`; statusColor = "#b45309"; }
+                    else { status = "準時"; }
+                    const dtBadge = sch?.day_type==="national_holiday"?{l:"國假",c:"#b91c1c"}:sch?.day_type==="rest_day"?{l:"休息日",c:"#b45309"}:null;
+                    const editAtt = async (a) => {
+                      if (!a) return;
+                      const orig = new Date(a.timestamp);
+                      const dateStr = orig.toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});
+                      const timeStr = orig.toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei",hour12:false}).slice(0,5);
+                      const typeLabel = a.type==="clock_in"?"上班":"下班";
+                      const newTime = prompt(`編輯 ${d.emp_name} ${dateStr} ${typeLabel}時間 (HH:MM)：`, timeStr);
+                      if (!newTime || !/^\d{2}:\d{2}$/.test(newTime)) return;
+                      const iso = `${dateStr}T${newTime}:00+08:00`;
+                      const r = await sap("/api/admin/attendance",{action:"update",attendance_id:a.id,timestamp:iso,edited_by:auth?.id,edited_by_name:auth?.name});
+                      if (r) load();
+                    };
+                    return (
+                      <tr key={d.emp_id+"|"+d.date} style={{borderBottom:"1px solid #f0eeea"}}>
+                        <td style={{padding:6,fontSize:10}}>{d.date.slice(5)}</td>
+                        <td style={{padding:6,fontWeight:500}}>{d.emp_name}{dtBadge&&<span style={{fontSize:8,color:dtBadge.c,marginLeft:3,padding:"1px 3px",background:"#fff",border:"1px solid "+dtBadge.c,borderRadius:2}}>{dtBadge.l}</span>}</td>
+                        <td style={{padding:6,fontSize:10,color:"#555"}}>{sch?.shifts?.name || "-"}</td>
+                        <td style={{padding:6,fontSize:10,color:"#888"}}>{schStart && schEnd ? schStart+"–"+schEnd : "-"}</td>
+                        <td style={{padding:6,fontSize:10,color:earliestIn?(late>0?"#b91c1c":"#0a7c42"):"#ccc",cursor:earliestIn?"pointer":"default"}}
+                            onClick={()=>editAtt(earliestIn)}
+                            title={earliestIn?"點擊編輯":""}>
+                          {inT || "—"}
+                          {d.ins.length>1 && <span style={{fontSize:8,color:"#999",marginLeft:2}}>(+{d.ins.length-1})</span>}
+                        </td>
+                        <td style={{padding:6,fontSize:10,color:latestOut?(early>0?"#b45309":"#0a7c42"):"#ccc",cursor:latestOut?"pointer":"default"}}
+                            onClick={()=>editAtt(latestOut)}
+                            title={latestOut?"點擊編輯":""}>
+                          {outT || "—"}
+                          {d.outs.length>1 && <span style={{fontSize:8,color:"#999",marginLeft:2}}>(+{d.outs.length-1})</span>}
+                        </td>
+                        <td style={{padding:6,fontSize:10,color:"#888"}}>{brk?brk+"min":"-"}</td>
+                        <td style={{padding:6,fontWeight:500,color:"#0a7c42"}}>{workMin>0?workHr+"hr":"-"}</td>
+                        <td style={{padding:6,fontSize:10,color:statusColor,fontWeight:500}}>{status}</td>
+                        <td style={{padding:6}}>
+                          {latestOut && <button onClick={async()=>{
+                            if(!confirm(`重算 ${d.emp_name} ${d.date} 的加班？`))return;
+                            const r = await sap("/api/admin/attendance",{action:"recompute_ot",employee_id:d.emp_id,date:d.date});
+                            if(r){const res=r.result;alert(res?.ok?`✅ 已建立加班：${res.otMinutes}分 $${res.amount}`:`未建立：${res?.reason||"無"}`);load();}
+                          }} style={{padding:"2px 6px",borderRadius:3,border:"1px solid #b45309",background:"#fff",fontSize:9,cursor:"pointer",color:"#b45309",marginRight:2}}>⏱重算</button>}
+                          {(earliestIn || latestOut) && <button onClick={async()=>{
+                            if(!confirm(`刪除 ${d.emp_name} ${d.date} 的所有打卡（${d.ins.length+d.outs.length}筆）？`))return;
+                            for (const a of [...d.ins, ...d.outs]) {
+                              await sap("/api/admin/attendance",{action:"delete",attendance_id:a.id});
+                            }
+                            load();
+                          }} style={{padding:"2px 6px",borderRadius:3,border:"1px solid #ddd",background:"#fff",fontSize:9,cursor:"pointer",color:"#b91c1c"}}>🗑刪除</button>}
+                        </td>
+                      </tr>
+                    );
+                  })}</tbody>
                 </table>
               </div>
                 </div>);
