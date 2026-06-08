@@ -60,9 +60,9 @@ export async function GET(request) {
   // 若沒指定 employee_id（員工要看全店班）→ 多 join employees(name, phone) 以便聯絡
   const selectFields = slim
     ? (employee_id
-        ? "id, date, employee_id, shift_id, type, leave_type, half_day, day_type, note, published, shifts(name, start_time, end_time, role, color)"
-        : "id, date, employee_id, shift_id, type, leave_type, half_day, day_type, note, published, employees(name, phone), shifts(name, start_time, end_time, role, color)")
-    : "*, employees(name, line_uid), shifts(name, start_time, end_time, role, color), stores(name)";
+        ? "id, date, employee_id, shift_id, type, leave_type, half_day, day_type, note, published, shifts(name, start_time, end_time, break_minutes, role, color)"
+        : "id, date, employee_id, shift_id, type, leave_type, half_day, day_type, note, published, employees(name, phone), shifts(name, start_time, end_time, break_minutes, role, color)")
+    : "*, employees(name, line_uid), shifts(name, start_time, end_time, break_minutes, role, color), stores(name)";
 
   let query = supabase.from("schedules").select(selectFields).order("date");
   if (store_id) query = query.eq("store_id", store_id);
