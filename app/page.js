@@ -1452,6 +1452,23 @@ export default function AdminPage() {
                 📱 LINE發送薪資條
               </button>
             </div>
+            {/* 💡 公式速查 — 折疊式 */}
+            <details style={{marginBottom:8,background:"#fff8e6",border:"1px solid #f0e6c8",borderRadius:6,padding:"6px 10px",fontSize:11}}>
+              <summary style={{cursor:"pointer",fontWeight:600,color:"#854d0e"}}>💡 點此查看計算公式（出勤/底薪/加班/假日加班）</summary>
+              <div style={{marginTop:8,color:"#555",lineHeight:1.7}}>
+                <div><b>出勤：</b> 正職顯示「天」、兼職顯示「時」（= 排班 work 天數 × 8hr）</div>
+                <div><b>底薪：</b> 月薪 = 固定 monthly_salary；時薪 = 時薪 × 工作時數（休息日/國假不算進底薪）</div>
+                <div><b>平日加班：</b> 超過排班 end_time 部分。前 2 小時 × 1.34，2 小時以後 × 1.67</div>
+                <div><b>假日加班：</b></div>
+                <div style={{marginLeft:14}}>• <span style={{color:"#b91c1c"}}>國定假日</span>：當天工時 ×（月薪日薪 或 時薪 × 8hr × 2.0 倍）</div>
+                <div style={{marginLeft:14}}>• <span style={{color:"#b91c1c"}}>休息日</span>（勞基法 24-1 階梯）：前 2hr × 1.34 + 2~8hr × 1.67 + 8~12hr × 1.67 + 本薪</div>
+                <div><b>勞保自付：</b> 依勞保級距表（正/兼職不同）；可手動覆寫（員工詳情頁）</div>
+                <div><b>健保自付：</b> 一律正職表（健保最低 = 基本工資）；兼職若在他司加保則為 0</div>
+                <div><b>補充保費：</b> 兼職且底薪 &gt; 29,500 時，扣 2.11%</div>
+                <div><b>實發 = </b> 底薪 + 加班費 + 假日加班 - 勞保 - 健保 - 補充保費 + 加項 - 扣項 - 請假扣</div>
+                <div style={{marginTop:6,padding:6,background:"#fff",borderRadius:4,fontSize:10,color:"#888"}}>💡 將滑鼠停在每個數字上會顯示該員工的詳細計算</div>
+              </div>
+            </details>
             {/* 薪資表 — 按門市分組 */}
             {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
               const storeEmps = store.id==="__hq__" ? ae.filter(e => !e.store_id || !stores.some(s=>s.id===e.store_id)) : ae.filter(e => e.store_id === store.id);
@@ -1466,42 +1483,82 @@ export default function AdminPage() {
                   // 優先讀 payroll_records（後端正確結算的權威值）；無紀錄時顯示「未結算」
                   const pr = payrollMap[e.id];
                   const settled = !!pr;
+                  const isPT = e.employment_type === "parttime";
+                  const hourlyRate = settled && pr.hourly_rate > 0 ? Number(pr.hourly_rate) : Number(e.hourly_rate || 0);
+                  const monthlySalary = Number(e.monthly_salary || 0);
                   const wd = settled ? (pr.work_days || 0) : att.filter(a=>a.employees&&a.employees.name===e.name&&a.type==="clock_in").length;
-                  const bp = settled ? Number(pr.base_salary||0) : (e.monthly_salary ? Number(e.monthly_salary) : (e.hourly_rate ? Number(e.hourly_rate)*wd*8 : 0));
+                  const bp = settled ? Number(pr.base_salary||0) : (monthlySalary ? monthlySalary : (hourlyRate ? hourlyRate*wd*8 : 0));
+                  // 從 base_salary 反推時數（兼職時薪制）— 用於「出勤時數」顯示
+                  const baseHrs = (!monthlySalary && hourlyRate > 0) ? Math.round(bp / hourlyRate) : 0;
+                  const baseDays = baseHrs > 0 ? Math.round(baseHrs / 8 * 10) / 10 : 0;
                   const ot = settled ? Number(pr.overtime_pay||0) : otRecords.filter(r=>r.employee_id===e.id&&(r.comp_type==="pay"||r.comp_converted)).reduce((s,r)=>s+Number(r.amount||0),0);
                   const compH = settled ? Number(pr.comp_hours||0) : otRecords.filter(r=>r.employee_id===e.id&&r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted).reduce((s,r)=>s+Number(r.comp_hours||0),0);
+                  // 平日加班時數（從 OT records 推算）
+                  const otRecs = otRecords.filter(r=>r.employee_id===e.id && (r.comp_type==="pay"||r.comp_converted) && (!r.overtime_type || (r.overtime_type!=="rest_1" && r.overtime_type!=="rest_2" && r.overtime_type!=="holiday")));
+                  const otHrs = otRecs.reduce((s,r)=>s + Number(r.overtime_minutes||0),0) / 60;
                   // 請假扣款（月薪制）
                   const deductRates = {sick:0.5,personal:1,menstrual:0.5,family_care:1};
                   const eLv = lr.filter(l=>l.employee_id===e.id&&l.status==="approved"&&l.start_date>=month+"-01"&&l.start_date<=month+"-31");
                   let lvDeductCalc = 0;
-                  if (e.monthly_salary) {
-                    const dr = Number(e.monthly_salary)/30;
+                  if (monthlySalary) {
+                    const dr = monthlySalary/30;
                     eLv.forEach(l => { const days = l.half_day?0.5:(Math.ceil((new Date(l.end_date)-new Date(l.start_date))/86400000)+1); const rate=deductRates[l.leave_type]||0; if(rate>0)lvDeductCalc+=Math.round(dr*days*rate); });
                   }
                   const lvDeduct = settled ? Number(pr.leave_deduction||0) : lvDeductCalc;
                   const ls = settled ? Number(pr.labor_self||0) : laborSelfFor(e);
                   const hs = settled ? Number(pr.health_self||0) : healthSelfFor(e);
-                  const suppH = settled ? Number(pr.supplementary_health||0) : (e.employment_type==="parttime"&&bp>29500?Math.round(bp*0.0211):0);
+                  const suppH = settled ? Number(pr.supplementary_health||0) : (isPT&&bp>29500?Math.round(bp*0.0211):0);
                   const da = settled ? Number(pr.allowance||0) : Number(e.default_allowance||0);
                   const dd = settled ? Number(pr.other_deduction||0) : Number(e.default_deduction||0);
                   // 國定假日 + 休息日加班費（結算後讀資料庫；未結算用舊估算）
                   const holDays = settled ? Number(pr.holiday_days||0) : scheds.filter(s=>s.employee_id===e.id&&s.type==="shift"&&s.date>=month+"-01"&&s.date<=month+"-31"&&s.notes&&s.notes.includes("國定假日出勤")).length;
-                  const hPay = settled ? Number(pr.holiday_pay||0) : Math.round((e.monthly_salary?Number(e.monthly_salary)/30:(e.hourly_rate?Number(e.hourly_rate)*8:0))*holDays);
+                  const hPay = settled ? Number(pr.holiday_pay||0) : Math.round((monthlySalary?monthlySalary/30:(hourlyRate?hourlyRate*8:0))*holDays);
                   const restPay = settled ? Number(pr.rest_day_pay||0) : 0;
                   const restDays = settled ? Number(pr.rest_day_count||0) : 0;
                   const net = settled ? Number(pr.net_salary||0) : (bp+ot+hPay-ls-hs-suppH+da-dd-lvDeduct);
                   const holWork = { length: holDays };
+                  // 假日加班 hover 公式
+                  const holFormula = [];
+                  if (holDays > 0) {
+                    const each = monthlySalary ? Math.round(monthlySalary/30) : (hourlyRate*8*2);
+                    holFormula.push(`國假 ${holDays}天 × ${monthlySalary?"日薪":"8hr × $"+hourlyRate+" × 2倍"} ≈ +$${(holDays*each).toLocaleString()}`);
+                  }
+                  if (restDays > 0) {
+                    holFormula.push(`休息日 ${restDays}天（勞基法24-1階梯加給）= +$${restPay.toLocaleString()}`);
+                  }
+                  if (holFormula.length === 0) holFormula.push("無假日加班");
+                  // 底薪 hover/subtitle
+                  const baseSubtitle = monthlySalary ? "(固定月薪)" : (hourlyRate ? `$${hourlyRate}/hr × ${baseHrs}hr` : "");
+                  const attDisplay = isPT && baseHrs > 0 ? `${baseHrs}時` : `${wd}天`;
+                  const attSubtitle = isPT && baseHrs > 0 ? `(${baseDays}天)` : (monthlySalary ? "" : "");
+
                   return (
                     <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                      <td style={{padding:"5px 4px",fontWeight:500,textAlign:"left"}}>{e.name}{!settled && <span style={{ fontSize:8, color:"#b45309", marginLeft:4, background:"#fef3c7", padding:"1px 3px", borderRadius:2 }}>未結算</span>}</td>
-                      <td style={{padding:"5px 4px",textAlign:"right"}}>{wd+"天"}</td>
-                      <td style={{padding:"5px 4px",textAlign:"right"}}>{fmt(bp)}</td>
-                      <td style={{padding:"5px 4px",textAlign:"right",color:ot>0?"#b45309":"#ccc"}}>{ot>0?"+"+fmt(ot):"-"}</td>
+                      <td style={{padding:"5px 4px",fontWeight:500,textAlign:"left"}}>
+                        {e.name}
+                        <span style={{ fontSize:8, color:isPT?"#b45309":"#0a7c42", marginLeft:4, background:isPT?"#fef3c7":"#e6f9f0", padding:"1px 3px", borderRadius:2 }}>{isPT?"兼":"正"}</span>
+                        {!settled && <span style={{ fontSize:8, color:"#b91c1c", marginLeft:3, background:"#fee2e2", padding:"1px 3px", borderRadius:2 }}>未結算</span>}
+                      </td>
+                      <td style={{padding:"5px 4px",textAlign:"right"}} title={isPT?`排班工時 ${baseHrs}hr（${baseDays}天）`:`工作天數 ${wd}天`}>
+                        {attDisplay}
+                        {attSubtitle && <div style={{fontSize:8,color:"#999"}}>{attSubtitle}</div>}
+                      </td>
+                      <td style={{padding:"5px 4px",textAlign:"right"}} title={baseSubtitle}>
+                        {fmt(bp)}
+                        {baseSubtitle && <div style={{fontSize:8,color:"#999"}}>{baseSubtitle}</div>}
+                      </td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:ot>0?"#b45309":"#ccc"}} title={ot>0?`平日加班 ${otHrs.toFixed(1)}hr × 加給倍率 = +$${ot.toLocaleString()}`:""}>
+                        {ot>0?"+"+fmt(ot):"-"}
+                        {ot>0 && otHrs>0 && <div style={{fontSize:8,color:"#999"}}>{otHrs.toFixed(1)}hr</div>}
+                      </td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:compH>0?"#4361ee":"#ccc"}}>{compH>0?compH+"hr":"-"}</td>
-                      <td style={{padding:"5px 4px",textAlign:"right",color:(hPay+restPay)>0?"#b91c1c":"#ccc"}}>{(hPay+restPay)>0?"+"+fmt(hPay+restPay)+(holDays>0||restDays>0?"("+(holDays>0?holDays+"國":"")+(holDays>0&&restDays>0?"+":"")+(restDays>0?restDays+"休":"")+")":""):"-"}</td>
-                      <td style={{padding:"5px 4px",textAlign:"right",color:lvDeduct>0?"#b91c1c":"#ccc"}}>{lvDeduct>0?"-"+fmt(lvDeduct):"-"}</td>
-                      <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}}>{ls>0?"-"+fmt(ls):"-"}</td>
-                      <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}}>{hs>0?"-"+fmt(hs):"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:(hPay+restPay)>0?"#b91c1c":"#ccc"}} title={holFormula.join("\n")}>
+                        {(hPay+restPay)>0?"+"+fmt(hPay+restPay):"-"}
+                        {(hPay+restPay)>0 && <div style={{fontSize:8,color:"#999"}}>{holDays>0?`國${holDays}`:""}{holDays>0&&restDays>0?" + ":""}{restDays>0?`休${restDays}`:""}</div>}
+                      </td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:lvDeduct>0?"#b91c1c":"#ccc"}} title={settled && pr.leave_detail?pr.leave_detail:""}>{lvDeduct>0?"-"+fmt(lvDeduct):"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}} title={e.labor_tier?`勞保 L${e.labor_tier}`:""}>{ls>0?"-"+fmt(ls):"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}} title={e.health_tier?`健保 H${e.health_tier}`:(isPT&&e.health_insured_here===false?"他司加保":"")}>{hs>0?"-"+fmt(hs):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:suppH>0?"#b91c1c":"#ccc"}}>{suppH>0?"-"+fmt(suppH):"-"}</td>
                       <td style={{padding:"5px 2px"}}>
                         <input type="text" id={"pan-"+e.id} defaultValue={e.default_allowance_note||""} placeholder="名目"
