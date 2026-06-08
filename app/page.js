@@ -107,6 +107,7 @@ export default function AdminPage() {
   const [avReports, setAvReports] = useState([]);
   const [avView, setAvView] = useState("employee"); // "employee"|"day"
   const [showAvail, setShowAvail] = useState(true);
+  const [showAnalytics, setShowAnalytics] = useState(false); // 總覽分析區塊預設摺疊（加速首屏）
   const [ws, setWs] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - d.getDay());
@@ -155,6 +156,7 @@ export default function AdminPage() {
   const [amendments, setAmendments] = useState([]);
   const [monthlyReport, setMonthlyReport] = useState([]);
   const [reminders, setReminders] = useState([]);
+  const [loaded, setLoaded] = useState({}); // 各資料源是否已載入（避免顯示誤導的 0）
   const [rvData, setRvData] = useState([]);
   const [bnData, setBnData] = useState(null);
   const [productList, setProductList] = useState([]);
@@ -255,6 +257,7 @@ export default function AdminPage() {
       if (needExp) { setExps(ex.data||[]); setExpSum({total:ex.total,byCategory:ex.byCategory}); }
       if (needPnl) setPnl(pl2);
       if (needAnn) setAnns(an.data||[]);
+      setLoaded(l => ({ ...l, core: true }));
       setLd(false);
     }).catch(err => {
       console.error("dashboard load failed:", err);
@@ -287,7 +290,7 @@ export default function AdminPage() {
     }
     if (need(["dashboard","payments"]) && myTabs.includes("payments")) {
       ap("/api/admin/payments")
-        .then(r => { setPmtRecords(r.data||[]); setPmtSum(r.summary||{}); });
+        .then(r => { setPmtRecords(r.data||[]); setPmtSum(r.summary||{}); setLoaded(l => ({ ...l, pmt: true })); });
     }
     if (need(["schedules","attendance","leaves","dashboard"])) {
       ap("/api/admin/holidays?month=" + month)
@@ -323,7 +326,7 @@ export default function AdminPage() {
       ap("/api/admin/products").then(r => setProductList(r.data||[])).catch(()=>{});
     }
     if (need(["dashboard","orders"]) && myTabs.includes("orders")) {
-      ap("/api/admin/orders").then(r => { setOrderList(r.data||[]); setOrderSum(r.summary||{}); });
+      ap("/api/admin/orders").then(r => { setOrderList(r.data||[]); setOrderSum(r.summary||{}); setLoaded(l => ({ ...l, orders: true })); });
     }
     if (T === "production" && myTabs.includes("production")) {
       ap("/api/admin/production?month=" + month)
@@ -521,16 +524,17 @@ export default function AdminPage() {
         {/* DASHBOARD */}
         {!ld && tab === "dashboard" && (
           <div>
+            {!loaded.core && <div style={{background:"#fff8e6",border:"1px solid #f0e6c8",borderRadius:6,padding:"5px 10px",marginBottom:8,fontSize:11,color:"#854d0e",textAlign:"center"}}>⏳ 資料載入中…（首次進入或冷啟動較慢，數字會陸續顯示）</div>}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:6,marginBottom:10}}>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>本月營收</div><div style={{fontSize:18,fontWeight:700,color:"#0a7c42"}}>{fmt(sum.total_net_sales)}</div></div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>待審(假+費用)</div><div style={{fontSize:18,fontWeight:700,color:"#b45309"}}>{pl.length + exps.filter(e=>e.status==="pending").length}</div></div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>在職員工</div><div style={{fontSize:18,fontWeight:700}}>{ae.length}</div></div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>待撥款</div><div style={{fontSize:18,fontWeight:700,color:"#b91c1c"}}>{fmt(pmtSum.pending)}</div></div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>應收帳款</div><div style={{fontSize:18,fontWeight:700,color:"#b45309"}}>{fmt(orderSum.unpaid)}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>本月營收</div><div style={{fontSize:18,fontWeight:700,color:"#0a7c42"}}>{loaded.core?fmt(sum.total_net_sales):<span style={{color:"#ccc"}}>…</span>}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>待審(假+費用)</div><div style={{fontSize:18,fontWeight:700,color:"#b45309"}}>{loaded.core?(pl.length + exps.filter(e=>e.status==="pending").length):<span style={{color:"#ccc"}}>…</span>}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>在職員工</div><div style={{fontSize:18,fontWeight:700}}>{loaded.core?ae.length:<span style={{color:"#ccc"}}>…</span>}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>待撥款</div><div style={{fontSize:18,fontWeight:700,color:"#b91c1c"}}>{loaded.pmt?fmt(pmtSum.pending):<span style={{color:"#ccc"}}>…</span>}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>應收帳款</div><div style={{fontSize:18,fontWeight:700,color:"#b45309"}}>{loaded.orders?fmt(orderSum.unpaid):<span style={{color:"#ccc"}}>…</span>}</div></div>
             </div>
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-              {/* 門市營收達成率 */}
+              {/* 門市營收達成率 — 留在精簡版（用已載入的資料，無額外 API） */}
               <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10}}>
                 <h4 style={{fontSize:11,fontWeight:600,marginBottom:6}}>📊 門市營收達成率</h4>
                 {stores.map(s => {
@@ -581,6 +585,12 @@ export default function AdminPage() {
               })()}
             </div>
 
+            {/* 📊 詳細統計（預設摺疊以加速首屏） */}
+            <button onClick={()=>setShowAnalytics(!showAnalytics)} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid #e8e6e1",background:showAnalytics?"#faf8f5":"#fff",cursor:"pointer",fontSize:12,fontWeight:600,color:"#555",textAlign:"left",marginBottom:8}}>
+              {showAnalytics?"▼":"▶"} 📊 詳細統計（系統提醒、員工KPI、門市人效）
+            </button>
+
+            {showAnalytics && <>
             {/* 🔔 系統提醒 */}
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10,marginBottom:10}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
@@ -633,6 +643,7 @@ export default function AdminPage() {
                 })}
               </div>
             </div>
+            </>}
           </div>
         )}
         {!ld && (tab === "employees" || tab === "store_staff") && (
