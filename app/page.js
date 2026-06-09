@@ -1160,17 +1160,17 @@ export default function AdminPage() {
                   const k = s.employee_id + "|" + s.date;
                   if (!dayMap[k]) dayMap[k] = { emp_id: s.employee_id, emp_name: s.employees?.name||emps.find(e=>e.id===s.employee_id)?.name||"", date: s.date, ins: [], outs: [] };
                 }
-                // 補上排班資訊：優先用 att 的 shifts/schedules join（最可靠），fallback 用 scheds 查找
+                // 補上排班資訊：優先用 att 的 shift/schedule join（最可靠），fallback 用 scheds 查找
                 for (const k in dayMap) {
                   const d = dayMap[k];
                   const ref = d.ins[0] || d.outs[0]; // 任一打卡記錄都帶有 schedule join
-                  if (ref?.shifts || ref?.schedules) {
+                  if (ref?.shift || ref?.schedule) {
                     d.sched = {
                       id: ref.schedule_id,
                       shift_id: ref.shift_id,
-                      day_type: ref.schedules?.day_type,
-                      break_minutes: ref.schedules?.break_minutes,
-                      shifts: ref.shifts || null,
+                      day_type: ref.schedule?.day_type,
+                      break_minutes: ref.schedule?.break_minutes,
+                      shifts: ref.shift || null,
                     };
                   } else {
                     d.sched = scheds.find(s => s.employee_id === d.emp_id && s.date === d.date);

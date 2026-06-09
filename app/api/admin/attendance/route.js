@@ -119,7 +119,7 @@ export async function GET(request) {
 
   // 出勤紀錄
   let query = supabase.from("attendances")
-    .select("*, employees(name), stores(name), shifts(name, start_time, end_time, break_minutes), schedules(break_minutes, day_type)")
+    .select("*, employees(name), stores(name), shift:shift_id(name, start_time, end_time, break_minutes), schedule:schedule_id(break_minutes, day_type)")
     .order("timestamp", { ascending: false });
   if (store_id) query = query.eq("store_id", store_id);
   if (month) {
@@ -130,7 +130,8 @@ export async function GET(request) {
     query = query.gte("timestamp", date + "T00:00:00")
       .lte("timestamp", date + "T23:59:59");
   }
-  const { data, error } = await query.limit(200);
+  // 一個月的打卡可能有 5,000 筆以上（4店 × 8人 × 30天 × 2 in/out），舊 limit(200) 會截斷
+  const { data, error } = await query.limit(10000);
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ data });
 }
