@@ -1746,18 +1746,26 @@ export default function AdminPage() {
                     {isExpanded && (
                       <tr style={{borderBottom:"1px solid #f0eeea",background:"#fafafa"}}>
                         <td colSpan={14} style={{padding:"6px 10px"}}>
-                          <div style={{display:"flex",gap:12,fontSize:10,color:"#666",marginBottom:6,flexWrap:"wrap"}}>
+                          <div style={{display:"flex",gap:12,fontSize:10,color:"#666",marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
                             <span><b>當月排班：</b>{empScheds.length} 天</span>
                             <span>排班時段合計 {(totalSpanMin/60).toFixed(1)} hr</span>
                             <span>休息時數 {(totalBreakMin/60).toFixed(1)} hr</span>
-                            <span style={{color:"#0a7c42",fontWeight:600}}>實際工時 {totalWorkHr.toFixed(1)} hr</span>
+                            <span style={{color:"#0a7c42",fontWeight:600}}>計薪工時 {totalWorkHr.toFixed(1)} hr</span>
+                            {isPT && hourlyRate > 0 && (
+                              <span style={{padding:"2px 6px",background:"#fff8e6",borderRadius:4,border:"1px solid #f0e6c8",color:"#8a6d00",fontWeight:600}}>
+                                💰 ${hourlyRate}/hr × {totalWorkHr.toFixed(1)} hr = ${Math.round(hourlyRate*totalWorkHr).toLocaleString()}
+                                {settled && Math.round(hourlyRate*totalWorkHr) !== bp && (
+                                  <span style={{color:"#b91c1c",marginLeft:6}}>⚠ 跟結算 ${fmt(bp)} 不符（資料變動後請重新結算）</span>
+                                )}
+                              </span>
+                            )}
                           </div>
                           {empScheds.length === 0 ? (
                             <div style={{fontSize:10,color:"#999"}}>當月無排班資料</div>
                           ) : (
                             <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
                               <thead><tr style={{background:"#f0eeea"}}>
-                                {["日期","星期","班別","上班","下班","休息","工時","類型"].map(h=>
+                                {["日期","星期","班別","上班","下班","休息","計薪工時","類型"].map(h=>
                                   <th key={h} style={{padding:"3px 6px",textAlign:"left",fontWeight:500,color:"#555"}}>{h}</th>
                                 )}
                               </tr></thead>
