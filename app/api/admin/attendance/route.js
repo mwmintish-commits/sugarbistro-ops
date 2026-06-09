@@ -119,7 +119,7 @@ export async function GET(request) {
 
   // 出勤紀錄
   let query = supabase.from("attendances")
-    .select("*, employees(name), stores(name), shifts(name)")
+    .select("*, employees(name), stores(name), shifts(name, start_time, end_time, break_minutes), schedules(break_minutes, day_type)")
     .order("timestamp", { ascending: false });
   if (store_id) query = query.eq("store_id", store_id);
   if (month) {
@@ -308,6 +308,52 @@ export async function POST(request) {
   }
 
   // ✦13 建立補登申請（後台手動）
+  // 後台手動補上打卡（不走補登申請流程，直接 insert）
+  if (body.action === "manual_add") {
+    const { employee_id, date, type, time, edited_by, edited_by_name } = body;
+    if (!employee_id || !date || !type || !time) return Response.json({ error: "缺欄位" }, { status: 400 });
+    if (!/^\d{2}:\d{2}$/.test(time)) return Response.json({ error: "時間格式錯誤 HH:MM" }, { status: 400 });
+    // 找出該員工該日排班（補 schedule_id / shift_id 及計算遲到早退）
+    const { data: sched } = await supabase.from("schedules")
+      .select("id, shift_id, store_id, day_type, shifts(start_time, end_time)")
+      .eq("employee_id", employee_id).eq("date", date).maybeSingle();
+    const { data: emp } = await supabase.from("employees").select("store_id").eq("id", employee_id).maybeSingle();
+    const { data: settings } = await supabase.from("attendance_settings").select("*").limit(1).single();
+    const lateGrace = settings?.late_grace_minutes ?? 5;
+    const earlyThr = settings?.early_leave_minutes ?? 5;
+    let late_minutes = 0, early_leave_minutes = 0;
+    const isOffDay = sched?.day_type === "regular_off" || sched?.day_type === "rest_day";
+    if (!isOffDay && sched?.shifts) {
+      const [ch, cm] = time.split(":").map(Number);
+      if (type === "clock_in" && sched.shifts.start_time) {
+        const [sh, sm] = sched.shifts.start_time.split(":").map(Number);
+        const diff = (ch * 60 + cm) - (sh * 60 + sm);
+        late_minutes = diff > lateGrace ? diff : 0;
+      }
+      if (type === "clock_out" && sched.shifts.end_time) {
+        const [eh, em] = sched.shifts.end_time.split(":").map(Number);
+        const diff = (eh * 60 + em) - (ch * 60 + cm);
+        early_leave_minutes = diff > earlyThr ? diff : 0;
+      }
+    }
+    const timestamp = `${date}T${time}:00+08:00`;
+    const { data, error } = await supabase.from("attendances").insert({
+      employee_id, store_id: sched?.store_id || emp?.store_id || null,
+      schedule_id: sched?.id || null, shift_id: sched?.shift_id || null,
+      type, timestamp, is_amendment: true,
+      late_minutes, early_leave_minutes,
+      notes: `後台手動補上 by ${edited_by_name || edited_by || "管理員"} @${new Date().toISOString().slice(0,16).replace("T"," ")}`,
+    }).select().single();
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    await auditLog(edited_by, edited_by_name, "attendance_manual_add", "attendance", String(data.id), { employee_id, date, type, time });
+    // 補下班 → 自動重算加班
+    let otResult = null;
+    if (type === "clock_out") {
+      try { otResult = await recomputeDayOT(employee_id, date); } catch (e) { otResult = { ok: false, reason: e.message }; }
+    }
+    return Response.json({ data, overtime: otResult });
+  }
+
   if (body.action === "create_amendment") {
     const { employee_id, store_id, date, type, amended_time, reason } = body;
     const { data, error } = await supabase.from("clock_amendments").insert({

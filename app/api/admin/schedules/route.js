@@ -321,6 +321,39 @@ export async function POST(request) {
 
   // 逐天覆寫休息分鐘（薪資頁出勤明細用）
   // 改完後若該員工該月已有 payroll_records → 自動重算該員工的薪資
+  // 逐日設定休息分鐘（出勤頁用）：若該日有排班 → 更新；無則 upsert
+  // upsert 走 (employee_id, date) 唯一鍵；若該日尚無排班則寫入「破班」(shift_id=null)
+  if (action === "set_break_for_day") {
+    const { employee_id, date, break_minutes } = body;
+    if (!employee_id || !date) return Response.json({ error: "缺 employee_id 或 date" }, { status: 400 });
+    const val = break_minutes === null || break_minutes === "" ? null : Number(break_minutes);
+    if (val !== null && (isNaN(val) || val < 0)) return Response.json({ error: "休息分鐘需為非負數" }, { status: 400 });
+    const { data: existing } = await supabase.from("schedules")
+      .select("id").eq("employee_id", employee_id).eq("date", date).maybeSingle();
+    if (existing) {
+      const { error } = await supabase.from("schedules").update({ break_minutes: val }).eq("id", existing.id);
+      if (error) return Response.json({ error: error.message }, { status: 500 });
+    } else {
+      const { data: emp } = await supabase.from("employees").select("store_id").eq("id", employee_id).maybeSingle();
+      const { error } = await supabase.from("schedules").insert({
+        employee_id, store_id: emp?.store_id || null,
+        date, type: "shift", day_type: "work", status: "scheduled",
+        break_minutes: val,
+      });
+      if (error) return Response.json({ error: error.message }, { status: 500 });
+    }
+    // 已結算則自動重算
+    let payrollUpdated = false;
+    const [y, m] = date.split("-").map(Number);
+    const { data: pr } = await supabase.from("payroll_records")
+      .select("id").eq("employee_id", employee_id).eq("year", y).eq("month", m).maybeSingle();
+    if (pr) {
+      await regeneratePayroll(y, m, { employee_ids: [employee_id] });
+      payrollUpdated = true;
+    }
+    return Response.json({ ok: true, payroll_updated: payrollUpdated });
+  }
+
   if (action === "update_break") {
     const { schedule_id, break_minutes } = body;
     if (!schedule_id) return Response.json({ error: "缺 schedule_id" }, { status: 400 });

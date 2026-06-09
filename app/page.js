@@ -1160,15 +1160,33 @@ export default function AdminPage() {
                   const k = s.employee_id + "|" + s.date;
                   if (!dayMap[k]) dayMap[k] = { emp_id: s.employee_id, emp_name: s.employees?.name||emps.find(e=>e.id===s.employee_id)?.name||"", date: s.date, ins: [], outs: [] };
                 }
-                // 補上排班資訊
+                // 補上排班資訊：優先用 att 的 shifts/schedules join（最可靠），fallback 用 scheds 查找
                 for (const k in dayMap) {
                   const d = dayMap[k];
-                  d.sched = scheds.find(s => s.employee_id === d.emp_id && s.date === d.date);
+                  const ref = d.ins[0] || d.outs[0]; // 任一打卡記錄都帶有 schedule join
+                  if (ref?.shifts || ref?.schedules) {
+                    d.sched = {
+                      id: ref.schedule_id,
+                      shift_id: ref.shift_id,
+                      day_type: ref.schedules?.day_type,
+                      break_minutes: ref.schedules?.break_minutes,
+                      shifts: ref.shifts || null,
+                    };
+                  } else {
+                    d.sched = scheds.find(s => s.employee_id === d.emp_id && s.date === d.date);
+                  }
                 }
                 const days = Object.values(dayMap).sort((a,b)=>b.date.localeCompare(a.date) || (a.emp_name||"").localeCompare(b.emp_name||""));
                 if (days.length === 0 && (!sf || attEmpFilter)) return null;
                 const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei",hour:"2-digit",minute:"2-digit",hour12:false}) : "";
                 const minDiff = (h1m1, h2m2) => { const [h1,m1]=h1m1.split(":").map(Number); const [h2,m2]=h2m2.split(":").map(Number); return (h2*60+m2)-(h1*60+m1); };
+                // 儲存逐日休息（schedule.break_minutes 覆寫；無排班則新增 virtual schedule）
+                const saveBreak = async (d, newVal) => {
+                  const body = { action: "set_break_for_day", employee_id: d.emp_id, date: d.date, break_minutes: newVal === "" ? null : Number(newVal) };
+                  const r = await ap("/api/admin/schedules", body);
+                  if (r?.error) alert(r.error);
+                  load();
+                };
                 return (
                 <div key={store.id} style={{marginBottom:10}}>
                   <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+days.length+"日次）"}</h4>
@@ -1179,6 +1197,7 @@ export default function AdminPage() {
                     const sch = d.sched;
                     const shiftBrk = Number(sch?.shifts?.break_minutes||0);
                     const brk = sch?.break_minutes != null ? Number(sch.break_minutes) : shiftBrk;
+                    const overridden = sch?.break_minutes != null && Number(sch.break_minutes) !== shiftBrk;
                     const schStart = sch?.shifts?.start_time?.slice(0,5) || "";
                     const schEnd = sch?.shifts?.end_time?.slice(0,5) || "";
                     // 實際取最早上班 / 最晚下班
@@ -1216,25 +1235,44 @@ export default function AdminPage() {
                       const r = await sap("/api/admin/attendance",{action:"update",attendance_id:a.id,timestamp:iso,edited_by:auth?.id,edited_by_name:auth?.name});
                       if (r) load();
                     };
+                    const addAtt = async (type) => {
+                      const typeLabel = type==="clock_in"?"上班":"下班";
+                      const defaultTime = type==="clock_in" ? (schStart||"10:00") : (schEnd||"18:00");
+                      const newTime = prompt(`補上 ${d.emp_name} ${d.date} ${typeLabel}時間 (HH:MM)：`, defaultTime);
+                      if (!newTime || !/^\d{2}:\d{2}$/.test(newTime)) return;
+                      const r = await sap("/api/admin/attendance",{action:"manual_add",employee_id:d.emp_id,date:d.date,type,time:newTime,edited_by:auth?.id,edited_by_name:auth?.name});
+                      if (r) load();
+                    };
                     return (
                       <tr key={d.emp_id+"|"+d.date} style={{borderBottom:"1px solid #f0eeea"}}>
                         <td style={{padding:6,fontSize:10}}>{d.date.slice(5)}</td>
                         <td style={{padding:6,fontWeight:500}}>{d.emp_name}{dtBadge&&<span style={{fontSize:8,color:dtBadge.c,marginLeft:3,padding:"1px 3px",background:"#fff",border:"1px solid "+dtBadge.c,borderRadius:2}}>{dtBadge.l}</span>}</td>
                         <td style={{padding:6,fontSize:10,color:"#555"}}>{sch?.shifts?.name || "-"}</td>
                         <td style={{padding:6,fontSize:10,color:"#888"}}>{schStart && schEnd ? schStart+"–"+schEnd : "-"}</td>
-                        <td style={{padding:6,fontSize:10,color:earliestIn?(late>0?"#b91c1c":"#0a7c42"):"#ccc",cursor:earliestIn?"pointer":"default"}}
-                            onClick={()=>editAtt(earliestIn)}
-                            title={earliestIn?"點擊編輯":""}>
-                          {inT || "—"}
+                        <td style={{padding:6,fontSize:10,color:earliestIn?(late>0?"#b91c1c":"#0a7c42"):"#4361ee",cursor:"pointer",textDecoration:earliestIn?"none":"underline"}}
+                            onClick={()=>earliestIn?editAtt(earliestIn):addAtt("clock_in")}
+                            title={earliestIn?"點擊編輯":"點擊補上"}>
+                          {inT || "+ 補上"}
                           {d.ins.length>1 && <span style={{fontSize:8,color:"#999",marginLeft:2}}>(+{d.ins.length-1})</span>}
                         </td>
-                        <td style={{padding:6,fontSize:10,color:latestOut?(early>0?"#b45309":"#0a7c42"):"#ccc",cursor:latestOut?"pointer":"default"}}
-                            onClick={()=>editAtt(latestOut)}
-                            title={latestOut?"點擊編輯":""}>
-                          {outT || "—"}
+                        <td style={{padding:6,fontSize:10,color:latestOut?(early>0?"#b45309":"#0a7c42"):"#4361ee",cursor:"pointer",textDecoration:latestOut?"none":"underline"}}
+                            onClick={()=>latestOut?editAtt(latestOut):addAtt("clock_out")}
+                            title={latestOut?"點擊編輯":"點擊補上"}>
+                          {outT || "+ 補上"}
                           {d.outs.length>1 && <span style={{fontSize:8,color:"#999",marginLeft:2}}>(+{d.outs.length-1})</span>}
                         </td>
-                        <td style={{padding:6,fontSize:10,color:"#888"}}>{brk?brk+"min":"-"}</td>
+                        <td style={{padding:6,fontSize:10}}>
+                          <input type="number" min="0" max="480" defaultValue={brk}
+                            title={overridden?`覆寫值（班別預設 ${shiftBrk}min）。清空 → 回到預設`:(sch?.shifts?`班別預設 ${shiftBrk}min`:"逐日填寫")}
+                            onBlur={async ev=>{
+                              const raw=ev.target.value.trim();
+                              const newVal=raw===""?"":Number(raw);
+                              if(newVal===brk||(newVal===""&&sch?.break_minutes==null))return;
+                              await saveBreak(d, raw);
+                            }}
+                            style={{width:42,padding:"1px 3px",borderRadius:3,border:overridden?"1px solid #b45309":"1px solid #ddd",fontSize:10,textAlign:"right",background:overridden?"#fff8e6":"#fff"}} />
+                          <span style={{fontSize:8,color:"#999",marginLeft:2}}>min</span>
+                        </td>
                         <td style={{padding:6,fontWeight:500,color:"#0a7c42"}}>{workMin>0?workHr+"hr":"-"}</td>
                         <td style={{padding:6,fontSize:10,color:statusColor,fontWeight:500}}>{status}</td>
                         <td style={{padding:6}}>
