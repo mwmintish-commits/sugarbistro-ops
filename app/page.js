@@ -1148,8 +1148,10 @@ export default function AdminPage() {
                   if (a.type === "clock_in") dayMap[k].ins.push(a);
                   else if (a.type === "clock_out") dayMap[k].outs.push(a);
                 }
-                // 把有排班但沒打卡的日子也補進來（曠職可見）
+                // 把有排班但沒打卡的日子也補進來（曠職可見）— 限定當月
+                const monthFrom = month + "-01", monthTo = month + "-31";
                 for (const s of scheds) {
+                  if (s.date < monthFrom || s.date > monthTo) continue;
                   if (attEmpFilter && s.employee_id !== attEmpFilter) continue;
                   if (!inStore(s.employee_id)) continue;
                   if (!["work","rest_day","national_holiday"].includes(s.day_type)) continue;
