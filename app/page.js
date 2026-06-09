@@ -1138,18 +1138,20 @@ export default function AdminPage() {
                 // 整合：以 (員工, 日期) 分組，每組顯示排班+實際打卡+休息+工時+狀態
                 const inStore = (eid) => { const emp = emps.find(e=>e.id===eid); return emp && (store.id==="__hq__" ? (!emp.store_id || !stores.some(st=>st.id===emp.store_id)) : emp.store_id === store.id); };
                 const dayMap = {};
+                const monthFrom = month + "-01", monthTo = month + "-31";
                 for (const a of att) {
                   if (attEmpFilter && a.employee_id !== attEmpFilter) continue;
                   if (!inStore(a.employee_id)) continue;
                   const date = a.timestamp ? new Date(a.timestamp).toLocaleDateString("sv-SE", {timeZone:"Asia/Taipei"}) : "";
                   if (!date) continue;
+                  // attendance API 用 timestamp(UTC) 過濾；Taipei 時區換算後可能跨日，需再過濾月份
+                  if (date < monthFrom || date > monthTo) continue;
                   const k = a.employee_id + "|" + date;
                   if (!dayMap[k]) dayMap[k] = { emp_id: a.employee_id, emp_name: a.employees?.name||"", date, ins: [], outs: [] };
                   if (a.type === "clock_in") dayMap[k].ins.push(a);
                   else if (a.type === "clock_out") dayMap[k].outs.push(a);
                 }
                 // 把有排班但沒打卡的日子也補進來（曠職可見）— 限定當月
-                const monthFrom = month + "-01", monthTo = month + "-31";
                 for (const s of scheds) {
                   if (s.date < monthFrom || s.date > monthTo) continue;
                   if (attEmpFilter && s.employee_id !== attEmpFilter) continue;
