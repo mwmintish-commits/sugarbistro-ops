@@ -1191,8 +1191,8 @@ export default function AdminPage() {
                 <div key={store.id} style={{marginBottom:10}}>
                   <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+days.length+"日次）"}</h4>
               <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:880}}>
-                  <thead><tr style={{background:"#faf8f5"}}>{["日期","員工","班別","排班","實際上班","實際下班","休息","工時","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:920}}>
+                  <thead><tr style={{background:"#faf8f5"}}>{["日期","員工","班別","排班","實際上班","實際下班","休息","計薪","實際","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                   <tbody>{days.map(d=>{
                     const sch = d.sched;
                     const shiftBrk = Number(sch?.shifts?.break_minutes||0);
@@ -1205,11 +1205,14 @@ export default function AdminPage() {
                     const latestOut = d.outs.length ? d.outs.reduce((m,a)=>!m||new Date(a.timestamp)>new Date(m.timestamp)?a:m, null) : null;
                     const inT = earliestIn ? fmtTime(earliestIn.timestamp) : "";
                     const outT = latestOut ? fmtTime(latestOut.timestamp) : "";
-                    // 工時：用實際打卡（若雙缺則用排班）
-                    let workMin = 0;
-                    if (inT && outT) workMin = Math.max(0, minDiff(inT, outT) - brk);
-                    else if (schStart && schEnd) workMin = Math.max(0, minDiff(schStart, schEnd) - brk);
-                    const workHr = (workMin/60).toFixed(1);
+                    // 兩種工時：
+                    // - paidHr：薪資計算用的「排班工時」（end−start−break）。提早到/晚走但無加班簽核 → 不算入薪資。
+                    // - actualHr：實際打卡工時（純顯示，給你看勞動實況）
+                    const paidMin = (schStart && schEnd) ? Math.max(0, minDiff(schStart, schEnd) - brk) : 0;
+                    const actualMin = (inT && outT) ? Math.max(0, minDiff(inT, outT) - brk) : 0;
+                    const paidHr = (paidMin/60).toFixed(1);
+                    const actualHr = (actualMin/60).toFixed(1);
+                    const overWorked = actualMin > paidMin + 5; // 多做 >5min 才算異常
                     // 狀態
                     const late = earliestIn?.late_minutes || 0;
                     const early = latestOut?.early_leave_minutes || 0;
@@ -1273,7 +1276,15 @@ export default function AdminPage() {
                             style={{width:42,padding:"1px 3px",borderRadius:3,border:overridden?"1px solid #b45309":"1px solid #ddd",fontSize:10,textAlign:"right",background:overridden?"#fff8e6":"#fff"}} />
                           <span style={{fontSize:8,color:"#999",marginLeft:2}}>min</span>
                         </td>
-                        <td style={{padding:6,fontWeight:500,color:"#0a7c42"}}>{workMin>0?workHr+"hr":"-"}</td>
+                        <td style={{padding:6,fontWeight:500,color:paidMin>0?"#0a7c42":"#ccc"}}
+                            title="薪資計算用的排班工時（end−start−break）。提早到/晚走 但未申請加班 → 不算入薪資">
+                          {paidMin>0?paidHr+"hr":"-"}
+                        </td>
+                        <td style={{padding:6,color:actualMin>0?(overWorked?"#b45309":"#666"):"#ccc"}}
+                            title={overWorked?`實際多做 ${((actualMin-paidMin)/60).toFixed(1)} hr 未轉成加班`:"實際打卡工時（純顯示）"}>
+                          {actualMin>0?actualHr+"hr":"-"}
+                          {overWorked && <span style={{fontSize:8,color:"#b45309",marginLeft:2}}>⚠</span>}
+                        </td>
                         <td style={{padding:6,fontSize:10,color:statusColor,fontWeight:500}}>{status}</td>
                         <td style={{padding:6}}>
                           {latestOut && <button onClick={async()=>{
