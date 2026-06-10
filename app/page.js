@@ -1893,17 +1893,19 @@ export default function AdminPage() {
                                     <option value="comp">🔄 全部轉補休</option>
                                   </select>
                                 </td>
-                                <td style={{padding:"4px 6px",color:diff>0?"#4361ee":diff<0?"#b91c1c":"#888"}}>
-                                  {diff>0?"+"+diff:diff} 天
+                                <td style={{padding:"4px 6px",color:isPT?"#ccc":(diff>0?"#4361ee":diff<0?"#b91c1c":"#888")}}>
+                                  {isPT?"—":((diff>0?"+"+diff:diff) + " 天")}
                                 </td>
                                 <td style={{padding:"4px 6px"}}>
-                                  <select value={diffDisp} onChange={ev=>saveDisp("attendance_diff_disposition", ev.target.value || null)}
-                                    style={{padding:"2px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:10,background:diffDisp?"#fff8e6":"#fff"}}>
-                                    <option value="">預設（不處理）</option>
-                                    <option value="pay">💰 轉加班費</option>
-                                    <option value="comp">🏖 累積補休</option>
-                                    <option value="ignore">略過</option>
-                                  </select>
+                                  {isPT ? <span style={{fontSize:10,color:"#ccc"}}>—</span> : (
+                                    <select value={diffDisp} onChange={ev=>saveDisp("attendance_diff_disposition", ev.target.value || null)}
+                                      style={{padding:"2px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:10,background:diffDisp?"#fff8e6":"#fff"}}>
+                                      <option value="">預設（不處理）</option>
+                                      <option value="pay">💰 轉加班費</option>
+                                      <option value="comp">🏖 累積補休</option>
+                                      <option value="ignore">略過</option>
+                                    </select>
+                                  )}
                                 </td>
                               </tr>
                             );
