@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import dynamic from "next/dynamic";
 import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, pickLaborSelf, pickHealthSelf, INSURANCE_TIERS, INSURANCE_TIERS_PT } from "./components/utils";
+import { calcExpectedWorkDays } from "../lib/hr-utils";
 // 兼容舊呼叫：以 employee 物件為主（含 override / health_insured_here）
 const laborSelfFor = (emp) => pickLaborSelf(emp);
 const healthSelfFor = (emp) => pickHealthSelf(emp);
@@ -1076,6 +1077,16 @@ export default function AdminPage() {
             </div>
 
             {attView === "records" && (() => {
+              // 該月應出席天數（政府公告國假表 + 週六日）
+              const [y, m] = month.split("-").map(Number);
+              const activeHolDates = new Set((holidays || []).filter(h => h.is_active !== false).map(h => h.date));
+              const expectedWorkDays = calcExpectedWorkDays(y, m, activeHolDates);
+              const holidayCount = Array.from(activeHolDates).filter(d => {
+                const wd = new Date(d).getUTCDay();
+                return d.startsWith(month) && wd !== 0 && wd !== 6;
+              }).length;
+              const monthDays = new Date(y, m, 0).getDate();
+              const weekendCount = monthDays - expectedWorkDays - holidayCount;
               // 偵測重複打卡：相同 (employee_id, date, type) 出現 2 次以上（不含補登）
               const groups = {};
               for (const a of att) {
@@ -1136,6 +1147,64 @@ export default function AdminPage() {
                     <div style={{fontSize:10,color:"#666"}}>規則：單班店家保留 1 上 + 1 下；雙班店家保留 2 上 + 2 下。clock_in 取最早，clock_out 取最晚。</div>
                   </div>
                 )}
+              {/* 📊 本月對帳總覽（依政府公告國假表 + 週六日 算應出席） */}
+              <div style={{background:"#fff",border:"1px solid #e8e6e1",borderRadius:8,padding:10,marginBottom:10}}>
+                <div style={{display:"flex",gap:14,fontSize:11,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
+                  <span style={{fontWeight:600,fontSize:12}}>📊 {month} 對帳</span>
+                  <span style={{color:"#0a7c42"}}>本月應出席 <b>{expectedWorkDays}</b> 天</span>
+                  <span style={{color:"#666"}}>({monthDays} 天 − 國假 {holidayCount} − 週六日 {weekendCount})</span>
+                </div>
+                <div style={{overflow:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:780}}>
+                    <thead><tr style={{background:"#faf8f5"}}>
+                      {["員工","應出席","排班","實際打卡","差(排−應)","缺打卡","遲到分","早退分","休假"].map(h=>
+                        <th key={h} style={{padding:"5px 6px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>
+                      )}
+                    </tr></thead>
+                    <tbody>
+                      {(() => {
+                        const mFrom = month + "-01", mTo = month + "-31";
+                        return emps.filter(e=>e.is_active!==false && (!sf || e.store_id===sf) && (!attEmpFilter || e.id===attEmpFilter))
+                        .sort((a,b)=>(a.name||"").localeCompare(b.name||""))
+                        .map(e=>{
+                          const empAtts = att.filter(a=>a.employee_id===e.id);
+                          const empScheds = scheds.filter(s=>s.employee_id===e.id && s.date>=mFrom && s.date<=mTo);
+                          const workScheds = empScheds.filter(s=>["work","rest_day","national_holiday"].includes(s.day_type));
+                          const leaveScheds = empScheds.filter(s=>["paid_leave","unpaid_leave","half_pay_leave","regular_off"].includes(s.day_type));
+                          const dates = new Set();
+                          empAtts.forEach(a=>{ if(a.timestamp){ const d=new Date(a.timestamp).toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"}); if(d>=mFrom&&d<=mTo&&a.type==="clock_in")dates.add(d); }});
+                          const actualDays = dates.size;
+                          const lateMin = empAtts.filter(a=>a.type==="clock_in").reduce((s,a)=>s+(a.late_minutes||0),0);
+                          const earlyMin = empAtts.filter(a=>a.type==="clock_out").reduce((s,a)=>s+(a.early_leave_minutes||0),0);
+                          const diff = workScheds.length - expectedWorkDays;
+                          const missDays = workScheds.length - actualDays;
+                          const diffColor = diff > 0 ? "#4361ee" : diff < 0 ? "#b91c1c" : "#888";
+                          const isPT = e.employment_type === "parttime";
+                          return (
+                            <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                              <td style={{padding:"4px 6px",textAlign:"left",fontWeight:500}}>
+                                {e.name}
+                                <span style={{fontSize:8,color:isPT?"#b45309":"#0a7c42",marginLeft:4,background:isPT?"#fef3c7":"#e6f9f0",padding:"1px 3px",borderRadius:2}}>{isPT?"兼":"正"}</span>
+                              </td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:"#0a7c42"}}>{expectedWorkDays}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right"}}>{workScheds.length}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right"}}>{actualDays}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:diffColor,fontWeight:diff!==0?600:400}}>{diff>0?"+"+diff:diff}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:missDays>0?"#b91c1c":"#ccc"}}>{missDays>0?missDays:"-"}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:lateMin>0?"#b91c1c":"#ccc"}}>{lateMin>0?lateMin:"-"}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:earlyMin>0?"#b45309":"#ccc"}}>{earlyMin>0?earlyMin:"-"}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:leaveScheds.length>0?"#6b21a8":"#ccc"}}>{leaveScheds.length>0?leaveScheds.length:"-"}</td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{fontSize:9,color:"#999",marginTop:6}}>
+                  排−應 為正(藍) = 多排班；為負(紅) = 少排班。缺打卡 = 排了但沒打卡的天。
+                </div>
+              </div>
               {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
                 // 整合：以 (員工, 日期) 分組，每組顯示排班+實際打卡+休息+工時+狀態
                 const inStore = (eid) => { const emp = emps.find(e=>e.id===eid); return emp && (store.id==="__hq__" ? (!emp.store_id || !stores.some(st=>st.id===emp.store_id)) : emp.store_id === store.id); };
@@ -1887,6 +1956,22 @@ export default function AdminPage() {
                     {isExpanded && (
                       <tr style={{borderBottom:"1px solid #f0eeea",background:"#fafafa"}}>
                         <td colSpan={15} style={{padding:"6px 10px"}}>
+                          {(() => {
+                            const [py, pm] = month.split("-").map(Number);
+                            const activeHolDates = new Set((holidays || []).filter(h => h.is_active !== false).map(h => h.date));
+                            const expectedDays = calcExpectedWorkDays(py, pm, activeHolDates);
+                            const diff = empScheds.length - expectedDays;
+                            return (
+                              <div style={{display:"flex",gap:8,fontSize:10,marginBottom:4,padding:"4px 8px",background:"#f5f3ff",borderLeft:"3px solid #6b21a8",borderRadius:3,alignItems:"center",flexWrap:"wrap"}}>
+                                <b style={{color:"#6b21a8"}}>📊 應出席對帳</b>
+                                <span>應出席 <b>{expectedDays}</b> 天</span>
+                                <span>已排班 <b>{empScheds.length}</b> 天</span>
+                                <span style={{color:diff>0?"#4361ee":diff<0?"#b91c1c":"#888",fontWeight:600}}>
+                                  {diff>0?`多排 +${diff} 天`:diff<0?`少排 ${diff} 天`:"剛好"}
+                                </span>
+                              </div>
+                            );
+                          })()}
                           <div style={{display:"flex",gap:12,fontSize:10,color:"#666",marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
                             <span><b>當月排班：</b>{empScheds.length} 天</span>
                             {(() => {
