@@ -1877,6 +1877,17 @@ export default function AdminPage() {
                         <td colSpan={14} style={{padding:"6px 10px"}}>
                           <div style={{display:"flex",gap:12,fontSize:10,color:"#666",marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
                             <span><b>當月排班：</b>{empScheds.length} 天</span>
+                            {(() => {
+                              const byType = empScheds.reduce((m,s)=>{m[s.day_type||"work"]=(m[s.day_type||"work"]||0)+1;return m;},{});
+                              const parts = [];
+                              if (byType.work) parts.push(<span key="w" style={{color:"#0a7c42"}}>正常 {byType.work}</span>);
+                              if (byType.rest_day) parts.push(<span key="r" style={{color:"#b45309"}}>休息日加班 {byType.rest_day}</span>);
+                              if (byType.national_holiday) parts.push(<span key="h" style={{color:"#b91c1c"}}>國假 {byType.national_holiday}</span>);
+                              if (byType.regular_off) parts.push(<span key="o" style={{color:"#888"}}>例假 {byType.regular_off}</span>);
+                              const leave = (byType.unpaid_leave||0)+(byType.half_pay_leave||0)+(byType.paid_leave||0);
+                              if (leave) parts.push(<span key="l" style={{color:"#6b21a8"}}>請假 {leave}</span>);
+                              return parts.length ? <span style={{display:"flex",gap:8}}>（{parts.reduce((a,e,i)=>i===0?[e]:[...a," · ",e],[])}）</span> : null;
+                            })()}
                             <span>排班時段合計 {(totalSpanMin/60).toFixed(1)} hr</span>
                             <span>休息時數 {(totalBreakMin/60).toFixed(1)} hr</span>
                             <span style={{color:"#0a7c42",fontWeight:600}}>計薪工時 {totalWorkHr.toFixed(1)} hr</span>
