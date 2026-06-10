@@ -24,6 +24,7 @@ const MarkdownView = dynamic(() => import("./components/MarkdownView"), { ssr: f
 const OrderSuggestionsView = dynamic(() => import("./components/OrderSuggestionsView"), { ssr: false });
 const SalesGapView = dynamic(() => import("./components/SalesGapView"), { ssr: false });
 const LeavesMgr = dynamic(() => import("./components/LeavesMgr"), { ssr: false });
+const LaborAudit = dynamic(() => import("./components/LaborAudit"), { ssr: false });
 
 const ROLE_TABS = {
   admin: ["dashboard","employees","schedules","leaves","attendance","overtime","payroll",
@@ -842,7 +843,29 @@ export default function AdminPage() {
               const wd=Array.from({length:numDays},(_,i)=>new Date(new Date(ws).getTime()+i*86400000).toLocaleDateString("sv-SE"));
               const schedEmps=ae.filter(e=>e.role!=="admin");
               const displayStores=sf?stores.filter(s=>s.id===sf):stores;
-              const addSch=async(eid,sid,date,dayType)=>{const s=shifts.find(x=>x.id===sid);const r=await ap("/api/admin/schedules",{action:"create",employee_id:eid,store_id:s?s.store_id:sf,shift_id:sid,date,day_type:dayType||undefined});if(r.warning)alert(r.warning);if(r.error)alert(r.error);load();};
+              const addSch=async(eid,sid,date,dayType)=>{
+                // 一例一休 client-side 前置警示（僅針對 work 性質排班）
+                if (!dayType || dayType === "work") {
+                  const d = new Date(date + "T00:00:00");
+                  const dow = d.getDay();
+                  const monOff = dow === 0 ? -6 : 1 - dow;
+                  const monStr = new Date(d.getTime() + monOff * 86400000).toLocaleDateString("sv-SE");
+                  const sunStr = new Date(d.getTime() + (monOff + 6) * 86400000).toLocaleDateString("sv-SE");
+                  const wkAll = scheds.filter(s => s.employee_id === eid && s.date >= monStr && s.date <= sunStr && s.date !== date);
+                  const workCount = wkAll.filter(s => s.day_type === "work" || s.day_type === "national_holiday").length;
+                  const hasRestOrOff = wkAll.some(s => s.day_type === "rest_day" || s.day_type === "regular_off" || s.leave_type === "rest" || s.leave_type === "off");
+                  if (workCount >= 6) {
+                    if (!confirm(`⚠️ 本週已排 ${workCount} 天工作，再排這天即連續 ${workCount + 1} 天，違反勞基法 36 條（一例一休）。\n\n確定繼續？`)) return;
+                  } else if (workCount >= 5 && !hasRestOrOff) {
+                    if (!confirm(`⚠️ 本週尚無例假/休息日，再排這天將達 ${workCount + 1} 天工作。\n\n建議先排例假或休息日。確定繼續？`)) return;
+                  }
+                }
+                const s=shifts.find(x=>x.id===sid);
+                const r=await ap("/api/admin/schedules",{action:"create",employee_id:eid,store_id:s?s.store_id:sf,shift_id:sid,date,day_type:dayType||undefined});
+                if(r.warning)alert(r.warning);
+                if(r.error)alert(r.error);
+                load();
+              };
               const addLv=async(eid,date,lt)=>{
                 // 檢查是否已有排班→提示整天或部分請假
                 const existing=scheds.find(s=>s.employee_id===eid&&s.date===date&&s.type==="shift");
@@ -1072,7 +1095,7 @@ export default function AdminPage() {
         {!ld && tab === "attendance" && (
           <div>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
-              {[["records","📍打卡紀錄"],["calendar","📅 月曆檢視"],["amendments","🔧補登申請"],["report","📊月報表"]].map(([k,l])=>(
+              {[["records","📍打卡紀錄"],["calendar","📅 月曆檢視"],["amendments","🔧補登申請"],["report","📊月報表"],["labor","🔍 法規對帳"]].map(([k,l])=>(
                 <button key={k} onClick={()=>setAttView(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:attView===k?"#1a1a1a":"#fff",color:attView===k?"#fff":"#666",fontSize:11,cursor:"pointer"}}>{l}</button>
               ))}
             </div>
@@ -1588,6 +1611,10 @@ export default function AdminPage() {
                   </table>
                 </div>
               </div>
+            )}
+
+            {attView === "labor" && (
+              <LaborAudit scheds={scheds} att={att} emps={emps} sf={sf} month={month} />
             )}
           </div>
         )}

@@ -101,6 +101,15 @@ export async function POST(request) {
       else if (type === "leave") day_type = "paid_leave";
       else day_type = "work";
     }
+    // 員工週模板：若是預設 work 且該員工有設週模板 → 套用
+    // 屏東店員工通常設「週三例假、週四休息日」；台北店員工留空（不套用）
+    if (day_type === "work" && type !== "leave" && employee_id && date) {
+      const { data: empRow } = await supabase.from("employees")
+        .select("weekly_regular_off, weekly_rest_day").eq("id", employee_id).maybeSingle();
+      const weekday = ["sun","mon","tue","wed","thu","fri","sat"][new Date(date + "T00:00:00").getDay()];
+      if (empRow?.weekly_regular_off === weekday) day_type = "regular_off";
+      else if (empRow?.weekly_rest_day === weekday) day_type = "rest_day";
+    }
     // 檢查是否為國定假日（自動帶 day_type）
     if (day_type === "work" && type !== "leave") {
       const { data: hol } = await supabase.from("national_holidays").select("id").eq("date", date).eq("is_active", true).limit(1).maybeSingle();

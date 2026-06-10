@@ -32,6 +32,7 @@ export default function EmpDetail({ empId, onClose, storesRef, auth }) {
     hire_date: "", annual_leave_override: "",
     phone: "", email: "", birthday: "", id_number: "", address: "",
     emergency_contact: "", emergency_phone: "", bank_name: "", bank_account: "",
+    weekly_regular_off: "", weekly_rest_day: "",
     name: ""
   });
 
@@ -71,6 +72,8 @@ export default function EmpDetail({ empId, onClose, storesRef, auth }) {
           address: r.data.address || "",
           emergency_contact: r.data.emergency_contact || "", emergency_phone: r.data.emergency_phone || "",
           bank_name: r.data.bank_name || "", bank_account: r.data.bank_account || "",
+          weekly_regular_off: r.data.weekly_regular_off || "",
+          weekly_rest_day: r.data.weekly_rest_day || "",
           name: r.data.name || "",
         });
       }
@@ -104,6 +107,8 @@ export default function EmpDetail({ empId, onClose, storesRef, auth }) {
       health_start_date: form.health_start_date || null,
       hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : null,
       monthly_salary: form.monthly_salary ? Number(form.monthly_salary) : null,
+      weekly_regular_off: form.weekly_regular_off || null,
+      weekly_rest_day: form.weekly_rest_day || null,
       _admin_name: auth?.name || null,
     });
     // 手動調整特休天數
@@ -375,6 +380,47 @@ export default function EmpDetail({ empId, onClose, storesRef, auth }) {
               <input type="number" value={form.hourly_rate} onChange={ev => setForm({...form, hourly_rate: ev.target.value})} style={inp} />
             </div>
           </div>
+        </div>
+
+        <div style={{ ...sec, border: "2px solid #0a7c42" }}>
+          <h3 style={{ ...sh, color: "#0a7c42" }}>📅 排班週模板（一例一休）</h3>
+          <div style={{ fontSize: 10, color: "#666", marginBottom: 6, padding: 6, background: "#dcfce7", borderRadius: 4 }}>
+            💡 勞基法 36 條：每 7 天應有 1 例假 + 1 休息日。設定後，排班頁該員工在這幾天會自動帶入對應 day_type。
+            <br/>固定休（如屏東店週三/四）建議設；不固定休（如台北店）留空，手動指定。
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            <div>
+              <label style={{ fontSize: 10, color: "#888" }}>週例假日</label>
+              <select value={form.weekly_regular_off} onChange={ev => setForm({...form, weekly_regular_off: ev.target.value})} style={inp}>
+                <option value="">未設定（每次手動）</option>
+                <option value="mon">週一</option>
+                <option value="tue">週二</option>
+                <option value="wed">週三</option>
+                <option value="thu">週四</option>
+                <option value="fri">週五</option>
+                <option value="sat">週六</option>
+                <option value="sun">週日</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 10, color: "#888" }}>週休息日</label>
+              <select value={form.weekly_rest_day} onChange={ev => setForm({...form, weekly_rest_day: ev.target.value})} style={inp}>
+                <option value="">未設定（每次手動）</option>
+                <option value="mon">週一</option>
+                <option value="tue">週二</option>
+                <option value="wed">週三</option>
+                <option value="thu">週四</option>
+                <option value="fri">週五</option>
+                <option value="sat">週六</option>
+                <option value="sun">週日</option>
+              </select>
+            </div>
+          </div>
+          {form.weekly_regular_off && form.weekly_regular_off === form.weekly_rest_day && (
+            <div style={{ marginTop: 6, fontSize: 11, color: "#b91c1c" }}>
+              ⚠️ 例假與休息日不可為同一天
+            </div>
+          )}
         </div>
 
         <div style={{ ...sec, border: "2px solid #b45309" }}>
