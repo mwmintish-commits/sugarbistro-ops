@@ -218,7 +218,7 @@ export async function POST(request) {
   }
 
   if (action === "add_leave") {
-    const { employee_id, date, leave_type, half_day, note } = body;
+    const { employee_id, date, leave_type, half_day, note, comp_source } = body;
 
     // 檢查是否已有排班
     const { data: existing } = await supabase.from("schedules")
@@ -251,6 +251,10 @@ export async function POST(request) {
       date, type: "leave", leave_type,
       status: "confirmed", day_type: dayType,
     };
+    // 補假來源（只在 holiday_comp 有意義）：salary=扣月薪、annual_leave=扣特休
+    if (leave_type === "holiday_comp" && comp_source) {
+      payload.comp_source = comp_source;
+    }
     if (half_day) payload.half_day = half_day;
     if (note) payload.note = note;
     const { data, error } = await supabase.from("schedules").upsert(payload, { onConflict: "employee_id,date" }).select().single();

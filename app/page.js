@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import dynamic from "next/dynamic";
 import { ap, sap, fmt, Badge, RB, Row, LT, ROLES, pickLaborSelf, pickHealthSelf, INSURANCE_TIERS, INSURANCE_TIERS_PT } from "./components/utils";
+import { calcExpectedWorkDays } from "../lib/hr-utils";
 // 兼容舊呼叫：以 employee 物件為主（含 override / health_insured_here）
 const laborSelfFor = (emp) => pickLaborSelf(emp);
 const healthSelfFor = (emp) => pickHealthSelf(emp);
@@ -83,6 +84,7 @@ export default function AdminPage() {
   const [docMap, setDocMap] = useState({});
   const [holMode, setHolMode] = useState(null);
   const [holCompDate, setHolCompDate] = useState("");
+  const [holCompSource, setHolCompSource] = useState("salary"); // 'salary' 扣月薪 | 'annual_leave' 扣特休
   const [holPending, setHolPending] = useState(null); // {eid, sid, shiftName}
   const [stl, setStl] = useState([]);
   const [sum, setSum] = useState({});
@@ -1076,6 +1078,16 @@ export default function AdminPage() {
             </div>
 
             {attView === "records" && (() => {
+              // 該月應出席天數（政府公告國假表 + 週六日）
+              const [y, m] = month.split("-").map(Number);
+              const activeHolDates = new Set((holidays || []).filter(h => h.is_active !== false).map(h => h.date));
+              const expectedWorkDays = calcExpectedWorkDays(y, m, activeHolDates);
+              const holidayCount = Array.from(activeHolDates).filter(d => {
+                const wd = new Date(d).getUTCDay();
+                return d.startsWith(month) && wd !== 0 && wd !== 6;
+              }).length;
+              const monthDays = new Date(y, m, 0).getDate();
+              const weekendCount = monthDays - expectedWorkDays - holidayCount;
               // 偵測重複打卡：相同 (employee_id, date, type) 出現 2 次以上（不含補登）
               const groups = {};
               for (const a of att) {
@@ -1136,6 +1148,64 @@ export default function AdminPage() {
                     <div style={{fontSize:10,color:"#666"}}>規則：單班店家保留 1 上 + 1 下；雙班店家保留 2 上 + 2 下。clock_in 取最早，clock_out 取最晚。</div>
                   </div>
                 )}
+              {/* 📊 本月對帳總覽（依政府公告國假表 + 週六日 算應出席） */}
+              <div style={{background:"#fff",border:"1px solid #e8e6e1",borderRadius:8,padding:10,marginBottom:10}}>
+                <div style={{display:"flex",gap:14,fontSize:11,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
+                  <span style={{fontWeight:600,fontSize:12}}>📊 {month} 對帳</span>
+                  <span style={{color:"#0a7c42"}}>本月應出席 <b>{expectedWorkDays}</b> 天</span>
+                  <span style={{color:"#666"}}>({monthDays} 天 − 國假 {holidayCount} − 週六日 {weekendCount})</span>
+                </div>
+                <div style={{overflow:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:780}}>
+                    <thead><tr style={{background:"#faf8f5"}}>
+                      {["員工","應出席","排班","實際打卡","差(排−應)","缺打卡","遲到分","早退分","休假"].map(h=>
+                        <th key={h} style={{padding:"5px 6px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>
+                      )}
+                    </tr></thead>
+                    <tbody>
+                      {(() => {
+                        const mFrom = month + "-01", mTo = month + "-31";
+                        return emps.filter(e=>e.is_active!==false && (!sf || e.store_id===sf) && (!attEmpFilter || e.id===attEmpFilter))
+                        .sort((a,b)=>(a.name||"").localeCompare(b.name||""))
+                        .map(e=>{
+                          const empAtts = att.filter(a=>a.employee_id===e.id);
+                          const empScheds = scheds.filter(s=>s.employee_id===e.id && s.date>=mFrom && s.date<=mTo);
+                          const workScheds = empScheds.filter(s=>["work","rest_day","national_holiday"].includes(s.day_type));
+                          const leaveScheds = empScheds.filter(s=>["paid_leave","unpaid_leave","half_pay_leave","regular_off"].includes(s.day_type));
+                          const dates = new Set();
+                          empAtts.forEach(a=>{ if(a.timestamp){ const d=new Date(a.timestamp).toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"}); if(d>=mFrom&&d<=mTo&&a.type==="clock_in")dates.add(d); }});
+                          const actualDays = dates.size;
+                          const lateMin = empAtts.filter(a=>a.type==="clock_in").reduce((s,a)=>s+(a.late_minutes||0),0);
+                          const earlyMin = empAtts.filter(a=>a.type==="clock_out").reduce((s,a)=>s+(a.early_leave_minutes||0),0);
+                          const diff = workScheds.length - expectedWorkDays;
+                          const missDays = workScheds.length - actualDays;
+                          const diffColor = diff > 0 ? "#4361ee" : diff < 0 ? "#b91c1c" : "#888";
+                          const isPT = e.employment_type === "parttime";
+                          return (
+                            <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                              <td style={{padding:"4px 6px",textAlign:"left",fontWeight:500}}>
+                                {e.name}
+                                <span style={{fontSize:8,color:isPT?"#b45309":"#0a7c42",marginLeft:4,background:isPT?"#fef3c7":"#e6f9f0",padding:"1px 3px",borderRadius:2}}>{isPT?"兼":"正"}</span>
+                              </td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:"#0a7c42"}}>{expectedWorkDays}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right"}}>{workScheds.length}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right"}}>{actualDays}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:diffColor,fontWeight:diff!==0?600:400}}>{diff>0?"+"+diff:diff}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:missDays>0?"#b91c1c":"#ccc"}}>{missDays>0?missDays:"-"}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:lateMin>0?"#b91c1c":"#ccc"}}>{lateMin>0?lateMin:"-"}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:earlyMin>0?"#b45309":"#ccc"}}>{earlyMin>0?earlyMin:"-"}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:leaveScheds.length>0?"#6b21a8":"#ccc"}}>{leaveScheds.length>0?leaveScheds.length:"-"}</td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{fontSize:9,color:"#999",marginTop:6}}>
+                  排−應 為正(藍) = 多排班；為負(紅) = 少排班。缺打卡 = 排了但沒打卡的天。
+                </div>
+              </div>
               {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
                 // 整合：以 (員工, 日期) 分組，每組顯示排班+實際打卡+休息+工時+狀態
                 const inStore = (eid) => { const emp = emps.find(e=>e.id===eid); return emp && (store.id==="__hq__" ? (!emp.store_id || !stores.some(st=>st.id===emp.store_id)) : emp.store_id === store.id); };
@@ -1736,6 +1806,91 @@ export default function AdminPage() {
                 <div style={{marginTop:6,padding:6,background:"#fff",borderRadius:4,fontSize:10,color:"#888"}}>💡 將滑鼠停在每個數字上會顯示該員工的詳細計算</div>
               </div>
             </details>
+
+            {/* 📋 月底對帳設定（管理者選擇本月加班/多排處理方式，存到 payroll_records） */}
+            <details style={{marginBottom:8,background:"#f5f3ff",border:"1px solid #d8b4fe",borderRadius:6,padding:"6px 10px",fontSize:11}}>
+              <summary style={{cursor:"pointer",fontWeight:600,color:"#6b21a8"}}>📋 月底對帳設定（加班/多排怎麼處理）— 點此展開</summary>
+              <div style={{marginTop:8}}>
+                <div style={{fontSize:10,color:"#666",marginBottom:8,lineHeight:1.5}}>
+                  設定本月每位員工的「加班處理方式」與「多/少排處理方式」，按「結算」會套用：
+                  <br/>• <b>加班轉薪</b>：已核准 OT 換現金（加進加班費）
+                  <br/>• <b>加班轉補休</b>：OT 時數累積到員工 leave_balances.comp_balance，不領現金
+                  <br/>• <b>多排轉薪</b>：多上班的天當加班費（暫保留，後續實作）
+                  <br/>• <b>多排扣假</b>：多上班的天累積補休
+                </div>
+                <div style={{overflow:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:560}}>
+                    <thead><tr style={{background:"#faf8f5"}}>
+                      {["員工","本月加班 (分)","加班處理","多/少排 (天)","多排處理"].map(h=>
+                        <th key={h} style={{padding:"5px 6px",textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>
+                      )}
+                    </tr></thead>
+                    <tbody>
+                      {(() => {
+                        const [py, pm] = month.split("-").map(Number);
+                        const mFrom = month + "-01", mTo = month + "-31";
+                        const activeHolDates = new Set((holidays || []).filter(h => h.is_active !== false).map(h => h.date));
+                        const expectedDays = calcExpectedWorkDays(py, pm, activeHolDates);
+                        return ae.filter(e=>e.is_active!==false && (!sf || e.store_id===sf))
+                          .sort((a,b)=>(a.name||"").localeCompare(b.name||""))
+                          .map(e=>{
+                            const empScheds = scheds.filter(s=>s.employee_id===e.id && s.date>=mFrom && s.date<=mTo);
+                            const workScheds = empScheds.filter(s=>["work","rest_day","national_holiday"].includes(s.day_type));
+                            const empOTs = otRecords.filter(r=>r.employee_id===e.id);
+                            const otMin = empOTs.reduce((s,r)=>s+Number(r.overtime_minutes||0),0);
+                            const otPending = empOTs.filter(r=>r.status==="pending").length;
+                            const diff = workScheds.length - expectedDays;
+                            const pr = payrollMap[e.id] || {};
+                            const otDisp = pr.overtime_disposition || "";
+                            const diffDisp = pr.attendance_diff_disposition || "";
+                            const saveDisp = async (key, value) => {
+                              await ap("/api/admin/payroll", { action: "set_disposition", employee_id: e.id, year: py, month: pm, [key]: value });
+                              load();
+                            };
+                            const isPT = e.employment_type === "parttime";
+                            return (
+                              <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                                <td style={{padding:"4px 6px",fontWeight:500}}>
+                                  {e.name}
+                                  <span style={{fontSize:8,color:isPT?"#b45309":"#0a7c42",marginLeft:4,background:isPT?"#fef3c7":"#e6f9f0",padding:"1px 3px",borderRadius:2}}>{isPT?"兼":"正"}</span>
+                                </td>
+                                <td style={{padding:"4px 6px",color:otMin>0?"#b45309":"#ccc"}}>
+                                  {otMin>0?otMin+"分":"-"}
+                                  {otPending>0 && <span style={{fontSize:8,color:"#b91c1c",marginLeft:3}}>({otPending}待批)</span>}
+                                </td>
+                                <td style={{padding:"4px 6px"}}>
+                                  <select value={otDisp} onChange={ev=>saveDisp("overtime_disposition", ev.target.value || null)}
+                                    style={{padding:"2px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:10,background:otDisp?"#fff8e6":"#fff"}}>
+                                    <option value="">預設（依 OT 設定）</option>
+                                    <option value="pay">💰 全部轉薪</option>
+                                    <option value="comp">🔄 全部轉補休</option>
+                                  </select>
+                                </td>
+                                <td style={{padding:"4px 6px",color:diff>0?"#4361ee":diff<0?"#b91c1c":"#888"}}>
+                                  {diff>0?"+"+diff:diff} 天
+                                </td>
+                                <td style={{padding:"4px 6px"}}>
+                                  <select value={diffDisp} onChange={ev=>saveDisp("attendance_diff_disposition", ev.target.value || null)}
+                                    style={{padding:"2px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:10,background:diffDisp?"#fff8e6":"#fff"}}>
+                                    <option value="">預設（不處理）</option>
+                                    <option value="pay">💰 轉加班費</option>
+                                    <option value="comp">🏖 累積補休</option>
+                                    <option value="ignore">略過</option>
+                                  </select>
+                                </td>
+                              </tr>
+                            );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{fontSize:9,color:"#999",marginTop:6}}>
+                  設定會即時存到 payroll_records；按「結算」會讀這些值套用。多排處理的「轉加班費」目前只記錄，計算邏輯後續實作。
+                </div>
+              </div>
+            </details>
+
             {/* 薪資表 — 按門市分組 */}
             {(sf ? stores.filter(s=>s.id===sf) : [...stores, {id:"__hq__",name:"總部"}]).map(store => {
               const storeEmps = store.id==="__hq__" ? ae.filter(e => !e.store_id || !stores.some(s=>s.id===e.store_id)) : ae.filter(e => e.store_id === store.id);
@@ -1887,6 +2042,22 @@ export default function AdminPage() {
                     {isExpanded && (
                       <tr style={{borderBottom:"1px solid #f0eeea",background:"#fafafa"}}>
                         <td colSpan={15} style={{padding:"6px 10px"}}>
+                          {(() => {
+                            const [py, pm] = month.split("-").map(Number);
+                            const activeHolDates = new Set((holidays || []).filter(h => h.is_active !== false).map(h => h.date));
+                            const expectedDays = calcExpectedWorkDays(py, pm, activeHolDates);
+                            const diff = empScheds.length - expectedDays;
+                            return (
+                              <div style={{display:"flex",gap:8,fontSize:10,marginBottom:4,padding:"4px 8px",background:"#f5f3ff",borderLeft:"3px solid #6b21a8",borderRadius:3,alignItems:"center",flexWrap:"wrap"}}>
+                                <b style={{color:"#6b21a8"}}>📊 應出席對帳</b>
+                                <span>應出席 <b>{expectedDays}</b> 天</span>
+                                <span>已排班 <b>{empScheds.length}</b> 天</span>
+                                <span style={{color:diff>0?"#4361ee":diff<0?"#b91c1c":"#888",fontWeight:600}}>
+                                  {diff>0?`多排 +${diff} 天`:diff<0?`少排 ${diff} 天`:"剛好"}
+                                </span>
+                              </div>
+                            );
+                          })()}
                           <div style={{display:"flex",gap:12,fontSize:10,color:"#666",marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
                             <span><b>當月排班：</b>{empScheds.length} 天</span>
                             {(() => {
@@ -3919,8 +4090,8 @@ export default function AdminPage() {
             } else if (mode === "transfer") {
               if (!holCompDate) { alert("請選擇補假日期"); return; }
               await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: storeId, shift_id: sid, date: schPop.date, day_type: "national_holiday", notes: "國定假日挪移→" + holCompDate });
-              await ap("/api/admin/schedules", { action: "add_leave", employee_id: eid, date: holCompDate, leave_type: "holiday_comp", note: popHol.name + "補假" });
-              alert("✅ 已排班，" + holCompDate + " 補假");
+              await ap("/api/admin/schedules", { action: "add_leave", employee_id: eid, date: holCompDate, leave_type: "holiday_comp", note: popHol.name + "補假", comp_source: holCompSource });
+              alert("✅ 已排班，" + holCompDate + " 補假（" + (holCompSource === "annual_leave" ? "扣特休" : "扣月薪") + "）");
             } else if (mode === "work") {
               await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: storeId, shift_id: sid, date: schPop.date, day_type: "national_holiday", notes: "國定假日出勤(雙倍薪)" });
               alert("✅ 已排班，薪資雙倍計算");
@@ -3963,6 +4134,22 @@ export default function AdminPage() {
                   <div style={{ fontSize: 10, color: "#666", marginBottom: 6 }}>{holPending.shiftName} 在 {schPop.date}（{popHol.name}）出勤</div>
                   <input type="date" value={holCompDate} onChange={e => setHolCompDate(e.target.value)}
                     style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, marginBottom: 8 }} />
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#185fa5", marginBottom: 4 }}>補假來源：</div>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                    <button onClick={() => setHolCompSource("salary")}
+                      style={{ flex: 1, padding: "6px 8px", borderRadius: 5, border: "1px solid #ddd", background: holCompSource === "salary" ? "#185fa5" : "#fff", color: holCompSource === "salary" ? "#fff" : "#666", fontSize: 11, cursor: "pointer", fontWeight: holCompSource === "salary" ? 600 : 400 }}>
+                      💰 扣月薪（預設）
+                    </button>
+                    <button onClick={() => setHolCompSource("annual_leave")}
+                      style={{ flex: 1, padding: "6px 8px", borderRadius: 5, border: "1px solid #ddd", background: holCompSource === "annual_leave" ? "#0a7c42" : "#fff", color: holCompSource === "annual_leave" ? "#fff" : "#666", fontSize: 11, cursor: "pointer", fontWeight: holCompSource === "annual_leave" ? 600 : 400 }}>
+                      🏖 扣特休
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 9, color: "#888", marginBottom: 8 }}>
+                    {holCompSource === "salary"
+                      ? "5/1 加給的 1 日工資會從 5/2 補假扣回，員工實領 = 月薪"
+                      : "5/1 加給的 1 日工資正常給；5/2 補假扣員工 1 天特休餘額"}
+                  </div>
                   <button onClick={() => confirmHol("transfer")} disabled={!holCompDate}
                     style={{ width: "100%", padding: 10, borderRadius: 6, border: "none", background: holCompDate ? "#4361ee" : "#ccc", color: "#fff", fontSize: 13, fontWeight: 600, cursor: holCompDate ? "pointer" : "default", marginBottom: 6 }}>
                     ✅ 確認排班＋補假 {holCompDate || ""}
