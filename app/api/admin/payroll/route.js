@@ -60,6 +60,28 @@ export async function POST(request) {
     return Response.json({ success: true, sent });
   }
 
+  // 設定管理者本月對帳 disposition（不重新計算薪資，只更新欄位）
+  // 後續按「結算」會讀這些值套用到計算
+  if (body.action === "set_disposition") {
+    const { employee_id, year, month, overtime_disposition, attendance_diff_disposition } = body;
+    if (!employee_id || !year || !month) return Response.json({ error: "缺欄位" }, { status: 400 });
+    // 先確保 payroll_records 有這筆（若無則建空殼）
+    const { data: existing } = await supabase.from("payroll_records")
+      .select("id").eq("employee_id", employee_id).eq("year", year).eq("month", month).maybeSingle();
+    const { data: emp } = await supabase.from("employees").select("store_id").eq("id", employee_id).maybeSingle();
+    const update = {};
+    if (overtime_disposition !== undefined) update.overtime_disposition = overtime_disposition;
+    if (attendance_diff_disposition !== undefined) update.attendance_diff_disposition = attendance_diff_disposition;
+    if (existing) {
+      await supabase.from("payroll_records").update(update).eq("id", existing.id);
+    } else {
+      await supabase.from("payroll_records").insert({
+        employee_id, year, month, store_id: emp?.store_id || null, ...update,
+      });
+    }
+    return Response.json({ ok: true });
+  }
+
   // 薪資調整（加項/扣項/獎金）
   if (body.action === "adjust") {
     const { payroll_id, allowance, allowance_note, other_deduction, deduction_note, bonus_amount, bonus_note } = body;
