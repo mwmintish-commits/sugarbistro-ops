@@ -52,43 +52,48 @@ export default function LaborAudit({ scheds, att, emps, sf, month }) {
   for (const emp of empsFiltered) {
     const empScheds = (schedByEmp[emp.id] || []).slice().sort((a, b) => a.date.localeCompare(b.date));
     if (empScheds.length === 0) continue;
-
-    // 按週分組（Mon-Sun）
-    const weeks = {};
-    for (const s of empScheds) {
-      const wk = weekKey(s.date);
-      (weeks[wk] ||= []).push(s);
-    }
+    // 兼職員工沒有「應出勤天數」概念，週模板/缺例假/缺休息日對他們不適用。
+    // 但 36 條「連續 7 天工作」仍對所有員工適用，金額加給(39/40 條)同樣適用。
+    const isPT = emp.employment_type === "parttime";
 
     const empFlags = [];
     const moneyFlags = [];
 
-    // 每週合規檢查
-    for (const [wkStart, wkScheds] of Object.entries(weeks)) {
-      const types = wkScheds.reduce((m, s) => {
-        m[s.day_type] = (m[s.day_type] || 0) + 1;
-        return m;
-      }, {});
-      const workish = (types.work || 0) + (types.national_holiday || 0);
-      const hasRegOff = (types.regular_off || 0) > 0;
-      const hasRestDay = (types.rest_day || 0) > 0;
-      // 只有當該週至少排了 5 天以上才檢查（避免月初月末殘缺週誤報）
-      const totalScheduled = wkScheds.length;
-      if (totalScheduled >= 5) {
-        if (!hasRegOff && workish >= 6) {
-          empFlags.push({ level: "red", text: `${wkStart} 該週無例假日（違反勞基法 36 條）` });
-        } else if (!hasRegOff) {
-          empFlags.push({ level: "yellow", text: `${wkStart} 該週未指定例假日` });
-        }
-        if (!hasRestDay && workish >= 6) {
-          empFlags.push({ level: "red", text: `${wkStart} 該週無休息日且工作日 ≥6 天（違反 36 條）` });
-        } else if (!hasRestDay) {
-          empFlags.push({ level: "yellow", text: `${wkStart} 該週未指定休息日` });
+    if (!isPT) {
+      // 按週分組（Mon-Sun）只對正職做週模板檢查
+      const weeks = {};
+      for (const s of empScheds) {
+        const wk = weekKey(s.date);
+        (weeks[wk] ||= []).push(s);
+      }
+
+      // 每週合規檢查
+      for (const [wkStart, wkScheds] of Object.entries(weeks)) {
+        const types = wkScheds.reduce((m, s) => {
+          m[s.day_type] = (m[s.day_type] || 0) + 1;
+          return m;
+        }, {});
+        const workish = (types.work || 0) + (types.national_holiday || 0);
+        const hasRegOff = (types.regular_off || 0) > 0;
+        const hasRestDay = (types.rest_day || 0) > 0;
+        // 只有當該週至少排了 5 天以上才檢查（避免月初月末殘缺週誤報）
+        const totalScheduled = wkScheds.length;
+        if (totalScheduled >= 5) {
+          if (!hasRegOff && workish >= 6) {
+            empFlags.push({ level: "red", text: `${wkStart} 該週無例假日（違反勞基法 36 條）` });
+          } else if (!hasRegOff) {
+            empFlags.push({ level: "yellow", text: `${wkStart} 該週未指定例假日` });
+          }
+          if (!hasRestDay && workish >= 6) {
+            empFlags.push({ level: "red", text: `${wkStart} 該週無休息日且工作日 ≥6 天（違反 36 條）` });
+          } else if (!hasRestDay) {
+            empFlags.push({ level: "yellow", text: `${wkStart} 該週未指定休息日` });
+          }
         }
       }
     }
 
-    // 連續工作天檢查（跨週）
+    // 連續工作天檢查（跨週）— 正職/兼職皆適用
     let curr = 0, maxConsec = 0, consecStart = "";
     for (const s of empScheds) {
       if (s.day_type === "work" || s.day_type === "national_holiday") {
@@ -122,7 +127,7 @@ export default function LaborAudit({ scheds, att, emps, sf, month }) {
     }
 
     if (empFlags.length > 0 || moneyFlags.length > 0) {
-      issues.push({ emp, empFlags, moneyFlags });
+      issues.push({ emp, empFlags, moneyFlags, isPT });
     }
   }
 
@@ -139,16 +144,19 @@ export default function LaborAudit({ scheds, att, emps, sf, month }) {
       <div style={{ marginBottom: 10, padding: 10, background: "#fef3c7", borderRadius: 8, fontSize: 12, color: "#92400e" }}>
         🔍 法規對帳：{issues.length} / {empsFiltered.length} 位員工有需要檢視的項目。所有判斷皆為唯讀，不會自動修改資料。
       </div>
-      {issues.map(({ emp, empFlags, moneyFlags }) => (
+      {issues.map(({ emp, empFlags, moneyFlags, isPT }) => (
         <div key={emp.id} style={card}>
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>
             👤 {emp.name}
-            {emp.weekly_regular_off && (
+            <span style={{ ...badge, background: isPT ? "#fef3c7" : "#e6f9f0", color: isPT ? "#b45309" : "#0a7c42", marginLeft: 8 }}>
+              {isPT ? "兼職" : "正職"}
+            </span>
+            {!isPT && emp.weekly_regular_off && (
               <span style={{ ...flagGreen, marginLeft: 8 }}>
                 週模板：例假={emp.weekly_regular_off} / 休息日={emp.weekly_rest_day || "未設"}
               </span>
             )}
-            {!emp.weekly_regular_off && (
+            {!isPT && !emp.weekly_regular_off && (
               <span style={{ ...flagYellow, marginLeft: 8 }}>未設週模板</span>
             )}
           </div>

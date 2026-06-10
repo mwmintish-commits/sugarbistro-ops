@@ -1210,10 +1210,10 @@ export default function AdminPage() {
                                 {e.name}
                                 <span style={{fontSize:8,color:isPT?"#b45309":"#0a7c42",marginLeft:4,background:isPT?"#fef3c7":"#e6f9f0",padding:"1px 3px",borderRadius:2}}>{isPT?"兼":"正"}</span>
                               </td>
-                              <td style={{padding:"4px 6px",textAlign:"right",color:"#0a7c42"}}>{expectedWorkDays}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:"#0a7c42"}}>{isPT?"—":expectedWorkDays}</td>
                               <td style={{padding:"4px 6px",textAlign:"right"}}>{workScheds.length}</td>
                               <td style={{padding:"4px 6px",textAlign:"right"}}>{actualDays}</td>
-                              <td style={{padding:"4px 6px",textAlign:"right",color:diffColor,fontWeight:diff!==0?600:400}}>{diff>0?"+"+diff:diff}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:diffColor,fontWeight:diff!==0?600:400}}>{isPT?"—":(diff>0?"+"+diff:diff)}</td>
                               <td style={{padding:"4px 6px",textAlign:"right",color:missDays>0?"#b91c1c":"#ccc"}}>{missDays>0?missDays:"-"}</td>
                               <td style={{padding:"4px 6px",textAlign:"right",color:lateMin>0?"#b91c1c":"#ccc"}}>{lateMin>0?lateMin:"-"}</td>
                               <td style={{padding:"4px 6px",textAlign:"right",color:earlyMin>0?"#b45309":"#ccc"}}>{earlyMin>0?earlyMin:"-"}</td>
@@ -2070,6 +2070,15 @@ export default function AdminPage() {
                       <tr style={{borderBottom:"1px solid #f0eeea",background:"#fafafa"}}>
                         <td colSpan={15} style={{padding:"6px 10px"}}>
                           {(() => {
+                            // 兼職員工無「應出席天數」概念，跳過顯示
+                            if (e.employment_type === "parttime") {
+                              return (
+                                <div style={{display:"flex",gap:8,fontSize:10,marginBottom:4,padding:"4px 8px",background:"#fef9c3",borderLeft:"3px solid #b45309",borderRadius:3,alignItems:"center",flexWrap:"wrap"}}>
+                                  <b style={{color:"#b45309"}}>📊 兼職員工</b>
+                                  <span>已排班 <b>{empScheds.length}</b> 天（無應出席天數限制）</span>
+                                </div>
+                              );
+                            }
                             const [py, pm] = month.split("-").map(Number);
                             const activeHolDates = new Set((holidays || []).filter(h => h.is_active !== false).map(h => h.date));
                             const expectedDays = calcExpectedWorkDays(py, pm, activeHolDates);
