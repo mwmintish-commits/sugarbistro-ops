@@ -218,7 +218,9 @@ export default function AdminPage() {
     // 否則員工被排到別店的班會抓不到（會造成「出勤展開 0 天」的 bug）
     const empCentricTab = ["payroll","reviews","bonus","attendance"].includes(tab);
     const schedStoreParam = (sf && !empCentricTab) ? "&store_id=" + sf : "";
-    const sp = (sv === "week" || sv === "biweek")
+    // 薪資/考核/獎金/出勤 tab：強制用 month 抓整月排班（不依 sv 週/雙週設定，否則只抓到 1 週資料）
+    const useMonthRange = empCentricTab;
+    const sp = (!useMonthRange && (sv === "week" || sv === "biweek"))
       ? "week_start=" + (expandForCounts ? monthStart(ws) : ws) + "&week_end=" + (expandForCounts ? monthEnd(we2) : we2) + schedStoreParam
       : "month=" + month + schedStoreParam;
 
@@ -1068,7 +1070,7 @@ export default function AdminPage() {
         {!ld && tab === "attendance" && (
           <div>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
-              {[["records","📍打卡紀錄"],["amendments","🔧補登申請"],["report","📊月報表"]].map(([k,l])=>(
+              {[["records","📍打卡紀錄"],["calendar","📅 月曆檢視"],["amendments","🔧補登申請"],["report","📊月報表"]].map(([k,l])=>(
                 <button key={k} onClick={()=>setAttView(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:attView===k?"#1a1a1a":"#fff",color:attView===k?"#fff":"#666",fontSize:11,cursor:"pointer"}}>{l}</button>
               ))}
             </div>
@@ -1265,7 +1267,7 @@ export default function AdminPage() {
                           {d.outs.length>1 && <span style={{fontSize:8,color:"#999",marginLeft:2}}>(+{d.outs.length-1})</span>}
                         </td>
                         <td style={{padding:6,fontSize:10}}>
-                          <input type="number" min="0" max="480" defaultValue={brk}
+                          <input key={(sch?.id||"new")+"-"+brk} type="number" min="0" max="480" defaultValue={brk}
                             title={overridden?`覆寫值（班別預設 ${shiftBrk}min）。清空 → 回到預設`:(sch?.shifts?`班別預設 ${shiftBrk}min`:"逐日填寫")}
                             onBlur={async ev=>{
                               const raw=ev.target.value.trim();
@@ -1308,6 +1310,133 @@ export default function AdminPage() {
                 </div>);
               })}
               </div>
+              );
+            })()}
+
+            {attView === "calendar" && (() => {
+              // 月曆檢視：選擇單一員工 → 顯示該員整月每日狀態（排班 / 打卡 / 休假）
+              if (!attEmpFilter) {
+                return (
+                  <div style={{padding:20,background:"#fff",border:"1px solid #e8e6e1",borderRadius:8,fontSize:12,color:"#666",textAlign:"center"}}>
+                    👆 請先在上方「篩選員工」選一位員工，月曆會顯示該員工整月的出勤/休假情況
+                  </div>
+                );
+              }
+              const emp = emps.find(e=>e.id===attEmpFilter);
+              if (!emp) return null;
+              const [y,m] = month.split("-").map(Number);
+              const firstDay = new Date(y, m-1, 1);
+              const lastDay = new Date(y, m, 0);
+              const startWeekday = firstDay.getDay();
+              const daysInMonth = lastDay.getDate();
+              // 拉這個員工的當月排班 + 打卡
+              const monthFrom = month + "-01", monthTo = month + "-31";
+              const empScheds = scheds.filter(s => s.employee_id === emp.id && s.date >= monthFrom && s.date <= monthTo);
+              const empAttByDay = {};
+              for (const a of att) {
+                if (a.employee_id !== emp.id) continue;
+                const date = a.timestamp ? new Date(a.timestamp).toLocaleDateString("sv-SE", {timeZone:"Asia/Taipei"}) : "";
+                if (date < monthFrom || date > monthTo) continue;
+                if (!empAttByDay[date]) empAttByDay[date] = { ins: [], outs: [] };
+                if (a.type === "clock_in") empAttByDay[date].ins.push(a);
+                else if (a.type === "clock_out") empAttByDay[date].outs.push(a);
+              }
+              // 構建 6 × 7 格
+              const cells = [];
+              for (let i = 0; i < startWeekday; i++) cells.push(null);
+              for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${month}-${String(d).padStart(2,"0")}`;
+                const sch = empScheds.find(s => s.date === dateStr);
+                const day = empAttByDay[dateStr] || { ins: [], outs: [] };
+                const ins = day.ins.sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
+                const outs = day.outs.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+                const inT = ins[0] ? new Date(ins[0].timestamp).toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei",hour:"2-digit",minute:"2-digit",hour12:false}) : "";
+                const outT = outs[0] ? new Date(outs[0].timestamp).toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei",hour:"2-digit",minute:"2-digit",hour12:false}) : "";
+                cells.push({ d, dateStr, sch, ins, outs, inT, outT });
+              }
+              // 顏色映射
+              const cellStyle = (c) => {
+                if (!c) return { background:"#f5f5f5" };
+                if (!c.sch) return { background:"#fff", color:"#bbb" };
+                const dt = c.sch.day_type;
+                if (dt === "regular_off") return { background:"#f5f5f5", borderLeft:"3px solid #999" };
+                if (dt === "rest_day") return { background:"#fff7ed", borderLeft:"3px solid #b45309" };
+                if (dt === "national_holiday") return { background:"#fef2f2", borderLeft:"3px solid #b91c1c" };
+                if (dt === "unpaid_leave" || dt === "half_pay_leave" || dt === "paid_leave") return { background:"#f5f3ff", borderLeft:"3px solid #6b21a8" };
+                // work day
+                if (!c.inT && !c.outT) return { background:"#fee2e2", borderLeft:"3px solid #b91c1c" }; // 未出勤
+                if (!c.inT || !c.outT) return { background:"#fef3c7", borderLeft:"3px solid #b45309" }; // 缺打卡
+                const lateIn = c.ins[0]?.late_minutes || 0;
+                const earlyOut = c.outs[0]?.early_leave_minutes || 0;
+                if (lateIn > 0 || earlyOut > 0) return { background:"#fff7ed", borderLeft:"3px solid #b45309" };
+                return { background:"#f0fdf4", borderLeft:"3px solid #0a7c42" };
+              };
+              const cellLabel = (c) => {
+                if (!c?.sch) return c?.sch===undefined?"":null;
+                const dt = c.sch.day_type;
+                if (dt === "regular_off") return { l: "例假", c: "#666" };
+                if (dt === "rest_day") return { l: "休息日", c: "#b45309" };
+                if (dt === "national_holiday") return { l: "國假", c: "#b91c1c" };
+                if (dt === "unpaid_leave") return { l: "無薪假", c: "#6b21a8" };
+                if (dt === "half_pay_leave") return { l: "半薪假", c: "#6b21a8" };
+                if (dt === "paid_leave") return { l: "請假", c: "#6b21a8" };
+                if (!c.inT && !c.outT) return { l: "未出勤", c: "#b91c1c" };
+                if (!c.inT) return { l: "缺上班", c: "#b91c1c" };
+                if (!c.outT) return { l: "缺下班", c: "#b45309" };
+                const lateIn = c.ins[0]?.late_minutes || 0;
+                const earlyOut = c.outs[0]?.early_leave_minutes || 0;
+                if (lateIn > 0) return { l: `遲${lateIn}分`, c: "#b91c1c" };
+                if (earlyOut > 0) return { l: `早${earlyOut}分`, c: "#b45309" };
+                return { l: "準時", c: "#0a7c42" };
+              };
+              // 統計
+              const stats = { 排班:0, 出勤:0, 準時:0, 遲早:0, 缺打卡:0, 未出勤:0, 休假:0 };
+              for (const c of cells.filter(x=>x)) {
+                if (!c.sch) continue;
+                const dt = c.sch.day_type;
+                if (["regular_off","unpaid_leave","half_pay_leave","paid_leave"].includes(dt)) { stats.休假++; continue; }
+                stats.排班++;
+                if (c.inT && c.outT) {
+                  stats.出勤++;
+                  const lateIn = c.ins[0]?.late_minutes || 0;
+                  const earlyOut = c.outs[0]?.early_leave_minutes || 0;
+                  if (lateIn > 0 || earlyOut > 0) stats.遲早++; else stats.準時++;
+                } else if (c.inT || c.outT) stats.缺打卡++;
+                else stats.未出勤++;
+              }
+              return (
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
+                  <div style={{display:"flex",gap:12,fontSize:11,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+                    <span style={{fontWeight:600,fontSize:13}}>👤 {emp.name} · {month}</span>
+                    <span>排班 <b>{stats.排班}</b> 天</span>
+                    <span style={{color:"#0a7c42"}}>準時 <b>{stats.準時}</b></span>
+                    <span style={{color:"#b45309"}}>遲/早 <b>{stats.遲早}</b></span>
+                    <span style={{color:"#b45309"}}>缺打卡 <b>{stats.缺打卡}</b></span>
+                    <span style={{color:"#b91c1c"}}>未出勤 <b>{stats.未出勤}</b></span>
+                    <span style={{color:"#6b21a8"}}>休假 <b>{stats.休假}</b></span>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
+                    {["日","一","二","三","四","五","六"].map((w,i)=>(
+                      <div key={"h"+i} style={{padding:"4px 6px",fontSize:10,fontWeight:600,color:i===0||i===6?"#b91c1c":"#666",textAlign:"center",background:"#faf8f5",borderRadius:4}}>{w}</div>
+                    ))}
+                    {cells.map((c,i)=>{
+                      if (!c) return <div key={"e"+i} style={{minHeight:78,background:"#f5f5f5",borderRadius:4}} />;
+                      const label = cellLabel(c);
+                      return (
+                        <div key={c.dateStr} style={{...cellStyle(c),padding:"4px 6px",borderRadius:4,minHeight:78,fontSize:10,display:"flex",flexDirection:"column"}}>
+                          <div style={{fontWeight:600,fontSize:11,marginBottom:2}}>{c.d}</div>
+                          {c.sch?.shifts?.name && <div style={{color:"#555",fontSize:9,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.sch.shifts.name}</div>}
+                          {(c.inT || c.outT) && (
+                            <div style={{fontSize:9,color:"#444",marginTop:1}}>
+                              {c.inT || "—"} / {c.outT || "—"}
+                            </div>
+                          )}
+                          {label && <div style={{fontSize:9,color:label.c,fontWeight:600,marginTop:"auto"}}>{label.l}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })()}
 
@@ -1789,7 +1918,7 @@ export default function AdminPage() {
                                     <td style={{padding:"3px 6px"}}>{st.slice(0,5)}</td>
                                     <td style={{padding:"3px 6px"}}>{et.slice(0,5)}</td>
                                     <td style={{padding:"3px 6px"}}>
-                                      <input type="number" min="0" max="480" defaultValue={brk}
+                                      <input key={s.id+"-"+brk} type="number" min="0" max="480" defaultValue={brk}
                                         title={overridden?`覆寫值（班別預設 ${shiftBrk}min）。清空 → 回到預設`:`班別預設 ${shiftBrk}min。修改後即覆寫此筆`}
                                         onBlur={async ev=>{
                                           const raw=ev.target.value.trim();
