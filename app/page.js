@@ -1902,53 +1902,83 @@ export default function AdminPage() {
                           </div>
                           {empScheds.length === 0 ? (
                             <div style={{fontSize:10,color:"#999"}}>當月無排班資料</div>
-                          ) : (
-                            <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
-                              <thead><tr style={{background:"#f0eeea"}}>
-                                {["日期","星期","班別","上班","下班","休息","計薪工時","類型"].map(h=>
-                                  <th key={h} style={{padding:"3px 6px",textAlign:"left",fontWeight:500,color:"#555"}}>{h}</th>
-                                )}
-                              </tr></thead>
-                              <tbody>{empScheds.map(s=>{
-                                const st=s.shifts?.start_time||""; const et=s.shifts?.end_time||"";
-                                const shiftBrk=Number(s.shifts?.break_minutes||0);
-                                const brk=effBreak(s); // 含覆寫
-                                const overridden = s.break_minutes != null && Number(s.break_minutes) !== shiftBrk;
-                                const[sh,sm]=st?st.split(":").map(Number):[0,0];
-                                const[eh,em]=et?et.split(":").map(Number):[0,0];
-                                const spanMin=st&&et?Math.max(0,eh*60+em-sh*60-sm):0;
-                                const workHr=((spanMin-brk)/60).toFixed(1);
-                                const w=new Date(s.date).getDay();
-                                const wDay=["日","一","二","三","四","五","六"][w];
-                                const dtLabel={work:"正常",rest_day:"休息日",national_holiday:"國假",regular_off:"例假",unpaid_leave:"無薪假",half_pay_leave:"半薪假"}[s.day_type]||(s.day_type||"-");
-                                return (
-                                  <tr key={s.id} style={{borderBottom:"1px solid #eee"}}>
-                                    <td style={{padding:"3px 6px"}}>{s.date.slice(5)}</td>
-                                    <td style={{padding:"3px 6px",color:w===0||w===6?"#b91c1c":"#666"}}>{wDay}</td>
-                                    <td style={{padding:"3px 6px"}}>{s.shifts?.name||"-"}</td>
-                                    <td style={{padding:"3px 6px"}}>{st.slice(0,5)}</td>
-                                    <td style={{padding:"3px 6px"}}>{et.slice(0,5)}</td>
-                                    <td style={{padding:"3px 6px"}}>
-                                      <input key={s.id+"-"+brk} type="number" min="0" max="480" defaultValue={brk}
-                                        title={overridden?`覆寫值（班別預設 ${shiftBrk}min）。清空 → 回到預設`:`班別預設 ${shiftBrk}min。修改後即覆寫此筆`}
-                                        onBlur={async ev=>{
-                                          const raw=ev.target.value.trim();
-                                          const newVal=raw===""?null:Number(raw);
-                                          if(newVal===brk||(newVal===null&&s.break_minutes==null))return;
-                                          const r=await ap("/api/admin/schedules",{action:"update_break",schedule_id:s.id,break_minutes:newVal});
-                                          if(r.error){alert(r.error);ev.target.value=brk;return;}
-                                          load();
-                                        }}
-                                        style={{width:42,padding:"1px 3px",borderRadius:3,border:overridden?"1px solid #b45309":"1px solid #ddd",fontSize:10,textAlign:"right",background:overridden?"#fff8e6":"#fff"}} />
-                                      <span style={{fontSize:8,color:"#999",marginLeft:2}}>min</span>
-                                    </td>
-                                    <td style={{padding:"3px 6px",fontWeight:500,color:"#0a7c42"}}>{workHr}hr</td>
-                                    <td style={{padding:"3px 6px",fontSize:9,color:s.day_type==="national_holiday"?"#b91c1c":s.day_type==="rest_day"?"#b45309":"#666"}}>{dtLabel}</td>
-                                  </tr>
-                                );
-                              })}</tbody>
-                            </table>
-                          )}
+                          ) : (() => {
+                            // 比對 att 找出哪幾天有打卡（用 employee_id + date）
+                            const attByDate = {};
+                            for (const a of att) {
+                              if (a.employee_id !== e.id) continue;
+                              const dt = a.timestamp ? new Date(a.timestamp).toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"}) : "";
+                              if (!dt) continue;
+                              if (!attByDate[dt]) attByDate[dt] = { in: false, out: false };
+                              if (a.type === "clock_in") attByDate[dt].in = true;
+                              if (a.type === "clock_out") attByDate[dt].out = true;
+                            }
+                            const noAttDays = empScheds.filter(s => !attByDate[s.date] && s.day_type !== "regular_off").length;
+                            const partialAttDays = empScheds.filter(s => attByDate[s.date] && (!attByDate[s.date].in || !attByDate[s.date].out)).length;
+                            return (
+                            <>
+                              {(noAttDays > 0 || partialAttDays > 0) && (
+                                <div style={{fontSize:10,padding:"4px 8px",background:"#fef3c7",borderLeft:"3px solid #b45309",marginBottom:6,borderRadius:3,color:"#8a6d00"}}>
+                                  ⚠ 對帳：排班 {empScheds.length} 天，{noAttDays>0?`其中 ${noAttDays} 天完全沒打卡（請假/曠職？）`:""}
+                                  {partialAttDays>0?`、${partialAttDays} 天只有半邊打卡（缺上班或下班）`:""}
+                                </div>
+                              )}
+                              <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
+                                <thead><tr style={{background:"#f0eeea"}}>
+                                  {["日期","星期","班別","上班","下班","休息","計薪工時","類型","打卡"].map(h=>
+                                    <th key={h} style={{padding:"3px 6px",textAlign:"left",fontWeight:500,color:"#555"}}>{h}</th>
+                                  )}
+                                </tr></thead>
+                                <tbody>{empScheds.map(s=>{
+                                  const st=s.shifts?.start_time||""; const et=s.shifts?.end_time||"";
+                                  const shiftBrk=Number(s.shifts?.break_minutes||0);
+                                  const brk=effBreak(s); // 含覆寫
+                                  const overridden = s.break_minutes != null && Number(s.break_minutes) !== shiftBrk;
+                                  const[sh,sm]=st?st.split(":").map(Number):[0,0];
+                                  const[eh,em]=et?et.split(":").map(Number):[0,0];
+                                  const spanMin=st&&et?Math.max(0,eh*60+em-sh*60-sm):0;
+                                  const workHr=((spanMin-brk)/60).toFixed(1);
+                                  const w=new Date(s.date).getDay();
+                                  const wDay=["日","一","二","三","四","五","六"][w];
+                                  const dtLabel={work:"正常",rest_day:"休息日",national_holiday:"國假",regular_off:"例假",unpaid_leave:"無薪假",half_pay_leave:"半薪假"}[s.day_type]||(s.day_type||"-");
+                                  const punch = attByDate[s.date];
+                                  let punchLabel = "✓", punchColor = "#0a7c42";
+                                  if (s.day_type === "regular_off") { punchLabel = "—"; punchColor = "#bbb"; }
+                                  else if (!punch) { punchLabel = "✗ 無打卡"; punchColor = "#b91c1c"; }
+                                  else if (!punch.in) { punchLabel = "缺上班"; punchColor = "#b91c1c"; }
+                                  else if (!punch.out) { punchLabel = "缺下班"; punchColor = "#b45309"; }
+                                  const rowBg = !punch && s.day_type !== "regular_off" ? "#fef3c7" : "transparent";
+                                  return (
+                                    <tr key={s.id} style={{borderBottom:"1px solid #eee",background:rowBg}}>
+                                      <td style={{padding:"3px 6px"}}>{s.date.slice(5)}</td>
+                                      <td style={{padding:"3px 6px",color:w===0||w===6?"#b91c1c":"#666"}}>{wDay}</td>
+                                      <td style={{padding:"3px 6px"}}>{s.shifts?.name||"-"}</td>
+                                      <td style={{padding:"3px 6px"}}>{st.slice(0,5)}</td>
+                                      <td style={{padding:"3px 6px"}}>{et.slice(0,5)}</td>
+                                      <td style={{padding:"3px 6px"}}>
+                                        <input key={s.id+"-"+brk} type="number" min="0" max="480" defaultValue={brk}
+                                          title={overridden?`覆寫值（班別預設 ${shiftBrk}min）。清空 → 回到預設`:`班別預設 ${shiftBrk}min。修改後即覆寫此筆`}
+                                          onBlur={async ev=>{
+                                            const raw=ev.target.value.trim();
+                                            const newVal=raw===""?null:Number(raw);
+                                            if(newVal===brk||(newVal===null&&s.break_minutes==null))return;
+                                            const r=await ap("/api/admin/schedules",{action:"update_break",schedule_id:s.id,break_minutes:newVal});
+                                            if(r.error){alert(r.error);ev.target.value=brk;return;}
+                                            load();
+                                          }}
+                                          style={{width:42,padding:"1px 3px",borderRadius:3,border:overridden?"1px solid #b45309":"1px solid #ddd",fontSize:10,textAlign:"right",background:overridden?"#fff8e6":"#fff"}} />
+                                        <span style={{fontSize:8,color:"#999",marginLeft:2}}>min</span>
+                                      </td>
+                                      <td style={{padding:"3px 6px",fontWeight:500,color:"#0a7c42"}}>{workHr}hr</td>
+                                      <td style={{padding:"3px 6px",fontSize:9,color:s.day_type==="national_holiday"?"#b91c1c":s.day_type==="rest_day"?"#b45309":"#666"}}>{dtLabel}</td>
+                                      <td style={{padding:"3px 6px",fontSize:9,color:punchColor,fontWeight:500}}>{punchLabel}</td>
+                                    </tr>
+                                  );
+                                })}</tbody>
+                              </table>
+                            </>
+                            );
+                          })()}
                         </td>
                       </tr>
                     )}
