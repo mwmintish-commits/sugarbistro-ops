@@ -1731,7 +1731,8 @@ export default function AdminPage() {
                 <div><b>勞保自付：</b> 依勞保級距表（正/兼職不同）；可手動覆寫（員工詳情頁）</div>
                 <div><b>健保自付：</b> 一律正職表（健保最低 = 基本工資）；兼職若在他司加保則為 0</div>
                 <div><b>補充保費：</b> 兼職且底薪 &gt; 29,500 時，扣 2.11%</div>
-                <div><b>實發 = </b> 底薪 + 加班費 + 假日加班 - 勞保 - 健保 - 補充保費 + 加項 - 扣項 - 請假扣</div>
+                <div><b>遲到/早退扣：</b> （遲到分鐘 + 早退分鐘）÷ 60 × 時薪</div>
+                <div><b>實發 = </b> 底薪 + 加班費 + 假日加班 - 勞保 - 健保 - 補充保費 + 加項 - 扣項 - 請假扣 - 遲早扣</div>
                 <div style={{marginTop:6,padding:6,background:"#fff",borderRadius:4,fontSize:10,color:"#888"}}>💡 將滑鼠停在每個數字上會顯示該員工的詳細計算</div>
               </div>
             </details>
@@ -1744,7 +1745,7 @@ export default function AdminPage() {
                   <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
             <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:750}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","假日加班","請假扣","勞保","健保","補充保費","加項","扣項","實發","存"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","假日加班","請假扣","遲早扣","勞保","健保","補充保費","加項","扣項","實發","存"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
                 <tbody>{storeEmps.map(e=>{
                   // 優先讀 payroll_records（後端正確結算的權威值）；無紀錄時顯示「未結算」
                   const pr = payrollMap[e.id];
@@ -1845,6 +1846,17 @@ export default function AdminPage() {
                         {(hPay+restPay)>0 && <div style={{fontSize:8,color:"#999"}}>{holDays>0?`國${holDays}`:""}{holDays>0&&restDays>0?" + ":""}{restDays>0?`休${restDays}`:""}</div>}
                       </td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:lvDeduct>0?"#b91c1c":"#ccc"}} title={settled && pr.leave_detail?pr.leave_detail:""}>{lvDeduct>0?"-"+fmt(lvDeduct):"-"}</td>
+                      {(() => {
+                        const lateMin = settled ? Number(pr.late_minutes||0) : 0;
+                        const earlyMin = settled ? Number(pr.early_leave_minutes||0) : 0;
+                        const lateDeduct = settled ? Number(pr.late_deduction||0) : 0;
+                        return (
+                          <td style={{padding:"5px 4px",textAlign:"right",color:lateDeduct>0?"#b91c1c":"#ccc"}} title={lateDeduct>0?`遲到 ${lateMin}分 + 早退 ${earlyMin}分 × $${hourlyRate}/hr = -$${lateDeduct.toLocaleString()}`:""}>
+                            {lateDeduct>0?"-"+fmt(lateDeduct):"-"}
+                            {(lateMin>0||earlyMin>0) && <div style={{fontSize:8,color:"#999"}}>{lateMin>0?`遲${lateMin}`:""}{lateMin>0&&earlyMin>0?"+":""}{earlyMin>0?`早${earlyMin}`:""}</div>}
+                          </td>
+                        );
+                      })()}
                       <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}} title={e.labor_tier?`勞保 L${e.labor_tier}`:""}>{ls>0?"-"+fmt(ls):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}} title={e.health_tier?`健保 H${e.health_tier}`:(isPT&&e.health_insured_here===false?"他司加保":"")}>{hs>0?"-"+fmt(hs):"-"}</td>
                       <td style={{padding:"5px 4px",textAlign:"right",color:suppH>0?"#b91c1c":"#ccc"}}>{suppH>0?"-"+fmt(suppH):"-"}</td>
@@ -1874,7 +1886,7 @@ export default function AdminPage() {
                     </tr>
                     {isExpanded && (
                       <tr style={{borderBottom:"1px solid #f0eeea",background:"#fafafa"}}>
-                        <td colSpan={14} style={{padding:"6px 10px"}}>
+                        <td colSpan={15} style={{padding:"6px 10px"}}>
                           <div style={{display:"flex",gap:12,fontSize:10,color:"#666",marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
                             <span><b>當月排班：</b>{empScheds.length} 天</span>
                             {(() => {
