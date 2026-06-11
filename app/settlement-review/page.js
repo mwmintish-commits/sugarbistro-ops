@@ -1,8 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
+import { PageShell, PageHeader, LoadingSkeleton, ErrorState } from "../components/ui";
+import { fetchJSON } from "@/lib/fetch-json";
 
 const FIELDS = [
-  { k: "net_sales", l: "營業淨額", color: "#0a7c42" },
+  { k: "net_sales", l: "營業淨額", color: "var(--success)" },
   { k: "cash_amount", l: "現金" },
   { k: "twqr_amount", l: "TWQR" },
   { k: "remittance_amount", l: "匯款" },
@@ -34,8 +36,7 @@ export default function SettlementReview() {
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("id");
     if (!id) { setErr("缺少 ID"); setLoading(false); return; }
-    fetch("/api/admin/settlements?id=" + id)
-      .then(r => r.json())
+    fetchJSON("/api/admin/settlements?id=" + id)
       .then(r => {
         if (r.error || !r.data) { setErr("找不到日結資料"); setLoading(false); return; }
         setData(r.data);
@@ -76,67 +77,66 @@ export default function SettlementReview() {
     else setDone(true);
   };
 
-  if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#888" }}>載入中...</div>;
-  if (err) return <div style={{ padding: 40, textAlign: "center", color: "#b91c1c" }}>{err}</div>;
+  if (loading) return <PageShell maxWidth={420}><LoadingSkeleton kind="list" rows={8} /></PageShell>;
+  if (err) return <PageShell maxWidth={420}><ErrorState message={err} onRetry={() => window.location.reload()} /></PageShell>;
   if (done) return (
-    <div style={{ padding: 40, textAlign: "center" }}>
-      <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
-      <div style={{ fontSize: 18, fontWeight: 600 }}>日結已確認送出</div>
-      <div style={{ fontSize: 13, color: "#888", marginTop: 8 }}>可關閉此頁面</div>
-    </div>
+    <PageShell maxWidth={420}>
+      <div className="sb-card" style={{ padding: 40, textAlign: "center", marginTop: 40 }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+        <div style={{ fontSize: 18, fontWeight: 600 }}>日結已確認送出</div>
+        <div style={{ fontSize: 13, color: "var(--text-3)", marginTop: 8 }}>可關閉此頁面</div>
+      </div>
+    </PageShell>
   );
 
   return (
-    <div style={{ maxWidth: 420, margin: "0 auto", padding: 16, fontFamily: "-apple-system,sans-serif" }}>
-      <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>📊 日結確認</h2>
-      <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>
-        {data.stores?.name || ""} {data.date} {data.cashier_name ? "(" + data.cashier_name + ")" : ""}
-      </div>
+    <PageShell maxWidth={420}>
+      <PageHeader emoji="📊" title="日結確認"
+        subtitle={`${data.stores?.name || ""} ${data.date} ${data.cashier_name ? "(" + data.cashier_name + ")" : ""}`} />
 
       {data.image_url && (
         <div style={{ marginBottom: 12 }}>
           <button onClick={() => setShowImg(!showImg)}
-            style={{ fontSize: 12, color: "#4361ee", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            style={{ fontSize: 13, color: "var(--brand-strong)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: "8px 0" }}>
             {showImg ? "▼ 收起單據照片" : "▶ 查看單據照片"}
           </button>
-          {showImg && <img src={data.image_url} alt="" style={{ width: "100%", borderRadius: 8, marginTop: 6, border: "1px solid #eee" }} />}
+          {showImg && <img src={data.image_url} alt="" style={{ width: "100%", borderRadius: 8, marginTop: 6, border: "1px solid var(--border)" }} />}
         </div>
       )}
 
-      <div style={{ background: "#faf8f5", borderRadius: 10, padding: 12, marginBottom: 12 }}>
+      <div className="sb-card" style={{ borderRadius: 10, padding: 12, marginBottom: 12 }}>
         {FIELDS.map(({ k, l, color }) => (
           <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <label style={{ fontSize: 12, color: "#666", minWidth: 90 }}>{l}</label>
+            <label style={{ fontSize: 12, color: "var(--text-2)", minWidth: 90 }}>{l}</label>
             <input type="number" value={form[k] || ""} onChange={e => setForm({ ...form, [k]: e.target.value })}
-              style={{ width: 110, padding: "6px 8px", borderRadius: 6, border: "1px solid " + (Number(form[k] || 0) !== Number(data[k] || 0) ? "#4361ee" : "#ddd"),
-                fontSize: 13, textAlign: "right", fontWeight: color ? 600 : 400, color: color || "inherit",
-                background: Number(form[k] || 0) !== Number(data[k] || 0) ? "#e6f1fb" : "#fff" }} />
+              style={{ width: 120, padding: "8px", borderRadius: 6, border: "1px solid " + (Number(form[k] || 0) !== Number(data[k] || 0) ? "var(--brand)" : "var(--border)"),
+                textAlign: "right", fontWeight: color ? 600 : 400, color: color || "inherit",
+                background: Number(form[k] || 0) !== Number(data[k] || 0) ? "var(--sugar-50)" : "var(--surface)" }} />
           </div>
         ))}
       </div>
 
       {/* 驗算 */}
-      <div style={{ background: Math.abs(diff) > 100 ? "#fef2f2" : "#e6f9f0", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12 }}>
+      <div style={{ background: Math.abs(diff) > 100 ? "var(--danger-bg)" : "var(--success-bg)", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12 }}>
         <div>營收 {fmt(form.net_sales)} — 收款合計 {fmt(paySum)}</div>
         {Math.abs(diff) > 100
-          ? <div style={{ color: "#b91c1c", fontWeight: 600 }}>⚠️ 差額 {fmt(diff)}，請核對</div>
-          : <div style={{ color: "#0a7c42" }}>✅ 數字吻合</div>}
+          ? <div style={{ color: "var(--danger)", fontWeight: 600 }}>⚠️ 差額 {fmt(diff)}，請核對</div>
+          : <div style={{ color: "var(--success)" }}>✅ 數字吻合</div>}
       </div>
 
       {/* 修改原因 */}
       {hasChanges && (
         <div style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 12, color: "#b91c1c", fontWeight: 500 }}>⚠️ 數字有修改，請填寫原因：</label>
+          <label style={{ fontSize: 12, color: "var(--danger)", fontWeight: 500 }}>⚠️ 數字有修改，請填寫原因：</label>
           <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="例：AI把3辨識成8、漏算匯款金額..."
-            style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #fca5a5", fontSize: 12, marginTop: 4, minHeight: 60, resize: "vertical" }} />
+            style={{ width: "100%", boxSizing: "border-box", padding: 8, borderRadius: 6, border: "1px solid var(--danger)", marginTop: 4, minHeight: 60, resize: "vertical" }} />
         </div>
       )}
 
       <button onClick={submit}
-        style={{ width: "100%", padding: 14, borderRadius: 8, border: "none",
-          background: hasChanges ? "#4361ee" : "#0a7c42", color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+        className={hasChanges ? "sb-btn sb-btn-primary" : "sb-btn sb-btn-success"} style={{ fontSize: 15, minHeight: 52 }}>
         {hasChanges ? "✏️ 修正並送出" : "✅ 確認送出"}
       </button>
-    </div>
+    </PageShell>
   );
 }
