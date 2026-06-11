@@ -8,6 +8,7 @@ const laborSelfFor = (emp) => pickLaborSelf(emp);
 const healthSelfFor = (emp) => pickHealthSelf(emp);
 import { routePaymentMethod } from "../lib/payment-router";
 import { checkAppVersion, validateAuth, nukeCache } from "../lib/cache-buster";
+import { useToast } from "./components/ui";
 
 const COL_LABELS = {
   cash_amount: "現金", credit_card_amount: "信用卡", line_pay_amount: "LINE Pay",
@@ -199,11 +200,18 @@ export default function AdminPage() {
     }
   }, [auth]);
 
+  const { toast, el: toastEl } = useToast();
   const loadingRef = useRef(false);
   const pendingLoadRef = useRef(false);
-  const load = useCallback(() => {
+  // Tab 資料快取：5 分鐘內切回同一組 (tab,月份,門市,檢視) 不重抓；手動刷新可強制
+  const loadCacheRef = useRef({});
+  const CACHE_TTL = 5 * 60 * 1000;
+  // useCache=true 只用於 Tab 切換（useEffect）；mutation 後的 load() 一律強制重抓最新資料
+  const load = useCallback((useCache = false) => {
     // 防止 load() 同時被觸發多次：上一次還沒跑完，先把這次需求記下來，跑完再 fire 一次
     if (loadingRef.current) { pendingLoadRef.current = true; return; }
+    const cacheKey = [tab, month, sf, sv, ws, expType].join("|");
+    if (useCache === true && loadCacheRef.current[cacheKey] && Date.now() - loadCacheRef.current[cacheKey] < CACHE_TTL) return;
     loadingRef.current = true;
     // 不 setLd(true)：保持頁面已渲染，資料邊到邊更新（避免 Promise.all 全部完成才顯示 = 卡 20-30 秒）
     const p = new URLSearchParams();
@@ -239,18 +247,20 @@ export default function AdminPage() {
     const needPnl    = T === "pnl" && myTabs.includes("pnl");
     const needAnn    = need(["dashboard","announcements","store_staff"]);
 
+    // 單一 API 失敗回 fallback，不讓整批 Promise.all 中斷（網路不穩時其餘資料照常顯示）
+    const safe = (pr, fb) => pr.catch(err => { console.error("load() partial fail:", err); toast("⚠️ 部分資料載入失敗，請重新整理", "danger"); return fb; });
     Promise.all([
-      needSettle ? ap("/api/admin/settlements?" + p) : Promise.resolve({data:[],summary:{}}),
-      needDep    ? ap("/api/admin/deposits?"    + p) : Promise.resolve({data:[]}),
-      ap("/api/admin/employees" + (sf ? "?store_id=" + sf : "")),
-      needShifts ? ap("/api/admin/shifts" + (sf ? "?store_id=" + sf : "")) : Promise.resolve({data:[]}),
-      needSched  ? ap("/api/admin/schedules?" + sp) : Promise.resolve({data:[]}),
-      needAtt    ? ap("/api/admin/attendance?" + p) : Promise.resolve({data:[]}),
-      needAtt    ? ap("/api/admin/attendance?summary=true&" + p) : Promise.resolve({}),
-      needLv     ? ap("/api/admin/leaves?" + p) : Promise.resolve({data:[]}),
-      needExp    ? ap("/api/admin/expenses?" + p + "&type=" + expType) : Promise.resolve({data:[]}),
-      needPnl    ? ap("/api/admin/pnl?month=" + month + "&compare=stores" + (sf ? "&store_id=" + sf : "")) : Promise.resolve(null),
-      needAnn    ? ap("/api/admin/announcements") : Promise.resolve({data:[]}),
+      needSettle ? safe(ap("/api/admin/settlements?" + p), {data:[],summary:{}}) : Promise.resolve({data:[],summary:{}}),
+      needDep    ? safe(ap("/api/admin/deposits?"    + p), {data:[]}) : Promise.resolve({data:[]}),
+      safe(ap("/api/admin/employees" + (sf ? "?store_id=" + sf : "")), {data:[]}),
+      needShifts ? safe(ap("/api/admin/shifts" + (sf ? "?store_id=" + sf : "")), {data:[]}) : Promise.resolve({data:[]}),
+      needSched  ? safe(ap("/api/admin/schedules?" + sp), {data:[]}) : Promise.resolve({data:[]}),
+      needAtt    ? safe(ap("/api/admin/attendance?" + p), {data:[]}) : Promise.resolve({data:[]}),
+      needAtt    ? safe(ap("/api/admin/attendance?summary=true&" + p), {}) : Promise.resolve({}),
+      needLv     ? safe(ap("/api/admin/leaves?" + p), {data:[]}) : Promise.resolve({data:[]}),
+      needExp    ? safe(ap("/api/admin/expenses?" + p + "&type=" + expType), {data:[]}) : Promise.resolve({data:[]}),
+      needPnl    ? safe(ap("/api/admin/pnl?month=" + month + "&compare=stores" + (sf ? "&store_id=" + sf : "")), null) : Promise.resolve(null),
+      needAnn    ? safe(ap("/api/admin/announcements"), {data:[]}) : Promise.resolve({data:[]}),
     ]).then(([s,d,e,shs,sc,at2,as3,lr2,ex,pl2,an]) => {
       if (needSettle) { setStl(s.data||[]); setSum(s.summary||{}); }
       if (needDep) setDep(d.data||[]);
@@ -267,6 +277,7 @@ export default function AdminPage() {
       if (needPnl) setPnl(pl2);
       if (needAnn) setAnns(an.data||[]);
       setLoaded(l => ({ ...l, core: true }));
+      loadCacheRef.current[cacheKey] = Date.now();
       setLd(false);
     }).catch(err => {
       console.error("dashboard load failed:", err);
@@ -282,7 +293,7 @@ export default function AdminPage() {
 
     if (need(["dashboard","overtime","payroll","reviews"]) && myTabs.includes("overtime")) {
       ap("/api/admin/overtime?month=" + month + (sf ? "&store_id=" + sf : ""))
-        .then(r => { setOtRecords(r.data||[]); setOtSum(r.summary||{}); });
+        .then(r => { setOtRecords(r.data||[]); setOtSum(r.summary||{}); }).catch(() => {});
       if (T === "overtime" || T === "payroll") {
         ap("/api/admin/overtime?year=" + month.slice(0,4) + (sf ? "&store_id=" + sf : ""))
           .then(r => setOtYearly(r.data||[])).catch(() => {});
@@ -299,7 +310,7 @@ export default function AdminPage() {
     }
     if (need(["dashboard","payments"]) && myTabs.includes("payments")) {
       ap("/api/admin/payments")
-        .then(r => { setPmtRecords(r.data||[]); setPmtSum(r.summary||{}); setLoaded(l => ({ ...l, pmt: true })); });
+        .then(r => { setPmtRecords(r.data||[]); setPmtSum(r.summary||{}); setLoaded(l => ({ ...l, pmt: true })); }).catch(() => {});
     }
     if (need(["schedules","attendance","leaves","dashboard"])) {
       ap("/api/admin/holidays?month=" + month)
@@ -322,24 +333,24 @@ export default function AdminPage() {
       }
     }
     if (need(["inventory","stock","shipments"]) && (myTabs.includes("inventory") || myTabs.includes("shipments"))) {
-      ap("/api/admin/inventory").then(r => { setInvItems(r.data||[]); setInvSum(r.summary||{}); });
-      ap("/api/admin/inventory?type=orders").then(r => setInvOrders(r.data||[]));
-      ap("/api/admin/shipments?type=pending_orders_by_store").then(r => setShipPending(r.data||[]));
-      ap("/api/admin/shipments").then(r => setShipList(r.data||[]));
+      ap("/api/admin/inventory").then(r => { setInvItems(r.data||[]); setInvSum(r.summary||{}); }).catch(() => {});
+      ap("/api/admin/inventory?type=orders").then(r => setInvOrders(r.data||[])).catch(() => {});
+      ap("/api/admin/shipments?type=pending_orders_by_store").then(r => setShipPending(r.data||[])).catch(() => {});
+      ap("/api/admin/shipments").then(r => setShipList(r.data||[])).catch(() => {});
     }
     if (need(["recipes","production"]) && myTabs.includes("recipes")) {
-      ap("/api/admin/recipes").then(r => setRecipeList(r.data||[]));
+      ap("/api/admin/recipes").then(r => setRecipeList(r.data||[])).catch(() => {});
     }
     if (need(["clients","orders"]) && myTabs.includes("clients")) {
-      ap("/api/admin/clients").then(r => setClientList(r.data||[]));
+      ap("/api/admin/clients").then(r => setClientList(r.data||[])).catch(() => {});
       ap("/api/admin/products").then(r => setProductList(r.data||[])).catch(()=>{});
     }
     if (need(["dashboard","orders"]) && myTabs.includes("orders")) {
-      ap("/api/admin/orders").then(r => { setOrderList(r.data||[]); setOrderSum(r.summary||{}); setLoaded(l => ({ ...l, orders: true })); });
+      ap("/api/admin/orders").then(r => { setOrderList(r.data||[]); setOrderSum(r.summary||{}); setLoaded(l => ({ ...l, orders: true })); }).catch(() => {});
     }
     if (T === "production" && myTabs.includes("production")) {
       ap("/api/admin/production?month=" + month)
-        .then(r => { setProdList(r.data||[]); setProdSum(r.summary||{}); });
+        .then(r => { setProdList(r.data||[]); setProdSum(r.summary||{}); }).catch(() => {});
     }
     // 系統提醒
     if (T === "dashboard" && myTabs.includes("dashboard")) {
@@ -348,7 +359,7 @@ export default function AdminPage() {
   }, [month, sf, sv, ws, myTabs.join(","), expType, tab]);
 
   // 等 tab 被設定後再 load（避免 tab="" 的空 load 觸發後又被真正的 load 蓋過去，造成 connection pool 大塞車）
-  useEffect(() => { if (auth && tab) load(); }, [auth, tab, load]);
+  useEffect(() => { if (auth && tab) load(true); }, [auth, tab, load]);
 
   // 排班頁進入 週/雙週 視圖時自動載入不可出勤回報（顯示於對應日期格）
   useEffect(() => {
@@ -473,6 +484,7 @@ export default function AdminPage() {
   // ===== MAIN SHELL =====
   return (
     <div className="sb-admin" style={{background:"var(--bg)",minHeight:"100vh"}}>
+      {toastEl}
       {/* HEADER */}
       <div className="sb-admin-header" style={{background:"#fff",borderBottom:"1px solid var(--border)",padding:"8px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -494,6 +506,11 @@ export default function AdminPage() {
           ) : (
             <span style={{padding:"3px 8px",borderRadius:6,background:"var(--info-bg)",color:"var(--info)",fontSize:11}}>{storeName}</span>
           )}
+          <button onClick={() => { loadCacheRef.current = {}; load(); toast("🔄 重新整理中…"); }}
+            title="強制重新抓取目前頁面資料"
+            style={{padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",background:"#fff",fontSize:11,cursor:"pointer",color:"var(--text-2)"}}>
+            🔄
+          </button>
           <button onClick={logout}
             style={{padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",background:"#fff",fontSize:11,cursor:"pointer",color:"var(--danger)"}}>
             登出
@@ -528,7 +545,13 @@ export default function AdminPage() {
 
       {/* CONTENT */}
       <div style={{padding:"12px 14px",maxWidth:1200,margin:"0 auto"}}>
-        {ld && <div style={{textAlign:"center",padding:30,color:"var(--text-hint)"}}>載入中...</div>}
+        {ld && (
+          <div>
+            <div className="sb-skel" style={{height:64,borderRadius:8,marginBottom:8}} />
+            <div className="sb-skel" style={{height:200,borderRadius:8,marginBottom:8}} />
+            <div className="sb-skel" style={{height:120,borderRadius:8}} />
+          </div>
+        )}
 
         {/* DASHBOARD */}
         {!ld && tab === "dashboard" && (
@@ -968,7 +991,7 @@ export default function AdminPage() {
                     const lastWeekEnd=new Date(new Date(month+"-01").getTime()-1*86400000).toLocaleDateString("sv-SE");
                     if(!confirm("📋 複製上週（"+lastWeekStart+"~"+lastWeekEnd+"）的排班到本月？"))return;
                     const{data:src}=await ap("/api/admin/schedules",{action:"copy_week",source_start:lastWeekStart,source_end:lastWeekEnd,target_start:month+"-01",store_id:sf});
-                    alert("✅ 已複製"+(src?.count||0)+"筆");load();
+                    toast("✅ 已複製"+(src?.count||0)+"筆");load();
                   }} style={{padding:"6px 12px",borderRadius:6,border:"1px solid var(--brand-strong)",background:"#fff",color:"var(--brand-strong)",fontSize:11,cursor:"pointer"}}>📋 複製上週班表</button>
                   <button onClick={async()=>{
                     if(!sf){alert("請先選擇門市");return;}
@@ -980,7 +1003,7 @@ export default function AdminPage() {
                       if(sid.startsWith("leave:"))await ap("/api/admin/schedules",{action:"add_leave",employee_id:e.id,date,leave_type:sid.split(":")[1]});
                       else{const s=shifts.find(x=>x.id===sid);await ap("/api/admin/schedules",{action:"create",employee_id:e.id,store_id:sf,shift_id:sid,date});}
                     }
-                    alert("✅ 全員"+storeEmps.length+"人已排入");load();
+                    toast("✅ 全員"+storeEmps.length+"人已排入");load();
                   }} style={{padding:"6px 12px",borderRadius:6,border:"1px solid var(--warning)",background:"#fff",color:"var(--warning)",fontSize:11,cursor:"pointer"}}>👥 全員同班</button>
                 </div>
                 <h4 style={{fontSize:11,fontWeight:500,color:"var(--text-3)",marginBottom:6}}>➕ 快速排班</h4>
@@ -1000,7 +1023,7 @@ export default function AdminPage() {
                         if(sid.startsWith("leave:"))await ap("/api/admin/schedules",{action:"add_leave",employee_id:id,date:ds,leave_type:sid.split(":")[1]});
                         else{const sh=shifts.find(x=>x.id===sid);const r=await ap("/api/admin/schedules",{action:"create",employee_id:id,store_id:sh?sh.store_id:sf,shift_id:sid,date:ds});if(r.skipped)skip++;else count++;}
                         d.setDate(d.getDate()+1);}}
-                    alert("✅ 已排"+count+"筆"+(skip?" ⏭跳過"+skip+"筆（有休假）":""));load();
+                    toast("✅ 已排"+count+"筆"+(skip?" ⏭跳過"+skip+"筆（有休假）":""));load();
                   }} style={{padding:"5px 14px",borderRadius:5,border:"none",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer",height:28}}>排班</button>
                 </div>
                 <div style={{fontSize:9,color:"var(--text-3)",marginTop:4}}>💡 選「👥全員」=門市全部人排同班。自動跳過有預假/休假的員工。也可用「週檢視」逐格排班。</div>
@@ -1648,7 +1671,7 @@ export default function AdminPage() {
                       <button onClick={async()=>{
                         const v=prompt(e.name+" 特休時數(hr)：",annualDays);if(v===null)return;
                         const r=await sap("/api/admin/leave-balances",{action:"update_balance",employee_id:e.id,annual_total:Number(v)});
-                        if(r){alert("✅ "+e.name+" 特休已改為 "+v+"hr");load();}
+                        if(r){toast("✅ "+e.name+" 特休已改為 "+v+"hr");load();}
                       }} style={{fontSize:9,color:"var(--brand-strong)",background:"none",border:"none",cursor:"pointer"}}>✏️修改</button>
                     </div>
                     <div style={{background:compAvail>0?"var(--success-bg)":"#f5f5f5",borderRadius:8,padding:12,textAlign:"center"}}>
@@ -2035,7 +2058,7 @@ export default function AdminPage() {
                           const allowNote=document.getElementById("pan-"+e.id).value||"";
                           const deductNote=document.getElementById("pdn-"+e.id).value||"";
                           const r=await sap("/api/admin/employees",{action:"update",employee_id:e.id,default_allowance:allow,default_deduction:deduct,default_allowance_note:allowNote,default_deduction_note:deductNote});
-                          if(r) alert("✅ "+e.name+" 已儲存");
+                          if(r) toast("✅ "+e.name+" 已儲存");
                         }} style={{padding:"1px 5px",borderRadius:3,border:"1px solid var(--success)",background:"transparent",color:"var(--success)",fontSize:8,cursor:"pointer"}}>💾</button>
                       </td>
                     </tr>
@@ -3177,7 +3200,7 @@ export default function AdminPage() {
                         const exp=prompt("預計到貨日 YYYY-MM-DD（可空）：","");
                         const r=await ap("/api/admin/inventory",{action:"order_create",item_id:i.id,quantity:Number(q),store_id:i.store_id||sf||null,expected_date:exp||undefined,requested_by_name:auth?.name||"admin"});
                         if(r.error){alert("叫貨失敗："+r.error);return;}
-                        alert("✅ 已建立叫貨單");load();
+                        toast("✅ 已建立叫貨單");load();
                       }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--warning)",background:"transparent",fontSize:9,cursor:"pointer",color:"var(--warning)",marginLeft:2}}>📦叫貨</button>
                       <button onClick={async()=>{const q=prompt("入庫數量：");if(!q)return;await ap("/api/admin/inventory",{action:"movement",item_id:i.id,store_id:sf||null,type:"purchase",quantity:Number(q),notes:"手動入庫"});load();}}
                         style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--success)",background:"transparent",fontSize:9,cursor:"pointer",color:"var(--success)",marginLeft:2}}>+入庫</button>
@@ -3199,8 +3222,8 @@ export default function AdminPage() {
         {/* SHIPMENTS 出貨單 */}
         {!ld && tab === "shipments" && (() => {
           const reloadShip = () => {
-            ap("/api/admin/shipments?type=pending_orders_by_store").then(r => setShipPending(r.data||[]));
-            ap("/api/admin/shipments").then(r => setShipList(r.data||[]));
+            ap("/api/admin/shipments?type=pending_orders_by_store").then(r => setShipPending(r.data||[])).catch(() => {});
+            ap("/api/admin/shipments").then(r => setShipList(r.data||[])).catch(() => {});
             if (shipDetailId) ap("/api/admin/shipments?type=detail&id=" + shipDetailId).then(r => setShipDetail(r.data||null));
           };
           // 開始建立出貨單：把該店所有 pending orders 帶入編輯區
@@ -4044,7 +4067,7 @@ export default function AdminPage() {
                     if(pubForm.start>pubForm.end){alert("開始日期不可晚於結束日期");return;}
                     const r=await ap("/api/admin/schedules",{action:"publish",week_start:pubForm.start,week_end:pubForm.end,store_id:pubForm.store_id});
                     if(r.error){alert("錯誤："+r.error);return;}
-                    alert("✅ "+(r.message||`已發布 ${r.published||0} 筆，通知 ${r.notified||0} 人`));
+                    toast("✅ "+(r.message||`已發布 ${r.published||0} 筆，通知 ${r.notified||0} 人`));
                     setPubForm(null); load();
                   }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"var(--success)",color:"#fff",fontSize:11,cursor:"pointer",fontWeight:600}}>📢 確認發布</button>
                 </div>
@@ -4086,15 +4109,15 @@ export default function AdminPage() {
             const { eid, sid, storeId } = holPending;
             if (mode === "off") {
               await ap("/api/admin/schedules", { action: "add_leave", employee_id: eid, date: schPop.date, leave_type: "holiday_comp", note: popHol.name });
-              alert("✅ 已標記國定假日放假");
+              toast("✅ 已標記國定假日放假");
             } else if (mode === "transfer") {
               if (!holCompDate) { alert("請選擇補假日期"); return; }
               await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: storeId, shift_id: sid, date: schPop.date, day_type: "national_holiday", notes: "國定假日挪移→" + holCompDate });
               await ap("/api/admin/schedules", { action: "add_leave", employee_id: eid, date: holCompDate, leave_type: "holiday_comp", note: popHol.name + "補假", comp_source: holCompSource });
-              alert("✅ 已排班，" + holCompDate + " 補假（" + (holCompSource === "annual_leave" ? "扣特休" : "扣月薪") + "）");
+              toast("✅ 已排班，" + holCompDate + " 補假（" + (holCompSource === "annual_leave" ? "扣特休" : "扣月薪") + "）");
             } else if (mode === "work") {
               await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: storeId, shift_id: sid, date: schPop.date, day_type: "national_holiday", notes: "國定假日出勤(雙倍薪)" });
-              alert("✅ 已排班，薪資雙倍計算");
+              toast("✅ 已排班，薪資雙倍計算");
             }
             setHolMode(null); setHolCompDate(""); setHolPending(null); load();
           };
@@ -4209,7 +4232,7 @@ export default function AdminPage() {
                         const r = await ap("/api/admin/schedules", { action: "create", employee_id: eid, store_id: schPop.storeId === "__hq__" ? null : schPop.storeId, shift_id: s.id, date: schPop.date, day_type: "rest_day" });
                         if (r.warning) alert(r.warning);
                         if (r.error) alert(r.error);
-                        else alert("✅ 已排休息日出勤，同意書已推送");
+                        else toast("✅ 已排休息日出勤，同意書已推送");
                         load();
                       }}
                         style={{ padding: "6px", borderRadius: 6, border: "1px dashed var(--warning)", background: "var(--warning-bg)", fontSize: 10, cursor: "pointer", textAlign: "left" }}>
