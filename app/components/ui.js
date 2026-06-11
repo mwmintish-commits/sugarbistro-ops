@@ -153,6 +153,16 @@ export function Badge({ tone = "neutral", children }) {
   );
 }
 
+export function BackLink({ eid, label = "← 回面板" }) {
+  return (
+    <div style={{ marginTop: 14, textAlign: "center" }}>
+      <a href={`/me?eid=${eid || ""}`} style={{ display: "inline-block", padding: "10px 18px", fontSize: 13, color: "var(--brand-strong)", fontWeight: 600, textDecoration: "none" }}>
+        {label}
+      </a>
+    </div>
+  );
+}
+
 // 輕量 toast：const { toast, el } = useToast(); toast("已儲存"); render {el}
 export function useToast() {
   const [msg, setMsg] = useState(null);

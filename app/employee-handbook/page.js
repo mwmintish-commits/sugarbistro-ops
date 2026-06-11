@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { BONUS_SECTION } from "@/lib/bonus-terms";
+import { PageShell, PageHeader, LoadingSkeleton, BackLink } from "../components/ui";
+import { fetchJSON } from "@/lib/fetch-json";
 
 const FALLBACK_HB = [
   { title: "一、出勤、排班與請假", items: ["準時上班：應提前5分鐘到崗，完成更衣、儀容確認後方可開始工作。","依公司系統（QR Code）進行上下班打卡，不得代打、協助他人代打。","不得無故曠職：第一次書面警告，第二次以上得依規定解僱。","事假、病假至少提前4小時以書面（LINE群組）通知直屬主管。","病假超過3日須檢附醫院證明，否則視為事假計算。","換班須提前告知主管並經書面同意，當事雙方負連帶責任。"] },
@@ -23,8 +25,8 @@ export default function EmployeeHandbook() {
   useEffect(() => {
     setEid(new URLSearchParams(window.location.search).get("eid") || "");
     Promise.all([
-      fetch("/api/admin/system?key=handbook").then(r => r.json()).catch(() => ({})),
-      fetch("/api/admin/system?key=bonus_terms").then(r => r.json()).catch(() => ({})),
+      fetchJSON("/api/admin/system?key=handbook", { swrKey: "handbook", swrTtl: 300 }).catch(() => ({})),
+      fetchJSON("/api/admin/system?key=bonus_terms", { swrKey: "bonus_terms", swrTtl: 300 }).catch(() => ({})),
     ]).then(([hbRes, btRes]) => {
       const hbVal = hbRes.data?.value;
       const btVal = btRes.data?.value;
@@ -35,32 +37,26 @@ export default function EmployeeHandbook() {
     }).catch(() => { setSections([...FALLBACK_HB, BONUS_SECTION]); setLoading(false); });
   }, []);
 
-  const wrap = { maxWidth: 480, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "#f7f5f0", minHeight: "100vh" };
-
   return (
-    <div style={wrap}>
-      <div style={{ background: "linear-gradient(135deg, #c2185b, #880e4f)", borderRadius: 16, padding: "16px 18px", marginBottom: 14, color: "#fff" }}>
-        <div style={{ fontSize: 11, opacity: 0.85 }}>📋 員工守則</div>
-        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4 }}>小食糖 Sugar Bistro</div>
-        <div style={{ fontSize: 12, marginTop: 2, opacity: 0.85 }}>請詳閱並遵守各項規範</div>
-      </div>
+    <PageShell>
+      <PageHeader emoji="📋" title="員工守則" subtitle="小食糖 Sugar Bistro · 請詳閱並遵守各項規範" />
 
-      {loading && <div style={{ textAlign: "center", color: "#888", padding: 40, fontSize: 13 }}>載入中...</div>}
+      {loading && <LoadingSkeleton kind="list" rows={6} />}
 
       {!loading && sections.map((sec, i) => (
-        <div key={i} style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e6e1", marginBottom: 8, overflow: "hidden" }}>
+        <div key={i} className="sb-card" style={{ marginBottom: 8, overflow: "hidden" }}>
           <button
             onClick={() => setOpen(open === i ? null : i)}
-            style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", border: "none", background: "none", cursor: "pointer", textAlign: "left" }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#222" }}>{sec.title}</span>
-            <span style={{ fontSize: 14, color: "#888", transform: open === i ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</span>
+            style={{ width: "100%", minHeight: "var(--tap-min)", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", border: "none", background: "none", cursor: "pointer", textAlign: "left" }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{sec.title}</span>
+            <span style={{ fontSize: 14, color: "var(--text-3)", transform: open === i ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</span>
           </button>
           {open === i && (
             <div style={{ padding: "0 14px 12px" }}>
               {(sec.items || []).map((item, j) => (
-                <div key={j} style={{ display: "flex", gap: 8, padding: "5px 0", borderTop: j === 0 ? "1px solid #f0ede8" : "none" }}>
-                  <span style={{ color: "#c2185b", fontSize: 12, flexShrink: 0, marginTop: 1 }}>•</span>
-                  <span style={{ fontSize: 12, color: "#444", lineHeight: 1.7 }}>{item}</span>
+                <div key={j} style={{ display: "flex", gap: 8, padding: "5px 0", borderTop: j === 0 ? "1px solid var(--divider)" : "none" }}>
+                  <span style={{ color: "var(--brand)", fontSize: 12, flexShrink: 0, marginTop: 1 }}>•</span>
+                  <span style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.7 }}>{item}</span>
                 </div>
               ))}
             </div>
@@ -68,13 +64,11 @@ export default function EmployeeHandbook() {
         </div>
       ))}
 
-      <div style={{ marginTop: 14, background: "#fff3e0", borderRadius: 10, padding: 12, fontSize: 11, color: "#e65100", textAlign: "center" }}>
+      <div style={{ marginTop: 14, background: "var(--warning-bg)", borderRadius: 10, padding: 12, fontSize: 12, color: "var(--warning)", textAlign: "center" }}>
         如有任何疑問，請向店長或總部反映
       </div>
 
-      <div style={{ marginTop: 12, textAlign: "center" }}>
-        <a href={`/me?eid=${eid}`} style={{ fontSize: 12, color: "#880e4f" }}>← 回面板</a>
-      </div>
-    </div>
+      <BackLink eid={eid} />
+    </PageShell>
   );
 }
