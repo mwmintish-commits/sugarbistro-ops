@@ -37,6 +37,17 @@ async function setUserState(uid, flow, flowData = {}) { await supabase.from("use
 async function clearUserState(uid) { await supabase.from("user_states").delete().eq("line_uid", uid); }
 async function getEmployee(uid) { const { data } = await supabase.from("employees").select("*, stores!store_id(*)").eq("line_uid", uid).eq("is_active", true).single(); return data; }
 
+// 並行推播多位收件人；allSettled 確保單一失敗不影響其他人、不 throw
+// （收件人最多 ~30 人，遠低於 LINE push API 限流）
+function pushAll(recipients, text, excludeUid) {
+  return Promise.allSettled(
+    (recipients || [])
+      .map(r => (typeof r === "string" ? r : r?.line_uid))
+      .filter(u => u && u !== excludeUid)
+      .map(u => pushText(u, text))
+  );
+}
+
 async function handleBinding(rt, userId, code) {
   const { data: emp } = await supabase.from("employees").select("*, stores!store_id(name)").eq("bind_code", code).eq("is_active", true).single();
   if (!emp) return replyText(rt, "❌ 綁定碼無效。格式：綁定 123456");
@@ -270,9 +281,7 @@ async function confirmLeave(rt, uid, state) {
     // 通知主管
     const { data: mgrs } = await supabase.from("employees").select("line_uid")
       .in("role", ["admin", "store_manager"]).eq("is_active", true);
-    for (const m of mgrs || []) {
-      if (m.line_uid && m.line_uid !== uid) await pushText(m.line_uid, `📌 預假通知\n👤 ${d.employee_name}\n📅 ${startDate}\n⏰ ${d.advance_time || "整天"}`).catch(() => {});
-    }
+    await pushAll(mgrs, `📌 預假通知\n👤 ${d.employee_name}\n📅 ${startDate}\n⏰ ${d.advance_time || "整天"}`, uid);
     return replyWithQuickReply(rt, `✅ 預假已登記\n\n📅 ${startDate}\n⏰ ${d.advance_time || "整天"}\n\n排班時會自動避開此日`, getMenu("staff"));
   }
 
@@ -362,7 +371,7 @@ async function confirmOTRequest(rt, uid, reason, state) {
     const recipients = await getStoreManagers(supabase, d.store_id);
     const { data: st } = await supabase.from("stores").select("name").eq("id", d.store_id).single();
     const msg = `📩 加班申請待核准\n👤 ${d.employee_name}（${st?.name || ""}）\n📅 ${d.date}\n⏱ 預估 ${d.requested_minutes} 分鐘\n💼 ${prefLabel}\n📝 ${reason}\n\n核准請輸入：加班核准:${rec.id.slice(0,8)}\n退回請輸入：加班退回:${rec.id.slice(0,8)}`;
-    for (const r of recipients) await pushText(r.line_uid, msg).catch(() => {});
+    await pushAll(recipients, msg);
   } catch {}
 
   return replyText(rt, `✅ 加班申請已送出\n\n📅 ${d.date}\n⏱ ${d.requested_minutes} 分鐘\n💼 ${prefLabel}\n📝 ${reason}\n\n⏳ 等待主管核准（核准後下班打卡自動成立）`);
@@ -545,9 +554,16 @@ async function confirmSettlement(uid, emp) {
   if(!d.image_url){await pushText(uid,"❌ 日結必須上傳照片才能送出");return false;}
   const{data:stl,error}=await supabase.from("daily_settlements").upsert({store_id:d.store_id,date:d.date,period_start:d.period_start,period_end:d.period_end,cashier_name:d.cashier_name,net_sales:d.net_sales,discount_total:d.discount_total,cash_amount:d.cash_amount,line_pay_amount:d.line_pay_amount,twqr_amount:d.twqr_amount,uber_eat_amount:d.uber_eat_amount,easy_card_amount:d.easy_card_amount,remittance_amount:d.remittance_amount||0,meal_voucher_amount:d.meal_voucher_amount,line_credit_amount:d.line_credit_amount,drink_voucher_amount:d.drink_voucher_amount,invoice_count:d.invoice_count,invoice_start:d.invoice_start,invoice_end:d.invoice_end,void_invoice_count:d.void_invoice_count,void_invoice_amount:d.void_invoice_amount,void_invoice_numbers:d.void_invoice_numbers||"",cash_in_register:d.cash_in_register,petty_cash_reserved:d.petty_cash_reserved,void_item_count:d.void_item_count||0,void_item_amount:d.void_item_amount||0,cash_to_deposit:d.cash_to_deposit,image_url:d.image_url,ai_raw_data:d.ai_raw_data,submitted_by:d.employee_id,submitted_at:new Date().toISOString(),status:"confirmed"},{onConflict:"store_id,date"}).select().single();
   if(error){console.error(error);return false;}
-  if(d.receipts?.length&&stl){for(const r of d.receipts){await supabase.from("settlement_receipts").insert({settlement_id:stl.id,receipt_type:r.type,image_url:r.image_url,serial_numbers:r.serial_numbers,ai_raw_data:r.ai_raw_data});if((r.type==="meal_voucher"||r.type==="drink_voucher")&&r.serial_numbers?.length){for(const sn of r.serial_numbers){await supabase.from("voucher_serials").insert({serial_number:sn,voucher_type:r.type==="meal_voucher"?"meal":"drink",store_id:d.store_id,settlement_id:stl.id,date:d.date});}}}}
+  if(d.receipts?.length&&stl){
+    const receiptRows=d.receipts.map(r=>({settlement_id:stl.id,receipt_type:r.type,image_url:r.image_url,serial_numbers:r.serial_numbers,ai_raw_data:r.ai_raw_data}));
+    await supabase.from("settlement_receipts").insert(receiptRows);
+    const serialRows=d.receipts
+      .filter(r=>(r.type==="meal_voucher"||r.type==="drink_voucher")&&r.serial_numbers?.length)
+      .flatMap(r=>r.serial_numbers.map(sn=>({serial_number:sn,voucher_type:r.type==="meal_voucher"?"meal":"drink",store_id:d.store_id,settlement_id:stl.id,date:d.date})));
+    if(serialRows.length)await supabase.from("voucher_serials").insert(serialRows);
+  }
   const{data:adm}=await supabase.from("employees").select("line_uid").eq("role","admin").eq("is_active",true);
-  if(adm)for(const a of adm)if(a.line_uid&&a.line_uid!==uid)await pushText(a.line_uid,`📊 日結 ${d.store_name} ${d.date}\n淨額${fmt(d.net_sales)}`).catch(()=>{});
+  await pushAll(adm,`📊 日結 ${d.store_name} ${d.date}\n淨額${fmt(d.net_sales)}`,uid);
   await clearUserState(uid);return true;
 }
 
@@ -575,7 +591,7 @@ async function confirmDeposit(rt,uid,state,emp){
   const amt=Number(d.amount)||0,diff=amt-exp,abs=Math.abs(diff);
   let st,em,tx;if(abs<=500){st="matched";em="✅";tx="吻合";}else if(abs<=2000){st="minor_diff";em="⚠️";tx="小差異";}else{st="anomaly";em="🚨";tx="異常";}
   await supabase.from("deposits").insert({store_id:d.store_id,deposit_date:d.deposit_date,amount:amt,bank_name:d.bank_name,bank_branch:d.bank_branch,account_number:d.account_number,depositor_name:d.employee_name,roc_date:d.roc_date,period_start:d.period_start,period_end:d.period_end,expected_cash:exp,difference:diff,status:st,image_url:d.image_url,ai_raw_data:d.ai_raw_data,submitted_by:d.employee_id});
-  if(st!=="matched"){const{data:adm}=await supabase.from("employees").select("line_uid").eq("role","admin").eq("is_active",true);if(adm)for(const a of adm)if(a.line_uid&&a.line_uid!==uid)await pushText(a.line_uid,`${em} 存款${tx} ${d.store_name}｜${d.employee_name}\n${fmt(amt)} vs ${fmt(exp)}（${d.period_start}~${d.period_end}）`).catch(()=>{});}
+  if(st!=="matched"){const{data:adm}=await supabase.from("employees").select("line_uid").eq("role","admin").eq("is_active",true);await pushAll(adm,`${em} 存款${tx} ${d.store_name}｜${d.employee_name}\n${fmt(amt)} vs ${fmt(exp)}（${d.period_start}~${d.period_end}）`,uid);}
   await clearUserState(uid);
   return replyWithQuickReply(rt,`✅ 存款已登記\n\n🏠 ${d.store_name}\n💰 ${fmt(amt)} vs 應存 ${fmt(exp)}\n📅 ${d.period_start} ~ ${d.period_end}\n${em} ${tx}`,getMenu(emp?.role||"staff"));
 }
@@ -584,7 +600,8 @@ async function queryRevenue(rt){const today=new Date().toLocaleDateString("sv-SE
 
 // ===== 主事件 =====
 async function handleEvent(event) {
-  const userId = event.source.userId, emp = await getEmployee(userId), state = await getUserState(userId);
+  const userId = event.source.userId;
+  const [emp, state] = await Promise.all([getEmployee(userId), getUserState(userId)]);
 
   // 圖片訊息：webhook 不處理（serverless 10s timeout 風險），請走網頁 /upload
   if (event.type === "message" && event.message.type === "image") {
@@ -613,11 +630,7 @@ async function handleEvent(event) {
       const tag = accepted ? "✅ 已同意" : "❌ 已拒絕";
       const sh = sch?.shifts;
       const shiftStr = sh ? `${(sh.start_time||"").slice(0,5)}~${(sh.end_time||"").slice(0,5)}` : "";
-      for (const m of mgrs || []) {
-        if (m.line_uid && m.line_uid !== userId) {
-          await pushText(m.line_uid, `${tag} 休息日加班\n👤 ${sch?.employees?.name || ""}\n📅 ${sch?.date || ""} ${shiftStr}` + (accepted ? "" : "\n⚠️ 請重新安排此日排班")).catch(() => {});
-        }
-      }
+      await pushAll(mgrs, `${tag} 休息日加班\n👤 ${sch?.employees?.name || ""}\n📅 ${sch?.date || ""} ${shiftStr}` + (accepted ? "" : "\n⚠️ 請重新安排此日排班"), userId);
       return replyText(rt, accepted
         ? `✅ 已同意 ${sch?.date || ""} 休息日加班\n依法將以加班費階梯計薪`
         : `❌ 已拒絕 ${sch?.date || ""} 休息日加班\n排班已取消，主管已收到通知`);
@@ -781,42 +794,11 @@ async function handleEvent(event) {
     const { data: mgrs } = await supabase.from("employees")
       .select("line_uid").eq("store_id", d.store_id)
       .in("role", ["store_manager", "manager", "admin"]).eq("is_active", true);
-    for (const m of mgrs || []) {
-      if (m.line_uid) {
-        await pushText(m.line_uid,
-          "🔧 補打卡申請\n👤 " + emp.name + "\n📅 " + d.date +
-          " " + (d.type === "clock_in" ? "上班" : "下班") + " " + d.amended_time +
-          "\n📝 " + text
-        ).catch(() => {});
-      }
-    }
-    return replyWithQuickReply(rt,
-      "✅ 補打卡申請已送出\n\n📅 " + d.date + " " +
-      (d.type === "clock_in" ? "上班" : "下班") + " " + d.amended_time +
-      "\n📝 " + text + "\n\n⏳ 等待主管核准",
-      getMenu(emp.role)
+    await pushAll(mgrs,
+      "🔧 補打卡申請\n👤 " + emp.name + "\n📅 " + d.date +
+      " " + (d.type === "clock_in" ? "上班" : "下班") + " " + d.amended_time +
+      "\n📝 " + text
     );
-  }
-  if (state?.current_flow === "amend_reason") {
-    const d = state.flow_data;
-    await supabase.from("clock_amendments").insert({
-      employee_id: d.employee_id, store_id: d.store_id,
-      date: d.date, type: d.type, amended_time: d.amended_time, reason: text,
-    });
-    await clearUserState(userId);
-    // 通知主管
-    const { data: mgrs } = await supabase.from("employees")
-      .select("line_uid").eq("store_id", d.store_id)
-      .in("role", ["store_manager", "manager", "admin"]).eq("is_active", true);
-    for (const m of mgrs || []) {
-      if (m.line_uid) {
-        await pushText(m.line_uid,
-          "🔧 補打卡申請\n👤 " + emp.name + "\n📅 " + d.date +
-          " " + (d.type === "clock_in" ? "上班" : "下班") + " " + d.amended_time +
-          "\n📝 " + text
-        ).catch(() => {});
-      }
-    }
     return replyWithQuickReply(rt,
       "✅ 補打卡申請已送出\n\n📅 " + d.date + " " +
       (d.type === "clock_in" ? "上班" : "下班") + " " + d.amended_time +
@@ -857,9 +839,7 @@ async function handleEvent(event) {
     // 通知主管
     const { data: mgrs } = await supabase.from("employees").select("line_uid")
       .eq("store_id", emp.store_id).in("role", ["store_manager", "manager", "admin"]).eq("is_active", true);
-    for (const m of mgrs || []) {
-      if (m.line_uid) await pushText(m.line_uid, "🔄 調班申請\n" + d.requester_name + " ↔ " + d.target_name + "\n📅 " + d.date_a + " ↔ " + text + "\n⏳ 待核准").catch(() => {});
-    }
+    await pushAll(mgrs, "🔄 調班申請\n" + d.requester_name + " ↔ " + d.target_name + "\n📅 " + d.date_a + " ↔ " + text + "\n⏳ 待核准");
     return replyText(rt, "✅ 調班申請已送出\n\n🔄 " + d.requester_name + " ↔ " + d.target_name + "\n📅 " + d.date_a + " ↔ " + text + "\n\n⏳ 等待主管核准");
   }
 
@@ -924,13 +904,14 @@ async function handleEvent(event) {
   if (text.startsWith("週時段:") && state?.current_flow === "advance_weekly_time") return handleAdvanceWeeklyTime(rt, userId, text.replace("週時段:", ""), state);
   if (text === "確認週預假" && state?.current_flow === "advance_weekly_confirm") {
     const d = state.flow_data;
-    for (const date of d.dates || []) {
-      await supabase.from("schedules").upsert({ employee_id: d.employee_id, date, type: "leave", leave_type: "advance", notes: d.advance_time || "預假" }, { onConflict: "employee_id,date" });
+    if ((d.dates || []).length) {
+      const rows = d.dates.map(date => ({ employee_id: d.employee_id, date, type: "leave", leave_type: "advance", notes: d.advance_time || "預假" }));
+      await supabase.from("schedules").upsert(rows, { onConflict: "employee_id,date" });
     }
     await clearUserState(userId);
     const dayNames = ["日","一","二","三","四","五","六"];
     const { data: mgrs } = await supabase.from("employees").select("line_uid").in("role",["admin","store_manager"]).eq("is_active",true);
-    for (const m of mgrs||[]) if(m.line_uid&&m.line_uid!==userId) await pushText(m.line_uid, `📌 每週預假\n👤 ${d.employee_name}\n📅 每週${d.selected_days.map(i=>"週"+dayNames[i]).join("、")}\n⏰ ${d.advance_time}\n📋 共${d.dates.length}天`).catch(()=>{});
+    await pushAll(mgrs, `📌 每週預假\n👤 ${d.employee_name}\n📅 每週${d.selected_days.map(i=>"週"+dayNames[i]).join("、")}\n⏰ ${d.advance_time}\n📋 共${d.dates.length}天`, userId);
     return replyWithQuickReply(rt, `✅ 每週預假已登記！\n\n📅 共 ${d.dates.length} 天\n⏰ ${d.advance_time}\n\n排班時會自動避開`, getMenu(emp.role));
   }
   if (text.startsWith("天數:") && state?.current_flow === "leave_select_day_type") return handleLeaveDayType(rt, userId, text.replace("天數:", ""), state);
@@ -1198,7 +1179,7 @@ async function handleEvent(event) {
       await supabase.from("expenses").insert(records);
       await clearUserState(userId);
       const { data: admins } = await supabase.from("employees").select("line_uid").eq("role", "admin").eq("is_active", true);
-      if (admins) for (const a of admins) if (a.line_uid && a.line_uid !== userId) await pushText(a.line_uid, `📦 預付費用\n${d.store_name}｜${d.employee_name}\n${d.vendor_name || ""} ${fmt(d.amount)}（分${d.prepaid_months}個月 每月${fmt(monthlyAmt)}）`).catch(() => {});
+      await pushAll(admins, `📦 預付費用\n${d.store_name}｜${d.employee_name}\n${d.vendor_name || ""} ${fmt(d.amount)}（分${d.prepaid_months}個月 每月${fmt(monthlyAmt)}）`, userId);
       return replyWithQuickReply(rt, `✅ 預付費用已儲存！\n${d.vendor_name || ""} ${fmt(d.amount)}\n📆 分攤${d.prepaid_months}個月（每月${fmt(monthlyAmt)}）`, getMenu(emp.role));
     }
 
@@ -1236,7 +1217,7 @@ async function handleEvent(event) {
     }
     await clearUserState(userId);
     const { data: admins } = await supabase.from("employees").select("line_uid").eq("role", "admin").eq("is_active", true);
-    if (admins) for (const a of admins) if (a.line_uid && a.line_uid !== userId) await pushText(a.line_uid, `📦 ${d.expense_type === "vendor" ? "月結單據" : d.expense_type === "hq_advance" ? "總部代付" : "零用金"}\n${d.store_name}｜${d.employee_name}\n${d.vendor_name || ""} ${fmt(d.amount)}\n📋 ${d.category_suggestion}`).catch(() => {});
+    await pushAll(admins, `📦 ${d.expense_type === "vendor" ? "月結單據" : d.expense_type === "hq_advance" ? "總部代付" : "零用金"}\n${d.store_name}｜${d.employee_name}\n${d.vendor_name || ""} ${fmt(d.amount)}\n📋 ${d.category_suggestion}`, userId);
     return replyWithQuickReply(rt, `✅ 已儲存！\n${d.vendor_name || ""} ${fmt(d.amount)}`, getMenu(emp.role));
   }
 
