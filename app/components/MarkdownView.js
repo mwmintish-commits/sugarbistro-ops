@@ -4,17 +4,17 @@
 // 設計參照：staff-promotions-handbook.pdf（米色 callout、灰色表頭、底線標題）
 
 const COLORS = {
-  text: "#222",
-  meta: "#888",
-  rule: "#1a1a1a",
-  callout_bg: "#faf5e8",
+  text: "var(--text)",
+  meta: "var(--text-3)",
+  rule: "var(--ink)",
+  callout_bg: "var(--surface-warm)",
   callout_border: "#e8dfc4",
   code_bg: "#f0ebe0",
   th_bg: "#f5f0e5",
-  td_border: "#eee",
-  link: "#185fa5",
+  td_border: "var(--divider)",
+  link: "var(--info)",
   green_bg: "#e6f9ed",
-  red_bg: "#fde8e8",
+  red_bg: "var(--danger-bg)",
 };
 
 // 行內語法：**bold**、`code`、URL → JSX

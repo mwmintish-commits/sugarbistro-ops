@@ -146,29 +146,13 @@ textarea {
 .sb-table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  border-radius: var(--radius-sm);
-}
-.sb-table-wrap table th:first-child,
-.sb-table-wrap table td:first-child {
-  position: sticky;
-  left: 0;
-  background: var(--surface);
-  z-index: 1;
-}
-.sb-table-wrap table thead th:first-child {
-  z-index: 2;
-}
-
-.sb-admin-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
 }
 
 @media (max-width: 768px) {
+  /* Tab 列：手機改單列橫向滑動 */
   .sb-admin-tabs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 4px;
     scrollbar-width: none;
@@ -176,18 +160,23 @@ textarea {
   .sb-admin-tabs::-webkit-scrollbar { display: none; }
   .sb-admin-tabs > * { flex: 0 0 auto; }
 
-  .sb-admin-toolbar {
-    flex-direction: column !important;
-    align-items: stretch !important;
+  /* 寬表格：手機固定第一欄（員工名等），單指橫滑其餘欄位 */
+  .sb-table-wrap table th:first-child,
+  .sb-table-wrap table td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--surface);
+    z-index: 1;
   }
-  .sb-admin-toolbar > * { width: 100%; }
+  .sb-table-wrap table thead th:first-child { z-index: 2; }
 
-  .sb-admin-header { padding: 8px 10px !important; }
+  .sb-admin-header { flex-wrap: wrap; gap: 6px; }
 
+  /* 觸控目標下限 */
   .sb-admin button,
   .sb-admin select,
   .sb-admin input[type="date"],
   .sb-admin input[type="month"] {
-    min-height: var(--tap-min);
+    min-height: 38px;
   }
 }

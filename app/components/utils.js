@@ -45,42 +45,42 @@ export const ROLES = {
 };
 
 export const LT = {
-  advance: { l: "預假", c: "#b45309", bg: "#fef3c7" },
-  holiday_comp: { l: "國定補假", c: "#b91c1c", bg: "#fde8e8" },
-  annual: { l: "特休", c: "#4361ee", bg: "#e6f1fb" },
-  sick: { l: "病假", c: "#b45309", bg: "#fff8e6" },
-  personal: { l: "事假", c: "#8a6d00", bg: "#fef9c3" },
+  advance: { l: "預假", c: "var(--warning)", bg: "var(--warning-bg)" },
+  holiday_comp: { l: "國定補假", c: "var(--danger)", bg: "var(--danger-bg)" },
+  annual: { l: "特休", c: "var(--brand-strong)", bg: "var(--info-bg)" },
+  sick: { l: "病假", c: "var(--warning)", bg: "var(--warning-bg)" },
+  personal: { l: "事假", c: "var(--warning)", bg: "var(--warning-bg)" },
   menstrual: { l: "生理假", c: "#993556", bg: "#fbeaf0" },
-  off: { l: "⬛ 例假", c: "#333", bg: "#e0e0e0" },
-  rest: { l: "🔲 休息日", c: "#555", bg: "#e8e8e8" },
-  comp_time: { l: "補休", c: "#185fa5", bg: "#e6f1fb" },
-  marriage: { l: "婚假", c: "#b45309", bg: "#fff8e6" },
-  funeral: { l: "喪假", c: "#555", bg: "#e8e8e8" },
-  paternity: { l: "陪產假", c: "#185fa5", bg: "#e6f1fb" },
+  off: { l: "⬛ 例假", c: "var(--text)", bg: "#e0e0e0" },
+  rest: { l: "🔲 休息日", c: "var(--text-2)", bg: "#e8e8e8" },
+  comp_time: { l: "補休", c: "var(--info)", bg: "var(--info-bg)" },
+  marriage: { l: "婚假", c: "var(--warning)", bg: "var(--warning-bg)" },
+  funeral: { l: "喪假", c: "var(--text-2)", bg: "#e8e8e8" },
+  paternity: { l: "陪產假", c: "var(--info)", bg: "var(--info-bg)" },
   maternity: { l: "產假", c: "#993556", bg: "#fbeaf0" },
-  family_care: { l: "家庭照顧", c: "#8a6d00", bg: "#fef9c3" },
-  official: { l: "公假", c: "#666", bg: "#f0f0f0" },
-  work_injury: { l: "公傷假", c: "#b91c1c", bg: "#fde8e8" }
+  family_care: { l: "家庭照顧", c: "var(--warning)", bg: "var(--warning-bg)" },
+  official: { l: "公假", c: "var(--text-2)", bg: "#f0f0f0" },
+  work_injury: { l: "公傷假", c: "var(--danger)", bg: "var(--danger-bg)" }
 };
 
 export function Badge({ status }) {
   const m = {
     draft: { bg: "#f3f4f6", c: "#6b7280" },
-    matched: { bg: "#e6f9f0", c: "#0a7c42" },
-    pending: { bg: "#fff8e6", c: "#8a6d00" },
-    approved: { bg: "#e6f9f0", c: "#0a7c42" },
-    rejected: { bg: "#fde8e8", c: "#b91c1c" },
-    anomaly: { bg: "#fde8e8", c: "#b91c1c" },
-    planned: { bg: "#e6f1fb", c: "#185fa5" },
-    in_progress: { bg: "#fff8e6", c: "#8a6d00" },
-    completed: { bg: "#e6f9f0", c: "#0a7c42" },
-    confirmed: { bg: "#e6f1fb", c: "#185fa5" },
-    shipped: { bg: "#fff8e6", c: "#8a6d00" },
-    delivered: { bg: "#e6f9f0", c: "#0a7c42" },
-    paid: { bg: "#e6f9f0", c: "#0a7c42" },
-    unpaid: { bg: "#fde8e8", c: "#b91c1c" },
+    matched: { bg: "var(--success-bg)", c: "var(--success)" },
+    pending: { bg: "var(--warning-bg)", c: "var(--warning)" },
+    approved: { bg: "var(--success-bg)", c: "var(--success)" },
+    rejected: { bg: "var(--danger-bg)", c: "var(--danger)" },
+    anomaly: { bg: "var(--danger-bg)", c: "var(--danger)" },
+    planned: { bg: "var(--info-bg)", c: "var(--info)" },
+    in_progress: { bg: "var(--warning-bg)", c: "var(--warning)" },
+    completed: { bg: "var(--success-bg)", c: "var(--success)" },
+    confirmed: { bg: "var(--info-bg)", c: "var(--info)" },
+    shipped: { bg: "var(--warning-bg)", c: "var(--warning)" },
+    delivered: { bg: "var(--success-bg)", c: "var(--success)" },
+    paid: { bg: "var(--success-bg)", c: "var(--success)" },
+    unpaid: { bg: "var(--danger-bg)", c: "var(--danger)" },
   };
-  const s = m[status] || { bg: "#f0f0f0", c: "#666" };
+  const s = m[status] || { bg: "#f0f0f0", c: "var(--text-2)" };
   return (
     <span style={{
       padding: "2px 6px", borderRadius: 8,
@@ -93,10 +93,10 @@ export function Badge({ status }) {
 
 export function RB({ role }) {
   const c = {
-    admin: { bg: "#fde8e8", c: "#b91c1c" },
-    manager: { bg: "#e6f1fb", c: "#185fa5" },
-    store_manager: { bg: "#fef9c3", c: "#8a6d00" },
-    staff: { bg: "#e6f9f0", c: "#0a7c42" }
+    admin: { bg: "var(--danger-bg)", c: "var(--danger)" },
+    manager: { bg: "var(--info-bg)", c: "var(--info)" },
+    store_manager: { bg: "var(--warning-bg)", c: "var(--warning)" },
+    staff: { bg: "var(--success-bg)", c: "var(--success)" }
   };
   const s = c[role] || c.staff;
   return (
@@ -115,7 +115,7 @@ export function Row({ l, v }) {
       display: "flex", justifyContent: "space-between",
       alignItems: "center", padding: "4px 0", fontSize: 12
     }}>
-      <span style={{ color: "#888" }}>{l}</span>
+      <span style={{ color: "var(--text-3)" }}>{l}</span>
       <span>{v || "-"}</span>
     </div>
   );

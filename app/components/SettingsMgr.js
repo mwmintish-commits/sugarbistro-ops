@@ -100,20 +100,20 @@ export default function SettingsMgr({ stores, load, month, auth }) {
       <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>⚙️ 系統設定</h3>
 
       {/* 公司名稱 */}
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🏢 公司設定</h4>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <input value={companyName} onChange={e => setCompanyName(e.target.value)}
-            style={{ flex: 1, padding: "5px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12 }} />
+            style={{ flex: 1, padding: "5px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12 }} />
           <button onClick={() => ap("/api/admin/system", { key: "company_name", value: companyName }).then(() => alert("已儲存"))}
-            style={{ padding: "5px 12px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer" }}>💾</button>
+            style={{ padding: "5px 12px", borderRadius: 4, border: "none", background: "var(--success)", color: "#fff", fontSize: 11, cursor: "pointer" }}>💾</button>
         </div>
       </div>
 
       {/* iCHEF 自動同步區塊 */}
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🍽️ iCHEF 自動同步（從會員系統拉日結）</h4>
-        <div style={{ fontSize: 10, color: "#888", marginBottom: 8, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 8, lineHeight: 1.6 }}>
           • 每日 04:00 自動執行（需設定 cron-job.org）<br/>
           • 來源：sugarbistro-member（會員系統 03:10 抓 iCHEF）<br/>
           • 已對應 ichef_code 的門市才會匯入；已連結存款的日期會跳過<br/>
@@ -121,12 +121,12 @@ export default function SettingsMgr({ stores, load, month, auth }) {
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "flex-end", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 100 }}>
-            <label style={{ fontSize: 9, color: "#888" }}>起始日</label>
-            <input type="date" id="ichef-start" style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+            <label style={{ fontSize: 9, color: "var(--text-3)" }}>起始日</label>
+            <input type="date" id="ichef-start" style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }} />
           </div>
           <div style={{ flex: 1, minWidth: 100 }}>
-            <label style={{ fontSize: 9, color: "#888" }}>結束日（留空=同起始日）</label>
-            <input type="date" id="ichef-end" style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+            <label style={{ fontSize: 9, color: "var(--text-3)" }}>結束日（留空=同起始日）</label>
+            <input type="date" id="ichef-end" style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }} />
           </div>
           <button onClick={async () => {
             const start = document.getElementById("ichef-start")?.value;
@@ -138,14 +138,14 @@ export default function SettingsMgr({ stores, load, month, auth }) {
             if (btn) { btn.textContent = "🔄 立即補抓"; btn.disabled = false; }
             if (r.error) { alert("❌ " + r.error + (r.detail ? "\n\n" + r.detail : "")); return; }
             alert(`✅ ${r.message}\n\n抓回 ${r.fetched} 筆${r.unmapped_codes?.length ? "\n\n⚠️ 未對應的 storeCode：" + r.unmapped_codes.join(", ") : ""}${r.errors?.length ? "\n\n⚠️ 錯誤：\n" + r.errors.slice(0,3).join("\n") : ""}`);
-          }} id="ichef-pull-btn" style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#b45309", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔄 立即補抓</button>
+          }} id="ichef-pull-btn" style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "var(--warning)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔄 立即補抓</button>
         </div>
       </div>
 
       {/* iCHEF 品項銷售匯入 */}
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🍰 iCHEF 品項銷售匯入（從會員系統拉每筆品項）</h4>
-        <div style={{ fontSize: 10, color: "#888", marginBottom: 8, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 8, lineHeight: 1.6 }}>
           • 來源：sugarbistro-member /api/admin/ichef/sales-items（需對方先實作）<br/>
           • 解鎖：品項銷售排行、自動扣原料、進銷存核對、毛利分析<br/>
           • 對方未實作前可勾「使用 mock 來源」測試結構是否正確<br/>
@@ -153,14 +153,14 @@ export default function SettingsMgr({ stores, load, month, auth }) {
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "flex-end", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 100 }}>
-            <label style={{ fontSize: 9, color: "#888" }}>起始日</label>
-            <input type="date" id="sales-start" style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+            <label style={{ fontSize: 9, color: "var(--text-3)" }}>起始日</label>
+            <input type="date" id="sales-start" style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }} />
           </div>
           <div style={{ flex: 1, minWidth: 100 }}>
-            <label style={{ fontSize: 9, color: "#888" }}>結束日</label>
-            <input type="date" id="sales-end" style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+            <label style={{ fontSize: 9, color: "var(--text-3)" }}>結束日</label>
+            <input type="date" id="sales-end" style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }} />
           </div>
-          <label style={{ fontSize: 10, color: "#666", display: "flex", alignItems: "center", gap: 4, paddingBottom: 6 }}>
+          <label style={{ fontSize: 10, color: "var(--text-2)", display: "flex", alignItems: "center", gap: 4, paddingBottom: 6 }}>
             <input type="checkbox" id="sales-mock" /> 使用 mock 來源（測試用）
           </label>
           <button onClick={async () => {
@@ -179,15 +179,15 @@ export default function SettingsMgr({ stores, load, month, auth }) {
       </div>
 
       {/* 門市管理（含定位、目標、預算） */}
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🏠 門市管理</h4>
         {stores.map(s => (
-          <div key={s.id} style={{ padding: 10, marginBottom: 8, borderRadius: 8, border: "1px solid #e8e6e1", background: "#faf8f5" }}>
+          <div key={s.id} style={{ padding: 10, marginBottom: 8, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-warm)" }}>
             <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
-              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>名稱</label><input id={"sn-"+s.id} defaultValue={s.name} style={{ width: "100%", padding: "5px 8px", border: "1px solid #eee", borderRadius: 6, fontSize: 12, fontWeight: 600 }} /></div>
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "var(--text-3)" }}>名稱</label><input id={"sn-"+s.id} defaultValue={s.name} style={{ width: "100%", padding: "5px 8px", border: "1px solid #eee", borderRadius: 6, fontSize: 12, fontWeight: 600 }} /></div>
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "flex-end" }}>
-              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>地址</label><input id={"sa-"+s.id} defaultValue={s.address||""} placeholder="輸入完整地址" style={{ width: "100%", padding: "5px 8px", border: "1px solid #eee", borderRadius: 6, fontSize: 11 }} /></div>
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "var(--text-3)" }}>地址</label><input id={"sa-"+s.id} defaultValue={s.address||""} placeholder="輸入完整地址" style={{ width: "100%", padding: "5px 8px", border: "1px solid #eee", borderRadius: 6, fontSize: 11 }} /></div>
             </div>
             {/* 定位方式 */}
             <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap" }}>
@@ -195,7 +195,7 @@ export default function SettingsMgr({ stores, load, month, auth }) {
                 const addr = document.getElementById("sa-"+s.id).value || s.name;
                 window.open("https://www.google.com/maps/search/" + encodeURIComponent(addr), "_blank");
                 alert("請在 Google Maps 找到門市位置後：\n\n1. 右鍵點擊門市位置\n2. 點擊座標數字（會自動複製）\n3. 回來貼到下方「緯度, 經度」欄位\n\n格式範例：25.033964, 121.564468");
-              }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #4361ee", background: "#fff", color: "#4361ee", fontSize: 11, cursor: "pointer" }}>🗺️ Google Maps 查詢</button>
+              }} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid var(--brand-strong)", background: "#fff", color: "var(--brand-strong)", fontSize: 11, cursor: "pointer" }}>🗺️ Google Maps 查詢</button>
               <button onClick={() => {
                 if (!navigator.geolocation) { alert("不支援定位"); return; }
                 const btn = document.getElementById("loc-btn-"+s.id);
@@ -208,12 +208,12 @@ export default function SettingsMgr({ stores, load, month, auth }) {
                   document.getElementById("map-wrap-"+s.id).style.display = "block";
                   if (btn) btn.textContent = "✅ 精度" + Math.round(pos.coords.accuracy) + "m";
                 }, err => { if (btn) btn.textContent = "❌"; alert("定位失敗：" + err.message + "\n\n請用 Google Maps 查詢方式"); }, { enableHighAccuracy: true, timeout: 15000 });
-              }} id={"loc-btn-"+s.id} style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer" }}>📍 到現場定位</button>
+              }} id={"loc-btn-"+s.id} style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: "var(--success)", color: "#fff", fontSize: 11, cursor: "pointer" }}>📍 到現場定位</button>
             </div>
             {/* 座標輸入（從 Google Maps 複製貼上） */}
             <div style={{ display: "flex", gap: 4, marginBottom: 6, alignItems: "flex-end" }}>
               <div style={{ flex: 2 }}>
-                <label style={{ fontSize: 9, color: "#888" }}>緯度, 經度（從 Google Maps 複製）</label>
+                <label style={{ fontSize: 9, color: "var(--text-3)" }}>緯度, 經度（從 Google Maps 複製）</label>
                 <input id={"coords-"+s.id} defaultValue={s.latitude && s.longitude ? s.latitude + ", " + s.longitude : ""} placeholder="25.033964, 121.564468"
                   onChange={e => {
                     const parts = e.target.value.split(",").map(x => x.trim());
@@ -225,11 +225,11 @@ export default function SettingsMgr({ stores, load, month, auth }) {
                       document.getElementById("map-wrap-"+s.id).style.display = "block";
                     }
                   }}
-                  style={{ width: "100%", padding: "5px 8px", border: "1px solid #ddd", borderRadius: 6, fontSize: 11 }} />
+                  style={{ width: "100%", padding: "5px 8px", border: "1px solid var(--border)", borderRadius: 6, fontSize: 11 }} />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 9, color: "#888" }}>打卡範圍</label>
-                <select id={"rad-"+s.id} defaultValue={s.radius_m||200} style={{ width: "100%", padding: "5px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="50">50m</option><option value="100">100m</option><option value="150">150m</option><option value="200">200m</option><option value="300">300m</option><option value="500">500m</option></select>
+                <label style={{ fontSize: 9, color: "var(--text-3)" }}>打卡範圍</label>
+                <select id={"rad-"+s.id} defaultValue={s.radius_m||200} style={{ width: "100%", padding: "5px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }}><option value="50">50m</option><option value="100">100m</option><option value="150">150m</option><option value="200">200m</option><option value="300">300m</option><option value="500">500m</option></select>
               </div>
             </div>
             {/* 地圖預覽 */}
@@ -240,18 +240,18 @@ export default function SettingsMgr({ stores, load, month, auth }) {
             <input type="hidden" id={"lng-"+s.id} defaultValue={s.longitude||""} />
             {/* 目標 + 預算 */}
             <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "flex-end" }}>
-              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>日營收目標</label><input type="number" id={"dt-"+s.id} defaultValue={s.daily_target||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} /></div>
-              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "#888" }}>月費用預算</label><input type="number" id={"eb-"+s.id} defaultValue={s.monthly_expense_budget||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} /></div>
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "var(--text-3)" }}>日營收目標</label><input type="number" id={"dt-"+s.id} defaultValue={s.daily_target||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }} /></div>
+              <div style={{ flex: 1 }}><label style={{ fontSize: 9, color: "var(--text-3)" }}>月費用預算</label><input type="number" id={"eb-"+s.id} defaultValue={s.monthly_expense_budget||0} style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }} /></div>
             </div>
             {/* iCHEF 對應碼（會員系統 storeCode → 自動匯入日結用） */}
             <div style={{ marginBottom: 6 }}>
-              <label style={{ fontSize: 9, color: "#888" }}>iCHEF 對應碼（YK / PT / SKM_ZY / SKM_OUTLET，留空=不自動匯入）</label>
-              <input id={"ic-"+s.id} defaultValue={s.ichef_code||""} placeholder="例：YK" style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+              <label style={{ fontSize: 9, color: "var(--text-3)" }}>iCHEF 對應碼（YK / PT / SKM_ZY / SKM_OUTLET，留空=不自動匯入）</label>
+              <input id={"ic-"+s.id} defaultValue={s.ichef_code||""} placeholder="例：YK" style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }} />
             </div>
             {/* 自定義結帳方式（用逗號分隔，後台拆分日結時當快速選單） */}
             <div style={{ marginBottom: 6 }}>
-              <label style={{ fontSize: 9, color: "#888" }}>常用自定義結帳方式（逗號分隔，例：匯款,SKMpay,百貨點數）</label>
-              <input id={"cpm-"+s.id} defaultValue={(s.custom_payment_methods||[]).join(",")} placeholder="匯款,SKMpay,百貨點數" style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+              <label style={{ fontSize: 9, color: "var(--text-3)" }}>常用自定義結帳方式（逗號分隔，例：匯款,SKMpay,百貨點數）</label>
+              <input id={"cpm-"+s.id} defaultValue={(s.custom_payment_methods||[]).join(",")} placeholder="匯款,SKMpay,百貨點數" style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }} />
             </div>
             <button onClick={async () => {
               try {
@@ -270,42 +270,42 @@ export default function SettingsMgr({ stores, load, month, auth }) {
                 alert("✅ " + name + " 已儲存");
                 load();
               } catch (e) { alert("❌ " + (e.message || "儲存失敗")); }
-            }} style={{ width: "100%", padding: "7px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>💾 儲存 {s.name}</button>
+            }} style={{ width: "100%", padding: "7px", borderRadius: 6, border: "none", background: "var(--success)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>💾 儲存 {s.name}</button>
           </div>
         ))}
         {/* 新增門市 */}
         <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
           <input value={newStore.name} onChange={e=>setNewStore({...newStore,name:e.target.value})} placeholder="新門市名稱" style={{ flex: 1, padding: "5px 8px", border: "1px dashed #ccc", borderRadius: 6, fontSize: 11 }} />
           <input value={newStore.address} onChange={e=>setNewStore({...newStore,address:e.target.value})} placeholder="地址" style={{ flex: 2, padding: "5px 8px", border: "1px dashed #ccc", borderRadius: 6, fontSize: 11 }} />
-          <button onClick={()=>{if(!newStore.name)return;ap("/api/admin/stores",{action:"create",name:newStore.name,address:newStore.address}).then(()=>{setNewStore({name:"",address:""});load();});}} style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: "#1a1a1a", color: "#fff", fontSize: 11, cursor: "pointer" }}>＋新增</button>
+          <button onClick={()=>{if(!newStore.name)return;ap("/api/admin/stores",{action:"create",name:newStore.name,address:newStore.address}).then(()=>{setNewStore({name:"",address:""});load();});}} style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: "var(--ink)", color: "#fff", fontSize: 11, cursor: "pointer" }}>＋新增</button>
         </div>
       </div>
 
       {/* 打卡設定 */}
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>⚙️ 打卡設定</h4>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <div>
-            <label style={{ fontSize: 10, color: "#888" }}>遲到寬限（分鐘）</label>
+            <label style={{ fontSize: 10, color: "var(--text-3)" }}>遲到寬限（分鐘）</label>
             <input type="number" value={clockSettings.late_grace_minutes}
               onChange={e => setClockSettings({ ...clockSettings, late_grace_minutes: Number(e.target.value) })}
-              style={{ width: "100%", padding: "5px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12 }} />
+              style={{ width: "100%", padding: "5px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12 }} />
           </div>
           <div>
-            <label style={{ fontSize: 10, color: "#888" }}>加班起算（分鐘）</label>
+            <label style={{ fontSize: 10, color: "var(--text-3)" }}>加班起算（分鐘）</label>
             <input type="number" value={clockSettings.overtime_min_minutes}
               onChange={e => setClockSettings({ ...clockSettings, overtime_min_minutes: Number(e.target.value) })}
-              style={{ width: "100%", padding: "5px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12 }} />
+              style={{ width: "100%", padding: "5px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12 }} />
           </div>
         </div>
         <button onClick={() => ap("/api/admin/attendance", { action: "update_settings", late_grace_minutes: clockSettings.late_grace_minutes, overtime_min_minutes: clockSettings.overtime_min_minutes }).then(() => alert("已儲存"))}
-          style={{ marginTop: 6, padding: "4px 14px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer" }}>💾 儲存打卡設定</button>
+          style={{ marginTop: 6, padding: "4px 14px", borderRadius: 4, border: "none", background: "var(--success)", color: "#fff", fontSize: 11, cursor: "pointer" }}>💾 儲存打卡設定</button>
       </div>
 
 
       {/* 國定假日（僅 admin） */}
       {isAdmin && (
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
           {"🗓 " + new Date().getFullYear() + " 國定假日（" + hols.filter(h => h.is_active !== false).length + "/" + hols.length + "天啟用）"}
         </h4>
@@ -318,51 +318,51 @@ export default function SettingsMgr({ stores, load, month, auth }) {
               if (r?.synced > 0) alert(`已同步 ${r.synced} 筆班表：${next ? "加倍薪計算已啟用" : "已改為一般工作日"}`);
             }} style={{
               padding: "3px 8px", borderRadius: 4, cursor: "pointer",
-              background: h.is_active === false ? "#f0f0f0" : "#fde8e8",
-              color: h.is_active === false ? "#ccc" : "#b91c1c",
-              fontSize: 10, border: "1px solid " + (h.is_active === false ? "#ddd" : "#f5c6c6"),
+              background: h.is_active === false ? "#f0f0f0" : "var(--danger-bg)",
+              color: h.is_active === false ? "#ccc" : "var(--danger)",
+              fontSize: 10, border: "1px solid " + (h.is_active === false ? "var(--border)" : "#f5c6c6"),
               textDecoration: h.is_active === false ? "line-through" : "none"
             }}>
               {h.date.slice(5) + " " + h.name}
             </button>
           ))}
         </div>
-        <p style={{ fontSize: 10, color: "#888", marginTop: 6 }}>點擊可啟用/停用，停用的假日不標紅、不計雙倍薪</p>
+        <p style={{ fontSize: 10, color: "var(--text-3)", marginTop: 6 }}>點擊可啟用/停用，停用的假日不標紅、不計雙倍薪</p>
       </div>
       )}
 
       {/* 員工守則 + 獎金條款（僅 admin） */}
       {isAdmin && (
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📋 員工守則編輯器</h4>
-        {hbLoading ? <p style={{ color: "#aaa" }}>載入中...</p> : (
+        {hbLoading ? <p style={{ color: "var(--text-hint)" }}>載入中...</p> : (
           <div>
             {(hb || []).map((ch, ci) => (
-              <div key={ci} style={{ marginBottom: 8, padding: 8, background: "#faf8f5", borderRadius: 6 }}>
+              <div key={ci} style={{ marginBottom: 8, padding: 8, background: "var(--surface-warm)", borderRadius: 6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <input value={ch.title} onChange={e => { const nb = [...hb]; nb[ci] = { ...nb[ci], title: e.target.value }; setHb(nb); }}
                     style={{ fontWeight: 600, fontSize: 12, border: "none", background: "transparent", flex: 1 }} />
                   <button onClick={() => { const nb = hb.filter((_, i) => i !== ci); setHb(nb); }}
-                    style={{ fontSize: 10, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>刪除章節</button>
+                    style={{ fontSize: 10, color: "var(--danger)", background: "none", border: "none", cursor: "pointer" }}>刪除章節</button>
                 </div>
                 {ch.items.map((item, ii) => (
                   <div key={ii} style={{ display: "flex", gap: 4, marginBottom: 2 }}>
-                    <span style={{ color: "#888", fontSize: 10, width: 16 }}>{ii + 1}.</span>
+                    <span style={{ color: "var(--text-3)", fontSize: 10, width: 16 }}>{ii + 1}.</span>
                     <input value={item} onChange={e => { const nb = [...hb]; nb[ci].items[ii] = e.target.value; setHb(nb); }}
-                      style={{ flex: 1, padding: 2, border: "1px solid #e8e6e1", borderRadius: 3, fontSize: 11 }} />
+                      style={{ flex: 1, padding: 2, border: "1px solid var(--border)", borderRadius: 3, fontSize: 11 }} />
                     <button onClick={() => { const nb = [...hb]; nb[ci].items.splice(ii, 1); setHb(nb); }}
-                      style={{ fontSize: 9, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+                      style={{ fontSize: 9, color: "var(--danger)", background: "none", border: "none", cursor: "pointer" }}>✕</button>
                   </div>
                 ))}
                 <button onClick={() => { const nb = [...hb]; nb[ci].items.push(""); setHb(nb); }}
-                  style={{ fontSize: 10, color: "#4361ee", background: "none", border: "none", cursor: "pointer", marginTop: 2 }}>＋新增項目</button>
+                  style={{ fontSize: 10, color: "var(--brand-strong)", background: "none", border: "none", cursor: "pointer", marginTop: 2 }}>＋新增項目</button>
               </div>
             ))}
             <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
               <button onClick={() => setHb([...(hb || []), { title: "新章節", items: [""] }])}
-                style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #ddd", background: "transparent", fontSize: 11, cursor: "pointer" }}>＋新增章節</button>
+                style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid var(--border)", background: "transparent", fontSize: 11, cursor: "pointer" }}>＋新增章節</button>
               <button onClick={saveHb} disabled={hbSaving}
-                style={{ padding: "4px 14px", borderRadius: 4, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer" }}>
+                style={{ padding: "4px 14px", borderRadius: 4, border: "none", background: "var(--success)", color: "#fff", fontSize: 11, cursor: "pointer" }}>
                 {hbSaving ? "儲存中..." : "💾 儲存守則"}
               </button>
             </div>
@@ -385,14 +385,14 @@ export default function SettingsMgr({ stores, load, month, auth }) {
                   rows={2}
                   style={{ flex: 1, padding: 4, fontSize: 11, lineHeight: 1.6, border: "1px solid #f0e6d6", borderRadius: 3, resize: "vertical", fontFamily: "system-ui" }} />
                 <button onClick={() => { const next = bonusSec.items.filter((_, j) => j !== i); setBonusSec({ ...bonusSec, items: next }); }}
-                  style={{ fontSize: 10, color: "#b91c1c", background: "none", border: "none", cursor: "pointer", alignSelf: "flex-start", marginTop: 4 }}>✕</button>
+                  style={{ fontSize: 10, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", alignSelf: "flex-start", marginTop: 4 }}>✕</button>
               </div>
             ))}
             <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
               <button onClick={() => setBonusSec({ ...bonusSec, items: [...(bonusSec.items || []), ""] })}
-                style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid #ddd", background: "transparent", fontSize: 10, cursor: "pointer" }}>＋新增條款</button>
+                style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid var(--border)", background: "transparent", fontSize: 10, cursor: "pointer" }}>＋新增條款</button>
               <button onClick={() => { if (confirm("還原為系統預設版本？將覆蓋目前內容（儲存後生效）")) setBonusSec(BONUS_SECTION); }}
-                style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid #ddd", background: "transparent", fontSize: 10, color: "#666", cursor: "pointer" }}>🔄 還原預設</button>
+                style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid var(--border)", background: "transparent", fontSize: 10, color: "var(--text-2)", cursor: "pointer" }}>🔄 還原預設</button>
               <button onClick={async () => {
                 setBonusSaving(true);
                 const r = await ap("/api/admin/system", { key: "bonus_terms", value: bonusSec });
@@ -404,7 +404,7 @@ export default function SettingsMgr({ stores, load, month, auth }) {
               </button>
             </div>
           </div>
-          <div style={{ fontSize: 10, color: "#888", lineHeight: 1.5 }}>
+          <div style={{ fontSize: 10, color: "var(--text-3)", lineHeight: 1.5 }}>
             ※ 建議保留「恩惠性給與 / 不計入工資基數 / 公司保留調整裁量權」核心字句，避免被認定為經常性給與。<br/>
             ※ 修改後立即套用於下一位報到員工的簽署版本；已簽署員工的歷史版本以簽署當下為準（存於 employee_documents）。
           </div>
@@ -414,35 +414,35 @@ export default function SettingsMgr({ stores, load, month, auth }) {
 
       {/* 工作合約編輯器（僅 admin） */}
       {isAdmin && (
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>📝 工作合約編輯器</h4>
-        <p style={{ fontSize: 10, color: "#888", marginBottom: 6 }}>新人報到簽署的合約內容，每行一個條款（自動加上編號）</p>
+        <p style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 6 }}>新人報到簽署的合約內容，每行一個條款（自動加上編號）</p>
         <textarea value={contractText} onChange={e => setContractText(e.target.value)}
-          style={{ width: "100%", minHeight: 200, padding: 8, borderRadius: 6, border: "1px solid #ddd", fontSize: 12, lineHeight: 1.8, fontFamily: "system-ui" }} />
+          style={{ width: "100%", minHeight: 200, padding: 8, borderRadius: 6, border: "1px solid var(--border)", fontSize: 12, lineHeight: 1.8, fontFamily: "system-ui" }} />
         <button onClick={async () => {
           await ap("/api/admin/system", { key: "contract", value: contractText });
           alert("合約已儲存");
-        }} style={{ marginTop: 6, padding: "5px 16px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, cursor: "pointer" }}>💾 儲存合約</button>
+        }} style={{ marginTop: 6, padding: "5px 16px", borderRadius: 6, border: "none", background: "var(--success)", color: "#fff", fontSize: 11, cursor: "pointer" }}>💾 儲存合約</button>
       </div>
       )}
 
       {/* 權限管理（僅 admin） */}
       {isAdmin && (
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🔐 角色權限管理</h4>
-        <div style={{ fontSize: 10, color: "#888", marginBottom: 8 }}>👑總部管理員 擁有所有權限（不可修改）。以下設定其他角色的可見功能：</div>
+        <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 8 }}>👑總部管理員 擁有所有權限（不可修改）。以下設定其他角色的可見功能：</div>
         {roleTabs && (
           <div style={{ overflow: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-              <thead><tr style={{ background: "#faf8f5" }}>
-                <th style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "#666" }}>功能</th>
-                {Object.keys(ROLE_NAMES).map(r => <th key={r} style={{ padding: 6, textAlign: "center", fontWeight: 500, color: "#666", minWidth: 70 }}>{ROLE_NAMES[r]}</th>)}
+              <thead><tr style={{ background: "var(--surface-warm)" }}>
+                <th style={{ padding: 6, textAlign: "left", fontWeight: 500, color: "var(--text-2)" }}>功能</th>
+                {Object.keys(ROLE_NAMES).map(r => <th key={r} style={{ padding: 6, textAlign: "center", fontWeight: 500, color: "var(--text-2)", minWidth: 70 }}>{ROLE_NAMES[r]}</th>)}
               </tr></thead>
               <tbody>
                 {["總覽","人資","財務","生產","業務","管理"].map(group => {
                   const tabs = ALL_TABS.filter(t => t.group === group);
                   return [
-                    <tr key={"g-"+group}><td colSpan={3} style={{ padding: "6px 6px 2px", fontWeight: 600, fontSize: 10, color: "#888", background: "#faf8f5" }}>{group}</td></tr>,
+                    <tr key={"g-"+group}><td colSpan={3} style={{ padding: "6px 6px 2px", fontWeight: 600, fontSize: 10, color: "var(--text-3)", background: "var(--surface-warm)" }}>{group}</td></tr>,
                     ...tabs.map(t => (
                       <tr key={t.key} style={{ borderBottom: "1px solid #f5f3f0" }}>
                         <td style={{ padding: "4px 6px", fontSize: 11 }}>{t.label}</td>
@@ -450,7 +450,7 @@ export default function SettingsMgr({ stores, load, month, auth }) {
                           const on = (roleTabs[role] || []).includes(t.key);
                           return <td key={role} style={{ padding: "4px 6px", textAlign: "center" }}>
                             <button onClick={() => { const nr = { ...roleTabs }; if (on) nr[role] = (nr[role] || []).filter(x => x !== t.key); else nr[role] = [...(nr[role] || []), t.key]; setRoleTabs(nr); }}
-                              style={{ width: 36, height: 22, borderRadius: 11, border: "none", background: on ? "#0a7c42" : "#ddd", cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
+                              style={{ width: 36, height: 22, borderRadius: 11, border: "none", background: on ? "var(--success)" : "var(--border)", cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
                               <div style={{ width: 16, height: 16, borderRadius: "50%", background: "#fff", position: "absolute", top: 3, left: on ? 17 : 3, transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
                             </button>
                           </td>;
@@ -462,7 +462,7 @@ export default function SettingsMgr({ stores, load, month, auth }) {
               </tbody>
             </table>
             <button onClick={async () => { await ap("/api/admin/system", { key: "role_tabs", value: roleTabs }); alert("✅ 權限已儲存，重新登入後生效"); }}
-              style={{ marginTop: 8, width: "100%", padding: 8, borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              style={{ marginTop: 8, width: "100%", padding: 8, borderRadius: 6, border: "none", background: "var(--success)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               💾 儲存權限設定
             </button>
           </div>
@@ -471,9 +471,9 @@ export default function SettingsMgr({ stores, load, month, auth }) {
       )}
 
       {/* 備份管理 */}
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>💾 資料備份</h4>
-        <div style={{ fontSize: 10, color: "#888", marginBottom: 8 }}>每日凌晨 Cron 自動備份到 Storage，保留 30 天。也可手動備份或下載。</div>
+        <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 8 }}>每日凌晨 Cron 自動備份到 Storage，保留 30 天。也可手動備份或下載。</div>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
           <button onClick={async () => {
             setBackupLoading(true);
@@ -482,31 +482,31 @@ export default function SettingsMgr({ stores, load, month, auth }) {
             if (r.success) alert("✅ 備份完成\n\n" + r.total_records + " 筆資料 / " + r.size_kb + " KB\n存放：Storage/backups/" + r.date + ".json");
             else alert("❌ " + (r.error || "備份失敗"));
           }} disabled={backupLoading}
-            style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: backupLoading ? "#ccc" : "#0a7c42", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+            style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: backupLoading ? "#ccc" : "var(--success)", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
             {backupLoading ? "⏳ 備份中..." : "💾 立即備份"}
           </button>
           <a href="/api/admin/backup?action=download" target="_blank" rel="noopener"
-            style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #4361ee", background: "#fff", color: "#4361ee", fontSize: 11, fontWeight: 600, cursor: "pointer", textDecoration: "none" }}>
+            style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid var(--brand-strong)", background: "#fff", color: "var(--brand-strong)", fontSize: 11, fontWeight: 600, cursor: "pointer", textDecoration: "none" }}>
             📥 下載完整 JSON
           </a>
           <button onClick={async () => {
             const r = await ap("/api/admin/backup?action=list");
             setBackups(r.data || []);
-          }} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", fontSize: 11, cursor: "pointer" }}>
+          }} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid var(--border)", background: "#fff", fontSize: 11, cursor: "pointer" }}>
             📋 查看備份紀錄
           </button>
         </div>
         {backups.length > 0 && (
-          <div style={{ maxHeight: 200, overflow: "auto", border: "1px solid #f0eeea", borderRadius: 6 }}>
+          <div style={{ maxHeight: 200, overflow: "auto", border: "1px solid var(--divider)", borderRadius: 6 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
-              <thead><tr style={{ background: "#faf8f5" }}>
-                <th style={{ padding: 4, textAlign: "left", color: "#666" }}>日期</th>
-                <th style={{ padding: 4, textAlign: "right", color: "#666" }}>大小</th>
+              <thead><tr style={{ background: "var(--surface-warm)" }}>
+                <th style={{ padding: 4, textAlign: "left", color: "var(--text-2)" }}>日期</th>
+                <th style={{ padding: 4, textAlign: "right", color: "var(--text-2)" }}>大小</th>
               </tr></thead>
               <tbody>{backups.map((b, i) => (
-                <tr key={i} style={{ borderBottom: "1px solid #f0eeea" }}>
+                <tr key={i} style={{ borderBottom: "1px solid var(--divider)" }}>
                   <td style={{ padding: 4 }}>{b.name?.replace(".json", "")}</td>
-                  <td style={{ padding: 4, textAlign: "right", color: "#888" }}>{b.metadata?.size ? Math.round(b.metadata.size / 1024) + " KB" : "-"}</td>
+                  <td style={{ padding: 4, textAlign: "right", color: "var(--text-3)" }}>{b.metadata?.size ? Math.round(b.metadata.size / 1024) + " KB" : "-"}</td>
                 </tr>
               ))}</tbody>
             </table>
@@ -515,19 +515,19 @@ export default function SettingsMgr({ stores, load, month, auth }) {
       </div>
 
       {/* 資料維護 */}
-      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+      <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginBottom: 12 }}>
         <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🧹 資料維護</h4>
-        <p style={{ fontSize: 10, color: "#b91c1c", marginBottom: 8 }}>⚠️ 刪除後無法復原，請謹慎操作</p>
+        <p style={{ fontSize: 10, color: "var(--danger)", marginBottom: 8 }}>⚠️ 刪除後無法復原，請謹慎操作</p>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
           <button onClick={async () => {
             const r = await ap("/api/admin/expenses", { action: "cleanup_rejected", days: 30 });
             alert("已清除 " + (r.deleted || 0) + " 筆駁回超過30天的費用");
             load();
-          }} style={{ padding: "5px 10px", borderRadius: 4, border: "1px solid #b45309", background: "transparent", color: "#b45309", fontSize: 11, cursor: "pointer" }}>
+          }} style={{ padding: "5px 10px", borderRadius: 4, border: "1px solid var(--warning)", background: "transparent", color: "var(--warning)", fontSize: 11, cursor: "pointer" }}>
             清除過期駁回單據
           </button>
         </div>
-        <div style={{ fontSize: 11, fontWeight: 500, color: "#666", marginBottom: 4 }}>🗑 一鍵清除（二次確認）</div>
+        <div style={{ fontSize: 11, fontWeight: 500, color: "var(--text-2)", marginBottom: 4 }}>🗑 一鍵清除（二次確認）</div>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {[
             ["schedules", "📅 排班"],
@@ -544,7 +544,7 @@ export default function SettingsMgr({ stores, load, month, auth }) {
               const r = await ap("/api/admin/system", { action: "cleanup", target: key });
               alert("已清除 " + (r.deleted || 0) + " 筆");
               load();
-            }} style={{ padding: "5px 10px", borderRadius: 4, border: "1px solid #b91c1c", background: "transparent", color: "#b91c1c", fontSize: 11, cursor: "pointer" }}>
+            }} style={{ padding: "5px 10px", borderRadius: 4, border: "1px solid var(--danger)", background: "transparent", color: "var(--danger)", fontSize: 11, cursor: "pointer" }}>
               {label}
             </button>
           ))}
@@ -580,50 +580,50 @@ export function BonusFormulaEditor() {
       <span style={{ fontSize: 11 }}>{label}</span>
       <div>
         <input type="number" value={bf[k]} onChange={e => upd(k, e.target.value)}
-          style={{ width: 60, padding: 2, borderRadius: 4, border: "1px solid #ddd", fontSize: 11, textAlign: "right" }} />
-        <span style={{ fontSize: 10, color: "#888", marginLeft: 4 }}>{unit || ""}</span>
+          style={{ width: 60, padding: 2, borderRadius: 4, border: "1px solid var(--border)", fontSize: 11, textAlign: "right" }} />
+        <span style={{ fontSize: 10, color: "var(--text-3)", marginLeft: 4 }}>{unit || ""}</span>
       </div>
     </div>
   );
   return (
-    <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginBottom: 12 }}>
+    <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginBottom: 12 }}>
       <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>🏆 獎金計算公式設定</h4>
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 4 }}>📊 達標率門檻</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", marginBottom: 4 }}>📊 達標率門檻</div>
         <R label="最低發放門檻" k="min_rate" unit="%" />
         <R label="全額發放門檻" k="full_rate" unit="%" />
         <R label="加成發放門檻" k="super_rate" unit="%" />
         <R label="加成倍率" k="super_multiplier" unit="×" />
       </div>
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 4 }}>📝 考核分數門檻</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", marginBottom: 4 }}>📝 考核分數門檻</div>
         <R label="全額發放門檻" k="review_full" unit="分" />
         <R label="半額發放門檻" k="review_half" unit="分" />
       </div>
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 4 }}>⚖️ 職務加權</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", marginBottom: 4 }}>⚖️ 職務加權</div>
         <R label="主管加權" k="manager_weight" unit="×" />
         <R label="一般員工" k="staff_weight" unit="×" />
       </div>
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 4 }}>📋 考核配分</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", marginBottom: 4 }}>📋 考核配分</div>
         <R label="出勤紀律" k="att_score" unit="分" />
         <R label="工作完成度" k="perf_score" unit="分" />
         <R label="服務態度" k="svc_score" unit="分" />
         <R label="違規紀錄" k="viol_score" unit="分" />
       </div>
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 4 }}>🔢 扣分標準</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", marginBottom: 4 }}>🔢 扣分標準</div>
         <R label="遲到每次扣" k="late_deduct" unit="分" />
         <R label="曠職每次扣" k="absent_deduct" unit="分" />
         <R label="客訴每筆扣" k="complaint_deduct" unit="分" />
       </div>
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 4 }}>💰 補休轉現金</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", marginBottom: 4 }}>💰 補休轉現金</div>
         <R label="加班費倍率" k="comp_convert_rate" unit="×時薪" />
       </div>
       <button onClick={save} disabled={saving}
-        style={{ width: "100%", padding: "8px", borderRadius: 6, border: "none", background: saving ? "#ccc" : "#0a7c42", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+        style={{ width: "100%", padding: "8px", borderRadius: 6, border: "none", background: saving ? "#ccc" : "var(--success)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
         {saving ? "儲存中..." : "💾 儲存公式設定"}
       </button>
     </div>
@@ -698,19 +698,19 @@ export function WorklogSettings({ stores }) {
   for (const c of Object.keys(byCatRaw)) if (!byCat[c]) byCat[c] = byCatRaw[c];
 
   return (
-    <div style={{ background: "#fff", borderRadius: 8, border: "1px solid #e8e6e1", padding: 12, marginTop: 12 }}>
+    <div style={{ background: "#fff", borderRadius: 8, border: "1px solid var(--border)", padding: 12, marginTop: 12 }}>
       <h4 style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>⚙️ 日誌設定（矩陣編輯器）</h4>
-      <select value={wlStore} onChange={e => setWlStore(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, marginBottom: 10, width: "100%" }}>
+      <select value={wlStore} onChange={e => setWlStore(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 12, marginBottom: 10, width: "100%" }}>
         <option value="">選擇門市</option>
         {stores.map(s => <option key={s.id} value={s.id}>{s.name + (s.shift_mode === "double" ? "（雙班）" : "")}</option>)}
       </select>
       {wlStore && <div>
         <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
-          <span style={{ fontSize: 10, color: "#888" }}>視圖：</span>
-          <button onClick={() => setWlView("checkpoint")} style={{ padding: "3px 8px", fontSize: 11, borderRadius: 6, border: "1px solid " + (wlView === "checkpoint" ? "#0a7c42" : "#ddd"), background: wlView === "checkpoint" ? "#0a7c42" : "#fff", color: wlView === "checkpoint" ? "#fff" : "#333", cursor: "pointer" }}>依時段（可排序）</button>
-          <button onClick={() => setWlView("category")} style={{ padding: "3px 8px", fontSize: 11, borderRadius: 6, border: "1px solid " + (wlView === "category" ? "#0a7c42" : "#ddd"), background: wlView === "category" ? "#0a7c42" : "#fff", color: wlView === "category" ? "#fff" : "#333", cursor: "pointer" }}>依分類（矩陣）</button>
+          <span style={{ fontSize: 10, color: "var(--text-3)" }}>視圖：</span>
+          <button onClick={() => setWlView("checkpoint")} style={{ padding: "3px 8px", fontSize: 11, borderRadius: 6, border: "1px solid " + (wlView === "checkpoint" ? "var(--success)" : "var(--border)"), background: wlView === "checkpoint" ? "var(--success)" : "#fff", color: wlView === "checkpoint" ? "#fff" : "var(--text)", cursor: "pointer" }}>依時段（可排序）</button>
+          <button onClick={() => setWlView("category")} style={{ padding: "3px 8px", fontSize: 11, borderRadius: 6, border: "1px solid " + (wlView === "category" ? "var(--success)" : "var(--border)"), background: wlView === "category" ? "var(--success)" : "#fff", color: wlView === "category" ? "#fff" : "var(--text)", cursor: "pointer" }}>依分類（矩陣）</button>
         </div>
-        <div style={{ fontSize: 10, color: "#888", marginBottom: 6 }}>
+        <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 6 }}>
           {wlView === "checkpoint" ? "依時段顯示：用 ↑↓ 調整該時段內順序（員工頁也會依此順序顯示）" : (isDouble ? "雙班模式：早班/晚班各自打勾，矩陣中打勾的時段該班需做" : "單班模式：勾選該項目出現在開店/營業/閉店哪個時段")}
         </div>
 
@@ -718,28 +718,28 @@ export function WorklogSettings({ stores }) {
         {wlView === "checkpoint" && <div style={{ marginBottom: 10 }}>
           {CPS.map(c => {
             const list = byCp[c.id] || [];
-            return (<div key={c.id} style={{ marginBottom: 10, border: "1px solid #e8e6e1", borderRadius: 8, overflow: "hidden" }}>
-              <div style={{ padding: "6px 10px", background: "#faf8f5", fontSize: 12, fontWeight: 600 }}>{c.l}（{list.length}）</div>
+            return (<div key={c.id} style={{ marginBottom: 10, border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+              <div style={{ padding: "6px 10px", background: "var(--surface-warm)", fontSize: 12, fontWeight: 600 }}>{c.l}（{list.length}）</div>
               {list.length === 0 ? <div style={{ padding: 12, textAlign: "center", fontSize: 11, color: "#ccc" }}>此時段尚無項目</div> :
                 list.map((t, idx) => (
-                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderTop: idx > 0 ? "1px solid #f0eeea" : "none" }}>
+                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderTop: idx > 0 ? "1px solid var(--divider)" : "none" }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                      <button onClick={() => moveItem(list, idx, -1)} disabled={idx === 0} style={{ width: 22, height: 16, fontSize: 10, padding: 0, borderRadius: 3, border: "1px solid #ddd", background: idx === 0 ? "#f5f5f5" : "#fff", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#ccc" : "#333" }}>↑</button>
-                      <button onClick={() => moveItem(list, idx, 1)} disabled={idx === list.length - 1} style={{ width: 22, height: 16, fontSize: 10, padding: 0, borderRadius: 3, border: "1px solid #ddd", background: idx === list.length - 1 ? "#f5f5f5" : "#fff", cursor: idx === list.length - 1 ? "default" : "pointer", color: idx === list.length - 1 ? "#ccc" : "#333" }}>↓</button>
+                      <button onClick={() => moveItem(list, idx, -1)} disabled={idx === 0} style={{ width: 22, height: 16, fontSize: 10, padding: 0, borderRadius: 3, border: "1px solid var(--border)", background: idx === 0 ? "#f5f5f5" : "#fff", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#ccc" : "var(--text)" }}>↑</button>
+                      <button onClick={() => moveItem(list, idx, 1)} disabled={idx === list.length - 1} style={{ width: 22, height: 16, fontSize: 10, padding: 0, borderRadius: 3, border: "1px solid var(--border)", background: idx === list.length - 1 ? "#f5f5f5" : "#fff", cursor: idx === list.length - 1 ? "default" : "pointer", color: idx === list.length - 1 ? "#ccc" : "var(--text)" }}>↓</button>
                     </div>
-                    <span style={{ fontSize: 11, color: "#888", minWidth: 22, textAlign: "right" }}>{idx + 1}.</span>
+                    <span style={{ fontSize: 11, color: "var(--text-3)", minWidth: 22, textAlign: "right" }}>{idx + 1}.</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 12 }}>{t.item}</div>
                       <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 2 }}>
-                        <select value={wlCategory(t.item, t.category)} onChange={async e => { await ap("/api/admin/worklogs", { action: "update_template", template_id: t.id, category: e.target.value }); loadT(); }} style={{ fontSize: 9, padding: "1px 3px", borderRadius: 4, border: "1px solid #ddd", background: "#faf8f5" }}>
+                        <select value={wlCategory(t.item, t.category)} onChange={async e => { await ap("/api/admin/worklogs", { action: "update_template", template_id: t.id, category: e.target.value }); loadT(); }} style={{ fontSize: 9, padding: "1px 3px", borderRadius: 4, border: "1px solid var(--border)", background: "var(--surface-warm)" }}>
                           {WL_CATS.map(cc => <option key={cc} value={cc}>{cc}</option>)}
                         </select>
-                        {t.requires_value && <span style={{ fontSize: 8, background: "#e6f9f0", color: "#0a7c42", padding: "0 4px", borderRadius: 3 }}>{"📊" + (t.value_label || "")}</span>}
-                        {t.role !== "all" && <span style={{ fontSize: 8, background: "#fef9c3", color: "#8a6d00", padding: "0 4px", borderRadius: 3 }}>{t.role}</span>}
+                        {t.requires_value && <span style={{ fontSize: 8, background: "var(--success-bg)", color: "var(--success)", padding: "0 4px", borderRadius: 3 }}>{"📊" + (t.value_label || "")}</span>}
+                        {t.role !== "all" && <span style={{ fontSize: 8, background: "var(--warning-bg)", color: "var(--warning)", padding: "0 4px", borderRadius: 3 }}>{t.role}</span>}
                       </div>
                     </div>
-                    <button onClick={() => toggleTplCp(t, c.id)} title="從此時段移除" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid #ddd", background: "#fff", cursor: "pointer", color: "#888" }}>移除</button>
-                    <button onClick={async () => { if (!confirm("刪除整個項目？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 12, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+                    <button onClick={() => toggleTplCp(t, c.id)} title="從此時段移除" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--border)", background: "#fff", cursor: "pointer", color: "var(--text-3)" }}>移除</button>
+                    <button onClick={async () => { if (!confirm("刪除整個項目？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 12, color: "var(--danger)", background: "none", border: "none", cursor: "pointer" }}>✕</button>
                   </div>
                 ))
               }
@@ -751,35 +751,35 @@ export function WorklogSettings({ stores }) {
         {wlView === "category" && <div style={{ overflowX: "auto", marginBottom: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
             <thead>
-              <tr style={{ background: "#faf8f5" }}>
-                <th style={{ padding: "6px 4px", textAlign: "left", borderBottom: "2px solid #e8e6e1", minWidth: 180 }}>工作項目</th>
-                {CPS.map(c => <th key={c.id} style={{ padding: "6px 4px", textAlign: "center", borderBottom: "2px solid #e8e6e1", minWidth: 56 }}>{c.l}</th>)}
-                <th style={{ padding: "6px 4px", borderBottom: "2px solid #e8e6e1", width: 30 }}></th>
+              <tr style={{ background: "var(--surface-warm)" }}>
+                <th style={{ padding: "6px 4px", textAlign: "left", borderBottom: "2px solid var(--border)", minWidth: 180 }}>工作項目</th>
+                {CPS.map(c => <th key={c.id} style={{ padding: "6px 4px", textAlign: "center", borderBottom: "2px solid var(--border)", minWidth: 56 }}>{c.l}</th>)}
+                <th style={{ padding: "6px 4px", borderBottom: "2px solid var(--border)", width: 30 }}></th>
               </tr>
             </thead>
             <tbody>
               {Object.entries(byCat).map(([cat, list]) => (
                 <React.Fragment key={cat}>
-                  <tr><td colSpan={CPS.length + 2} style={{ padding: "6px 4px", fontSize: 10, fontWeight: 600, color: "#888", background: "#f5f1eb" }}>{cat}</td></tr>
+                  <tr><td colSpan={CPS.length + 2} style={{ padding: "6px 4px", fontSize: 10, fontWeight: 600, color: "var(--text-3)", background: "#f5f1eb" }}>{cat}</td></tr>
                   {list.map(t => {
                     const cps = new Set(getCps(t));
-                    return (<tr key={t.id} style={{ borderBottom: "1px solid #f0eeea" }}>
+                    return (<tr key={t.id} style={{ borderBottom: "1px solid var(--divider)" }}>
                       <td style={{ padding: "4px" }}>
                         <div style={{ fontSize: 12 }}>{t.item}</div>
                         <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 2 }}>
-                          <select value={cat} onChange={async e => { await ap("/api/admin/worklogs", { action: "update_template", template_id: t.id, category: e.target.value }); loadT(); }} style={{ fontSize: 9, padding: "1px 3px", borderRadius: 4, border: "1px solid #ddd", background: "#faf8f5" }}>
+                          <select value={cat} onChange={async e => { await ap("/api/admin/worklogs", { action: "update_template", template_id: t.id, category: e.target.value }); loadT(); }} style={{ fontSize: 9, padding: "1px 3px", borderRadius: 4, border: "1px solid var(--border)", background: "var(--surface-warm)" }}>
                             {WL_CATS.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
-                          {t.requires_value && <span style={{ fontSize: 8, background: "#e6f9f0", color: "#0a7c42", padding: "0 4px", borderRadius: 3 }}>{"📊" + (t.value_label || "")}</span>}
-                          {t.role !== "all" && <span style={{ fontSize: 8, background: "#fef9c3", color: "#8a6d00", padding: "0 4px", borderRadius: 3 }}>{t.role}</span>}
+                          {t.requires_value && <span style={{ fontSize: 8, background: "var(--success-bg)", color: "var(--success)", padding: "0 4px", borderRadius: 3 }}>{"📊" + (t.value_label || "")}</span>}
+                          {t.role !== "all" && <span style={{ fontSize: 8, background: "var(--warning-bg)", color: "var(--warning)", padding: "0 4px", borderRadius: 3 }}>{t.role}</span>}
                         </div>
                       </td>
                       {CPS.map(c => (
                         <td key={c.id} style={{ padding: "4px", textAlign: "center" }}>
-                          <button onClick={() => toggleTplCp(t, c.id)} style={{ width: 26, height: 26, borderRadius: 6, border: cps.has(c.id) ? "none" : "1px solid #ddd", background: cps.has(c.id) ? "#0a7c42" : "#fff", color: cps.has(c.id) ? "#fff" : "#ccc", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>{cps.has(c.id) ? "✓" : ""}</button>
+                          <button onClick={() => toggleTplCp(t, c.id)} style={{ width: 26, height: 26, borderRadius: 6, border: cps.has(c.id) ? "none" : "1px solid var(--border)", background: cps.has(c.id) ? "var(--success)" : "#fff", color: cps.has(c.id) ? "#fff" : "#ccc", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>{cps.has(c.id) ? "✓" : ""}</button>
                         </td>
                       ))}
-                      <td style={{ textAlign: "center" }}><button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 12, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button></td>
+                      <td style={{ textAlign: "center" }}><button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 12, color: "var(--danger)", background: "none", border: "none", cursor: "pointer" }}>✕</button></td>
                     </tr>);
                   })}
                 </React.Fragment>
@@ -791,40 +791,40 @@ export function WorklogSettings({ stores }) {
 
         {/* 細部清潔（週/月） */}
         {deepTpls.length > 0 && <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#444", marginBottom: 4 }}>{"🧹 細部清潔（" + deepTpls.length + "）"}</div>
-          <div style={{ background: "#faf8f5", borderRadius: 6 }}>
-            {deepTpls.map(t => <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 8px", borderBottom: "1px solid #f0eeea", fontSize: 11 }}>
-              <span style={{ fontSize: 9, padding: "0 4px", borderRadius: 3, background: t.frequency === "weekly" ? "#e6f1fb" : "#fde8e8", color: t.frequency === "weekly" ? "#185fa5" : "#b91c1c" }}>{t.frequency === "weekly" ? "週" : "月"}</span>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", marginBottom: 4 }}>{"🧹 細部清潔（" + deepTpls.length + "）"}</div>
+          <div style={{ background: "var(--surface-warm)", borderRadius: 6 }}>
+            {deepTpls.map(t => <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 8px", borderBottom: "1px solid var(--divider)", fontSize: 11 }}>
+              <span style={{ fontSize: 9, padding: "0 4px", borderRadius: 3, background: t.frequency === "weekly" ? "var(--info-bg)" : "var(--danger-bg)", color: t.frequency === "weekly" ? "var(--info)" : "var(--danger)" }}>{t.frequency === "weekly" ? "週" : "月"}</span>
               <span style={{ flex: 1, fontWeight: 500 }}>{t.item}</span>
-              <span style={{ fontSize: 9, color: "#888" }}>{t.category}</span>
-              <button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 12, color: "#b91c1c", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+              <span style={{ fontSize: 9, color: "var(--text-3)" }}>{t.category}</span>
+              <button onClick={async () => { if (!confirm("刪除？")) return; await ap("/api/admin/worklogs", { action: "delete_template", template_id: t.id }); loadT(); }} style={{ fontSize: 12, color: "var(--danger)", background: "none", border: "none", cursor: "pointer" }}>✕</button>
             </div>)}
           </div>
         </div>}
 
         {/* 新增區塊 */}
-        <div style={{ background: "#faf8f5", borderRadius: 8, padding: 10, marginTop: 8 }}>
+        <div style={{ background: "var(--surface-warm)", borderRadius: 8, padding: 10, marginTop: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>＋ 新增工作項目</div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
-            <select value={wlNew.frequency} onChange={e => setWlNew({ ...wlNew, frequency: e.target.value, checkpoints: [] })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
+            <select value={wlNew.frequency} onChange={e => setWlNew({ ...wlNew, frequency: e.target.value, checkpoints: [] })} style={{ padding: 4, borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }}>
               <option value="daily">每日</option><option value="weekly">每週（細部）</option><option value="monthly">每月（細部）</option>
             </select>
-            {wlNew.frequency === "weekly" && <select value={wlNew.weekday} onChange={e => setWlNew({ ...wlNew, weekday: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="">不指定週幾</option>{["日","一","二","三","四","五","六"].map((d,i) => <option key={i} value={i}>{"週" + d}</option>)}</select>}
-            <select value={wlNew.category} onChange={e => setWlNew({ ...wlNew, category: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}>
+            {wlNew.frequency === "weekly" && <select value={wlNew.weekday} onChange={e => setWlNew({ ...wlNew, weekday: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }}><option value="">不指定週幾</option>{["日","一","二","三","四","五","六"].map((d,i) => <option key={i} value={i}>{"週" + d}</option>)}</select>}
+            <select value={wlNew.category} onChange={e => setWlNew({ ...wlNew, category: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }}>
               {WL_CATS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <select value={wlNew.role} onChange={e => setWlNew({ ...wlNew, role: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="all">全員</option><option value="外場">外場</option><option value="內場">內場</option><option value="吧台">吧台</option><option value="烘焙">烘焙</option></select>
+            <select value={wlNew.role} onChange={e => setWlNew({ ...wlNew, role: e.target.value })} style={{ padding: 4, borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }}><option value="all">全員</option><option value="外場">外場</option><option value="內場">內場</option><option value="吧台">吧台</option><option value="烘焙">烘焙</option></select>
           </div>
           {wlNew.frequency === "daily" && <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 10, color: "#666", alignSelf: "center", marginRight: 4 }}>時段：</span>
+            <span style={{ fontSize: 10, color: "var(--text-2)", alignSelf: "center", marginRight: 4 }}>時段：</span>
             {CPS.map(c => {
               const on = wlNew.checkpoints.includes(c.id);
               return <button key={c.id} onClick={() => setWlNew({ ...wlNew, checkpoints: on ? wlNew.checkpoints.filter(x => x !== c.id) : [...wlNew.checkpoints, c.id] })}
-                style={{ padding: "3px 8px", borderRadius: 6, border: on ? "none" : "1px solid #ddd", background: on ? "#0a7c42" : "#fff", color: on ? "#fff" : "#666", fontSize: 11, cursor: "pointer" }}>{c.l}</button>;
+                style={{ padding: "3px 8px", borderRadius: 6, border: on ? "none" : "1px solid var(--border)", background: on ? "var(--success)" : "#fff", color: on ? "#fff" : "var(--text-2)", fontSize: 11, cursor: "pointer" }}>{c.l}</button>;
             })}
           </div>}
           {wlNew.frequency === "daily" && wlNew.item.includes("盤點") && (
-            <div style={{ fontSize: 10, color: "#92400e", background: "#fef3c7", borderRadius: 4, padding: "4px 6px", marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: "#92400e", background: "var(--warning-bg)", borderRadius: 4, padding: "4px 6px", marginBottom: 6 }}>
               💡 盤點項目建議只勾「{isDouble ? "🌙晚下" : "🌙閉店"}」，避免早班同事重複盤
             </div>
           )}
@@ -839,17 +839,17 @@ export function WorklogSettings({ stores }) {
               } else {
                 setWlNew({ ...wlNew, item: val });
               }
-            }} placeholder="工作項目名稱（輸入「盤點」會自動建議晚班）" onKeyDown={e => { if (e.key === "Enter") addNew(); }} style={{ flex: 1, padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12 }} />
-            <button onClick={addNew} disabled={!wlNew.item} style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: wlNew.item ? "#0a7c42" : "#ccc", color: "#fff", fontSize: 12, cursor: "pointer" }}>新增</button>
+            }} placeholder="工作項目名稱（輸入「盤點」會自動建議晚班）" onKeyDown={e => { if (e.key === "Enter") addNew(); }} style={{ flex: 1, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 12 }} />
+            <button onClick={addNew} disabled={!wlNew.item} style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: wlNew.item ? "var(--success)" : "#ccc", color: "#fff", fontSize: 12, cursor: "pointer" }}>新增</button>
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, cursor: "pointer" }}>
             <input type="checkbox" checked={wlNew.requires_value} onChange={e => setWlNew({ ...wlNew, requires_value: e.target.checked })} />需輸入數值
-            {wlNew.requires_value && <input value={wlNew.value_label} onChange={e => setWlNew({ ...wlNew, value_label: e.target.value })} placeholder="單位" style={{ width: 60, padding: 2, borderRadius: 3, border: "1px solid #ddd", fontSize: 10, marginLeft: 4 }} />}
+            {wlNew.requires_value && <input value={wlNew.value_label} onChange={e => setWlNew({ ...wlNew, value_label: e.target.value })} placeholder="單位" style={{ width: 60, padding: 2, borderRadius: 3, border: "1px solid var(--border)", fontSize: 10, marginLeft: 4 }} />}
           </label>
         </div>
         {wlTemplates.length > 0 && <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-          <select value={wlCopyTarget} onChange={e => setWlCopyTarget(e.target.value)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }}><option value="">複製到門市...</option>{stores.filter(s => s.id !== wlStore).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-          <button onClick={async () => { if (!wlCopyTarget) return; await ap("/api/admin/worklogs", { action: "copy_to_store", from_store_id: wlStore, to_store_id: wlCopyTarget }); alert("已複製"); }} disabled={!wlCopyTarget} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: wlCopyTarget ? "#4361ee" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>📋 複製</button>
+          <select value={wlCopyTarget} onChange={e => setWlCopyTarget(e.target.value)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }}><option value="">複製到門市...</option>{stores.filter(s => s.id !== wlStore).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+          <button onClick={async () => { if (!wlCopyTarget) return; await ap("/api/admin/worklogs", { action: "copy_to_store", from_store_id: wlStore, to_store_id: wlCopyTarget }); alert("已複製"); }} disabled={!wlCopyTarget} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: wlCopyTarget ? "var(--brand-strong)" : "#ccc", color: "#fff", fontSize: 11, cursor: "pointer" }}>📋 複製</button>
         </div>}
       </div>}
     </div>

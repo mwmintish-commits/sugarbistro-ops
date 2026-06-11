@@ -409,7 +409,7 @@ export default function AdminPage() {
     setSf2({
       name: s.name, store_id: s.store_id, start_time: s.start_time,
       end_time: s.end_time, break_minutes: s.break_minutes, role: s.role || "全場",
-      color: s.color || "#0a7c42"
+      color: s.color || "var(--success)"
     });
     setEs(s); setSsf(true);
   };
@@ -435,7 +435,7 @@ export default function AdminPage() {
   // ===== LOGIN =====
   if (!auth) {
     return (
-      <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"#faf8f5",fontFamily:"system-ui"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"var(--surface-warm)",fontFamily:"system-ui"}}>
         <div style={{background:"#fff",borderRadius:14,padding:30,maxWidth:340,width:"100%",boxShadow:"0 2px 20px rgba(0,0,0,0.08)"}}>
           <div style={{textAlign:"center",marginBottom:20}}>
             <div style={{fontSize:36}}>🍯</div>
@@ -444,22 +444,22 @@ export default function AdminPage() {
           <div>
             <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="手機號碼" autoComplete="username"
               onKeyDown={e=>{if(e.key==="Enter"&&phone&&code)login();}}
-              style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,marginBottom:8}} />
+              style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1px solid var(--border)",fontSize:14,marginBottom:8}} />
             <input value={code} onChange={e=>setCode(e.target.value)} placeholder="密碼" type="password" autoComplete="current-password"
               onKeyDown={e=>{if(e.key==="Enter"&&phone&&code)login();}}
-              style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,marginBottom:10}} />
+              style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1px solid var(--border)",fontSize:14,marginBottom:10}} />
             <button onClick={login}
-              style={{width:"100%",padding:12,borderRadius:8,border:"none",background:"#1a1a1a",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>
+              style={{width:"100%",padding:12,borderRadius:8,border:"none",background:"var(--ink)",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>
               登入
             </button>
           </div>
-          {err && <p style={{color:"#b91c1c",fontSize:12,marginTop:8,textAlign:"center"}}>{err}</p>}
+          {err && <p style={{color:"var(--danger)",fontSize:12,marginTop:8,textAlign:"center"}}>{err}</p>}
           <div style={{marginTop:14,paddingTop:10,borderTop:"1px solid #eee",textAlign:"center"}}>
             <button onClick={()=>{
               if (!confirm("這會清掉本裝置所有快取（cookie / localStorage / Service Worker）並重新整理。\n用於排解「載入卡住、發送驗證碼沒反應」等異常。\n\n確定？")) return;
               nukeCache();
               setTimeout(()=>window.location.reload(true), 300);
-            }} style={{fontSize:10,color:"#888",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>
+            }} style={{fontSize:10,color:"var(--text-3)",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>
               載入有問題？點此強制清快取重試
             </button>
           </div>
@@ -472,50 +472,50 @@ export default function AdminPage() {
 
   // ===== MAIN SHELL =====
   return (
-    <div style={{fontFamily:"system-ui, 'Noto Sans TC', sans-serif",background:"#faf8f5",minHeight:"100vh"}}>
+    <div className="sb-admin" style={{background:"var(--bg)",minHeight:"100vh"}}>
       {/* HEADER */}
-      <div style={{background:"#fff",borderBottom:"1px solid #e8e6e1",padding:"8px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,zIndex:100}}>
+      <div className="sb-admin-header" style={{background:"#fff",borderBottom:"1px solid var(--border)",padding:"8px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <span style={{fontSize:20}}>🍯</span>
           <b style={{fontSize:14}}>小食糖後台</b>
           <RB role={auth.role} />
-          <span style={{fontSize:11,color:"#888"}}>{auth.name}</span>
+          <span style={{fontSize:11,color:"var(--text-3)"}}>{auth.name}</span>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <input type="month" value={month} onChange={e=>setMonth(e.target.value)}
-            style={{padding:"3px 8px",borderRadius:6,border:"1px solid #ddd",fontSize:11}} />
+            style={{padding:"3px 8px",borderRadius:6,border:"1px solid var(--border)",fontSize:11}} />
           {!lockedStore ? (
             <select value={sf} onChange={e=>setSf(e.target.value)}
-              style={{padding:"3px 8px",borderRadius:6,border:"1px solid #ddd",fontSize:11}}>
+              style={{padding:"3px 8px",borderRadius:6,border:"1px solid var(--border)",fontSize:11}}>
               <option value="">全部門市</option>
               {stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
               <option value="__hq__">🏢 總部均攤</option>
             </select>
           ) : (
-            <span style={{padding:"3px 8px",borderRadius:6,background:"#e6f1fb",color:"#185fa5",fontSize:11}}>{storeName}</span>
+            <span style={{padding:"3px 8px",borderRadius:6,background:"var(--info-bg)",color:"var(--info)",fontSize:11}}>{storeName}</span>
           )}
           <button onClick={logout}
-            style={{padding:"3px 10px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer",color:"#b91c1c"}}>
+            style={{padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",background:"#fff",fontSize:11,cursor:"pointer",color:"var(--danger)"}}>
             登出
           </button>
         </div>
       </div>
 
       {/* TABS */}
-      <div style={{background:"#fff",borderBottom:"1px solid #e8e6e1",padding:"6px 10px",display:"flex",gap:2,overflowX:"auto",flexWrap:"wrap"}}>
+      <div className="sb-admin-tabs" style={{background:"#fff",borderBottom:"1px solid var(--border)",padding:"6px 10px",display:"flex",gap:2,overflowX:"auto",flexWrap:"wrap"}}>
         {Object.entries(TAB_GROUPS).map(([group, tabs]) => {
           const visible = tabs.filter(t => myTabs.includes(t));
           if (visible.length === 0) return null;
           return (
             <div key={group} style={{display:"flex",alignItems:"center",gap:1}}>
-              <span style={{fontSize:9,color:"#aaa",padding:"0 4px"}}>{group}</span>
+              <span style={{fontSize:9,color:"var(--text-hint)",padding:"0 4px"}}>{group}</span>
               {visible.map(t => (
                 <button key={t} onClick={()=>setTab(t)}
                   style={{
                     padding:"4px 8px",borderRadius:6,fontSize:11,cursor:"pointer",
-                    border: tab===t ? "1px solid #1a1a1a" : "1px solid transparent",
-                    background: tab===t ? "#1a1a1a" : "transparent",
-                    color: tab===t ? "#fff" : "#666",
+                    border: tab===t ? "1px solid var(--ink)" : "1px solid transparent",
+                    background: tab===t ? "var(--ink)" : "transparent",
+                    color: tab===t ? "#fff" : "var(--text-2)",
                     fontWeight: tab===t ? 600 : 400,
                   }}>
                   {TAB_L[t]}
@@ -528,23 +528,23 @@ export default function AdminPage() {
 
       {/* CONTENT */}
       <div style={{padding:"12px 14px",maxWidth:1200,margin:"0 auto"}}>
-        {ld && <div style={{textAlign:"center",padding:30,color:"#aaa"}}>載入中...</div>}
+        {ld && <div style={{textAlign:"center",padding:30,color:"var(--text-hint)"}}>載入中...</div>}
 
         {/* DASHBOARD */}
         {!ld && tab === "dashboard" && (
           <div>
-            {!loaded.core && <div style={{background:"#fff8e6",border:"1px solid #f0e6c8",borderRadius:6,padding:"5px 10px",marginBottom:8,fontSize:11,color:"#854d0e",textAlign:"center"}}>⏳ 資料載入中…（首次進入或冷啟動較慢，數字會陸續顯示）</div>}
+            {!loaded.core && <div style={{background:"var(--warning-bg)",border:"1px solid #f0e6c8",borderRadius:6,padding:"5px 10px",marginBottom:8,fontSize:11,color:"var(--warning)",textAlign:"center"}}>⏳ 資料載入中…（首次進入或冷啟動較慢，數字會陸續顯示）</div>}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:6,marginBottom:10}}>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>本月營收</div><div style={{fontSize:18,fontWeight:700,color:"#0a7c42"}}>{loaded.core?fmt(sum.total_net_sales):<span style={{color:"#ccc"}}>…</span>}</div></div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>待審(假+費用)</div><div style={{fontSize:18,fontWeight:700,color:"#b45309"}}>{loaded.core?(pl.length + exps.filter(e=>e.status==="pending").length):<span style={{color:"#ccc"}}>…</span>}</div></div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>在職員工</div><div style={{fontSize:18,fontWeight:700}}>{loaded.core?ae.length:<span style={{color:"#ccc"}}>…</span>}</div></div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>待撥款</div><div style={{fontSize:18,fontWeight:700,color:"#b91c1c"}}>{loaded.pmt?fmt(pmtSum.pending):<span style={{color:"#ccc"}}>…</span>}</div></div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px"}}><div style={{fontSize:9,color:"#888"}}>應收帳款</div><div style={{fontSize:18,fontWeight:700,color:"#b45309"}}>{loaded.orders?fmt(orderSum.unpaid):<span style={{color:"#ccc"}}>…</span>}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"8px 10px"}}><div style={{fontSize:9,color:"var(--text-3)"}}>本月營收</div><div style={{fontSize:18,fontWeight:700,color:"var(--success)"}}>{loaded.core?fmt(sum.total_net_sales):<span style={{color:"#ccc"}}>…</span>}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"8px 10px"}}><div style={{fontSize:9,color:"var(--text-3)"}}>待審(假+費用)</div><div style={{fontSize:18,fontWeight:700,color:"var(--warning)"}}>{loaded.core?(pl.length + exps.filter(e=>e.status==="pending").length):<span style={{color:"#ccc"}}>…</span>}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"8px 10px"}}><div style={{fontSize:9,color:"var(--text-3)"}}>在職員工</div><div style={{fontSize:18,fontWeight:700}}>{loaded.core?ae.length:<span style={{color:"#ccc"}}>…</span>}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"8px 10px"}}><div style={{fontSize:9,color:"var(--text-3)"}}>待撥款</div><div style={{fontSize:18,fontWeight:700,color:"var(--danger)"}}>{loaded.pmt?fmt(pmtSum.pending):<span style={{color:"#ccc"}}>…</span>}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"8px 10px"}}><div style={{fontSize:9,color:"var(--text-3)"}}>應收帳款</div><div style={{fontSize:18,fontWeight:700,color:"var(--warning)"}}>{loaded.orders?fmt(orderSum.unpaid):<span style={{color:"#ccc"}}>…</span>}</div></div>
             </div>
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
               {/* 門市營收達成率 — 留在精簡版（用已載入的資料，無額外 API） */}
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10}}>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:10}}>
                 <h4 style={{fontSize:11,fontWeight:600,marginBottom:6}}>📊 門市營收達成率</h4>
                 {stores.map(s => {
                   const [my,mm] = month.split("-").map(Number);
@@ -554,8 +554,8 @@ export default function AdminPage() {
                   const pct = target > 0 ? Math.round(rev/target*100) : 0;
                   return (
                     <div key={s.id} style={{marginBottom:5}}>
-                      <div style={{display:"flex",justifyContent:"space-between",fontSize:10}}><span>{s.name}</span><span style={{fontWeight:600}}>{fmt(rev)}{target>0&&<span style={{color:"#888",fontWeight:400}}>{" / "+fmt(target)+" ("+pct+"%)"}</span>}</span></div>
-                      {target > 0 && <div style={{height:5,background:"#f0f0f0",borderRadius:3,marginTop:1}}><div style={{height:"100%",width:Math.min(100,pct)+"%",background:pct>=100?"#0a7c42":pct>=70?"#fbbf24":"#b91c1c",borderRadius:3}} /></div>}
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:10}}><span>{s.name}</span><span style={{fontWeight:600}}>{fmt(rev)}{target>0&&<span style={{color:"var(--text-3)",fontWeight:400}}>{" / "+fmt(target)+" ("+pct+"%)"}</span>}</span></div>
+                      {target > 0 && <div style={{height:5,background:"#f0f0f0",borderRadius:3,marginTop:1}}><div style={{height:"100%",width:Math.min(100,pct)+"%",background:pct>=100?"var(--success)":pct>=70?"#fbbf24":"var(--danger)",borderRadius:3}} /></div>}
                     </div>
                   );
                 })}
@@ -566,14 +566,14 @@ export default function AdminPage() {
                 const pendingEmps = emps.filter(e=>!e.is_active);
                 const liStyle = {fontSize:10,padding:"2px 0",cursor:"pointer"};
                 return (
-                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10}}>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:10}}>
                   <h4 style={{fontSize:11,fontWeight:600,marginBottom:6}}>📋 待辦事項</h4>
-                  {pendingEmps.length>0&&<div onClick={()=>setTab("employees")} style={{...liStyle,color:"#b45309"}}>{"👤 待審核員工 "+pendingEmps.length+" 位（點此前往）"}</div>}
-                  {pl.length>0&&<div onClick={()=>setTab("leaves")} style={{...liStyle,color:"#b45309"}}>{"🙋 待審請假 "+pl.length+" 筆"}</div>}
-                  {exps.filter(e=>e.status==="pending").length>0&&<div onClick={()=>setTab("expenses")} style={{...liStyle,color:"#b45309"}}>{"📦 待審費用 "+exps.filter(e=>e.status==="pending").length+" 筆"}</div>}
-                  {otRecords.filter(r=>r.status==="pending").length>0&&<div onClick={()=>setTab("overtime")} style={{...liStyle,color:"#b45309"}}>{"⏱ 待審加班 "+otRecords.filter(r=>r.status==="pending").length+" 筆"}</div>}
-                  {amendments.filter(a=>a.status==="pending").length>0&&<div style={{...liStyle,color:"#b45309"}}>{"🔧 待審補登 "+amendments.filter(a=>a.status==="pending").length+" 筆"}</div>}
-                  {dep.filter(d=>d.status==="anomaly").length>0&&<div onClick={()=>setTab("deposits")} style={{...liStyle,color:"#b91c1c"}}>{"🚨 存款異常 "+dep.filter(d=>d.status==="anomaly").length+" 筆"}</div>}
+                  {pendingEmps.length>0&&<div onClick={()=>setTab("employees")} style={{...liStyle,color:"var(--warning)"}}>{"👤 待審核員工 "+pendingEmps.length+" 位（點此前往）"}</div>}
+                  {pl.length>0&&<div onClick={()=>setTab("leaves")} style={{...liStyle,color:"var(--warning)"}}>{"🙋 待審請假 "+pl.length+" 筆"}</div>}
+                  {exps.filter(e=>e.status==="pending").length>0&&<div onClick={()=>setTab("expenses")} style={{...liStyle,color:"var(--warning)"}}>{"📦 待審費用 "+exps.filter(e=>e.status==="pending").length+" 筆"}</div>}
+                  {otRecords.filter(r=>r.status==="pending").length>0&&<div onClick={()=>setTab("overtime")} style={{...liStyle,color:"var(--warning)"}}>{"⏱ 待審加班 "+otRecords.filter(r=>r.status==="pending").length+" 筆"}</div>}
+                  {amendments.filter(a=>a.status==="pending").length>0&&<div style={{...liStyle,color:"var(--warning)"}}>{"🔧 待審補登 "+amendments.filter(a=>a.status==="pending").length+" 筆"}</div>}
+                  {dep.filter(d=>d.status==="anomaly").length>0&&<div onClick={()=>setTab("deposits")} style={{...liStyle,color:"var(--danger)"}}>{"🚨 存款異常 "+dep.filter(d=>d.status==="anomaly").length+" 筆"}</div>}
                   {(()=>{
                     // 偵測「閉店盤點未完成」：所有 active 店中、本日 stock_counts evening 缺漏的
                     const today = new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Taipei"});
@@ -586,7 +586,7 @@ export default function AdminPage() {
                       // 昨晚應該要有閉店盤點 → 找不到任何 last_count_at 在昨天 = 未完成
                       return recent.length === 0;
                     });
-                    return missingStores.length>0 ? <div onClick={()=>setTab("inventory")} style={{...liStyle,color:"#b91c1c"}}>{"🌙 昨晚閉店盤點未完成 "+missingStores.length+" 店（點此前往）"}</div> : null;
+                    return missingStores.length>0 ? <div onClick={()=>setTab("inventory")} style={{...liStyle,color:"var(--danger)"}}>{"🌙 昨晚閉店盤點未完成 "+missingStores.length+" 店（點此前往）"}</div> : null;
                   })()}
                   {pendingEmps.length===0&&pl.length===0&&exps.filter(e=>e.status==="pending").length===0&&otRecords.filter(r=>r.status==="pending").length===0&&amendments.filter(a=>a.status==="pending").length===0&&dep.filter(d=>d.status==="anomaly").length===0&&<div style={{fontSize:10,color:"#ccc",textAlign:"center",padding:8}}>✅ 無待辦</div>}
                 </div>
@@ -595,22 +595,22 @@ export default function AdminPage() {
             </div>
 
             {/* 📊 詳細統計（預設摺疊以加速首屏） */}
-            <button onClick={()=>setShowAnalytics(!showAnalytics)} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid #e8e6e1",background:showAnalytics?"#faf8f5":"#fff",cursor:"pointer",fontSize:12,fontWeight:600,color:"#555",textAlign:"left",marginBottom:8}}>
+            <button onClick={()=>setShowAnalytics(!showAnalytics)} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border)",background:showAnalytics?"var(--surface-warm)":"#fff",cursor:"pointer",fontSize:12,fontWeight:600,color:"var(--text-2)",textAlign:"left",marginBottom:8}}>
               {showAnalytics?"▼":"▶"} 📊 詳細統計（系統提醒、員工KPI、門市人效）
             </button>
 
             {showAnalytics && <>
             {/* 🔔 系統提醒 */}
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10,marginBottom:10}}>
+            <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:10,marginBottom:10}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                 <h4 style={{fontSize:11,fontWeight:600}}>🔔 系統提醒</h4>
                 <button onClick={async()=>{await ap("/api/admin/reminders",{action:"generate"});load();}}
-                  style={{padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:9,cursor:"pointer"}}>🔄 檢查</button>
+                  style={{padding:"2px 8px",borderRadius:4,border:"1px solid var(--border)",background:"#fff",fontSize:9,cursor:"pointer"}}>🔄 檢查</button>
               </div>
               {(reminders||[]).length===0
                 ? <div style={{fontSize:10,color:"#ccc",textAlign:"center",padding:6}}>✅ 無提醒</div>
                 : (reminders||[]).map(r=>(
-                  <div key={r.id} style={{fontSize:10,padding:"3px 0",borderBottom:"1px solid #f0eeea",display:"flex",gap:4}}>
+                  <div key={r.id} style={{fontSize:10,padding:"3px 0",borderBottom:"1px solid var(--divider)",display:"flex",gap:4}}>
                     <span style={{flex:1}}>{r.message}</span>
                     <button onClick={async()=>{await ap("/api/admin/reminders",{action:"dismiss",reminder_id:r.id});load();}}
                       style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"#ccc"}}>✕</button>
@@ -621,7 +621,7 @@ export default function AdminPage() {
 
             {/* ✦42-44 KPI */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10}}>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:10}}>
                 <h4 style={{fontSize:11,fontWeight:600,marginBottom:6}}>👥 員工KPI</h4>
                 {ae.slice(0,5).map(e => {
                   const schedCount = scheds.filter(s=>s.employee_id===e.id&&s.type==="shift").length;
@@ -637,7 +637,7 @@ export default function AdminPage() {
                   );
                 })}
               </div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10}}>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:10}}>
                 <h4 style={{fontSize:11,fontWeight:600,marginBottom:6}}>🏠 門市人效</h4>
                 {stores.map(s => {
                   const storeEmpCount = ae.filter(e=>e.store_id===s.id).length;
@@ -664,27 +664,27 @@ export default function AdminPage() {
               const role = prompt("角色（staff/store_manager/manager/admin）：","staff");
               const r = await ap("/api/admin/employees",{action:"create",name,phone,store_id:storeId,role:role||"staff"});
               if(r.error) alert(r.error); else { alert("已新增，綁定碼：" + (r.bind_code||"")); load(); }
-            }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
+            }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
               ＋新增員工
             </button>
 
             {/* 待啟用 */}
             {emps.filter(e=>!e.is_active).length > 0 && (
               <div style={{marginBottom:12}}>
-                <h4 style={{fontSize:12,color:"#b45309",marginBottom:4}}>{"⏳ 待審核（"+emps.filter(e=>!e.is_active).length+"）"}</h4>
-                <div style={{background:"#fff8e6",borderRadius:8,border:"1px solid #f0e6c8",overflow:"auto"}}>
+                <h4 style={{fontSize:12,color:"var(--warning)",marginBottom:4}}>{"⏳ 待審核（"+emps.filter(e=>!e.is_active).length+"）"}</h4>
+                <div className="sb-table-wrap" style={{background:"var(--warning-bg)",borderRadius:8,border:"1px solid var(--sugar-200)",overflow:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                    <thead><tr style={{background:"#fef3c7"}}>{["姓名","門市","合約","文件","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#92400e"}}>{h}</th>)}</tr></thead>
+                    <thead><tr style={{background:"var(--warning-bg)"}}>{["姓名","門市","合約","文件","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#92400e"}}>{h}</th>)}</tr></thead>
                     <tbody>{emps.filter(e=>!e.is_active).map(e=>{
                       const REQ=[["health_check","體檢"],["id_card_front","身證正"],["id_card_back","身證反"]];
                       const has=docMap[e.id]||[];
                       const missing=REQ.filter(([k])=>!has.includes(k));
                       return (
-                      <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                        <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}} onClick={()=>setDetailId(e.id)}>{e.name}</td>
+                      <tr key={e.id} style={{borderBottom:"1px solid var(--divider)"}}>
+                        <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"var(--brand-strong)"}} onClick={()=>setDetailId(e.id)}>{e.name}</td>
                         <td style={{padding:6}}>{e.stores?e.stores.name:"總部"}</td>
-                        <td style={{padding:6}}>{e.onboarding_completed||e.contract_signed?<span style={{color:"#0a7c42"}}>✅已簽</span>:<span style={{color:"#b91c1c"}}>❌未簽</span>}</td>
-                        <td style={{padding:6,fontSize:10}}>{missing.length===0?<span style={{color:"#0a7c42",fontWeight:600}}>✅ 齊全</span>:<span style={{color:"#b45309"}}>⚠️ 缺 {missing.map(m=>m[1]).join("、")}</span>}</td>
+                        <td style={{padding:6}}>{e.onboarding_completed||e.contract_signed?<span style={{color:"var(--success)"}}>✅已簽</span>:<span style={{color:"var(--danger)"}}>❌未簽</span>}</td>
+                        <td style={{padding:6,fontSize:10}}>{missing.length===0?<span style={{color:"var(--success)",fontWeight:600}}>✅ 齊全</span>:<span style={{color:"var(--warning)"}}>⚠️ 缺 {missing.map(m=>m[1]).join("、")}</span>}</td>
                         <td style={{padding:6}}>{e.line_uid?"✅":"❌"}</td>
                         <td style={{padding:6,whiteSpace:"nowrap"}}>
                           <button onClick={async()=>{
@@ -694,9 +694,9 @@ export default function AdminPage() {
                             const r=await sap("/api/admin/employees",{action:"activate",employee_id:e.id});
                             if(r){alert("✅ 已核准！"+(r.bind_code?"\n綁定碼："+r.bind_code:""));load();}
                           }}
-                            style={{padding:"2px 8px",borderRadius:4,border:"none",background:missing.length>0?"#b45309":"#0a7c42",color:"#fff",fontSize:10,cursor:"pointer",marginRight:3}}>✅核准</button>
+                            style={{padding:"2px 8px",borderRadius:4,border:"none",background:missing.length>0?"var(--warning)":"var(--success)",color:"#fff",fontSize:10,cursor:"pointer",marginRight:3}}>✅核准</button>
                           <button onClick={async()=>{if(!confirm("⚠️ 退回「"+e.name+"」？\n此操作會永久刪除"))return;const r=await sap("/api/admin/employees",{action:"delete",employee_id:e.id});if(r)load();}}
-                            style={{padding:"2px 8px",borderRadius:4,border:"none",background:"#b91c1c",color:"#fff",fontSize:10,cursor:"pointer"}}>❌退回</button>
+                            style={{padding:"2px 8px",borderRadius:4,border:"none",background:"var(--danger)",color:"#fff",fontSize:10,cursor:"pointer"}}>❌退回</button>
                         </td>
                       </tr>
                     );})}</tbody>
@@ -711,30 +711,30 @@ export default function AdminPage() {
               if (storeEmps.length === 0) return null;
               return (
                 <div key={store.id} style={{marginBottom:10}}>
-                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
-                  <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                  <h4 style={{fontSize:12,fontWeight:600,color:"var(--text-2)",marginBottom:4,padding:"4px 8px",background:"var(--surface-warm)",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
+                  <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                      <thead><tr style={{background:"#faf8f5"}}>{["順序","姓名","角色","年資","特休","薪資","勞健保","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{background:"var(--surface-warm)"}}>{["順序","姓名","角色","年資","特休","薪資","勞健保","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                       <tbody>{storeEmps.map((e,idx)=>(
-                        <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                        <tr key={e.id} style={{borderBottom:"1px solid var(--divider)"}}>
                           <td style={{padding:4,whiteSpace:"nowrap"}}>
                             <button disabled={idx===0} onClick={async()=>{const r=await ap("/api/admin/employees",{action:"reorder",employee_id:e.id,direction:"up"});if(r?.error){alert("❌ "+r.error);return;}load();}}
-                              style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:idx===0?"default":"pointer",opacity:idx===0?0.3:1,marginRight:2}}>↑</button>
+                              style={{padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",background:"#fff",fontSize:10,cursor:idx===0?"default":"pointer",opacity:idx===0?0.3:1,marginRight:2}}>↑</button>
                             <button disabled={idx===storeEmps.length-1} onClick={async()=>{const r=await ap("/api/admin/employees",{action:"reorder",employee_id:e.id,direction:"down"});if(r?.error){alert("❌ "+r.error);return;}load();}}
-                              style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:idx===storeEmps.length-1?"default":"pointer",opacity:idx===storeEmps.length-1?0.3:1}}>↓</button>
+                              style={{padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",background:"#fff",fontSize:10,cursor:idx===storeEmps.length-1?"default":"pointer",opacity:idx===storeEmps.length-1?0.3:1}}>↓</button>
                           </td>
-                          <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}} onClick={()=>setDetailId(e.id)}>{e.name}<span style={{fontSize:9,color:e.employment_type==="parttime"?"#b45309":"#888",marginLeft:4,fontWeight:400}}>{e.employment_type==="parttime"?"兼職":"正職"}</span></td>
+                          <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"var(--brand-strong)"}} onClick={()=>setDetailId(e.id)}>{e.name}<span style={{fontSize:9,color:e.employment_type==="parttime"?"var(--warning)":"var(--text-3)",marginLeft:4,fontWeight:400}}>{e.employment_type==="parttime"?"兼職":"正職"}</span></td>
                           <td style={{padding:6}}><RB role={e.role} /></td>
                           <td style={{padding:6}}>{(e.service_months||0)+"月"}</td>
                           <td style={{padding:6}}>{(e.annual_leave_days||0)+"hr"}</td>
                           <td style={{padding:6,fontSize:10,lineHeight:1.4}}>{(()=>{
                             const ms = Number(e.monthly_salary||0);
                             const hr = Number(e.hourly_rate||0);
-                            if (!ms && !hr) return <span style={{color:"#aaa"}}>未設定</span>;
+                            if (!ms && !hr) return <span style={{color:"var(--text-hint)"}}>未設定</span>;
                             return (
                               <div>
-                                {ms > 0 && <div style={{color:"#0a7c42",fontWeight:600}}>月 ${ms.toLocaleString()}</div>}
-                                {hr > 0 && <div style={{color:"#185fa5"}}>時 ${hr.toLocaleString()}</div>}
+                                {ms > 0 && <div style={{color:"var(--success)",fontWeight:600}}>月 ${ms.toLocaleString()}</div>}
+                                {hr > 0 && <div style={{color:"var(--info)"}}>時 ${hr.toLocaleString()}</div>}
                               </div>
                             );
                           })()}</td>
@@ -745,22 +745,22 @@ export default function AdminPage() {
                             const healthElsewhere = isPT && e.health_insured_here === false;
                             return (
                               <div>
-                                <div style={{color: laborSalary ? "#185fa5" : "#aaa"}}>
+                                <div style={{color: laborSalary ? "var(--info)" : "var(--text-hint)"}}>
                                   🛡 {laborSalary ? "$" + laborSalary.toLocaleString() : "未投保"}
                                 </div>
-                                <div style={{color: healthElsewhere ? "#b45309" : (healthSalary ? "#0a7c42" : "#aaa")}}>
+                                <div style={{color: healthElsewhere ? "var(--warning)" : (healthSalary ? "var(--success)" : "var(--text-hint)")}}>
                                   🏥 {healthElsewhere ? "他司" : (healthSalary ? "$" + healthSalary.toLocaleString() : "未投保")}
                                 </div>
-                                {e.insurance_start_date && <div style={{color:"#888",fontSize:9}}>起 {e.insurance_start_date.slice(2,10).replace(/-/g,"/")}</div>}
+                                {e.insurance_start_date && <div style={{color:"var(--text-3)",fontSize:9}}>起 {e.insurance_start_date.slice(2,10).replace(/-/g,"/")}</div>}
                               </div>
                             );
                           })()}</td>
                           <td style={{padding:6}}>{e.line_uid?"✅":"❌"}</td>
                           <td style={{padding:6,whiteSpace:"nowrap"}}>
                             <button onClick={async()=>{if(!confirm("停用"+e.name+"？"))return;const r=await sap("/api/admin/employees",{action:"deactivate",employee_id:e.id});if(r)load();}}
-                              style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>停用</button>
+                              style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--danger)",color:"#fff",fontSize:9,cursor:"pointer"}}>停用</button>
                             <button onClick={async()=>{if(!confirm("⚠️ 永久刪除「"+e.name+"」？\n所有資料將被清除，無法復原！"))return;if(!confirm("再次確認刪除？"))return;const r=await sap("/api/admin/employees",{action:"delete",employee_id:e.id});if(r)load();}}
-                              style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b91c1c",background:"transparent",color:"#b91c1c",fontSize:9,cursor:"pointer",marginLeft:2}}>🗑</button>
+                              style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--danger)",background:"transparent",color:"var(--danger)",fontSize:9,cursor:"pointer",marginLeft:2}}>🗑</button>
                           </td>
                         </tr>
                       ))}</tbody>
@@ -776,16 +776,16 @@ export default function AdminPage() {
         {!ld && tab === "schedules" && (
           <div>
             <div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
-              <button onClick={()=>setSv("week")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="week"?"#1a1a1a":"#fff",color:sv==="week"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>週（7天）</button>
-              <button onClick={()=>setSv("biweek")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="biweek"?"#1a1a1a":"#fff",color:sv==="biweek"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>雙週（14天）</button>
-              <button onClick={()=>setSv("month")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:sv==="month"?"#1a1a1a":"#fff",color:sv==="month"?"#fff":"#666",fontSize:11,cursor:"pointer"}}>月曆</button>
+              <button onClick={()=>setSv("week")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--border)",background:sv==="week"?"var(--ink)":"#fff",color:sv==="week"?"#fff":"var(--text-2)",fontSize:11,cursor:"pointer"}}>週（7天）</button>
+              <button onClick={()=>setSv("biweek")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--border)",background:sv==="biweek"?"var(--ink)":"#fff",color:sv==="biweek"?"#fff":"var(--text-2)",fontSize:11,cursor:"pointer"}}>雙週（14天）</button>
+              <button onClick={()=>setSv("month")} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--border)",background:sv==="month"?"var(--ink)":"#fff",color:sv==="month"?"#fff":"var(--text-2)",fontSize:11,cursor:"pointer"}}>月曆</button>
               <button onClick={()=>{setSv("availability");const nm=new Date(new Date().getFullYear(),new Date().getMonth()+1,1).toLocaleDateString("sv-SE").slice(0,7);ap("/api/availability?month="+nm+(sf?"&store_id="+sf:"")).then(r=>setAvReports(r.data||[]));}} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #3f51b5",background:sv==="availability"?"#3f51b5":"#fff",color:sv==="availability"?"#fff":"#3f51b5",fontSize:11,cursor:"pointer",fontWeight:600}}>👥 可用時段</button>
               {(sv==="week"||sv==="biweek") && (
                 <>
-                  <button onClick={()=>{const d=sv==="biweek"?14:7;setWs(new Date(new Date(ws).getTime()-d*86400000).toLocaleDateString("sv-SE"));}} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>◀</button>
+                  <button onClick={()=>{const d=sv==="biweek"?14:7;setWs(new Date(new Date(ws).getTime()-d*86400000).toLocaleDateString("sv-SE"));}} style={{padding:"3px 8px",borderRadius:5,border:"1px solid var(--border)",background:"#fff",cursor:"pointer",fontSize:11}}>◀</button>
                   <span style={{fontSize:12,fontWeight:500}}>{ws+" ~ "+new Date(new Date(ws).getTime()+(sv==="biweek"?13:6)*86400000).toLocaleDateString("sv-SE")}</span>
-                  <button onClick={()=>{const d=sv==="biweek"?14:7;setWs(new Date(new Date(ws).getTime()+d*86400000).toLocaleDateString("sv-SE"));}} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",cursor:"pointer",fontSize:11}}>▶</button>
-                  <button onClick={()=>{const next=!showAvail;setShowAvail(next);if(next){const months=new Set();const days=sv==="biweek"?14:7;for(let i=0;i<days;i++){const d=new Date(new Date(ws).getTime()+i*86400000).toLocaleDateString("sv-SE");months.add(d.slice(0,7));}Promise.all([...months].map(mo=>ap("/api/availability?month="+mo+(sf?"&store_id="+sf:"")))).then(rs=>{const all=rs.flatMap(r=>r.data||[]);setAvReports(all);});}}} style={{padding:"3px 8px",borderRadius:5,border:showAvail?"1px solid #854d0e":"1px solid #ddd",background:showAvail?"#fef9c3":"#fff",color:showAvail?"#854d0e":"#888",cursor:"pointer",fontSize:11,fontWeight:showAvail?600:400}}>📋 預排假</button>
+                  <button onClick={()=>{const d=sv==="biweek"?14:7;setWs(new Date(new Date(ws).getTime()+d*86400000).toLocaleDateString("sv-SE"));}} style={{padding:"3px 8px",borderRadius:5,border:"1px solid var(--border)",background:"#fff",cursor:"pointer",fontSize:11}}>▶</button>
+                  <button onClick={()=>{const next=!showAvail;setShowAvail(next);if(next){const months=new Set();const days=sv==="biweek"?14:7;for(let i=0;i<days;i++){const d=new Date(new Date(ws).getTime()+i*86400000).toLocaleDateString("sv-SE");months.add(d.slice(0,7));}Promise.all([...months].map(mo=>ap("/api/availability?month="+mo+(sf?"&store_id="+sf:"")))).then(rs=>{const all=rs.flatMap(r=>r.data||[]);setAvReports(all);});}}} style={{padding:"3px 8px",borderRadius:5,border:showAvail?"1px solid var(--warning)":"1px solid var(--border)",background:showAvail?"var(--warning-bg)":"#fff",color:showAvail?"var(--warning)":"var(--text-3)",cursor:"pointer",fontSize:11,fontWeight:showAvail?600:400}}>📋 預排假</button>
                 </>
               )}
               <button onClick={()=>{
@@ -798,7 +798,7 @@ export default function AdminPage() {
                   start = month+"-01"; end = new Date(y,m,0).toLocaleDateString("sv-SE");
                 }
                 setPubForm({ store_id: sf || "", start, end });
-              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:11,cursor:"pointer",marginLeft:"auto"}}>
+              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--success)",background:"transparent",color:"var(--success)",fontSize:11,cursor:"pointer",marginLeft:"auto"}}>
                 📢 發布班表
               </button>
               <button onClick={async()=>{
@@ -808,7 +808,7 @@ export default function AdminPage() {
                 if(!confirm("📋 複製上週("+srcStart+"~"+srcEnd+")班表到本週？\n\n• 自動跳過有預假/休假的日期\n• 不覆蓋已排的班"))return;
                 const r=await ap("/api/admin/schedules",{action:"copy_week",source_start:srcStart,source_end:srcEnd,target_start:ws,store_id:sf||undefined});
                 alert(r.message||"完成");load();
-              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #4361ee",background:"transparent",color:"#4361ee",fontSize:11,cursor:"pointer"}}>
+              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--brand-strong)",background:"transparent",color:"var(--brand-strong)",fontSize:11,cursor:"pointer"}}>
                 📋 複製上週
               </button>
               {/* ✦16 班表範本 */}
@@ -819,7 +819,7 @@ export default function AdminPage() {
                 const tpl=weekScheds.map(s=>({employee_id:s.employee_id,shift_id:s.shift_id,type:s.type,leave_type:s.leave_type,day_of_week:Math.floor((new Date(s.date)-new Date(ws))/86400000)}));
                 await ap("/api/admin/schedules",{action:"save_template",store_id:sf,name,template_data:tpl});
                 alert("範本「"+name+"」已儲存");
-              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #4361ee",background:"transparent",color:"#4361ee",fontSize:11,cursor:"pointer"}}>
+              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--brand-strong)",background:"transparent",color:"var(--brand-strong)",fontSize:11,cursor:"pointer"}}>
                 💾 存範本
               </button>
               <button onClick={async()=>{
@@ -832,7 +832,7 @@ export default function AdminPage() {
                 if(!confirm("將範本「"+tpl.name+"」套用到 "+ws+" 這週？"))return;
                 await ap("/api/admin/schedules",{action:"apply_template",template_id:tpl.id,week_start:ws,store_id:sf});
                 alert("已套用");load();
-              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #b45309",background:"transparent",color:"#b45309",fontSize:11,cursor:"pointer"}}>
+              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--warning)",background:"transparent",color:"var(--warning)",fontSize:11,cursor:"pointer"}}>
                 📋 套範本
               </button>
             </div>
@@ -872,13 +872,13 @@ export default function AdminPage() {
                 if(storeEmps.length===0)return null;
                 return(
                   <div key={store.id} style={{marginBottom:10}}>
-                    <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
-                    <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                    <h4 style={{fontSize:12,fontWeight:600,color:"var(--text-2)",marginBottom:4,padding:"4px 8px",background:"var(--surface-warm)",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
+                    <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
                       <table style={{width:"100%",borderCollapse:"collapse",fontSize:sv==="biweek"?9:10,minWidth:sv==="biweek"?900:650}}>
-                        <thead><tr style={{background:"#faf8f5",borderBottom:"1px solid #e8e6e1"}}>
-                          <th style={{padding:"5px 3px",textAlign:"left",fontWeight:500,color:"#666",minWidth:60,position:"sticky",left:0,background:"#faf8f5",zIndex:1}}>員工</th>
+                        <thead><tr style={{background:"var(--surface-warm)",borderBottom:"1px solid var(--border)"}}>
+                          <th style={{padding:"5px 3px",textAlign:"left",fontWeight:500,color:"var(--text-2)",minWidth:60,position:"sticky",left:0,background:"var(--surface-warm)",zIndex:1}}>員工</th>
                           {wd.map((d,i)=>{const day=DAYS[new Date(d).getDay()];const hol=holidays.find(h=>h.date===d);const isWe=new Date(d).getDay()===0||new Date(d).getDay()===6;const isSun=new Date(d).getDay()===0;
-                            return <th key={d} style={{padding:sv==="biweek"?"4px 1px":"7px 3px",textAlign:"center",fontWeight:isSun?700:500,color:hol?"#b91c1c":isWe?"#b45309":"#666",minWidth:sv==="biweek"?55:85,background:hol?"#fef2f2":isSun?"#f9f0f0":"transparent",borderLeft:i>0&&new Date(d).getDay()===0?"2px solid #e0d0d0":"none"}}>{d.slice(5)}<div style={{fontSize:sv==="biweek"?7:8,color:hol?"#b91c1c":"#999"}}>{day}{hol?" "+hol.name:""}</div></th>;})}
+                            return <th key={d} style={{padding:sv==="biweek"?"4px 1px":"7px 3px",textAlign:"center",fontWeight:isSun?700:500,color:hol?"var(--danger)":isWe?"var(--warning)":"var(--text-2)",minWidth:sv==="biweek"?55:85,background:hol?"var(--danger-bg)":isSun?"#f9f0f0":"transparent",borderLeft:i>0&&new Date(d).getDay()===0?"2px solid #e0d0d0":"none"}}>{d.slice(5)}<div style={{fontSize:sv==="biweek"?7:8,color:hol?"var(--danger)":"var(--text-3)"}}>{day}{hol?" "+hol.name:""}</div></th>;})}
                         </tr></thead>
                         <tbody>{storeEmps.map(emp=>{
                           // 統計以「可視週起點所在月」為單位（schedules 已擴展抓整月）
@@ -894,20 +894,20 @@ export default function AdminPage() {
                           const mLeaveDays=monthScheds.filter(s=>s.type==="leave").length;
                           const isFullTime=emp.employment_type!=="parttime";
                           return(
-                          <tr key={emp.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                          <tr key={emp.id} style={{borderBottom:"1px solid var(--divider)"}}>
                             <td style={{padding:"4px 3px",fontWeight:500,fontSize:10,position:"sticky",left:0,background:"#fff",zIndex:1,minWidth:60}}>
                               {emp.name}
-                              <div style={{fontSize:7,color:"#888",marginTop:1}}>{Number(wd[0].slice(5,7))}月: {mWorkDays}天 / {Math.round(mWorkHrs)}hr{mLeaveDays>0?" / 假"+mLeaveDays+"天":""}</div>
+                              <div style={{fontSize:7,color:"var(--text-3)",marginTop:1}}>{Number(wd[0].slice(5,7))}月: {mWorkDays}天 / {Math.round(mWorkHrs)}hr{mLeaveDays>0?" / 假"+mLeaveDays+"天":""}</div>
                             </td>
                             {wd.map(date=>{const sc=scheds.find(s=>s.employee_id===emp.id&&s.date===date);const hol=holidays.find(h=>h.date===date);const avRec=showAvail?avReports.find(r=>r.employee_id===emp.id&&r.start_date===date):null;return(
                               <td key={date} style={{padding:2,textAlign:"center",verticalAlign:"top",borderLeft:new Date(date).getDay()===0?"2px solid #e0d0d0":"none",background:avRec?(avRec.half_day?"rgba(251,191,36,0.18)":"rgba(239,68,68,0.18)"):"transparent",position:"relative"}}>
-                                {avRec&&<div title={avRec.reason||"無備註"} style={{fontSize:7,color:avRec.half_day?"#854d0e":"#b91c1c",background:avRec.half_day?"rgba(254,249,195,0.9)":"rgba(254,226,226,0.9)",borderRadius:2,padding:"0 2px",marginBottom:1,lineHeight:1.4,textAlign:"center",fontWeight:600}}>{avRec.half_day?`可${avRec.half_day}`:"❌整天不可"}</div>}
-                                {sc?(() => {const isLeave=sc.type==="leave";const lt=isLeave?(LT[sc.leave_type]||LT.off):null;const isRest=sc.day_type==="rest_day";const isHol=sc.day_type==="national_holiday";const pc=positions.find(p=>p.name===sc.shifts?.role)?.color||sc.shifts?.color||"#0a7c42";const hasPartialLeave=Number(sc.leave_hours)>0&&sc.type!=="leave";return(
-                                <div style={{background:isLeave?lt.bg:isRest?"#fff8e6":isHol?"#fde8e8":sc.published?pc+"12":"#fff8e6",border:`1.5px ${sc.published||isLeave?"solid":"dashed"} ${isLeave?lt.c:isRest?"#b45309":isHol?"#b91c1c":pc}`,borderRadius:4,padding:"2px 3px",fontSize:9,position:"relative"}}>
-                                  {isLeave?<div style={{color:lt.c,fontWeight:600}}>{lt.l}</div>:<><div style={{fontWeight:600,color:isRest?"#b45309":isHol?"#b91c1c":pc}}>{isRest?"💰 ":isHol?"🎉 ":""}{sc.shifts?.role&&sc.shifts.role!=="all"?sc.shifts.role:"全場"}</div><div style={{color:"#888",fontSize:8}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></>}
-                                  {hasPartialLeave&&<div style={{fontSize:7,color:"#b91c1c",background:"#fef2f2",borderRadius:2,padding:"0 2px",marginTop:1}}>{(LT[sc.leave_type]||{l:"假"}).l}{sc.leave_hours}hr</div>}
+                                {avRec&&<div title={avRec.reason||"無備註"} style={{fontSize:7,color:avRec.half_day?"var(--warning)":"var(--danger)",background:avRec.half_day?"rgba(254,249,195,0.9)":"rgba(254,226,226,0.9)",borderRadius:2,padding:"0 2px",marginBottom:1,lineHeight:1.4,textAlign:"center",fontWeight:600}}>{avRec.half_day?`可${avRec.half_day}`:"❌整天不可"}</div>}
+                                {sc?(() => {const isLeave=sc.type==="leave";const lt=isLeave?(LT[sc.leave_type]||LT.off):null;const isRest=sc.day_type==="rest_day";const isHol=sc.day_type==="national_holiday";const pc=positions.find(p=>p.name===sc.shifts?.role)?.color||sc.shifts?.color||"var(--success)";const hasPartialLeave=Number(sc.leave_hours)>0&&sc.type!=="leave";return(
+                                <div style={{background:isLeave?lt.bg:isRest?"var(--warning-bg)":isHol?"var(--danger-bg)":sc.published?pc+"12":"var(--warning-bg)",border:`1.5px ${sc.published||isLeave?"solid":"dashed"} ${isLeave?lt.c:isRest?"var(--warning)":isHol?"var(--danger)":pc}`,borderRadius:4,padding:"2px 3px",fontSize:9,position:"relative"}}>
+                                  {isLeave?<div style={{color:lt.c,fontWeight:600}}>{lt.l}</div>:<><div style={{fontWeight:600,color:isRest?"var(--warning)":isHol?"var(--danger)":pc}}>{isRest?"💰 ":isHol?"🎉 ":""}{sc.shifts?.role&&sc.shifts.role!=="all"?sc.shifts.role:"全場"}</div><div style={{color:"var(--text-3)",fontSize:8}}>{sc.shifts?(sc.shifts.start_time||"").slice(0,5)+"~"+(sc.shifts.end_time||"").slice(0,5):""}</div></>}
+                                  {hasPartialLeave&&<div style={{fontSize:7,color:"var(--danger)",background:"var(--danger-bg)",borderRadius:2,padding:"0 2px",marginTop:1}}>{(LT[sc.leave_type]||{l:"假"}).l}{sc.leave_hours}hr</div>}
                                   <button onClick={(ev)=>{ev.stopPropagation();if(hasPartialLeave){const c=confirm("刪除整筆（班+假）？\n\n按「取消」只移除請假時數");if(c)delSch(sc.id);else{ap("/api/admin/schedules",{action:"create",employee_id:emp.id,store_id:sc.store_id,shift_id:sc.shift_id,date,leave_hours:0,leave_type:null});load();}}else delSch(sc.id);}} style={{position:"absolute",top:0,right:1,background:"none",border:"none",cursor:"pointer",fontSize:8,color:"#ccc",padding:0}}>✕</button>
-                                </div>);})():(<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else if(v.startsWith("rest:"))addSch(emp.id,v.split(":")[1],date,"rest_day");else addSch(emp.id,v,date);}} style={{width:"100%",padding:2,borderRadius:4,border:"1px dashed #ccc",fontSize:9,color:"#999",background:"#fafafa",cursor:"pointer",height:36}}><option value="">＋</option><optgroup label="📋 班別">{storeShifts.map(s=><option key={s.id} value={s.id}>{(s.role==="all"?"全場":s.role||"全場")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}</optgroup>{isFullTime&&<optgroup label="💰 休息日出勤">{storeShifts.map(s=><option key={"r"+s.id} value={"rest:"+s.id}>💰{(s.role==="all"?"全場":s.role||"")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}</optgroup>}<optgroup label="📅 休假">{[["off","⬛ 例假"],["rest","🔲 休息日"],["annual","🏖 特休"],["personal","📋 事假"],["sick","🤒 病假"],["comp_time","🔄 補休"],["holiday_comp","🔴 國定補假"]].map(([k,l])=><option key={k} value={"leave:"+k}>{l}</option>)}</optgroup></select>)}
+                                </div>);})():(<select onChange={e=>{const v=e.target.value;e.target.value="";if(!v)return;if(v.startsWith("leave:"))addLv(emp.id,date,v.split(":")[1]);else if(v.startsWith("rest:"))addSch(emp.id,v.split(":")[1],date,"rest_day");else addSch(emp.id,v,date);}} style={{width:"100%",padding:2,borderRadius:4,border:"1px dashed #ccc",fontSize:9,color:"var(--text-3)",background:"#fafafa",cursor:"pointer",height:36}}><option value="">＋</option><optgroup label="📋 班別">{storeShifts.map(s=><option key={s.id} value={s.id}>{(s.role==="all"?"全場":s.role||"全場")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}</optgroup>{isFullTime&&<optgroup label="💰 休息日出勤">{storeShifts.map(s=><option key={"r"+s.id} value={"rest:"+s.id}>💰{(s.role==="all"?"全場":s.role||"")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}</optgroup>}<optgroup label="📅 休假">{[["off","⬛ 例假"],["rest","🔲 休息日"],["annual","🏖 特休"],["personal","📋 事假"],["sick","🤒 病假"],["comp_time","🔄 補休"],["holiday_comp","🔴 國定補假"]].map(([k,l])=><option key={k} value={"leave:"+k}>{l}</option>)}</optgroup></select>)}
                               </td>);})}
                           </tr>);})}</tbody>
                       </table>
@@ -924,32 +924,32 @@ export default function AdminPage() {
                 if (!hasEmps) return null;
                 return (
                 <div key={store.id} style={{marginBottom:10}}>
-                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name}</h4>
-                  <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                  <h4 style={{fontSize:12,fontWeight:600,color:"var(--text-2)",marginBottom:4,padding:"4px 8px",background:"var(--surface-warm)",borderRadius:4}}>{"🏠 "+store.name}</h4>
+                  <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
-                  <thead><tr>{DAYS.map(d=><th key={d} style={{padding:4,textAlign:"center",fontWeight:500,color:"#888",width:"14.2%"}}>{d}</th>)}</tr></thead>
+                  <thead><tr>{DAYS.map(d=><th key={d} style={{padding:4,textAlign:"center",fontWeight:500,color:"var(--text-3)",width:"14.2%"}}>{d}</th>)}</tr></thead>
                   <tbody>{(() => {
                     const [y,m]=month.split("-").map(Number);const sd=new Date(y,m-1,1).getDay();const dim=new Date(y,m,0).getDate();
                     const rows=[];let cells=[];
-                    for(let i=0;i<sd;i++)cells.push(<td key={"e"+i} style={{padding:3,border:"1px solid #f0eeea"}}/>);
+                    for(let i=0;i<sd;i++)cells.push(<td key={"e"+i} style={{padding:3,border:"1px solid var(--divider)"}}/>);
                     for(let d=1;d<=dim;d++){
                       const date=y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0");
                       const dow=new Date(date).getDay();
                       const ds=storeScheds.filter(s=>s.date===date);const hol=holidays.find(h=>h.date===date);const isSun=dow===0;const isSat=dow===6;
-                      cells.push(<td key={date} onClick={()=>setSchPop({date,storeId:store.id,storeName:store.name})} style={{padding:3,verticalAlign:"top",border:"1px solid #f0eeea",minHeight:48,background:hol?"#fde8e8":isSun?"#f0eeea":isSat?"#faf8f5":"transparent",cursor:"pointer"}}>
+                      cells.push(<td key={date} onClick={()=>setSchPop({date,storeId:store.id,storeName:store.name})} style={{padding:3,verticalAlign:"top",border:"1px solid var(--divider)",minHeight:48,background:hol?"var(--danger-bg)":isSun?"var(--divider)":isSat?"var(--surface-warm)":"transparent",cursor:"pointer"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <span style={{fontSize:10,fontWeight:500,color:hol?"#b91c1c":isSun?"#b91c1c":isSat?"#b45309":"#666"}}>{d}</span>
-                          {hol&&<span style={{fontSize:7,color:"#b91c1c",background:"#fecaca",padding:"0 3px",borderRadius:2}}>{hol.name}</span>}
+                          <span style={{fontSize:10,fontWeight:500,color:hol?"var(--danger)":isSun?"var(--danger)":isSat?"var(--warning)":"var(--text-2)"}}>{d}</span>
+                          {hol&&<span style={{fontSize:7,color:"var(--danger)",background:"#fecaca",padding:"0 3px",borderRadius:2}}>{hol.name}</span>}
                         </div>
-                        {ds.slice(0,5).map(s=>{const posColor=positions.find(p=>p.name===s.shifts?.role)?.color||s.shifts?.color||"#0a7c42";const isLeave=s.type==="leave";return(<div key={s.id} style={{background:isLeave?(LT[s.leave_type]||LT.off).bg:s.published?posColor+"12":"#fff8e6",border:isLeave?("2px solid "+(LT[s.leave_type]||LT.off).c):s.published?("2px solid "+posColor):("3px dashed "+posColor),borderRadius:5,padding:"3px 5px",fontSize:9,marginBottom:2,lineHeight:1.3}}>
+                        {ds.slice(0,5).map(s=>{const posColor=positions.find(p=>p.name===s.shifts?.role)?.color||s.shifts?.color||"var(--success)";const isLeave=s.type==="leave";return(<div key={s.id} style={{background:isLeave?(LT[s.leave_type]||LT.off).bg:s.published?posColor+"12":"var(--warning-bg)",border:isLeave?("2px solid "+(LT[s.leave_type]||LT.off).c):s.published?("2px solid "+posColor):("3px dashed "+posColor),borderRadius:5,padding:"3px 5px",fontSize:9,marginBottom:2,lineHeight:1.3}}>
                           <div style={{fontWeight:600,color:isLeave?(LT[s.leave_type]||LT.off).c:posColor}}>{s.employees?s.employees.name:""}</div>
-                          {isLeave?<div style={{fontSize:8,color:(LT[s.leave_type]||LT.off).c}}>{(LT[s.leave_type]||LT.off).l}{s.notes&&s.notes!=="預假"?" "+s.notes:""}</div>:<><div style={{fontSize:8,color:posColor}}>{s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role:"全場"}{s.day_type==="rest_day"?" 💰":s.day_type==="national_holiday"?" 🎉":""}</div><div style={{fontSize:7,color:"#888"}}>{s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):""}</div></>}
+                          {isLeave?<div style={{fontSize:8,color:(LT[s.leave_type]||LT.off).c}}>{(LT[s.leave_type]||LT.off).l}{s.notes&&s.notes!=="預假"?" "+s.notes:""}</div>:<><div style={{fontSize:8,color:posColor}}>{s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role:"全場"}{s.day_type==="rest_day"?" 💰":s.day_type==="national_holiday"?" 🎉":""}</div><div style={{fontSize:7,color:"var(--text-3)"}}>{s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):""}</div></>}
                         </div>);})}
                         {ds.length===0&&<div style={{fontSize:9,color:"#ccc",textAlign:"center",marginTop:4}}>+</div>}
                       </td>);
                       if(cells.length===7){rows.push(<tr key={"r"+rows.length}>{cells}</tr>);cells=[];}
                     }
-                    while(cells.length<7)cells.push(<td key={"f"+cells.length} style={{padding:3,border:"1px solid #f0eeea"}}/>);
+                    while(cells.length<7)cells.push(<td key={"f"+cells.length} style={{padding:3,border:"1px solid var(--divider)"}}/>);
                     if(cells.length)rows.push(<tr key={"r"+rows.length}>{cells}</tr>);
                     return rows;
                   })()}</tbody>
@@ -958,7 +958,7 @@ export default function AdminPage() {
                 </div>);
               })}
               {/* 快速操作列 */}
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10,marginTop:8}}>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:10,marginTop:8}}>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
                   <button onClick={async()=>{
                     if(!sf){alert("請先選擇門市");return;}
@@ -969,7 +969,7 @@ export default function AdminPage() {
                     if(!confirm("📋 複製上週（"+lastWeekStart+"~"+lastWeekEnd+"）的排班到本月？"))return;
                     const{data:src}=await ap("/api/admin/schedules",{action:"copy_week",source_start:lastWeekStart,source_end:lastWeekEnd,target_start:month+"-01",store_id:sf});
                     alert("✅ 已複製"+(src?.count||0)+"筆");load();
-                  }} style={{padding:"6px 12px",borderRadius:6,border:"1px solid #4361ee",background:"#fff",color:"#4361ee",fontSize:11,cursor:"pointer"}}>📋 複製上週班表</button>
+                  }} style={{padding:"6px 12px",borderRadius:6,border:"1px solid var(--brand-strong)",background:"#fff",color:"var(--brand-strong)",fontSize:11,cursor:"pointer"}}>📋 複製上週班表</button>
                   <button onClick={async()=>{
                     if(!sf){alert("請先選擇門市");return;}
                     const sid=document.getElementById("qs-shift")?.value;if(!sid){alert("請先選崗位");return;}
@@ -981,14 +981,14 @@ export default function AdminPage() {
                       else{const s=shifts.find(x=>x.id===sid);await ap("/api/admin/schedules",{action:"create",employee_id:e.id,store_id:sf,shift_id:sid,date});}
                     }
                     alert("✅ 全員"+storeEmps.length+"人已排入");load();
-                  }} style={{padding:"6px 12px",borderRadius:6,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:11,cursor:"pointer"}}>👥 全員同班</button>
+                  }} style={{padding:"6px 12px",borderRadius:6,border:"1px solid var(--warning)",background:"#fff",color:"var(--warning)",fontSize:11,cursor:"pointer"}}>👥 全員同班</button>
                 </div>
-                <h4 style={{fontSize:11,fontWeight:500,color:"#888",marginBottom:6}}>➕ 快速排班</h4>
+                <h4 style={{fontSize:11,fontWeight:500,color:"var(--text-3)",marginBottom:6}}>➕ 快速排班</h4>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"end"}}>
-                  <div><label style={{fontSize:9,color:"#888"}}>員工</label><select id="qs-emp" style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11,minWidth:80}}><option value="">選員工</option><option value="__all__">👥 全員排入</option>{ae.filter(e=>!sf||e.store_id===sf).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
-                  <div><label style={{fontSize:9,color:"#888"}}>班別</label><select id="qs-shift" style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11,minWidth:80}}><option value="">選崗位</option>{shifts.filter(s=>!sf||s.store_id===sf).map(s=><option key={s.id} value={s.id}>{(s.role==="all"?"全場":s.role||"全場")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}<optgroup label="休假">{Object.entries(LT).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select></div>
-                  <div><label style={{fontSize:9,color:"#888"}}>開始日</label><input id="qs-start" type="date" defaultValue={month+"-01"} style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
-                  <div><label style={{fontSize:9,color:"#888"}}>結束日</label><input id="qs-end" type="date" defaultValue={month+"-01"} style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:11}} /></div>
+                  <div><label style={{fontSize:9,color:"var(--text-3)"}}>員工</label><select id="qs-emp" style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid var(--border)",fontSize:11,minWidth:80}}><option value="">選員工</option><option value="__all__">👥 全員排入</option>{ae.filter(e=>!sf||e.store_id===sf).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+                  <div><label style={{fontSize:9,color:"var(--text-3)"}}>班別</label><select id="qs-shift" style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid var(--border)",fontSize:11,minWidth:80}}><option value="">選崗位</option>{shifts.filter(s=>!sf||s.store_id===sf).map(s=><option key={s.id} value={s.id}>{(s.role==="all"?"全場":s.role||"全場")+" "+(s.start_time||"").slice(0,5)+"~"+(s.end_time||"").slice(0,5)}</option>)}<optgroup label="休假">{Object.entries(LT).map(([k,v])=><option key={k} value={"leave:"+k}>{v.l}</option>)}</optgroup></select></div>
+                  <div><label style={{fontSize:9,color:"var(--text-3)"}}>開始日</label><input id="qs-start" type="date" defaultValue={month+"-01"} style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid var(--border)",fontSize:11}} /></div>
+                  <div><label style={{fontSize:9,color:"var(--text-3)"}}>結束日</label><input id="qs-end" type="date" defaultValue={month+"-01"} style={{display:"block",padding:"4px 6px",borderRadius:4,border:"1px solid var(--border)",fontSize:11}} /></div>
                   <button onClick={async()=>{
                     const eid=document.getElementById("qs-emp").value;const sid=document.getElementById("qs-shift").value;
                     const start=document.getElementById("qs-start").value;const end=document.getElementById("qs-end").value;
@@ -1001,9 +1001,9 @@ export default function AdminPage() {
                         else{const sh=shifts.find(x=>x.id===sid);const r=await ap("/api/admin/schedules",{action:"create",employee_id:id,store_id:sh?sh.store_id:sf,shift_id:sid,date:ds});if(r.skipped)skip++;else count++;}
                         d.setDate(d.getDate()+1);}}
                     alert("✅ 已排"+count+"筆"+(skip?" ⏭跳過"+skip+"筆（有休假）":""));load();
-                  }} style={{padding:"5px 14px",borderRadius:5,border:"none",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",height:28}}>排班</button>
+                  }} style={{padding:"5px 14px",borderRadius:5,border:"none",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer",height:28}}>排班</button>
                 </div>
-                <div style={{fontSize:9,color:"#888",marginTop:4}}>💡 選「👥全員」=門市全部人排同班。自動跳過有預假/休假的員工。也可用「週檢視」逐格排班。</div>
+                <div style={{fontSize:9,color:"var(--text-3)",marginTop:4}}>💡 選「👥全員」=門市全部人排同班。自動跳過有預假/休假的員工。也可用「週檢視」逐格排班。</div>
               </div>
               </div>
             )}
@@ -1021,22 +1021,22 @@ export default function AdminPage() {
                 <div>
                   <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
                     <span style={{fontSize:13,fontWeight:600,color:"#3f51b5"}}>{avy}年{avm}月 員工可用時段</span>
-                    <button onClick={()=>setAvView("employee")} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:avView==="employee"?"#3f51b5":"#fff",color:avView==="employee"?"#fff":"#555",fontSize:11,cursor:"pointer"}}>員工視角</button>
-                    <button onClick={()=>setAvView("day")} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:avView==="day"?"#3f51b5":"#fff",color:avView==="day"?"#fff":"#555",fontSize:11,cursor:"pointer"}}>日期視角</button>
-                    <button onClick={()=>ap("/api/availability?month="+avMonth+(sf?"&store_id="+sf:"")).then(r=>setAvReports(r.data||[]))} style={{padding:"3px 8px",borderRadius:5,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>🔄</button>
+                    <button onClick={()=>setAvView("employee")} style={{padding:"3px 8px",borderRadius:5,border:"1px solid var(--border)",background:avView==="employee"?"#3f51b5":"#fff",color:avView==="employee"?"#fff":"var(--text-2)",fontSize:11,cursor:"pointer"}}>員工視角</button>
+                    <button onClick={()=>setAvView("day")} style={{padding:"3px 8px",borderRadius:5,border:"1px solid var(--border)",background:avView==="day"?"#3f51b5":"#fff",color:avView==="day"?"#fff":"var(--text-2)",fontSize:11,cursor:"pointer"}}>日期視角</button>
+                    <button onClick={()=>ap("/api/availability?month="+avMonth+(sf?"&store_id="+sf:"")).then(r=>setAvReports(r.data||[]))} style={{padding:"3px 8px",borderRadius:5,border:"1px solid var(--border)",background:"#fff",fontSize:11,cursor:"pointer"}}>🔄</button>
                   </div>
-                  {notReported.length>0&&<div style={{background:"#fff8e6",border:"1px solid #fbc02d",borderRadius:6,padding:"6px 10px",marginBottom:8,fontSize:11,color:"#b45309"}}>⚠️ 尚未回報：{notReported.map(e=>e.name).join("、")}</div>}
+                  {notReported.length>0&&<div style={{background:"var(--warning-bg)",border:"1px solid #fbc02d",borderRadius:6,padding:"6px 10px",marginBottom:8,fontSize:11,color:"var(--warning)"}}>⚠️ 尚未回報：{notReported.map(e=>e.name).join("、")}</div>}
                   {avView==="employee"&&storeEmpsAv.map(emp=>{
                     const recs=byEmp[emp.id]||[];
                     const isPT=emp.employment_type==="part_time";
                     return(
-                      <div key={emp.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 10px",marginBottom:6}}>
+                      <div key={emp.id} style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"8px 10px",marginBottom:6}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:recs.length?4:0}}>
-                          <span style={{fontSize:12,fontWeight:600}}>{emp.name}<span style={{fontSize:9,color:"#aaa",marginLeft:4}}>{isPT?"兼職":"正職"}</span></span>
-                          <span style={{fontSize:10,color:recs.length?"#b91c1c":isPT?"#fb8c00":"#aaa",fontWeight:600}}>{recs.length?`❌ 限制 ${recs.length} 天`:isPT?"⚠️ 未回報":"✓ 正職"}</span>
+                          <span style={{fontSize:12,fontWeight:600}}>{emp.name}<span style={{fontSize:9,color:"var(--text-hint)",marginLeft:4}}>{isPT?"兼職":"正職"}</span></span>
+                          <span style={{fontSize:10,color:recs.length?"var(--danger)":isPT?"#fb8c00":"var(--text-hint)",fontWeight:600}}>{recs.length?`❌ 限制 ${recs.length} 天`:isPT?"⚠️ 未回報":"✓ 正職"}</span>
                         </div>
-                        {recs.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:3}}>{recs.sort((a,b)=>a.start_date.localeCompare(b.start_date)).map(r=><span key={r.id} style={{fontSize:10,background:r.half_day?"#fff8e6":"#fde8e8",color:r.half_day?"#b45309":"#b91c1c",borderRadius:3,padding:"1px 5px"}}>{r.start_date.slice(5)} {fmtHd(r.half_day)}</span>)}</div>}
-                        {recs[0]?.reason&&<div style={{fontSize:10,color:"#888",marginTop:3}}>💬 {recs[0].reason}</div>}
+                        {recs.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:3}}>{recs.sort((a,b)=>a.start_date.localeCompare(b.start_date)).map(r=><span key={r.id} style={{fontSize:10,background:r.half_day?"var(--warning-bg)":"var(--danger-bg)",color:r.half_day?"var(--warning)":"var(--danger)",borderRadius:3,padding:"1px 5px"}}>{r.start_date.slice(5)} {fmtHd(r.half_day)}</span>)}</div>}
+                        {recs[0]?.reason&&<div style={{fontSize:10,color:"var(--text-3)",marginTop:3}}>💬 {recs[0].reason}</div>}
                       </div>
                     );
                   })}
@@ -1047,11 +1047,11 @@ export default function AdminPage() {
                     const recs=byDate[dateStr]||[];
                     const availNames=storeEmpsAv.filter(e=>!recs.find(r=>r.employee_id===e.id)).map(e=>e.name);
                     return(
-                      <div key={dateStr} style={{background:"#fff",borderRadius:6,border:"1px solid #e8e6e1",padding:"6px 10px",marginBottom:4,display:"flex",gap:8,alignItems:"flex-start"}}>
-                        <div style={{minWidth:52,fontWeight:600,fontSize:12,color:dow===0?"#b91c1c":dow===6?"#b45309":"#333"}}>{avm}/{d}（{["日","一","二","三","四","五","六"][dow]}）</div>
+                      <div key={dateStr} style={{background:"#fff",borderRadius:6,border:"1px solid var(--border)",padding:"6px 10px",marginBottom:4,display:"flex",gap:8,alignItems:"flex-start"}}>
+                        <div style={{minWidth:52,fontWeight:600,fontSize:12,color:dow===0?"var(--danger)":dow===6?"var(--warning)":"var(--text)"}}>{avm}/{d}（{["日","一","二","三","四","五","六"][dow]}）</div>
                         <div style={{flex:1,fontSize:11}}>
-                          {recs.length>0&&<div style={{color:"#b91c1c",marginBottom:2}}>❌ {recs.map(r=>`${r.employees?.name}(${fmtHd(r.half_day)})`).join("、")}</div>}
-                          {availNames.length>0&&<div style={{color:"#0a7c42"}}>✓ 可排：{availNames.join("、")}</div>}
+                          {recs.length>0&&<div style={{color:"var(--danger)",marginBottom:2}}>❌ {recs.map(r=>`${r.employees?.name}(${fmtHd(r.half_day)})`).join("、")}</div>}
+                          {availNames.length>0&&<div style={{color:"var(--success)"}}>✓ 可排：{availNames.join("、")}</div>}
                         </div>
                       </div>
                     );
@@ -1073,7 +1073,7 @@ export default function AdminPage() {
           <div>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
               {[["records","📍打卡紀錄"],["calendar","📅 月曆檢視"],["amendments","🔧補登申請"],["report","📊月報表"]].map(([k,l])=>(
-                <button key={k} onClick={()=>setAttView(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:attView===k?"#1a1a1a":"#fff",color:attView===k?"#fff":"#666",fontSize:11,cursor:"pointer"}}>{l}</button>
+                <button key={k} onClick={()=>setAttView(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--border)",background:attView===k?"var(--ink)":"#fff",color:attView===k?"#fff":"var(--text-2)",fontSize:11,cursor:"pointer"}}>{l}</button>
               ))}
             </div>
 
@@ -1111,21 +1111,21 @@ export default function AdminPage() {
               <div>
                 {/* 員工篩選（門市用上方全域 sf） */}
                 <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
-                  <span style={{fontSize:11,color:"#666"}}>篩選員工：</span>
+                  <span style={{fontSize:11,color:"var(--text-2)"}}>篩選員工：</span>
                   <select value={attEmpFilter} onChange={e=>setAttEmpFilter(e.target.value)}
-                    style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11,minWidth:120}}>
+                    style={{padding:"4px 8px",borderRadius:5,border:"1px solid var(--border)",fontSize:11,minWidth:120}}>
                     <option value="">全部員工</option>
                     {emps.filter(e=>!sf||e.store_id===sf).sort((a,b)=>(a.name||"").localeCompare(b.name||"")).map(e=>(
                       <option key={e.id} value={e.id}>{e.name}</option>
                     ))}
                   </select>
-                  {attEmpFilter && <button onClick={()=>setAttEmpFilter("")} style={{padding:"3px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>✕ 清除</button>}
-                  <span style={{fontSize:10,color:"#888"}}>（門市用上方篩選器）</span>
+                  {attEmpFilter && <button onClick={()=>setAttEmpFilter("")} style={{padding:"3px 8px",borderRadius:4,border:"1px solid var(--border)",background:"#fff",fontSize:10,cursor:"pointer"}}>✕ 清除</button>}
+                  <span style={{fontSize:10,color:"var(--text-3)"}}>（門市用上方篩選器）</span>
                 </div>
                 {/* 重複打卡警示與清理 */}
                 {dupeList.length > 0 && (
-                  <div style={{background:"#fef3c7",border:"1px solid #f0e6c8",borderRadius:8,padding:10,marginBottom:10}}>
-                    <div style={{fontSize:12,fontWeight:600,color:"#8a6d00",marginBottom:6}}>
+                  <div style={{background:"var(--warning-bg)",border:"1px solid #f0e6c8",borderRadius:8,padding:10,marginBottom:10}}>
+                    <div style={{fontSize:12,fontWeight:600,color:"var(--warning)",marginBottom:6}}>
                       ⚠️ 偵測到 {dupeList.length} 個員工/日期有重複打卡共 {dupeList.reduce((a,d)=>a+d.extra,0)} 筆多餘紀錄
                     </div>
                     <div style={{maxHeight:120,overflow:"auto",marginBottom:6}}>
@@ -1140,26 +1140,26 @@ export default function AdminPage() {
                             if (r.error) { alert("❌ "+r.error); return; }
                             alert(`✅ 已清理：刪除 ${r.deleted} 筆、保留 ${r.kept} 筆`);
                             load();
-                          }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:10,cursor:"pointer"}}>🧹 清理此日</button>
+                          }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid var(--warning)",background:"#fff",color:"var(--warning)",fontSize:10,cursor:"pointer"}}>🧹 清理此日</button>
                         </div>
                       ))}
-                      {dupeList.length > 20 && <div style={{fontSize:10,color:"#888"}}>...還有 {dupeList.length - 20} 個未顯示</div>}
+                      {dupeList.length > 20 && <div style={{fontSize:10,color:"var(--text-3)"}}>...還有 {dupeList.length - 20} 個未顯示</div>}
                     </div>
-                    <div style={{fontSize:10,color:"#666"}}>規則：單班店家保留 1 上 + 1 下；雙班店家保留 2 上 + 2 下。clock_in 取最早，clock_out 取最晚。</div>
+                    <div style={{fontSize:10,color:"var(--text-2)"}}>規則：單班店家保留 1 上 + 1 下；雙班店家保留 2 上 + 2 下。clock_in 取最早，clock_out 取最晚。</div>
                   </div>
                 )}
               {/* 📊 本月對帳總覽（依政府公告國假表 + 週六日 算應出席） */}
-              <div style={{background:"#fff",border:"1px solid #e8e6e1",borderRadius:8,padding:10,marginBottom:10}}>
+              <div style={{background:"#fff",border:"1px solid var(--border)",borderRadius:8,padding:10,marginBottom:10}}>
                 <div style={{display:"flex",gap:14,fontSize:11,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
                   <span style={{fontWeight:600,fontSize:12}}>📊 {month} 對帳</span>
-                  <span style={{color:"#0a7c42"}}>本月應出席 <b>{expectedWorkDays}</b> 天</span>
-                  <span style={{color:"#666"}}>({monthDays} 天 − 國假 {holidayCount} − 週六日 {weekendCount})</span>
+                  <span style={{color:"var(--success)"}}>本月應出席 <b>{expectedWorkDays}</b> 天</span>
+                  <span style={{color:"var(--text-2)"}}>({monthDays} 天 − 國假 {holidayCount} − 週六日 {weekendCount})</span>
                 </div>
-                <div style={{overflow:"auto"}}>
+                <div className="sb-table-wrap" style={{overflow:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:780}}>
-                    <thead><tr style={{background:"#faf8f5"}}>
+                    <thead><tr style={{background:"var(--surface-warm)"}}>
                       {["員工","應出席","排班","實際打卡","差(排−應)","缺打卡","遲到分","早退分","休假"].map(h=>
-                        <th key={h} style={{padding:"5px 6px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>
+                        <th key={h} style={{padding:"5px 6px",textAlign:"right",fontWeight:500,color:"var(--text-2)"}}>{h}</th>
                       )}
                     </tr></thead>
                     <tbody>
@@ -1179,21 +1179,21 @@ export default function AdminPage() {
                           const earlyMin = empAtts.filter(a=>a.type==="clock_out").reduce((s,a)=>s+(a.early_leave_minutes||0),0);
                           const diff = workScheds.length - expectedWorkDays;
                           const missDays = workScheds.length - actualDays;
-                          const diffColor = diff > 0 ? "#4361ee" : diff < 0 ? "#b91c1c" : "#888";
+                          const diffColor = diff > 0 ? "var(--brand-strong)" : diff < 0 ? "var(--danger)" : "var(--text-3)";
                           const isPT = e.employment_type === "parttime";
                           return (
-                            <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                            <tr key={e.id} style={{borderBottom:"1px solid var(--divider)"}}>
                               <td style={{padding:"4px 6px",textAlign:"left",fontWeight:500}}>
                                 {e.name}
-                                <span style={{fontSize:8,color:isPT?"#b45309":"#0a7c42",marginLeft:4,background:isPT?"#fef3c7":"#e6f9f0",padding:"1px 3px",borderRadius:2}}>{isPT?"兼":"正"}</span>
+                                <span style={{fontSize:8,color:isPT?"var(--warning)":"var(--success)",marginLeft:4,background:isPT?"var(--warning-bg)":"var(--success-bg)",padding:"1px 3px",borderRadius:2}}>{isPT?"兼":"正"}</span>
                               </td>
-                              <td style={{padding:"4px 6px",textAlign:"right",color:"#0a7c42"}}>{expectedWorkDays}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:"var(--success)"}}>{expectedWorkDays}</td>
                               <td style={{padding:"4px 6px",textAlign:"right"}}>{workScheds.length}</td>
                               <td style={{padding:"4px 6px",textAlign:"right"}}>{actualDays}</td>
                               <td style={{padding:"4px 6px",textAlign:"right",color:diffColor,fontWeight:diff!==0?600:400}}>{diff>0?"+"+diff:diff}</td>
-                              <td style={{padding:"4px 6px",textAlign:"right",color:missDays>0?"#b91c1c":"#ccc"}}>{missDays>0?missDays:"-"}</td>
-                              <td style={{padding:"4px 6px",textAlign:"right",color:lateMin>0?"#b91c1c":"#ccc"}}>{lateMin>0?lateMin:"-"}</td>
-                              <td style={{padding:"4px 6px",textAlign:"right",color:earlyMin>0?"#b45309":"#ccc"}}>{earlyMin>0?earlyMin:"-"}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:missDays>0?"var(--danger)":"#ccc"}}>{missDays>0?missDays:"-"}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:lateMin>0?"var(--danger)":"#ccc"}}>{lateMin>0?lateMin:"-"}</td>
+                              <td style={{padding:"4px 6px",textAlign:"right",color:earlyMin>0?"var(--warning)":"#ccc"}}>{earlyMin>0?earlyMin:"-"}</td>
                               <td style={{padding:"4px 6px",textAlign:"right",color:leaveScheds.length>0?"#6b21a8":"#ccc"}}>{leaveScheds.length>0?leaveScheds.length:"-"}</td>
                             </tr>
                           );
@@ -1202,7 +1202,7 @@ export default function AdminPage() {
                     </tbody>
                   </table>
                 </div>
-                <div style={{fontSize:9,color:"#999",marginTop:6}}>
+                <div style={{fontSize:9,color:"var(--text-3)",marginTop:6}}>
                   排−應 為正(藍) = 多排班；為負(紅) = 少排班。缺打卡 = 排了但沒打卡的天。
                 </div>
               </div>
@@ -1261,10 +1261,10 @@ export default function AdminPage() {
                 };
                 return (
                 <div key={store.id} style={{marginBottom:10}}>
-                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+days.length+"日次）"}</h4>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                  <h4 style={{fontSize:12,fontWeight:600,color:"var(--text-2)",marginBottom:4,padding:"4px 8px",background:"var(--surface-warm)",borderRadius:4}}>{"🏠 "+store.name+"（"+days.length+"日次）"}</h4>
+              <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:920}}>
-                  <thead><tr style={{background:"#faf8f5"}}>{["日期","員工","班別","排班","實際上班","實際下班","休息","計薪","實際","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{background:"var(--surface-warm)"}}>{["日期","員工","班別","排班","實際上班","實際下班","休息","計薪","實際","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                   <tbody>{days.map(d=>{
                     const sch = d.sched;
                     const shiftBrk = Number(sch?.shifts?.break_minutes||0);
@@ -1288,16 +1288,16 @@ export default function AdminPage() {
                     // 狀態
                     const late = earliestIn?.late_minutes || 0;
                     const early = latestOut?.early_leave_minutes || 0;
-                    let status = "", statusColor = "#0a7c42";
-                    if (!sch) { status = "無排班"; statusColor = "#888"; }
-                    else if (!earliestIn && !latestOut) { status = "未出勤"; statusColor = "#b91c1c"; }
-                    else if (!earliestIn) { status = "缺上班"; statusColor = "#b91c1c"; }
-                    else if (!latestOut) { status = "缺下班"; statusColor = "#b45309"; }
-                    else if (late > 0 && early > 0) { status = `遲${late}/早${early}`; statusColor = "#b91c1c"; }
-                    else if (late > 0) { status = `遲${late}分`; statusColor = "#b91c1c"; }
-                    else if (early > 0) { status = `早退${early}分`; statusColor = "#b45309"; }
+                    let status = "", statusColor = "var(--success)";
+                    if (!sch) { status = "無排班"; statusColor = "var(--text-3)"; }
+                    else if (!earliestIn && !latestOut) { status = "未出勤"; statusColor = "var(--danger)"; }
+                    else if (!earliestIn) { status = "缺上班"; statusColor = "var(--danger)"; }
+                    else if (!latestOut) { status = "缺下班"; statusColor = "var(--warning)"; }
+                    else if (late > 0 && early > 0) { status = `遲${late}/早${early}`; statusColor = "var(--danger)"; }
+                    else if (late > 0) { status = `遲${late}分`; statusColor = "var(--danger)"; }
+                    else if (early > 0) { status = `早退${early}分`; statusColor = "var(--warning)"; }
                     else { status = "準時"; }
-                    const dtBadge = sch?.day_type==="national_holiday"?{l:"國假",c:"#b91c1c"}:sch?.day_type==="rest_day"?{l:"休息日",c:"#b45309"}:null;
+                    const dtBadge = sch?.day_type==="national_holiday"?{l:"國假",c:"var(--danger)"}:sch?.day_type==="rest_day"?{l:"休息日",c:"var(--warning)"}:null;
                     const editAtt = async (a) => {
                       if (!a) return;
                       const orig = new Date(a.timestamp);
@@ -1319,22 +1319,22 @@ export default function AdminPage() {
                       if (r) load();
                     };
                     return (
-                      <tr key={d.emp_id+"|"+d.date} style={{borderBottom:"1px solid #f0eeea"}}>
+                      <tr key={d.emp_id+"|"+d.date} style={{borderBottom:"1px solid var(--divider)"}}>
                         <td style={{padding:6,fontSize:10}}>{d.date.slice(5)}</td>
                         <td style={{padding:6,fontWeight:500}}>{d.emp_name}{dtBadge&&<span style={{fontSize:8,color:dtBadge.c,marginLeft:3,padding:"1px 3px",background:"#fff",border:"1px solid "+dtBadge.c,borderRadius:2}}>{dtBadge.l}</span>}</td>
-                        <td style={{padding:6,fontSize:10,color:"#555"}}>{sch?.shifts?.name || "-"}</td>
-                        <td style={{padding:6,fontSize:10,color:"#888"}}>{schStart && schEnd ? schStart+"–"+schEnd : "-"}</td>
-                        <td style={{padding:6,fontSize:10,color:earliestIn?(late>0?"#b91c1c":"#0a7c42"):"#4361ee",cursor:"pointer",textDecoration:earliestIn?"none":"underline"}}
+                        <td style={{padding:6,fontSize:10,color:"var(--text-2)"}}>{sch?.shifts?.name || "-"}</td>
+                        <td style={{padding:6,fontSize:10,color:"var(--text-3)"}}>{schStart && schEnd ? schStart+"–"+schEnd : "-"}</td>
+                        <td style={{padding:6,fontSize:10,color:earliestIn?(late>0?"var(--danger)":"var(--success)"):"var(--brand-strong)",cursor:"pointer",textDecoration:earliestIn?"none":"underline"}}
                             onClick={()=>earliestIn?editAtt(earliestIn):addAtt("clock_in")}
                             title={earliestIn?"點擊編輯":"點擊補上"}>
                           {inT || "+ 補上"}
-                          {d.ins.length>1 && <span style={{fontSize:8,color:"#999",marginLeft:2}}>(+{d.ins.length-1})</span>}
+                          {d.ins.length>1 && <span style={{fontSize:8,color:"var(--text-3)",marginLeft:2}}>(+{d.ins.length-1})</span>}
                         </td>
-                        <td style={{padding:6,fontSize:10,color:latestOut?(early>0?"#b45309":"#0a7c42"):"#4361ee",cursor:"pointer",textDecoration:latestOut?"none":"underline"}}
+                        <td style={{padding:6,fontSize:10,color:latestOut?(early>0?"var(--warning)":"var(--success)"):"var(--brand-strong)",cursor:"pointer",textDecoration:latestOut?"none":"underline"}}
                             onClick={()=>latestOut?editAtt(latestOut):addAtt("clock_out")}
                             title={latestOut?"點擊編輯":"點擊補上"}>
                           {outT || "+ 補上"}
-                          {d.outs.length>1 && <span style={{fontSize:8,color:"#999",marginLeft:2}}>(+{d.outs.length-1})</span>}
+                          {d.outs.length>1 && <span style={{fontSize:8,color:"var(--text-3)",marginLeft:2}}>(+{d.outs.length-1})</span>}
                         </td>
                         <td style={{padding:6,fontSize:10}}>
                           <input key={(sch?.id||"new")+"-"+brk} type="number" min="0" max="480" defaultValue={brk}
@@ -1345,17 +1345,17 @@ export default function AdminPage() {
                               if(newVal===brk||(newVal===""&&sch?.break_minutes==null))return;
                               await saveBreak(d, raw);
                             }}
-                            style={{width:42,padding:"1px 3px",borderRadius:3,border:overridden?"1px solid #b45309":"1px solid #ddd",fontSize:10,textAlign:"right",background:overridden?"#fff8e6":"#fff"}} />
-                          <span style={{fontSize:8,color:"#999",marginLeft:2}}>min</span>
+                            style={{width:42,padding:"1px 3px",borderRadius:3,border:overridden?"1px solid var(--warning)":"1px solid var(--border)",fontSize:10,textAlign:"right",background:overridden?"var(--warning-bg)":"#fff"}} />
+                          <span style={{fontSize:8,color:"var(--text-3)",marginLeft:2}}>min</span>
                         </td>
-                        <td style={{padding:6,fontWeight:500,color:paidMin>0?"#0a7c42":"#ccc"}}
+                        <td style={{padding:6,fontWeight:500,color:paidMin>0?"var(--success)":"#ccc"}}
                             title="薪資計算用的排班工時（end−start−break）。提早到/晚走 但未申請加班 → 不算入薪資">
                           {paidMin>0?paidHr+"hr":"-"}
                         </td>
-                        <td style={{padding:6,color:actualMin>0?(overWorked?"#b45309":"#666"):"#ccc"}}
+                        <td style={{padding:6,color:actualMin>0?(overWorked?"var(--warning)":"var(--text-2)"):"#ccc"}}
                             title={overWorked?`實際多做 ${((actualMin-paidMin)/60).toFixed(1)} hr 未轉成加班`:"實際打卡工時（純顯示）"}>
                           {actualMin>0?actualHr+"hr":"-"}
-                          {overWorked && <span style={{fontSize:8,color:"#b45309",marginLeft:2}}>⚠</span>}
+                          {overWorked && <span style={{fontSize:8,color:"var(--warning)",marginLeft:2}}>⚠</span>}
                         </td>
                         <td style={{padding:6,fontSize:10,color:statusColor,fontWeight:500}}>{status}</td>
                         <td style={{padding:6}}>
@@ -1363,14 +1363,14 @@ export default function AdminPage() {
                             if(!confirm(`重算 ${d.emp_name} ${d.date} 的加班？`))return;
                             const r = await sap("/api/admin/attendance",{action:"recompute_ot",employee_id:d.emp_id,date:d.date});
                             if(r){const res=r.result;alert(res?.ok?`✅ 已建立加班：${res.otMinutes}分 $${res.amount}`:`未建立：${res?.reason||"無"}`);load();}
-                          }} style={{padding:"2px 6px",borderRadius:3,border:"1px solid #b45309",background:"#fff",fontSize:9,cursor:"pointer",color:"#b45309",marginRight:2}}>⏱重算</button>}
+                          }} style={{padding:"2px 6px",borderRadius:3,border:"1px solid var(--warning)",background:"#fff",fontSize:9,cursor:"pointer",color:"var(--warning)",marginRight:2}}>⏱重算</button>}
                           {(earliestIn || latestOut) && <button onClick={async()=>{
                             if(!confirm(`刪除 ${d.emp_name} ${d.date} 的所有打卡（${d.ins.length+d.outs.length}筆）？`))return;
                             for (const a of [...d.ins, ...d.outs]) {
                               await sap("/api/admin/attendance",{action:"delete",attendance_id:a.id});
                             }
                             load();
-                          }} style={{padding:"2px 6px",borderRadius:3,border:"1px solid #ddd",background:"#fff",fontSize:9,cursor:"pointer",color:"#b91c1c"}}>🗑刪除</button>}
+                          }} style={{padding:"2px 6px",borderRadius:3,border:"1px solid var(--border)",background:"#fff",fontSize:9,cursor:"pointer",color:"var(--danger)"}}>🗑刪除</button>}
                         </td>
                       </tr>
                     );
@@ -1387,7 +1387,7 @@ export default function AdminPage() {
               // 月曆檢視：選擇單一員工 → 顯示該員整月每日狀態（排班 / 打卡 / 休假）
               if (!attEmpFilter) {
                 return (
-                  <div style={{padding:20,background:"#fff",border:"1px solid #e8e6e1",borderRadius:8,fontSize:12,color:"#666",textAlign:"center"}}>
+                  <div style={{padding:20,background:"#fff",border:"1px solid var(--border)",borderRadius:8,fontSize:12,color:"var(--text-2)",textAlign:"center"}}>
                     👆 請先在上方「篩選員工」選一位員工，月曆會顯示該員工整月的出勤/休假情況
                   </div>
                 );
@@ -1429,35 +1429,35 @@ export default function AdminPage() {
                 if (!c) return { background:"#f5f5f5" };
                 if (!c.sch) return { background:"#fff", color:"#bbb" };
                 const dt = c.sch.day_type;
-                if (dt === "regular_off") return { background:"#f5f5f5", borderLeft:"3px solid #999" };
-                if (dt === "rest_day") return { background:"#fff7ed", borderLeft:"3px solid #b45309" };
-                if (dt === "national_holiday") return { background:"#fef2f2", borderLeft:"3px solid #b91c1c" };
+                if (dt === "regular_off") return { background:"#f5f5f5", borderLeft:"3px solid var(--text-3)" };
+                if (dt === "rest_day") return { background:"#fff7ed", borderLeft:"3px solid var(--warning)" };
+                if (dt === "national_holiday") return { background:"var(--danger-bg)", borderLeft:"3px solid var(--danger)" };
                 if (dt === "unpaid_leave" || dt === "half_pay_leave" || dt === "paid_leave") return { background:"#f5f3ff", borderLeft:"3px solid #6b21a8" };
                 // work day
-                if (!c.inT && !c.outT) return { background:"#fee2e2", borderLeft:"3px solid #b91c1c" }; // 未出勤
-                if (!c.inT || !c.outT) return { background:"#fef3c7", borderLeft:"3px solid #b45309" }; // 缺打卡
+                if (!c.inT && !c.outT) return { background:"#fee2e2", borderLeft:"3px solid var(--danger)" }; // 未出勤
+                if (!c.inT || !c.outT) return { background:"var(--warning-bg)", borderLeft:"3px solid var(--warning)" }; // 缺打卡
                 const lateIn = c.ins[0]?.late_minutes || 0;
                 const earlyOut = c.outs[0]?.early_leave_minutes || 0;
-                if (lateIn > 0 || earlyOut > 0) return { background:"#fff7ed", borderLeft:"3px solid #b45309" };
-                return { background:"#f0fdf4", borderLeft:"3px solid #0a7c42" };
+                if (lateIn > 0 || earlyOut > 0) return { background:"#fff7ed", borderLeft:"3px solid var(--warning)" };
+                return { background:"#f0fdf4", borderLeft:"3px solid var(--success)" };
               };
               const cellLabel = (c) => {
                 if (!c?.sch) return c?.sch===undefined?"":null;
                 const dt = c.sch.day_type;
-                if (dt === "regular_off") return { l: "例假", c: "#666" };
-                if (dt === "rest_day") return { l: "休息日", c: "#b45309" };
-                if (dt === "national_holiday") return { l: "國假", c: "#b91c1c" };
+                if (dt === "regular_off") return { l: "例假", c: "var(--text-2)" };
+                if (dt === "rest_day") return { l: "休息日", c: "var(--warning)" };
+                if (dt === "national_holiday") return { l: "國假", c: "var(--danger)" };
                 if (dt === "unpaid_leave") return { l: "無薪假", c: "#6b21a8" };
                 if (dt === "half_pay_leave") return { l: "半薪假", c: "#6b21a8" };
                 if (dt === "paid_leave") return { l: "請假", c: "#6b21a8" };
-                if (!c.inT && !c.outT) return { l: "未出勤", c: "#b91c1c" };
-                if (!c.inT) return { l: "缺上班", c: "#b91c1c" };
-                if (!c.outT) return { l: "缺下班", c: "#b45309" };
+                if (!c.inT && !c.outT) return { l: "未出勤", c: "var(--danger)" };
+                if (!c.inT) return { l: "缺上班", c: "var(--danger)" };
+                if (!c.outT) return { l: "缺下班", c: "var(--warning)" };
                 const lateIn = c.ins[0]?.late_minutes || 0;
                 const earlyOut = c.outs[0]?.early_leave_minutes || 0;
-                if (lateIn > 0) return { l: `遲${lateIn}分`, c: "#b91c1c" };
-                if (earlyOut > 0) return { l: `早${earlyOut}分`, c: "#b45309" };
-                return { l: "準時", c: "#0a7c42" };
+                if (lateIn > 0) return { l: `遲${lateIn}分`, c: "var(--danger)" };
+                if (earlyOut > 0) return { l: `早${earlyOut}分`, c: "var(--warning)" };
+                return { l: "準時", c: "var(--success)" };
               };
               // 統計
               const stats = { 排班:0, 出勤:0, 準時:0, 遲早:0, 缺打卡:0, 未出勤:0, 休假:0 };
@@ -1475,19 +1475,19 @@ export default function AdminPage() {
                 else stats.未出勤++;
               }
               return (
-                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12}}>
                   <div style={{display:"flex",gap:12,fontSize:11,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
                     <span style={{fontWeight:600,fontSize:13}}>👤 {emp.name} · {month}</span>
                     <span>排班 <b>{stats.排班}</b> 天</span>
-                    <span style={{color:"#0a7c42"}}>準時 <b>{stats.準時}</b></span>
-                    <span style={{color:"#b45309"}}>遲/早 <b>{stats.遲早}</b></span>
-                    <span style={{color:"#b45309"}}>缺打卡 <b>{stats.缺打卡}</b></span>
-                    <span style={{color:"#b91c1c"}}>未出勤 <b>{stats.未出勤}</b></span>
+                    <span style={{color:"var(--success)"}}>準時 <b>{stats.準時}</b></span>
+                    <span style={{color:"var(--warning)"}}>遲/早 <b>{stats.遲早}</b></span>
+                    <span style={{color:"var(--warning)"}}>缺打卡 <b>{stats.缺打卡}</b></span>
+                    <span style={{color:"var(--danger)"}}>未出勤 <b>{stats.未出勤}</b></span>
                     <span style={{color:"#6b21a8"}}>休假 <b>{stats.休假}</b></span>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
                     {["日","一","二","三","四","五","六"].map((w,i)=>(
-                      <div key={"h"+i} style={{padding:"4px 6px",fontSize:10,fontWeight:600,color:i===0||i===6?"#b91c1c":"#666",textAlign:"center",background:"#faf8f5",borderRadius:4}}>{w}</div>
+                      <div key={"h"+i} style={{padding:"4px 6px",fontSize:10,fontWeight:600,color:i===0||i===6?"var(--danger)":"var(--text-2)",textAlign:"center",background:"var(--surface-warm)",borderRadius:4}}>{w}</div>
                     ))}
                     {cells.map((c,i)=>{
                       if (!c) return <div key={"e"+i} style={{minHeight:78,background:"#f5f5f5",borderRadius:4}} />;
@@ -1495,9 +1495,9 @@ export default function AdminPage() {
                       return (
                         <div key={c.dateStr} style={{...cellStyle(c),padding:"4px 6px",borderRadius:4,minHeight:78,fontSize:10,display:"flex",flexDirection:"column"}}>
                           <div style={{fontWeight:600,fontSize:11,marginBottom:2}}>{c.d}</div>
-                          {c.sch?.shifts?.name && <div style={{color:"#555",fontSize:9,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.sch.shifts.name}</div>}
+                          {c.sch?.shifts?.name && <div style={{color:"var(--text-2)",fontSize:9,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.sch.shifts.name}</div>}
                           {(c.inT || c.outT) && (
-                            <div style={{fontSize:9,color:"#444",marginTop:1}}>
+                            <div style={{fontSize:9,color:"var(--text-2)",marginTop:1}}>
                               {c.inT || "—"} / {c.outT || "—"}
                             </div>
                           )}
@@ -1512,26 +1512,26 @@ export default function AdminPage() {
 
             {attView === "amendments" && (
               <div>
-                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                    <thead><tr style={{background:"#faf8f5"}}>{["日期","員工","類型","時間","原因","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                    <thead><tr style={{background:"var(--surface-warm)"}}>{["日期","員工","類型","時間","原因","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                     <tbody>{(amendments||[]).length===0?(
                       <tr><td colSpan={7} style={{padding:20,textAlign:"center",color:"#ccc"}}>無補登申請</td></tr>
                     ):(amendments||[]).map(a=>(
-                      <tr key={a.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                      <tr key={a.id} style={{borderBottom:"1px solid var(--divider)"}}>
                         <td style={{padding:6}}>{a.date}</td>
                         <td style={{padding:6,fontWeight:500}}>{a.employees?a.employees.name:""}</td>
                         <td style={{padding:6}}>{a.type==="clock_in"?"上班":"下班"}</td>
                         <td style={{padding:6,fontWeight:600}}>{a.amended_time}</td>
-                        <td style={{padding:6,fontSize:10,color:"#666",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.reason}</td>
+                        <td style={{padding:6,fontSize:10,color:"var(--text-2)",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.reason}</td>
                         <td style={{padding:6}}><Badge status={a.status} /></td>
                         <td style={{padding:6}}>
                           {a.status==="pending"&&(
                             <span>
                               <button onClick={async()=>{await ap("/api/admin/attendance",{action:"review_amendment",amendment_id:a.id,status:"approved"});loadAmendments();load();}}
-                                style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>✅</button>
+                                style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--success)",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>✅</button>
                               <button onClick={async()=>{await ap("/api/admin/attendance",{action:"review_amendment",amendment_id:a.id,status:"rejected"});loadAmendments();}}
-                                style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>❌</button>
+                                style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--danger)",color:"#fff",fontSize:9,cursor:"pointer"}}>❌</button>
                             </span>
                           )}
                         </td>
@@ -1549,7 +1549,7 @@ export default function AdminPage() {
                   if(!confirm(month+" 月報表產生中，確定？")) return;
                   await ap("/api/admin/attendance",{action:"generate_monthly_report",year:y,month:m});
                   loadMonthlyReport(); alert("月報表已產生");
-                }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
+                }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
                   {"📊 產生 "+month+" 月報表"}
                 </button>
                 <button onClick={()=>{
@@ -1564,23 +1564,23 @@ export default function AdminPage() {
                   a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
                   a.download="出勤月報_"+month+(sf?"_"+(stores.find(s=>s.id===sf)?.name||""):"")+".csv";
                   a.click();
-                }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #0a7c42",background:"#fff",color:"#0a7c42",fontSize:11,cursor:"pointer",marginBottom:8,marginLeft:6,fontWeight:600}}>
+                }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--success)",background:"#fff",color:"var(--success)",fontSize:11,cursor:"pointer",marginBottom:8,marginLeft:6,fontWeight:600}}>
                   {"📥 下載 CSV"}
                 </button>
-                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                    <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","遲到","遲到分鐘","請假","加班hr","補休hr","加班費","補登"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                    <thead><tr style={{background:"var(--surface-warm)"}}>{["員工","出勤","遲到","遲到分鐘","請假","加班hr","補休hr","加班費","補登"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                     <tbody>{(monthlyReport||[]).length===0?(
                       <tr><td colSpan={9} style={{padding:20,textAlign:"center",color:"#ccc"}}>請先點擊「產生月報表」</td></tr>
                     ):(monthlyReport||[]).map(r=>(
-                      <tr key={r.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                      <tr key={r.id} style={{borderBottom:"1px solid var(--divider)"}}>
                         <td style={{padding:6,fontWeight:500}}>{r.employees?r.employees.name:""}</td>
                         <td style={{padding:6,fontWeight:600}}>{r.work_days+"天"}</td>
-                        <td style={{padding:6,color:r.late_count>0?"#b91c1c":"#0a7c42"}}>{r.late_count+"次"}</td>
-                        <td style={{padding:6,color:r.late_total_minutes>0?"#b91c1c":"#ccc"}}>{r.late_total_minutes||0}分</td>
+                        <td style={{padding:6,color:r.late_count>0?"var(--danger)":"var(--success)"}}>{r.late_count+"次"}</td>
+                        <td style={{padding:6,color:r.late_total_minutes>0?"var(--danger)":"#ccc"}}>{r.late_total_minutes||0}分</td>
                         <td style={{padding:6}}>{r.leave_days>0?r.leave_days+"天":"-"}</td>
                         <td style={{padding:6}}>{r.overtime_hours||0}</td>
-                        <td style={{padding:6,color:"#4361ee"}}>{r.overtime_comp_hours>0?r.overtime_comp_hours+"hr":"-"}</td>
+                        <td style={{padding:6,color:"var(--brand-strong)"}}>{r.overtime_comp_hours>0?r.overtime_comp_hours+"hr":"-"}</td>
                         <td style={{padding:6,fontWeight:600}}>{r.overtime_pay_amount>0?fmt(r.overtime_pay_amount):"-"}</td>
                         <td style={{padding:6}}>{r.amendment_count>0?r.amendment_count+"筆":"-"}</td>
                       </tr>
@@ -1598,10 +1598,10 @@ export default function AdminPage() {
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"🏖 "+new Date().getFullYear()+" 年度休假表"}</h3>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
               <button onClick={async()=>{const r=await ap("/api/admin/overtime",{action:"convert_expired"});alert("已轉換 "+(r.converted||0)+" 筆過期補休為加班費");load();}}
-                style={{padding:"4px 10px",borderRadius:5,border:"1px solid #b45309",background:"transparent",color:"#b45309",fontSize:11,cursor:"pointer"}}>
+                style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--warning)",background:"transparent",color:"var(--warning)",fontSize:11,cursor:"pointer"}}>
                 🔄 過期補休轉加班費
               </button>
-              <button onClick={load} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>🔄 重新整理</button>
+              <button onClick={load} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--border)",background:"#fff",fontSize:11,cursor:"pointer"}}>🔄 重新整理</button>
             </div>
 
             {/* 每人休假卡片 — 按門市分組 */}
@@ -1610,7 +1610,7 @@ export default function AdminPage() {
               if (storeEmps.length === 0) return null;
               return (
                 <div key={store.id} style={{marginBottom:10}}>
-                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
+                  <h4 style={{fontSize:12,fontWeight:600,color:"var(--text-2)",marginBottom:4,padding:"4px 8px",background:"var(--surface-warm)",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
             {storeEmps.map(e => {
               // 當月加班（from otRecords）
               const eOtMonth = otRecords.filter(r => r.employee_id === e.id);
@@ -1631,51 +1631,51 @@ export default function AdminPage() {
               const annualDays = e.annual_leave_days || 0;
 
               return (
-                <div key={e.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8}}>
+                <div key={e.id} style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12,marginBottom:8}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                     <div>
                       <span style={{fontSize:14,fontWeight:600}}>{e.name}</span>
-                      <span style={{fontSize:10,color:"#888",marginLeft:6}}>{e.stores?e.stores.name:"總部"}</span>
-                      <span style={{fontSize:9,color:"#aaa",marginLeft:6}}>年資{e.service_months||0}月</span>
+                      <span style={{fontSize:10,color:"var(--text-3)",marginLeft:6}}>{e.stores?e.stores.name:"總部"}</span>
+                      <span style={{fontSize:9,color:"var(--text-hint)",marginLeft:6}}>年資{e.service_months||0}月</span>
                     </div>
                   </div>
 
                   {/* 可用假期 */}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
-                    <div style={{background:"#e6f1fb",borderRadius:8,padding:12,textAlign:"center"}}>
-                      <div style={{fontSize:11,color:"#185fa5",fontWeight:500}}>🏖 年度特休</div>
-                      <div style={{fontSize:28,fontWeight:700,color:"#185fa5",margin:"6px 0"}}>{annualDays}<span style={{fontSize:12,fontWeight:400}}> hr</span></div>
+                    <div style={{background:"var(--info-bg)",borderRadius:8,padding:12,textAlign:"center"}}>
+                      <div style={{fontSize:11,color:"var(--info)",fontWeight:500}}>🏖 年度特休</div>
+                      <div style={{fontSize:28,fontWeight:700,color:"var(--info)",margin:"6px 0"}}>{annualDays}<span style={{fontSize:12,fontWeight:400}}> hr</span></div>
                       <button onClick={async()=>{
                         const v=prompt(e.name+" 特休時數(hr)：",annualDays);if(v===null)return;
                         const r=await sap("/api/admin/leave-balances",{action:"update_balance",employee_id:e.id,annual_total:Number(v)});
                         if(r){alert("✅ "+e.name+" 特休已改為 "+v+"hr");load();}
-                      }} style={{fontSize:9,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️修改</button>
+                      }} style={{fontSize:9,color:"var(--brand-strong)",background:"none",border:"none",cursor:"pointer"}}>✏️修改</button>
                     </div>
-                    <div style={{background:compAvail>0?"#e6f9f0":"#f5f5f5",borderRadius:8,padding:12,textAlign:"center"}}>
-                      <div style={{fontSize:11,color:"#0a7c42",fontWeight:500}}>🔄 補休餘額</div>
-                      <div style={{fontSize:28,fontWeight:700,color:compAvail>0?"#0a7c42":"#ccc",margin:"6px 0"}}>{compAvail>0?compAvail:0}<span style={{fontSize:12,fontWeight:400}}> hr</span></div>
-                      {compUsed>0 && <div style={{fontSize:9,color:"#888"}}>{"已使用 "+compUsed+"hr"}</div>}
-                      {expiringH>0 && <div style={{fontSize:9,color:"#b91c1c"}}>{"⚠️ "+expiringH+"hr 即將到期"}</div>}
+                    <div style={{background:compAvail>0?"var(--success-bg)":"#f5f5f5",borderRadius:8,padding:12,textAlign:"center"}}>
+                      <div style={{fontSize:11,color:"var(--success)",fontWeight:500}}>🔄 補休餘額</div>
+                      <div style={{fontSize:28,fontWeight:700,color:compAvail>0?"var(--success)":"#ccc",margin:"6px 0"}}>{compAvail>0?compAvail:0}<span style={{fontSize:12,fontWeight:400}}> hr</span></div>
+                      {compUsed>0 && <div style={{fontSize:9,color:"var(--text-3)"}}>{"已使用 "+compUsed+"hr"}</div>}
+                      {expiringH>0 && <div style={{fontSize:9,color:"var(--danger)"}}>{"⚠️ "+expiringH+"hr 即將到期"}</div>}
                       <button onClick={async()=>{
                         const v=prompt(e.name+" 補休調整\n正數=新增，負數=扣減\n目前餘額："+compAvail+"hr\n\n輸入調整時數：","0");
                         if(v===null||Number(v)===0)return;
                         const note=prompt("備註（選填）：","");
                         await ap("/api/admin/overtime",{action:"adjust_comp",employee_id:e.id,store_id:e.store_id,hours:Number(v),notes:note});
                         load();
-                      }} style={{fontSize:9,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️修改</button>
+                      }} style={{fontSize:9,color:"var(--brand-strong)",background:"none",border:"none",cursor:"pointer"}}>✏️修改</button>
                     </div>
                   </div>
 
                   {/* 本月加班（小字補充） */}
                   {monthHours > 0 && (
-                    <div style={{fontSize:10,color:"#888",marginBottom:4}}>{"⏱ 本月加班 "+Math.round(monthHours*10)/10+"hr（待審核或已核定，非自動累加至補休）"}</div>
+                    <div style={{fontSize:10,color:"var(--text-3)",marginBottom:4}}>{"⏱ 本月加班 "+Math.round(monthHours*10)/10+"hr（待審核或已核定，非自動累加至補休）"}</div>
                   )}
 
                   {/* 操作列 */}
                   <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
                     {compAvail>0 && (<>
                       <input type="number" id={"cv-"+e.id} placeholder="轉出時數" min="1" max={compAvail}
-                        style={{width:70,padding:"3px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:10}} />
+                        style={{width:70,padding:"3px 6px",borderRadius:4,border:"1px solid var(--border)",fontSize:10}} />
                       <button onClick={async()=>{
                         const hrs=Number(document.getElementById("cv-"+e.id).value||0);
                         if(!hrs||hrs<=0){alert("請輸入轉出時數");return;}
@@ -1684,12 +1684,12 @@ export default function AdminPage() {
                         const ids=eOtYear.filter(r=>r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted&&(!r.comp_expiry_date||r.comp_expiry_date>=today2)).map(r=>r.id);
                         await ap("/api/admin/overtime",{action:"convert_partial",employee_id:e.id,store_id:e.store_id,hours:hrs,record_ids:ids});
                         load();
-                      }} style={{padding:"3px 10px",borderRadius:4,border:"none",background:"#b45309",color:"#fff",fontSize:10,cursor:"pointer"}}>
+                      }} style={{padding:"3px 10px",borderRadius:4,border:"none",background:"var(--warning)",color:"#fff",fontSize:10,cursor:"pointer"}}>
                         💰 轉現金
                       </button>
                     </>)}
                     {eOtMonth.filter(r=>r.status==="pending").length>0 && (
-                      <span style={{fontSize:9,color:"#b91c1c",padding:"3px 0"}}>{"⏳ "+eOtMonth.filter(r=>r.status==="pending").length+"筆待審核"}</span>
+                      <span style={{fontSize:9,color:"var(--danger)",padding:"3px 0"}}>{"⏳ "+eOtMonth.filter(r=>r.status==="pending").length+"筆待審核"}</span>
                     )}
                   </div>
                 </div>
@@ -1702,20 +1702,20 @@ export default function AdminPage() {
             {otRecords.length > 0 && (
               <div style={{marginTop:12}}>
                 <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>{month+" 加班明細"}</h4>
-                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                    <thead><tr style={{background:"#faf8f5"}}>{["日期","員工","時數","類型","金額/補休","狀態","操作"].map(h=><th key={h} style={{padding:5,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                    <thead><tr style={{background:"var(--surface-warm)"}}>{["日期","員工","時數","類型","金額/補休","狀態","操作"].map(h=><th key={h} style={{padding:5,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                     <tbody>{otRecords.map(r=>(
-                      <tr key={r.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                      <tr key={r.id} style={{borderBottom:"1px solid var(--divider)"}}>
                         <td style={{padding:5}}>{r.date}</td>
                         <td style={{padding:5,fontWeight:500}}>{r.employees?r.employees.name:""}</td>
                         <td style={{padding:5}}>{Math.round(r.overtime_minutes/60*10)/10+"hr"}</td>
                         <td style={{padding:5}}>
-                          {r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted&&<span style={{background:"#e6f1fb",color:"#185fa5",padding:"1px 4px",borderRadius:3,fontSize:9}}>{"補休"+r.comp_hours+"hr"}</span>}
-                          {r.comp_type==="comp"&&r.comp_used&&<span style={{background:"#e6f9f0",color:"#0a7c42",padding:"1px 4px",borderRadius:3,fontSize:9}}>已休</span>}
-                          {r.comp_type==="comp"&&r.comp_converted&&<span style={{background:"#fef9c3",color:"#8a6d00",padding:"1px 4px",borderRadius:3,fontSize:9}}>轉薪</span>}
-                          {r.comp_type==="pay"&&<span style={{background:"#fff8e6",color:"#8a6d00",padding:"1px 4px",borderRadius:3,fontSize:9}}>{fmt(r.amount)}</span>}
-                          {r.comp_type==="pending"&&<span style={{background:"#f0f0f0",color:"#888",padding:"1px 4px",borderRadius:3,fontSize:9}}>待選</span>}
+                          {r.comp_type==="comp"&&!r.comp_used&&!r.comp_converted&&<span style={{background:"var(--info-bg)",color:"var(--info)",padding:"1px 4px",borderRadius:3,fontSize:9}}>{"補休"+r.comp_hours+"hr"}</span>}
+                          {r.comp_type==="comp"&&r.comp_used&&<span style={{background:"var(--success-bg)",color:"var(--success)",padding:"1px 4px",borderRadius:3,fontSize:9}}>已休</span>}
+                          {r.comp_type==="comp"&&r.comp_converted&&<span style={{background:"var(--warning-bg)",color:"var(--warning)",padding:"1px 4px",borderRadius:3,fontSize:9}}>轉薪</span>}
+                          {r.comp_type==="pay"&&<span style={{background:"var(--warning-bg)",color:"var(--warning)",padding:"1px 4px",borderRadius:3,fontSize:9}}>{fmt(r.amount)}</span>}
+                          {r.comp_type==="pending"&&<span style={{background:"#f0f0f0",color:"var(--text-3)",padding:"1px 4px",borderRadius:3,fontSize:9}}>待選</span>}
                         </td>
                         <td style={{padding:5,fontWeight:600}}>{r.comp_type==="pay"||r.comp_converted?fmt(r.amount):r.comp_type==="comp"?(r.comp_hours||0)+"hr":"-"}</td>
                         <td style={{padding:5}}><Badge status={r.status} /></td>
@@ -1723,11 +1723,11 @@ export default function AdminPage() {
                           {r.status==="pending" && (
                             <div style={{display:"flex",gap:2}}>
                               <button onClick={async()=>{await ap("/api/admin/overtime",{action:"review",record_id:r.id,status:"approved",comp_type:"pay"});load();}}
-                                style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#b45309",color:"#fff",fontSize:9,cursor:"pointer"}}>💰</button>
+                                style={{padding:"1px 5px",borderRadius:3,border:"none",background:"var(--warning)",color:"#fff",fontSize:9,cursor:"pointer"}}>💰</button>
                               <button onClick={async()=>{await ap("/api/admin/overtime",{action:"review",record_id:r.id,status:"approved",comp_type:"comp"});load();}}
-                                style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#4361ee",color:"#fff",fontSize:9,cursor:"pointer"}}>🔄</button>
+                                style={{padding:"1px 5px",borderRadius:3,border:"none",background:"var(--brand-strong)",color:"#fff",fontSize:9,cursor:"pointer"}}>🔄</button>
                               <button onClick={async()=>{await ap("/api/admin/overtime",{action:"review",record_id:r.id,status:"rejected"});load();}}
-                                style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer"}}>❌</button>
+                                style={{padding:"1px 5px",borderRadius:3,border:"none",background:"var(--danger)",color:"#fff",fontSize:9,cursor:"pointer"}}>❌</button>
                             </div>
                           )}
                         </td>
@@ -1742,7 +1742,7 @@ export default function AdminPage() {
               otRecords.forEach(r => { const n = r.employees ? r.employees.name : "?"; byEmp[n] = (byEmp[n]||0) + (r.overtime_minutes||0); });
               const over = Object.entries(byEmp).filter(([,m]) => m > 46*60);
               return over.length > 0 ? (
-                <div style={{background:"#fde8e8",borderRadius:6,padding:8,marginTop:8,fontSize:11,color:"#b91c1c"}}>
+                <div style={{background:"var(--danger-bg)",borderRadius:6,padding:8,marginTop:8,fontSize:11,color:"var(--danger)"}}>
                   {"⚠️ 月加班超過46小時上限：" + over.map(([n,m]) => n+"（"+Math.round(m/60)+"hr）").join("、")}
                 </div>
               ) : null;
@@ -1768,7 +1768,7 @@ export default function AdminPage() {
                     const da=Number(e.default_allowance||0);const dd=Number(e.default_deduction||0);
                     return [e.name+"(未結算)",wd,bp,ot,0,ls,hs,suppH,da,dd,0,bp+ot-ls-hs-suppH+da-dd];
                   }));
-              }} style={{marginLeft:8,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
+              }} style={{marginLeft:8,padding:"2px 8px",borderRadius:4,border:"1px solid var(--border)",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
             </h3>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
               <button onClick={async()=>{
@@ -1776,7 +1776,7 @@ export default function AdminPage() {
                 if(!confirm(month+" 薪資結算？"))return;
                 await ap("/api/admin/payroll",{action:"generate",year:y,month:m,store_id:sf||undefined});
                 load(); alert("薪資已結算並存檔");
-              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>
+              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer"}}>
                 📊 結算薪資
               </button>
               <button onClick={async()=>{
@@ -1784,26 +1784,26 @@ export default function AdminPage() {
                 if(!confirm("確定LINE發送薪資條？"))return;
                 const r = await ap("/api/admin/payroll",{action:"send_line",year:y,month:m});
                 alert("已發送 "+(r.sent||0)+" 位");
-              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #4361ee",background:"transparent",color:"#4361ee",fontSize:11,cursor:"pointer"}}>
+              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--brand-strong)",background:"transparent",color:"var(--brand-strong)",fontSize:11,cursor:"pointer"}}>
                 📱 LINE發送薪資條
               </button>
             </div>
             {/* 💡 公式速查 — 折疊式 */}
-            <details style={{marginBottom:8,background:"#fff8e6",border:"1px solid #f0e6c8",borderRadius:6,padding:"6px 10px",fontSize:11}}>
-              <summary style={{cursor:"pointer",fontWeight:600,color:"#854d0e"}}>💡 點此查看計算公式（出勤/底薪/加班/假日加班）</summary>
-              <div style={{marginTop:8,color:"#555",lineHeight:1.7}}>
+            <details style={{marginBottom:8,background:"var(--warning-bg)",border:"1px solid #f0e6c8",borderRadius:6,padding:"6px 10px",fontSize:11}}>
+              <summary style={{cursor:"pointer",fontWeight:600,color:"var(--warning)"}}>💡 點此查看計算公式（出勤/底薪/加班/假日加班）</summary>
+              <div style={{marginTop:8,color:"var(--text-2)",lineHeight:1.7}}>
                 <div><b>出勤：</b> 正職顯示「天」、兼職顯示「時」（= 每班次的 end−start−break_minutes 加總）</div>
                 <div><b>底薪：</b> 月薪 = 固定 monthly_salary；時薪 = 時薪 × 每班次實際工時（已扣休息；休息日/國假另計）</div>
                 <div><b>平日加班：</b> 超過排班 end_time 部分。前 2 小時 × 1.34，2 小時以後 × 1.67</div>
                 <div><b>假日加班：</b></div>
-                <div style={{marginLeft:14}}>• <span style={{color:"#b91c1c"}}>國定假日</span>：時薪 × 當天實際工時（已扣休息）× 2.0 倍</div>
-                <div style={{marginLeft:14}}>• <span style={{color:"#b91c1c"}}>休息日</span>（勞基法 24-1 階梯）：前 2hr × 1.34 + 2~8hr × 1.67 + 8~12hr × 1.67 + 本薪</div>
+                <div style={{marginLeft:14}}>• <span style={{color:"var(--danger)"}}>國定假日</span>：時薪 × 當天實際工時（已扣休息）× 2.0 倍</div>
+                <div style={{marginLeft:14}}>• <span style={{color:"var(--danger)"}}>休息日</span>（勞基法 24-1 階梯）：前 2hr × 1.34 + 2~8hr × 1.67 + 8~12hr × 1.67 + 本薪</div>
                 <div><b>勞保自付：</b> 依勞保級距表（正/兼職不同）；可手動覆寫（員工詳情頁）</div>
                 <div><b>健保自付：</b> 一律正職表（健保最低 = 基本工資）；兼職若在他司加保則為 0</div>
                 <div><b>補充保費：</b> 兼職且底薪 &gt; 29,500 時，扣 2.11%</div>
                 <div><b>遲到/早退扣：</b> （遲到分鐘 + 早退分鐘）÷ 60 × 時薪</div>
                 <div><b>實發 = </b> 底薪 + 加班費 + 假日加班 - 勞保 - 健保 - 補充保費 + 加項 - 扣項 - 請假扣 - 遲早扣</div>
-                <div style={{marginTop:6,padding:6,background:"#fff",borderRadius:4,fontSize:10,color:"#888"}}>💡 將滑鼠停在每個數字上會顯示該員工的詳細計算</div>
+                <div style={{marginTop:6,padding:6,background:"#fff",borderRadius:4,fontSize:10,color:"var(--text-3)"}}>💡 將滑鼠停在每個數字上會顯示該員工的詳細計算</div>
               </div>
             </details>
 
@@ -1811,18 +1811,18 @@ export default function AdminPage() {
             <details style={{marginBottom:8,background:"#f5f3ff",border:"1px solid #d8b4fe",borderRadius:6,padding:"6px 10px",fontSize:11}}>
               <summary style={{cursor:"pointer",fontWeight:600,color:"#6b21a8"}}>📋 月底對帳設定（加班/多排怎麼處理）— 點此展開</summary>
               <div style={{marginTop:8}}>
-                <div style={{fontSize:10,color:"#666",marginBottom:8,lineHeight:1.5}}>
+                <div style={{fontSize:10,color:"var(--text-2)",marginBottom:8,lineHeight:1.5}}>
                   設定本月每位員工的「加班處理方式」與「多/少排處理方式」，按「結算」會套用：
                   <br/>• <b>加班轉薪</b>：已核准 OT 換現金（加進加班費）
                   <br/>• <b>加班轉補休</b>：OT 時數累積到員工 leave_balances.comp_balance，不領現金
                   <br/>• <b>多排轉薪</b>：多上班的天當加班費（暫保留，後續實作）
                   <br/>• <b>多排扣假</b>：多上班的天累積補休
                 </div>
-                <div style={{overflow:"auto"}}>
+                <div className="sb-table-wrap" style={{overflow:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:560}}>
-                    <thead><tr style={{background:"#faf8f5"}}>
+                    <thead><tr style={{background:"var(--surface-warm)"}}>
                       {["員工","本月加班 (分)","加班處理","多/少排 (天)","多排處理"].map(h=>
-                        <th key={h} style={{padding:"5px 6px",textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>
+                        <th key={h} style={{padding:"5px 6px",textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>
                       )}
                     </tr></thead>
                     <tbody>
@@ -1849,29 +1849,29 @@ export default function AdminPage() {
                             };
                             const isPT = e.employment_type === "parttime";
                             return (
-                              <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                              <tr key={e.id} style={{borderBottom:"1px solid var(--divider)"}}>
                                 <td style={{padding:"4px 6px",fontWeight:500}}>
                                   {e.name}
-                                  <span style={{fontSize:8,color:isPT?"#b45309":"#0a7c42",marginLeft:4,background:isPT?"#fef3c7":"#e6f9f0",padding:"1px 3px",borderRadius:2}}>{isPT?"兼":"正"}</span>
+                                  <span style={{fontSize:8,color:isPT?"var(--warning)":"var(--success)",marginLeft:4,background:isPT?"var(--warning-bg)":"var(--success-bg)",padding:"1px 3px",borderRadius:2}}>{isPT?"兼":"正"}</span>
                                 </td>
-                                <td style={{padding:"4px 6px",color:otMin>0?"#b45309":"#ccc"}}>
+                                <td style={{padding:"4px 6px",color:otMin>0?"var(--warning)":"#ccc"}}>
                                   {otMin>0?otMin+"分":"-"}
-                                  {otPending>0 && <span style={{fontSize:8,color:"#b91c1c",marginLeft:3}}>({otPending}待批)</span>}
+                                  {otPending>0 && <span style={{fontSize:8,color:"var(--danger)",marginLeft:3}}>({otPending}待批)</span>}
                                 </td>
                                 <td style={{padding:"4px 6px"}}>
                                   <select value={otDisp} onChange={ev=>saveDisp("overtime_disposition", ev.target.value || null)}
-                                    style={{padding:"2px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:10,background:otDisp?"#fff8e6":"#fff"}}>
+                                    style={{padding:"2px 6px",borderRadius:4,border:"1px solid var(--border)",fontSize:10,background:otDisp?"var(--warning-bg)":"#fff"}}>
                                     <option value="">預設（依 OT 設定）</option>
                                     <option value="pay">💰 全部轉薪</option>
                                     <option value="comp">🔄 全部轉補休</option>
                                   </select>
                                 </td>
-                                <td style={{padding:"4px 6px",color:diff>0?"#4361ee":diff<0?"#b91c1c":"#888"}}>
+                                <td style={{padding:"4px 6px",color:diff>0?"var(--brand-strong)":diff<0?"var(--danger)":"var(--text-3)"}}>
                                   {diff>0?"+"+diff:diff} 天
                                 </td>
                                 <td style={{padding:"4px 6px"}}>
                                   <select value={diffDisp} onChange={ev=>saveDisp("attendance_diff_disposition", ev.target.value || null)}
-                                    style={{padding:"2px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:10,background:diffDisp?"#fff8e6":"#fff"}}>
+                                    style={{padding:"2px 6px",borderRadius:4,border:"1px solid var(--border)",fontSize:10,background:diffDisp?"var(--warning-bg)":"#fff"}}>
                                     <option value="">預設（不處理）</option>
                                     <option value="pay">💰 轉加班費</option>
                                     <option value="comp">🏖 累積補休</option>
@@ -1885,7 +1885,7 @@ export default function AdminPage() {
                     </tbody>
                   </table>
                 </div>
-                <div style={{fontSize:9,color:"#999",marginTop:6}}>
+                <div style={{fontSize:9,color:"var(--text-3)",marginTop:6}}>
                   設定會即時存到 payroll_records；按「結算」會讀這些值套用。多排處理的「轉加班費」目前只記錄，計算邏輯後續實作。
                 </div>
               </div>
@@ -1897,10 +1897,10 @@ export default function AdminPage() {
               if (storeEmps.length === 0) return null;
               return (
                 <div key={store.id} style={{marginBottom:10}}>
-                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                  <h4 style={{fontSize:12,fontWeight:600,color:"var(--text-2)",marginBottom:4,padding:"4px 8px",background:"var(--surface-warm)",borderRadius:4}}>{"🏠 "+store.name+"（"+storeEmps.length+"人）"}</h4>
+            <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:750}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["員工","出勤","底薪","加班費","補休","假日加班","請假扣","遲早扣","勞保","健保","補充保費","加項","扣項","實發","存"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"var(--surface-warm)"}}>{["員工","出勤","底薪","加班費","補休","假日加班","請假扣","遲早扣","勞保","健保","補充保費","加項","扣項","實發","存"].map(h=><th key={h} style={{padding:"5px 4px",textAlign:"right",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                 <tbody>{storeEmps.map(e=>{
                   // 優先讀 payroll_records（後端正確結算的權威值）；無紀錄時顯示「未結算」
                   const pr = payrollMap[e.id];
@@ -1975,59 +1975,59 @@ export default function AdminPage() {
                   const isExpanded = expandedAttId === e.id;
                   return (
                     <Fragment key={e.id}>
-                    <tr style={{borderBottom:isExpanded?"none":"1px solid #f0eeea"}}>
+                    <tr style={{borderBottom:isExpanded?"none":"1px solid var(--divider)"}}>
                       <td style={{padding:"5px 4px",fontWeight:500,textAlign:"left"}}>
                         {e.name}
-                        <span style={{ fontSize:8, color:isPT?"#b45309":"#0a7c42", marginLeft:4, background:isPT?"#fef3c7":"#e6f9f0", padding:"1px 3px", borderRadius:2 }}>{isPT?"兼":"正"}</span>
-                        {!settled && <span style={{ fontSize:8, color:"#b91c1c", marginLeft:3, background:"#fee2e2", padding:"1px 3px", borderRadius:2 }}>未結算</span>}
+                        <span style={{ fontSize:8, color:isPT?"var(--warning)":"var(--success)", marginLeft:4, background:isPT?"var(--warning-bg)":"var(--success-bg)", padding:"1px 3px", borderRadius:2 }}>{isPT?"兼":"正"}</span>
+                        {!settled && <span style={{ fontSize:8, color:"var(--danger)", marginLeft:3, background:"#fee2e2", padding:"1px 3px", borderRadius:2 }}>未結算</span>}
                       </td>
                       <td style={{padding:"5px 4px",textAlign:"right",cursor:"pointer",userSelect:"none"}}
                           onClick={()=>setExpandedAttId(isExpanded?null:e.id)}
                           title={isPT?`排班工時 ${baseHrs}hr（${baseDays}天）。點擊展開逐日明細`:`工作天數 ${wd}天。點擊展開逐日明細`}>
                         {isExpanded?"▼ ":"▶ "}{attDisplay}
-                        {attSubtitle && <div style={{fontSize:8,color:"#999"}}>{attSubtitle}</div>}
+                        {attSubtitle && <div style={{fontSize:8,color:"var(--text-3)"}}>{attSubtitle}</div>}
                       </td>
                       <td style={{padding:"5px 4px",textAlign:"right"}} title={baseSubtitle}>
                         {fmt(bp)}
-                        {baseSubtitle && <div style={{fontSize:8,color:"#999"}}>{baseSubtitle}</div>}
+                        {baseSubtitle && <div style={{fontSize:8,color:"var(--text-3)"}}>{baseSubtitle}</div>}
                       </td>
-                      <td style={{padding:"5px 4px",textAlign:"right",color:ot>0?"#b45309":"#ccc"}} title={ot>0?`平日加班 ${otHrs.toFixed(1)}hr × 加給倍率 = +$${ot.toLocaleString()}`:""}>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:ot>0?"var(--warning)":"#ccc"}} title={ot>0?`平日加班 ${otHrs.toFixed(1)}hr × 加給倍率 = +$${ot.toLocaleString()}`:""}>
                         {ot>0?"+"+fmt(ot):"-"}
-                        {ot>0 && otHrs>0 && <div style={{fontSize:8,color:"#999"}}>{otHrs.toFixed(1)}hr</div>}
+                        {ot>0 && otHrs>0 && <div style={{fontSize:8,color:"var(--text-3)"}}>{otHrs.toFixed(1)}hr</div>}
                       </td>
-                      <td style={{padding:"5px 4px",textAlign:"right",color:compH>0?"#4361ee":"#ccc"}}>{compH>0?compH+"hr":"-"}</td>
-                      <td style={{padding:"5px 4px",textAlign:"right",color:(hPay+restPay)>0?"#b91c1c":"#ccc"}} title={holFormula.join("\n")}>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:compH>0?"var(--brand-strong)":"#ccc"}}>{compH>0?compH+"hr":"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:(hPay+restPay)>0?"var(--danger)":"#ccc"}} title={holFormula.join("\n")}>
                         {(hPay+restPay)>0?"+"+fmt(hPay+restPay):"-"}
-                        {(hPay+restPay)>0 && <div style={{fontSize:8,color:"#999"}}>{holDays>0?`國${holDays}`:""}{holDays>0&&restDays>0?" + ":""}{restDays>0?`休${restDays}`:""}</div>}
+                        {(hPay+restPay)>0 && <div style={{fontSize:8,color:"var(--text-3)"}}>{holDays>0?`國${holDays}`:""}{holDays>0&&restDays>0?" + ":""}{restDays>0?`休${restDays}`:""}</div>}
                       </td>
-                      <td style={{padding:"5px 4px",textAlign:"right",color:lvDeduct>0?"#b91c1c":"#ccc"}} title={settled && pr.leave_detail?pr.leave_detail:""}>{lvDeduct>0?"-"+fmt(lvDeduct):"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:lvDeduct>0?"var(--danger)":"#ccc"}} title={settled && pr.leave_detail?pr.leave_detail:""}>{lvDeduct>0?"-"+fmt(lvDeduct):"-"}</td>
                       {(() => {
                         const lateMin = settled ? Number(pr.late_minutes||0) : 0;
                         const earlyMin = settled ? Number(pr.early_leave_minutes||0) : 0;
                         const lateDeduct = settled ? Number(pr.late_deduction||0) : 0;
                         return (
-                          <td style={{padding:"5px 4px",textAlign:"right",color:lateDeduct>0?"#b91c1c":"#ccc"}} title={lateDeduct>0?`遲到 ${lateMin}分 + 早退 ${earlyMin}分 × $${hourlyRate}/hr = -$${lateDeduct.toLocaleString()}`:""}>
+                          <td style={{padding:"5px 4px",textAlign:"right",color:lateDeduct>0?"var(--danger)":"#ccc"}} title={lateDeduct>0?`遲到 ${lateMin}分 + 早退 ${earlyMin}分 × $${hourlyRate}/hr = -$${lateDeduct.toLocaleString()}`:""}>
                             {lateDeduct>0?"-"+fmt(lateDeduct):"-"}
-                            {(lateMin>0||earlyMin>0) && <div style={{fontSize:8,color:"#999"}}>{lateMin>0?`遲${lateMin}`:""}{lateMin>0&&earlyMin>0?"+":""}{earlyMin>0?`早${earlyMin}`:""}</div>}
+                            {(lateMin>0||earlyMin>0) && <div style={{fontSize:8,color:"var(--text-3)"}}>{lateMin>0?`遲${lateMin}`:""}{lateMin>0&&earlyMin>0?"+":""}{earlyMin>0?`早${earlyMin}`:""}</div>}
                           </td>
                         );
                       })()}
-                      <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}} title={e.labor_tier?`勞保 L${e.labor_tier}`:""}>{ls>0?"-"+fmt(ls):"-"}</td>
-                      <td style={{padding:"5px 4px",textAlign:"right",color:"#888"}} title={e.health_tier?`健保 H${e.health_tier}`:(isPT&&e.health_insured_here===false?"他司加保":"")}>{hs>0?"-"+fmt(hs):"-"}</td>
-                      <td style={{padding:"5px 4px",textAlign:"right",color:suppH>0?"#b91c1c":"#ccc"}}>{suppH>0?"-"+fmt(suppH):"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:"var(--text-3)"}} title={e.labor_tier?`勞保 L${e.labor_tier}`:""}>{ls>0?"-"+fmt(ls):"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:"var(--text-3)"}} title={e.health_tier?`健保 H${e.health_tier}`:(isPT&&e.health_insured_here===false?"他司加保":"")}>{hs>0?"-"+fmt(hs):"-"}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",color:suppH>0?"var(--danger)":"#ccc"}}>{suppH>0?"-"+fmt(suppH):"-"}</td>
                       <td style={{padding:"5px 2px"}}>
                         <input type="text" id={"pan-"+e.id} defaultValue={e.default_allowance_note||""} placeholder="名目"
                           style={{width:40,padding:1,borderRadius:3,border:"1px solid #eee",fontSize:8,marginBottom:1}} />
                         <input type="number" id={"pa-"+e.id} defaultValue={e.default_allowance||""} placeholder="$"
-                          style={{width:40,padding:1,borderRadius:3,border:"1px solid #ddd",fontSize:9,textAlign:"right"}} />
+                          style={{width:40,padding:1,borderRadius:3,border:"1px solid var(--border)",fontSize:9,textAlign:"right"}} />
                       </td>
                       <td style={{padding:"5px 2px"}}>
                         <input type="text" id={"pdn-"+e.id} defaultValue={e.default_deduction_note||""} placeholder="名目"
                           style={{width:40,padding:1,borderRadius:3,border:"1px solid #eee",fontSize:8,marginBottom:1}} />
                         <input type="number" id={"pd-"+e.id} defaultValue={e.default_deduction||""} placeholder="$"
-                          style={{width:40,padding:1,borderRadius:3,border:"1px solid #ddd",fontSize:9,textAlign:"right"}} />
+                          style={{width:40,padding:1,borderRadius:3,border:"1px solid var(--border)",fontSize:9,textAlign:"right"}} />
                       </td>
-                      <td style={{padding:"5px 4px",textAlign:"right",fontWeight:700,fontSize:12,color:"#0a7c42"}}>{fmt(net)}</td>
+                      <td style={{padding:"5px 4px",textAlign:"right",fontWeight:700,fontSize:12,color:"var(--success)"}}>{fmt(net)}</td>
                       <td style={{padding:"5px 4px",textAlign:"center"}}>
                         <button onClick={async()=>{
                           const allow=Number(document.getElementById("pa-"+e.id).value||0);
@@ -2036,11 +2036,11 @@ export default function AdminPage() {
                           const deductNote=document.getElementById("pdn-"+e.id).value||"";
                           const r=await sap("/api/admin/employees",{action:"update",employee_id:e.id,default_allowance:allow,default_deduction:deduct,default_allowance_note:allowNote,default_deduction_note:deductNote});
                           if(r) alert("✅ "+e.name+" 已儲存");
-                        }} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:8,cursor:"pointer"}}>💾</button>
+                        }} style={{padding:"1px 5px",borderRadius:3,border:"1px solid var(--success)",background:"transparent",color:"var(--success)",fontSize:8,cursor:"pointer"}}>💾</button>
                       </td>
                     </tr>
                     {isExpanded && (
-                      <tr style={{borderBottom:"1px solid #f0eeea",background:"#fafafa"}}>
+                      <tr style={{borderBottom:"1px solid var(--divider)",background:"#fafafa"}}>
                         <td colSpan={15} style={{padding:"6px 10px"}}>
                           {(() => {
                             const [py, pm] = month.split("-").map(Number);
@@ -2052,39 +2052,39 @@ export default function AdminPage() {
                                 <b style={{color:"#6b21a8"}}>📊 應出席對帳</b>
                                 <span>應出席 <b>{expectedDays}</b> 天</span>
                                 <span>已排班 <b>{empScheds.length}</b> 天</span>
-                                <span style={{color:diff>0?"#4361ee":diff<0?"#b91c1c":"#888",fontWeight:600}}>
+                                <span style={{color:diff>0?"var(--brand-strong)":diff<0?"var(--danger)":"var(--text-3)",fontWeight:600}}>
                                   {diff>0?`多排 +${diff} 天`:diff<0?`少排 ${diff} 天`:"剛好"}
                                 </span>
                               </div>
                             );
                           })()}
-                          <div style={{display:"flex",gap:12,fontSize:10,color:"#666",marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
+                          <div style={{display:"flex",gap:12,fontSize:10,color:"var(--text-2)",marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
                             <span><b>當月排班：</b>{empScheds.length} 天</span>
                             {(() => {
                               const byType = empScheds.reduce((m,s)=>{m[s.day_type||"work"]=(m[s.day_type||"work"]||0)+1;return m;},{});
                               const parts = [];
-                              if (byType.work) parts.push(<span key="w" style={{color:"#0a7c42"}}>正常 {byType.work}</span>);
-                              if (byType.rest_day) parts.push(<span key="r" style={{color:"#b45309"}}>休息日加班 {byType.rest_day}</span>);
-                              if (byType.national_holiday) parts.push(<span key="h" style={{color:"#b91c1c"}}>國假 {byType.national_holiday}</span>);
-                              if (byType.regular_off) parts.push(<span key="o" style={{color:"#888"}}>例假 {byType.regular_off}</span>);
+                              if (byType.work) parts.push(<span key="w" style={{color:"var(--success)"}}>正常 {byType.work}</span>);
+                              if (byType.rest_day) parts.push(<span key="r" style={{color:"var(--warning)"}}>休息日加班 {byType.rest_day}</span>);
+                              if (byType.national_holiday) parts.push(<span key="h" style={{color:"var(--danger)"}}>國假 {byType.national_holiday}</span>);
+                              if (byType.regular_off) parts.push(<span key="o" style={{color:"var(--text-3)"}}>例假 {byType.regular_off}</span>);
                               const leave = (byType.unpaid_leave||0)+(byType.half_pay_leave||0)+(byType.paid_leave||0);
                               if (leave) parts.push(<span key="l" style={{color:"#6b21a8"}}>請假 {leave}</span>);
                               return parts.length ? <span style={{display:"flex",gap:8}}>（{parts.reduce((a,e,i)=>i===0?[e]:[...a," · ",e],[])}）</span> : null;
                             })()}
                             <span>排班時段合計 {(totalSpanMin/60).toFixed(1)} hr</span>
                             <span>休息時數 {(totalBreakMin/60).toFixed(1)} hr</span>
-                            <span style={{color:"#0a7c42",fontWeight:600}}>計薪工時 {totalWorkHr.toFixed(1)} hr</span>
+                            <span style={{color:"var(--success)",fontWeight:600}}>計薪工時 {totalWorkHr.toFixed(1)} hr</span>
                             {isPT && hourlyRate > 0 && (
-                              <span style={{padding:"2px 6px",background:"#fff8e6",borderRadius:4,border:"1px solid #f0e6c8",color:"#8a6d00",fontWeight:600}}>
+                              <span style={{padding:"2px 6px",background:"var(--warning-bg)",borderRadius:4,border:"1px solid #f0e6c8",color:"var(--warning)",fontWeight:600}}>
                                 💰 ${hourlyRate}/hr × {totalWorkHr.toFixed(1)} hr = ${Math.round(hourlyRate*totalWorkHr).toLocaleString()}
                                 {settled && Math.round(hourlyRate*totalWorkHr) !== bp && (
-                                  <span style={{color:"#b91c1c",marginLeft:6}}>⚠ 跟結算 ${fmt(bp)} 不符（資料變動後請重新結算）</span>
+                                  <span style={{color:"var(--danger)",marginLeft:6}}>⚠ 跟結算 ${fmt(bp)} 不符（資料變動後請重新結算）</span>
                                 )}
                               </span>
                             )}
                           </div>
                           {empScheds.length === 0 ? (
-                            <div style={{fontSize:10,color:"#999"}}>當月無排班資料</div>
+                            <div style={{fontSize:10,color:"var(--text-3)"}}>當月無排班資料</div>
                           ) : (() => {
                             // 比對 att 找出哪幾天有打卡（用 employee_id + date）
                             const attByDate = {};
@@ -2101,15 +2101,15 @@ export default function AdminPage() {
                             return (
                             <>
                               {(noAttDays > 0 || partialAttDays > 0) && (
-                                <div style={{fontSize:10,padding:"4px 8px",background:"#fef3c7",borderLeft:"3px solid #b45309",marginBottom:6,borderRadius:3,color:"#8a6d00"}}>
+                                <div style={{fontSize:10,padding:"4px 8px",background:"var(--warning-bg)",borderLeft:"3px solid var(--warning)",marginBottom:6,borderRadius:3,color:"var(--warning)"}}>
                                   ⚠ 對帳：排班 {empScheds.length} 天，{noAttDays>0?`其中 ${noAttDays} 天完全沒打卡（請假/曠職？）`:""}
                                   {partialAttDays>0?`、${partialAttDays} 天只有半邊打卡（缺上班或下班）`:""}
                                 </div>
                               )}
                               <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
-                                <thead><tr style={{background:"#f0eeea"}}>
+                                <thead><tr style={{background:"var(--divider)"}}>
                                   {["日期","星期","班別","上班","下班","休息","計薪工時","類型","打卡"].map(h=>
-                                    <th key={h} style={{padding:"3px 6px",textAlign:"left",fontWeight:500,color:"#555"}}>{h}</th>
+                                    <th key={h} style={{padding:"3px 6px",textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>
                                   )}
                                 </tr></thead>
                                 <tbody>{empScheds.map(s=>{
@@ -2125,16 +2125,16 @@ export default function AdminPage() {
                                   const wDay=["日","一","二","三","四","五","六"][w];
                                   const dtLabel={work:"正常",rest_day:"休息日",national_holiday:"國假",regular_off:"例假",unpaid_leave:"無薪假",half_pay_leave:"半薪假"}[s.day_type]||(s.day_type||"-");
                                   const punch = attByDate[s.date];
-                                  let punchLabel = "✓", punchColor = "#0a7c42";
+                                  let punchLabel = "✓", punchColor = "var(--success)";
                                   if (s.day_type === "regular_off") { punchLabel = "—"; punchColor = "#bbb"; }
-                                  else if (!punch) { punchLabel = "✗ 無打卡"; punchColor = "#b91c1c"; }
-                                  else if (!punch.in) { punchLabel = "缺上班"; punchColor = "#b91c1c"; }
-                                  else if (!punch.out) { punchLabel = "缺下班"; punchColor = "#b45309"; }
-                                  const rowBg = !punch && s.day_type !== "regular_off" ? "#fef3c7" : "transparent";
+                                  else if (!punch) { punchLabel = "✗ 無打卡"; punchColor = "var(--danger)"; }
+                                  else if (!punch.in) { punchLabel = "缺上班"; punchColor = "var(--danger)"; }
+                                  else if (!punch.out) { punchLabel = "缺下班"; punchColor = "var(--warning)"; }
+                                  const rowBg = !punch && s.day_type !== "regular_off" ? "var(--warning-bg)" : "transparent";
                                   return (
                                     <tr key={s.id} style={{borderBottom:"1px solid #eee",background:rowBg}}>
                                       <td style={{padding:"3px 6px"}}>{s.date.slice(5)}</td>
-                                      <td style={{padding:"3px 6px",color:w===0||w===6?"#b91c1c":"#666"}}>{wDay}</td>
+                                      <td style={{padding:"3px 6px",color:w===0||w===6?"var(--danger)":"var(--text-2)"}}>{wDay}</td>
                                       <td style={{padding:"3px 6px"}}>{s.shifts?.name||"-"}</td>
                                       <td style={{padding:"3px 6px"}}>{st.slice(0,5)}</td>
                                       <td style={{padding:"3px 6px"}}>{et.slice(0,5)}</td>
@@ -2149,11 +2149,11 @@ export default function AdminPage() {
                                             if(r.error){alert(r.error);ev.target.value=brk;return;}
                                             load();
                                           }}
-                                          style={{width:42,padding:"1px 3px",borderRadius:3,border:overridden?"1px solid #b45309":"1px solid #ddd",fontSize:10,textAlign:"right",background:overridden?"#fff8e6":"#fff"}} />
-                                        <span style={{fontSize:8,color:"#999",marginLeft:2}}>min</span>
+                                          style={{width:42,padding:"1px 3px",borderRadius:3,border:overridden?"1px solid var(--warning)":"1px solid var(--border)",fontSize:10,textAlign:"right",background:overridden?"var(--warning-bg)":"#fff"}} />
+                                        <span style={{fontSize:8,color:"var(--text-3)",marginLeft:2}}>min</span>
                                       </td>
-                                      <td style={{padding:"3px 6px",fontWeight:500,color:"#0a7c42"}}>{workHr}hr</td>
-                                      <td style={{padding:"3px 6px",fontSize:9,color:s.day_type==="national_holiday"?"#b91c1c":s.day_type==="rest_day"?"#b45309":"#666"}}>{dtLabel}</td>
+                                      <td style={{padding:"3px 6px",fontWeight:500,color:"var(--success)"}}>{workHr}hr</td>
+                                      <td style={{padding:"3px 6px",fontSize:9,color:s.day_type==="national_holiday"?"var(--danger)":s.day_type==="rest_day"?"var(--warning)":"var(--text-2)"}}>{dtLabel}</td>
                                       <td style={{padding:"3px 6px",fontSize:9,color:punchColor,fontWeight:500}}>{punchLabel}</td>
                                     </tr>
                                   );
@@ -2180,17 +2180,17 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📝 季考核</h3>
             <div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
-              <select id="rv-year" defaultValue={new Date().getFullYear()} style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}>
+              <select id="rv-year" defaultValue={new Date().getFullYear()} style={{padding:"4px 8px",borderRadius:5,border:"1px solid var(--border)",fontSize:11}}>
                 {[2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}
               </select>
-              <select id="rv-quarter" defaultValue={Math.ceil((new Date().getMonth()+1)/3)} style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}>
+              <select id="rv-quarter" defaultValue={Math.ceil((new Date().getMonth()+1)/3)} style={{padding:"4px 8px",borderRadius:5,border:"1px solid var(--border)",fontSize:11}}>
                 {[1,2,3,4].map(q=><option key={q} value={q}>{"Q"+q}</option>)}
               </select>
               <button onClick={async()=>{
                 const y=Number(document.getElementById("rv-year").value),q=Number(document.getElementById("rv-quarter").value);
                 const r=await ap("/api/admin/reviews?year="+y+"&quarter="+q+(sf?"&store_id="+sf:""));
                 setRvData(r.data||[]);
-              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>
+              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"#fff",fontSize:11,cursor:"pointer"}}>
                 🔍 查詢
               </button>
               <button onClick={async()=>{
@@ -2199,7 +2199,7 @@ export default function AdminPage() {
                 await ap("/api/admin/reviews",{action:"generate",year:y,quarter:q});
                 const r=await ap("/api/admin/reviews?year="+y+"&quarter="+q);
                 setRvData(r.data||[]);alert("已產生");
-              }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>
+              }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer"}}>
                 🔄 一鍵產生
               </button>
               <button onClick={async()=>{
@@ -2208,27 +2208,27 @@ export default function AdminPage() {
                 await ap("/api/admin/reviews",{action:"approve_all",year:y,quarter:q});
                 const r=await ap("/api/admin/reviews?year="+y+"&quarter="+q);
                 setRvData(r.data||[]);
-              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:11,cursor:"pointer"}}>
+              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--success)",background:"transparent",color:"var(--success)",fontSize:11,cursor:"pointer"}}>
                 ✅ 全部核准
               </button>
             </div>
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+            <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["員工","門市","出勤/30","完成度/30","服務/20","違規/20","總分","係數","狀態"].map(h=>
-                  <th key={h} style={{padding:6,textAlign:"center",fontWeight:500,color:"#666",fontSize:10}}>{h}</th>
+                <thead><tr style={{background:"var(--surface-warm)"}}>{["員工","門市","出勤/30","完成度/30","服務/20","違規/20","總分","係數","狀態"].map(h=>
+                  <th key={h} style={{padding:6,textAlign:"center",fontWeight:500,color:"var(--text-2)",fontSize:10}}>{h}</th>
                 )}</tr></thead>
                 <tbody>
                   {rvData.length===0 ? (
                     <tr><td colSpan={9} style={{padding:20,textAlign:"center",color:"#ccc",fontSize:11}}>請選擇季度後按「查詢」或「一鍵產生」</td></tr>
                   ) : rvData.map(r=>(
-                    <tr key={r.id} style={{borderBottom:"1px solid #f0eeea",background:r.bonus_coefficient===0?"#fef9c3":"transparent"}}>
+                    <tr key={r.id} style={{borderBottom:"1px solid var(--divider)",background:r.bonus_coefficient===0?"var(--warning-bg)":"transparent"}}>
                       <td style={{padding:6,fontWeight:500}}>{r.employees?.name}</td>
                       <td style={{padding:6,fontSize:10}}>{r.stores?.name}</td>
-                      <td style={{padding:6,textAlign:"center"}} title={r.attendance_detail ? `遲到${r.attendance_detail.late||0}次 早退${r.attendance_detail.early_leave||0}次 缺勤${r.attendance_detail.absent||0}次 排班${r.attendance_detail.scheduled||0}天` : ""}>{r.attendance_score}<div style={{fontSize:7,color:"#888"}}>{r.attendance_detail?`遲${r.attendance_detail.late||0} 退${r.attendance_detail.early_leave||0} 缺${r.attendance_detail.absent||0}`:""}</div></td>
-                      <td style={{padding:6,textAlign:"center"}}>{r.performance_score}{r.performance_adjust!==0&&<span style={{fontSize:8,color:r.performance_adjust>0?"#0a7c42":"#b91c1c"}}>{(r.performance_adjust>0?"+":"")+r.performance_adjust}</span>}</td>
-                      <td style={{padding:6,textAlign:"center"}}>{r.service_score}{r.service_adjust!==0&&<span style={{fontSize:8,color:r.service_adjust>0?"#0a7c42":"#b91c1c"}}>{(r.service_adjust>0?"+":"")+r.service_adjust}</span>}</td>
+                      <td style={{padding:6,textAlign:"center"}} title={r.attendance_detail ? `遲到${r.attendance_detail.late||0}次 早退${r.attendance_detail.early_leave||0}次 缺勤${r.attendance_detail.absent||0}次 排班${r.attendance_detail.scheduled||0}天` : ""}>{r.attendance_score}<div style={{fontSize:7,color:"var(--text-3)"}}>{r.attendance_detail?`遲${r.attendance_detail.late||0} 退${r.attendance_detail.early_leave||0} 缺${r.attendance_detail.absent||0}`:""}</div></td>
+                      <td style={{padding:6,textAlign:"center"}}>{r.performance_score}{r.performance_adjust!==0&&<span style={{fontSize:8,color:r.performance_adjust>0?"var(--success)":"var(--danger)"}}>{(r.performance_adjust>0?"+":"")+r.performance_adjust}</span>}</td>
+                      <td style={{padding:6,textAlign:"center"}}>{r.service_score}{r.service_adjust!==0&&<span style={{fontSize:8,color:r.service_adjust>0?"var(--success)":"var(--danger)"}}>{(r.service_adjust>0?"+":"")+r.service_adjust}</span>}</td>
                       <td style={{padding:6,textAlign:"center"}}>{r.violation_score}</td>
-                      <td style={{padding:6,textAlign:"center",fontWeight:700,color:r.total_score>=80?"#0a7c42":r.total_score>=70?"#b45309":"#b91c1c"}}>{r.total_score}</td>
+                      <td style={{padding:6,textAlign:"center",fontWeight:700,color:r.total_score>=80?"var(--success)":r.total_score>=70?"var(--warning)":"var(--danger)"}}>{r.total_score}</td>
                       <td style={{padding:6,textAlign:"center",fontWeight:600}}>{r.bonus_coefficient===0?"❌":"×"+r.bonus_coefficient}</td>
                       <td style={{padding:6,textAlign:"center"}}>{r.status==="approved"?"✅":r.status==="submitted"?"📤":"📝"}</td>
                     </tr>
@@ -2236,7 +2236,7 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
-            <p style={{fontSize:9,color:"#888",marginTop:6}}>出勤=自動（遲到-3 早退-3 缺勤-10）　違規=自動　完成度/服務=主管可±5分調整</p>
+            <p style={{fontSize:9,color:"var(--text-3)",marginTop:6}}>出勤=自動（遲到-3 早退-3 缺勤-10）　違規=自動　完成度/服務=主管可±5分調整</p>
           </div>
         )}
 
@@ -2245,10 +2245,10 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>🏆 季獎金發放</h3>
             <div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
-              <select id="bn-year" defaultValue={new Date().getFullYear()} style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}>
+              <select id="bn-year" defaultValue={new Date().getFullYear()} style={{padding:"4px 8px",borderRadius:5,border:"1px solid var(--border)",fontSize:11}}>
                 {[2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}
               </select>
-              <select id="bn-quarter" defaultValue={Math.ceil((new Date().getMonth()+1)/3)} style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11}}>
+              <select id="bn-quarter" defaultValue={Math.ceil((new Date().getMonth()+1)/3)} style={{padding:"4px 8px",borderRadius:5,border:"1px solid var(--border)",fontSize:11}}>
                 {[1,2,3,4].map(q=><option key={q} value={q}>{"Q"+q}</option>)}
               </select>
               <button onClick={async()=>{
@@ -2263,27 +2263,27 @@ export default function AdminPage() {
                   msg+="  Q淨利: "+fmt(s.q_net)+"\n";
                 });
                 alert(msg);
-              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>
+              }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"#fff",fontSize:11,cursor:"pointer"}}>
                 📊 查看達標率
               </button>
             </div>
 
             {auth.role==="admin" && (
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:10}}>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12,marginBottom:10}}>
                 <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>💰 總部填入各門市獎金總額</h4>
-                <p style={{fontSize:9,color:"#888",marginBottom:6}}>參照損益表決定金額，虧損門市自動鎖定</p>
+                <p style={{fontSize:9,color:"var(--text-3)",marginBottom:6}}>參照損益表決定金額，虧損門市自動鎖定</p>
                 {stores.map(s=>(
-                  <div key={s.id} style={{display:"flex",gap:6,alignItems:"center",padding:"4px 0",borderBottom:"1px solid #f0eeea"}}>
+                  <div key={s.id} style={{display:"flex",gap:6,alignItems:"center",padding:"4px 0",borderBottom:"1px solid var(--divider)"}}>
                     <span style={{fontSize:11,fontWeight:500,width:80}}>{s.name}</span>
                     <input type="number" id={"bp-"+s.id} placeholder="Q總獎金"
-                      style={{flex:1,padding:4,borderRadius:4,border:"1px solid #ddd",fontSize:11}} />
+                      style={{flex:1,padding:4,borderRadius:4,border:"1px solid var(--border)",fontSize:11}} />
                     <button onClick={async()=>{
                       const y=Number(document.getElementById("bn-year").value);
                       const q=Number(document.getElementById("bn-quarter").value);
                       const amt=Number(document.getElementById("bp-"+s.id).value||0);
                       await ap("/api/admin/bonus",{action:"set_pool",store_id:s.id,year:y,quarter:q,total_amount:amt});
                       alert(s.name+" 獎金池已設定 "+fmt(amt));
-                    }} style={{padding:"3px 8px",borderRadius:4,border:"none",background:"#0a7c42",color:"#fff",fontSize:10,cursor:"pointer"}}>💾</button>
+                    }} style={{padding:"3px 8px",borderRadius:4,border:"none",background:"var(--success)",color:"#fff",fontSize:10,cursor:"pointer"}}>💾</button>
                   </div>
                 ))}
                 <div style={{display:"flex",gap:4,marginTop:8}}>
@@ -2293,7 +2293,7 @@ export default function AdminPage() {
                     if(!confirm("計算Q"+q+"個人獎金？"))return;
                     const r=await ap("/api/admin/bonus",{action:"calculate",year:y,quarter:q});
                     alert("已計算 "+(r.calculated||0)+" 人");load();
-                  }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>
+                  }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer"}}>
                     📊 計算個人獎金
                   </button>
                   <button onClick={async()=>{
@@ -2302,7 +2302,7 @@ export default function AdminPage() {
                     if(!confirm("LINE發送獎金條？"))return;
                     const r=await ap("/api/admin/bonus",{action:"send_line",year:y,quarter:q});
                     alert("已發送 "+(r.sent||0)+" 位");
-                  }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #4361ee",background:"transparent",color:"#4361ee",fontSize:11,cursor:"pointer"}}>
+                  }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--brand-strong)",background:"transparent",color:"var(--brand-strong)",fontSize:11,cursor:"pointer"}}>
                     📱 LINE發送獎金條
                   </button>
                 </div>
@@ -2326,7 +2326,7 @@ export default function AdminPage() {
           <div>
             {/* 批次修正提示（單一自定義方式的店 → 一鍵歸位） */}
             {sf && fixable.length > 0 && routeFor && (
-              <div style={{background:"#fff8e6",border:"1px solid #f0e6c8",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
+              <div style={{background:"var(--warning-bg)",border:"1px solid #f0e6c8",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
                 <div style={{fontSize:12,marginBottom:6}}>
                   💡 偵測到 <b>{sfStore.name}</b> 本月有 <b>{fixable.length}</b> 筆「其他」金額 <b>{fmt(fixableTotal)}</b> 尚未拆分。
                   此店只設一個自定義方式「{oneMethod}」，可一鍵全部歸到「{COL_LABELS[routeFor]||routeFor}」欄。
@@ -2337,13 +2337,13 @@ export default function AdminPage() {
                   if (r.error) { alert("❌ "+r.error); return; }
                   alert(`✅ 已修正 ${r.updated} 筆，共 ${fmt(r.total)} 已歸到「${oneMethod}」欄`);
                   load();
-                }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"#b45309",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"var(--warning)",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>
                   🔄 一鍵全部歸為「{oneMethod}」（{fixable.length} 筆 / {fmt(fixableTotal)}）
                 </button>
               </div>
             )}
             {sf && fixable.length > 0 && !routeFor && (
-              <div style={{background:"#fef2f2",border:"1px solid #f0c8c8",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12}}>
+              <div style={{background:"var(--danger-bg)",border:"1px solid #f0c8c8",borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:12}}>
                 ⚠️ <b>{sfStore.name}</b> 本月有 <b>{fixable.length}</b> 筆「其他」金額 <b>{fmt(fixableTotal)}</b> 尚未拆分。
                 {sfMethods.length === 0
                   ? <>請先到「設定 → 門市」填寫常用自定義結帳方式，或逐筆點「📝拆分」修正。</>
@@ -2357,12 +2357,12 @@ export default function AdminPage() {
                 const store = stores.find(s=>s.id===sf);
                 const params = new URLSearchParams({type:"settlement",store_id:sf,store_name:store?.name||"",employee_id:auth?.employee_id||"",employee_name:auth?.name||""});
                 window.open("/upload?"+params.toString(),"_blank");
-              }} style={{marginLeft:8,padding:"2px 10px",borderRadius:4,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:10,cursor:"pointer",fontWeight:600}}>📷 後台上傳日結單</button>
+              }} style={{marginLeft:8,padding:"2px 10px",borderRadius:4,border:"1px solid var(--warning)",background:"#fff",color:"var(--warning)",fontSize:10,cursor:"pointer",fontWeight:600}}>📷 後台上傳日結單</button>
               <button onClick={()=>{
                 exportCSV("日結_"+month+".csv",["日期","門市","營收","現金","信用卡","LINE Pay","TWQR","匯款","UberEat","悠遊卡","餐券","其他","應存"],
                   stl.map(s=>[s.date,s.stores?.name,s.net_sales,s.cash_amount,s.credit_card_amount,s.line_pay_amount,s.twqr_amount,s.remittance_amount,s.uber_eat_amount,s.easy_card_amount,s.meal_voucher_amount,s.other_payment_amount,s.cash_to_deposit]));
-              }} style={{marginLeft:6,padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
-              <label style={{marginLeft:6,padding:"2px 8px",borderRadius:4,border:"1px solid #4361ee",background:"#fff",color:"#4361ee",fontSize:10,cursor:"pointer",display:"inline-block"}}>
+              }} style={{marginLeft:6,padding:"2px 8px",borderRadius:4,border:"1px solid var(--border)",background:"#fff",fontSize:10,cursor:"pointer"}}>📥 匯出CSV</button>
+              <label style={{marginLeft:6,padding:"2px 8px",borderRadius:4,border:"1px solid var(--brand-strong)",background:"#fff",color:"var(--brand-strong)",fontSize:10,cursor:"pointer",display:"inline-block"}}>
                 📤 匯入iChef CSV
                 <input type="file" accept=".csv,text/csv" style={{display:"none"}} onChange={async e=>{
                   const file = e.target.files?.[0]; e.target.value = "";
@@ -2411,17 +2411,17 @@ export default function AdminPage() {
             </h3>
             {stl.length > 0 && (
               <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
-                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"6px 10px",flex:1,minWidth:80}}>
-                  <div style={{fontSize:9,color:"#888"}}>營收合計</div>
-                  <div style={{fontSize:16,fontWeight:700,color:"#0a7c42"}}>{fmt(sum.total_net_sales)}</div>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"6px 10px",flex:1,minWidth:80}}>
+                  <div style={{fontSize:9,color:"var(--text-3)"}}>營收合計</div>
+                  <div style={{fontSize:16,fontWeight:700,color:"var(--success)"}}>{fmt(sum.total_net_sales)}</div>
                 </div>
-                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"6px 10px",flex:1,minWidth:80}}>
-                  <div style={{fontSize:9,color:"#888"}}>現金合計</div>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"6px 10px",flex:1,minWidth:80}}>
+                  <div style={{fontSize:9,color:"var(--text-3)"}}>現金合計</div>
                   <div style={{fontSize:14,fontWeight:600}}>{fmt(sum.total_cash)}</div>
                 </div>
-                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"6px 10px",flex:1,minWidth:80}}>
-                  <div style={{fontSize:9,color:"#888"}}>應存合計</div>
-                  <div style={{fontSize:14,fontWeight:600,color:"#b45309"}}>{fmt(sum.total_cash_to_deposit)}</div>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"6px 10px",flex:1,minWidth:80}}>
+                  <div style={{fontSize:9,color:"var(--text-3)"}}>應存合計</div>
+                  <div style={{fontSize:14,fontWeight:600,color:"var(--warning)"}}>{fmt(sum.total_cash_to_deposit)}</div>
                 </div>
               </div>
             )}
@@ -2438,20 +2438,20 @@ export default function AdminPage() {
               });
               dep.forEach(d => { if(Math.abs(d.difference||0)>500) alerts.push({icon:"🏦",store:d.stores?.name||"",date:d.deposit_date,msg:"存款差異"+fmt(d.difference),tip:"→ 請確認是否有未存入的現金",level:Math.abs(d.difference)>2000?"high":"mid"}); });
               return alerts.length ? (
-                <div style={{background:"#fef2f2",borderRadius:8,border:"1px solid #fecaca",padding:12,marginBottom:8}}>
-                  <h4 style={{fontSize:13,fontWeight:700,color:"#b91c1c",marginBottom:8}}>{"🚨 稽核警示（"+alerts.length+"項）"}</h4>
+                <div style={{background:"var(--danger-bg)",borderRadius:8,border:"1px solid #fecaca",padding:12,marginBottom:8}}>
+                  <h4 style={{fontSize:13,fontWeight:700,color:"var(--danger)",marginBottom:8}}>{"🚨 稽核警示（"+alerts.length+"項）"}</h4>
                   {alerts.map((a,i)=>(
-                    <div key={i} style={{padding:8,marginBottom:4,borderRadius:6,background:a.level==="high"?"#fee2e2":"#fff8e6",border:"1px solid "+(a.level==="high"?"#fca5a5":"#fde68a")}}>
+                    <div key={i} style={{padding:8,marginBottom:4,borderRadius:6,background:a.level==="high"?"#fee2e2":"var(--warning-bg)",border:"1px solid "+(a.level==="high"?"#fca5a5":"#fde68a")}}>
                       <div style={{fontSize:11,fontWeight:600}}>{a.icon+" "+a.store+" "+a.date+" — "+a.msg}</div>
-                      <div style={{fontSize:10,color:"#666",marginTop:2}}>{a.tip}</div>
+                      <div style={{fontSize:10,color:"var(--text-2)",marginTop:2}}>{a.tip}</div>
                     </div>
                   ))}
                 </div>
-              ) : <div style={{background:"#e6f9f0",borderRadius:8,padding:10,marginBottom:8,fontSize:12,color:"#0a7c42",fontWeight:500}}>✅ 本月日結核對無異常</div>;
+              ) : <div style={{background:"var(--success-bg)",borderRadius:8,padding:10,marginBottom:8,fontSize:12,color:"var(--success)",fontWeight:500}}>✅ 本月日結核對無異常</div>;
             })()}
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+            <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:700}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","營收","現金","信用卡","LINE Pay","TWQR","匯款","Uber","悠遊卡","餐券","其他","發票","作廢","應存","📸","操作"].map(h=><th key={h} style={{padding:"4px 3px",textAlign:"right",fontWeight:500,color:"#666",fontSize:9}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"var(--surface-warm)"}}>{["日期","門市","營收","現金","信用卡","LINE Pay","TWQR","匯款","Uber","悠遊卡","餐券","其他","發票","作廢","應存","📸","操作"].map(h=><th key={h} style={{padding:"4px 3px",textAlign:"right",fontWeight:500,color:"var(--text-2)",fontSize:9}}>{h}</th>)}</tr></thead>
                 <tbody>{stl.map(s=>{
                   const paySum = [s.cash_amount,s.credit_card_amount,s.line_pay_amount,s.twqr_amount,s.remittance_amount,s.uber_eat_amount,s.easy_card_amount,s.meal_voucher_amount,s.other_payment_amount].reduce((a,v)=>a+Number(v||0),0);
                   const mismatch = Math.abs(Number(s.net_sales||0) - paySum) > 100;
@@ -2461,38 +2461,38 @@ export default function AdminPage() {
                   if (hasVoid) flags.push("🚨作廢"+s.void_invoice_count);
                   if (Number(s.discount_total||0)>Number(s.net_sales||0)*0.1&&s.discount_total>0) flags.push("🔻折扣");
                   const isEdit = editStl === s.id;
-                  const ei = (field,val) => isEdit ? <input id={"stl-"+s.id+"-"+field} defaultValue={val||0} style={{width:55,padding:1,border:"1px solid #4361ee",borderRadius:3,fontSize:10,textAlign:"right"}} /> : null;
+                  const ei = (field,val) => isEdit ? <input id={"stl-"+s.id+"-"+field} defaultValue={val||0} style={{width:55,padding:1,border:"1px solid var(--brand-strong)",borderRadius:3,fontSize:10,textAlign:"right"}} /> : null;
                   const cv = (val,color) => <span style={{color:val>0?(color||"inherit"):"#ccc",fontSize:10}}>{val>0?fmt(val):"-"}</span>;
                   return (
-                  <tr key={s.id} style={{borderBottom:"1px solid #f0eeea",background:mismatch?"#fef2f2":hasVoid?"#fffbeb":"transparent"}}>
+                  <tr key={s.id} style={{borderBottom:"1px solid var(--divider)",background:mismatch?"var(--danger-bg)":hasVoid?"#fffbeb":"transparent"}}>
                     <td style={{padding:"4px 3px",textAlign:"right",fontSize:10}}>
                       {s.date?.slice(5)}
-                      {s.edit_reason&&<div onClick={(e)=>{e.stopPropagation();const changes=s.edit_changes?JSON.parse(s.edit_changes):[];alert("✏️ 修正紀錄\n原因："+s.edit_reason+"\n修改時間："+(s.edited_at?new Date(s.edited_at).toLocaleString("zh-TW"):"")+"\n\n"+changes.map(c=>c.field+"："+c.from+" → "+c.to).join("\n"));}} style={{fontSize:7,color:"#4361ee",cursor:"pointer"}}>✏️已修正</div>}
-                      {s.status==="draft"&&<div style={{fontSize:7,color:"#b45309"}}>📝草稿</div>}
-                      {flags.length>0&&<div style={{fontSize:7,color:"#b91c1c"}}>{flags.join(" ")}</div>}
+                      {s.edit_reason&&<div onClick={(e)=>{e.stopPropagation();const changes=s.edit_changes?JSON.parse(s.edit_changes):[];alert("✏️ 修正紀錄\n原因："+s.edit_reason+"\n修改時間："+(s.edited_at?new Date(s.edited_at).toLocaleString("zh-TW"):"")+"\n\n"+changes.map(c=>c.field+"："+c.from+" → "+c.to).join("\n"));}} style={{fontSize:7,color:"var(--brand-strong)",cursor:"pointer"}}>✏️已修正</div>}
+                      {s.status==="draft"&&<div style={{fontSize:7,color:"var(--warning)"}}>📝草稿</div>}
+                      {flags.length>0&&<div style={{fontSize:7,color:"var(--danger)"}}>{flags.join(" ")}</div>}
                     </td>
                     <td style={{padding:"4px 3px",textAlign:"right",fontWeight:500,fontSize:10}}>{s.stores?s.stores.name:""}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("net_sales",s.net_sales):<span style={{fontWeight:700,color:"#0a7c42",fontSize:10}}>{fmt(s.net_sales)}</span>}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("net_sales",s.net_sales):<span style={{fontWeight:700,color:"var(--success)",fontSize:10}}>{fmt(s.net_sales)}</span>}</td>
                     <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("cash_amount",s.cash_amount):<span style={{fontSize:10}}>{fmt(s.cash_amount)}</span>}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("credit_card_amount",s.credit_card_amount):cv(s.credit_card_amount,"#185fa5")}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("line_pay_amount",s.line_pay_amount):cv(s.line_pay_amount,"#0a7c42")}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("twqr_amount",s.twqr_amount):cv(s.twqr_amount,"#0a7c42")}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("remittance_amount",s.remittance_amount):cv(s.remittance_amount,"#185fa5")}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("uber_eat_amount",s.uber_eat_amount):cv(s.uber_eat_amount,"#0a7c42")}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("easy_card_amount",s.easy_card_amount):cv(s.easy_card_amount,"#b45309")}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("meal_voucher_amount",s.meal_voucher_amount):cv(s.meal_voucher_amount,"#b45309")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("credit_card_amount",s.credit_card_amount):cv(s.credit_card_amount,"var(--info)")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("line_pay_amount",s.line_pay_amount):cv(s.line_pay_amount,"var(--success)")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("twqr_amount",s.twqr_amount):cv(s.twqr_amount,"var(--success)")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("remittance_amount",s.remittance_amount):cv(s.remittance_amount,"var(--info)")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("uber_eat_amount",s.uber_eat_amount):cv(s.uber_eat_amount,"var(--success)")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("easy_card_amount",s.easy_card_amount):cv(s.easy_card_amount,"var(--warning)")}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right"}}>{isEdit?ei("meal_voucher_amount",s.meal_voucher_amount):cv(s.meal_voucher_amount,"var(--warning)")}</td>
                     <td style={{padding:"4px 3px",textAlign:"right"}}>
                       {isEdit ? ei("other_payment_amount",s.other_payment_amount) : (
                         <div>
-                          {cv(s.other_payment_amount,"#888")}
+                          {cv(s.other_payment_amount,"var(--text-3)")}
                           {Array.isArray(s.custom_payments) && s.custom_payments.length>0 && (
-                            <div style={{fontSize:8,color:"#666",lineHeight:1.3,marginTop:1}}>
+                            <div style={{fontSize:8,color:"var(--text-2)",lineHeight:1.3,marginTop:1}}>
                               {s.custom_payments.map((cp,i)=>(<div key={i}>{cp.method} ${Number(cp.amount).toLocaleString()}</div>))}
                             </div>
                           )}
                           {Number(s.other_payment_amount||0)>0 && (
                             <button onClick={()=>setSplitStl({settlement:s,entries:Array.isArray(s.custom_payments)?[...s.custom_payments]:[]})}
-                              style={{marginTop:2,padding:"1px 5px",borderRadius:3,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:8,cursor:"pointer"}}>
+                              style={{marginTop:2,padding:"1px 5px",borderRadius:3,border:"1px solid var(--warning)",background:"#fff",color:"var(--warning)",fontSize:8,cursor:"pointer"}}>
                               📝拆分
                             </button>
                           )}
@@ -2500,8 +2500,8 @@ export default function AdminPage() {
                       )}
                     </td>
                     <td style={{padding:"4px 3px",textAlign:"right",fontSize:9}}>{s.invoice_count||"-"}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right",color:s.void_invoice_count>0?"#b91c1c":"#ccc",fontSize:9}}>{s.void_invoice_count>0?s.void_invoice_count+"張":"-"}</td>
-                    <td style={{padding:"4px 3px",textAlign:"right",fontWeight:600,color:"#b45309",fontSize:10}}>{fmt(s.cash_to_deposit)}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right",color:s.void_invoice_count>0?"var(--danger)":"#ccc",fontSize:9}}>{s.void_invoice_count>0?s.void_invoice_count+"張":"-"}</td>
+                    <td style={{padding:"4px 3px",textAlign:"right",fontWeight:600,color:"var(--warning)",fontSize:10}}>{fmt(s.cash_to_deposit)}</td>
                     <td style={{padding:"4px",textAlign:"center"}}>{s.image_url?<button onClick={()=>setSi(s.image_url)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>📸</button>:<span style={{color:"#ccc"}}>-</span>}</td>
                     <td style={{padding:"4px",textAlign:"center",whiteSpace:"nowrap"}}>
                       {isEdit ? <>
@@ -2511,11 +2511,11 @@ export default function AdminPage() {
                           updates.cash_to_deposit=updates.cash_amount-(s.petty_cash_reserved||0);
                           const r=await sap("/api/admin/settlements",{action:"update",settlement_id:s.id,...updates});
                           if(r){setEditStl(null);load();}
-                        }} style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer"}}>💾</button>
-                        <button onClick={()=>setEditStl(null)} style={{padding:"1px 5px",borderRadius:3,border:"none",background:"#888",color:"#fff",fontSize:9,cursor:"pointer",marginLeft:2}}>✕</button>
+                        }} style={{padding:"1px 5px",borderRadius:3,border:"none",background:"var(--success)",color:"#fff",fontSize:9,cursor:"pointer"}}>💾</button>
+                        <button onClick={()=>setEditStl(null)} style={{padding:"1px 5px",borderRadius:3,border:"none",background:"var(--text-3)",color:"#fff",fontSize:9,cursor:"pointer",marginLeft:2}}>✕</button>
                       </> : <>
                         <button onClick={()=>setEditStl(s.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:10}}>✏️</button>
-                        <button onClick={async()=>{if(!confirm("刪除 "+s.date+" 日結？"))return;const r=await sap("/api/admin/settlements",{action:"delete",settlement_id:s.id});if(r)load();}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
+                        <button onClick={async()=>{if(!confirm("刪除 "+s.date+" 日結？"))return;const r=await sap("/api/admin/settlements",{action:"delete",settlement_id:s.id});if(r)load();}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"var(--danger)"}}>🗑</button>
                       </>}
                     </td>
                   </tr>);
@@ -2540,66 +2540,66 @@ export default function AdminPage() {
                 <div onClick={()=>setSplitStl(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
                   <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:10,padding:20,maxWidth:480,width:"100%",maxHeight:"85vh",overflow:"auto"}}>
                     <h3 style={{margin:"0 0 8px",fontSize:14,fontWeight:600}}>📝 拆分「其他」付款明細</h3>
-                    <div style={{fontSize:11,color:"#666",marginBottom:12}}>
+                    <div style={{fontSize:11,color:"var(--text-2)",marginBottom:12}}>
                       {store?.name || "?"} · {s.date} · 其他總額 <b>{fmt(target)}</b>
                     </div>
 
                     {/* 快速選單 */}
                     {quickPicks.length>0 && (
-                      <div style={{marginBottom:8,padding:8,background:"#faf8f5",borderRadius:6}}>
-                        <div style={{fontSize:10,color:"#888",marginBottom:4}}>快速加入（{store?.name} 常用方式）</div>
+                      <div style={{marginBottom:8,padding:8,background:"var(--surface-warm)",borderRadius:6}}>
+                        <div style={{fontSize:10,color:"var(--text-3)",marginBottom:4}}>快速加入（{store?.name} 常用方式）</div>
                         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                           {quickPicks.map(m=>(
                             <button key={m} onClick={()=>setSplitStl({...splitStl,entries:[...splitStl.entries,{method:m,amount:0}]})}
-                              style={{padding:"3px 8px",borderRadius:4,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:11,cursor:"pointer"}}>+ {m}</button>
+                              style={{padding:"3px 8px",borderRadius:4,border:"1px solid var(--warning)",background:"#fff",color:"var(--warning)",fontSize:11,cursor:"pointer"}}>+ {m}</button>
                           ))}
                         </div>
                       </div>
                     )}
                     {quickPicks.length===0 && (
-                      <div style={{fontSize:10,color:"#888",marginBottom:8,padding:6,background:"#fffbeb",borderRadius:4,border:"1px dashed #fbbf24"}}>
+                      <div style={{fontSize:10,color:"var(--text-3)",marginBottom:8,padding:6,background:"#fffbeb",borderRadius:4,border:"1px dashed #fbbf24"}}>
                         💡 提示：到「設定 → 門市管理」設「常用自定義結帳方式」可加快輸入
                       </div>
                     )}
 
                     {/* 明細列表 */}
                     <div style={{marginBottom:10}}>
-                      {splitStl.entries.length===0 && <div style={{padding:14,textAlign:"center",color:"#aaa",fontSize:12}}>尚無明細，點上方按鈕或「+ 新增空白項」</div>}
+                      {splitStl.entries.length===0 && <div style={{padding:14,textAlign:"center",color:"var(--text-hint)",fontSize:12}}>尚無明細，點上方按鈕或「+ 新增空白項」</div>}
                       {splitStl.entries.map((e,i)=>{
                         const routed = routePaymentMethod(e.method);
                         return (
                         <div key={i} style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
                           <div style={{flex:1,display:"flex",flexDirection:"column",gap:2}}>
-                            <input value={e.method||""} onChange={ev=>updateEntry(i,"method",ev.target.value)} placeholder="付款方式" style={{padding:"4px 8px",borderRadius:4,border:"1px solid "+(routed?"#0a7c42":"#ddd"),fontSize:12}} />
+                            <input value={e.method||""} onChange={ev=>updateEntry(i,"method",ev.target.value)} placeholder="付款方式" style={{padding:"4px 8px",borderRadius:4,border:"1px solid "+(routed?"var(--success)":"var(--border)"),fontSize:12}} />
                             {routed
-                              ? <span style={{fontSize:9,color:"#0a7c42"}}>→ 自動歸到「{COL_LABELS[routed]}」欄</span>
-                              : e.method ? <span style={{fontSize:9,color:"#b45309"}}>→ 保留在「其他/自定義」明細</span> : null}
+                              ? <span style={{fontSize:9,color:"var(--success)"}}>→ 自動歸到「{COL_LABELS[routed]}」欄</span>
+                              : e.method ? <span style={{fontSize:9,color:"var(--warning)"}}>→ 保留在「其他/自定義」明細</span> : null}
                           </div>
-                          <input type="number" value={e.amount||0} onChange={ev=>updateEntry(i,"amount",ev.target.value)} style={{width:90,padding:"4px 8px",borderRadius:4,border:"1px solid #ddd",fontSize:12,textAlign:"right"}} />
-                          <button onClick={()=>setSplitStl({...splitStl,entries:splitStl.entries.filter((_,x)=>x!==i)})} style={{background:"none",border:"none",color:"#b91c1c",fontSize:14,cursor:"pointer"}}>✕</button>
+                          <input type="number" value={e.amount||0} onChange={ev=>updateEntry(i,"amount",ev.target.value)} style={{width:90,padding:"4px 8px",borderRadius:4,border:"1px solid var(--border)",fontSize:12,textAlign:"right"}} />
+                          <button onClick={()=>setSplitStl({...splitStl,entries:splitStl.entries.filter((_,x)=>x!==i)})} style={{background:"none",border:"none",color:"var(--danger)",fontSize:14,cursor:"pointer"}}>✕</button>
                         </div>);
                       })}
                       <button onClick={()=>setSplitStl({...splitStl,entries:[...splitStl.entries,{method:"",amount:0}]})}
-                        style={{width:"100%",padding:6,borderRadius:4,border:"1px dashed #ccc",background:"transparent",color:"#888",fontSize:11,cursor:"pointer"}}>+ 新增空白項</button>
+                        style={{width:"100%",padding:6,borderRadius:4,border:"1px dashed #ccc",background:"transparent",color:"var(--text-3)",fontSize:11,cursor:"pointer"}}>+ 新增空白項</button>
                     </div>
 
                     {/* 對帳區 */}
-                    <div style={{padding:8,background:diff===0?"#e6f9f0":"#fef2f2",borderRadius:6,fontSize:11,marginBottom:12}}>
+                    <div style={{padding:8,background:diff===0?"var(--success-bg)":"var(--danger-bg)",borderRadius:6,fontSize:11,marginBottom:12}}>
                       <div style={{display:"flex",justifyContent:"space-between"}}><span>明細小計</span><b>{fmt(sum)}</b></div>
                       <div style={{display:"flex",justifyContent:"space-between"}}><span>其他總額</span><b>{fmt(target)}</b></div>
-                      <div style={{display:"flex",justifyContent:"space-between",color:diff===0?"#0a7c42":"#b91c1c",fontWeight:600,marginTop:4,paddingTop:4,borderTop:"1px solid #ddd"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",color:diff===0?"var(--success)":"var(--danger)",fontWeight:600,marginTop:4,paddingTop:4,borderTop:"1px solid var(--border)"}}>
                         <span>差額</span><span>{diff>0?"+":""}{fmt(diff)}</span>
                       </div>
-                      {diff!==0 && <div style={{fontSize:10,color:"#b91c1c",marginTop:4}}>⚠️ 明細小計與「其他」總額不符，仍可儲存但建議調整</div>}
+                      {diff!==0 && <div style={{fontSize:10,color:"var(--danger)",marginTop:4}}>⚠️ 明細小計與「其他」總額不符，仍可儲存但建議調整</div>}
                     </div>
 
                     <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
-                      <button onClick={()=>setSplitStl(null)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:12,cursor:"pointer"}}>取消</button>
+                      <button onClick={()=>setSplitStl(null)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid var(--border)",background:"#fff",fontSize:12,cursor:"pointer"}}>取消</button>
                       <button onClick={async()=>{
                         const cleaned = splitStl.entries.filter(e=>e.method && e.method.trim()).map(e=>({method:e.method.trim(),amount:Number(e.amount||0)}));
                         const r = await sap("/api/admin/settlements",{action:"update",settlement_id:s.id,custom_payments:cleaned});
                         if (r) { setSplitStl(null); load(); }
-                      }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"#0a7c42",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>💾 儲存明細</button>
+                      }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"var(--success)",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>💾 儲存明細</button>
                     </div>
                   </div>
                 </div>
@@ -2620,7 +2620,7 @@ export default function AdminPage() {
                 const store = stores.find(s=>s.id===sf);
                 const params = new URLSearchParams({type:"deposit",store_id:sf,store_name:store?.name||"",employee_id:auth?.employee_id||"",employee_name:auth?.name||""});
                 window.open("/upload?"+params.toString(),"_blank");
-              }} style={{marginLeft:8,padding:"2px 10px",borderRadius:4,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:10,cursor:"pointer",fontWeight:600}}>📷 後台上傳存款單</button>
+              }} style={{marginLeft:8,padding:"2px 10px",borderRadius:4,border:"1px solid var(--warning)",background:"#fff",color:"var(--warning)",fontSize:10,cursor:"pointer",fontWeight:600}}>📷 後台上傳存款單</button>
               <button onClick={()=>{
                 exportCSV(
                   month+"_存款.csv",
@@ -2634,16 +2634,16 @@ export default function AdminPage() {
                     d.image_url||""
                   ])
                 );
-              }} style={{marginLeft:6,padding:"2px 10px",borderRadius:4,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:10,cursor:"pointer"}}>📥 匯出 Excel</button>
+              }} style={{marginLeft:6,padding:"2px 10px",borderRadius:4,border:"1px solid var(--success)",background:"transparent",color:"var(--success)",fontSize:10,cursor:"pointer"}}>📥 匯出 Excel</button>
             </h3>
             {missingAmount > 0 && (
-              <div style={{background:"#fef3c7",border:"1px solid #f59e0b",borderRadius:6,padding:8,marginBottom:8,fontSize:11,color:"#92400e"}}>
+              <div style={{background:"var(--warning-bg)",border:"1px solid #f59e0b",borderRadius:6,padding:8,marginBottom:8,fontSize:11,color:"#92400e"}}>
                 ⚠️ 共 <strong>{missingAmount}</strong> 筆存款金額為 0（AI 辨識失敗），請點 ✏️ 手動補填金額
               </div>
             )}
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+            <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:700}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["存款日","門市","對帳區間","金額","應存","差異","說明","狀態","📸","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666",fontSize:10}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"var(--surface-warm)"}}>{["存款日","門市","對帳區間","金額","應存","差異","說明","狀態","📸","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)",fontSize:10}}>{h}</th>)}</tr></thead>
                 <tbody>{dep.map(d=>{
                   const diffAbs=Math.abs(d.difference||0);
                   const amtMissing=Number(d.amount||0)<=0;
@@ -2660,25 +2660,25 @@ export default function AdminPage() {
                     load();
                   };
                   return(
-                  <tr key={d.id} style={{borderBottom:"1px solid #f0eeea",background:isEdit?"#e0e7ff":amtMissing?"#fef3c7":diffAbs>2000?"#fef2f2":diffAbs>500?"#fffbeb":"transparent"}}>
+                  <tr key={d.id} style={{borderBottom:"1px solid var(--divider)",background:isEdit?"#e0e7ff":amtMissing?"var(--warning-bg)":diffAbs>2000?"var(--danger-bg)":diffAbs>500?"#fffbeb":"transparent"}}>
                     <td style={{padding:6,fontWeight:500}}>
-                      {isEdit ? <input type="date" value={editDep.deposit_date||""} onChange={e=>setEditDep({...editDep,deposit_date:e.target.value})} style={{padding:2,fontSize:10,border:"1px solid #4361ee",borderRadius:3,width:110}} /> : d.deposit_date}
+                      {isEdit ? <input type="date" value={editDep.deposit_date||""} onChange={e=>setEditDep({...editDep,deposit_date:e.target.value})} style={{padding:2,fontSize:10,border:"1px solid var(--brand-strong)",borderRadius:3,width:110}} /> : d.deposit_date}
                     </td>
                     <td style={{padding:6}}>{d.stores?d.stores.name:""}</td>
-                    <td style={{padding:6,fontSize:9,color:"#666"}}>
+                    <td style={{padding:6,fontSize:9,color:"var(--text-2)"}}>
                       {isEdit ? (
                         <div style={{display:"flex",gap:2,alignItems:"center"}}>
-                          <input type="date" value={editDep.period_start||""} onChange={e=>setEditDep({...editDep,period_start:e.target.value})} style={{padding:1,fontSize:9,border:"1px solid #4361ee",borderRadius:3,width:100}} />
+                          <input type="date" value={editDep.period_start||""} onChange={e=>setEditDep({...editDep,period_start:e.target.value})} style={{padding:1,fontSize:9,border:"1px solid var(--brand-strong)",borderRadius:3,width:100}} />
                           <span>~</span>
-                          <input type="date" value={editDep.period_end||""} onChange={e=>setEditDep({...editDep,period_end:e.target.value})} style={{padding:1,fontSize:9,border:"1px solid #4361ee",borderRadius:3,width:100}} />
+                          <input type="date" value={editDep.period_end||""} onChange={e=>setEditDep({...editDep,period_end:e.target.value})} style={{padding:1,fontSize:9,border:"1px solid var(--brand-strong)",borderRadius:3,width:100}} />
                         </div>
                       ) : (d.period_start&&d.period_end?(d.period_start+"~"+d.period_end):"-")}
                     </td>
-                    <td style={{padding:6,fontWeight:600,color:amtMissing&&!isEdit?"#b91c1c":"inherit"}}>
-                      {isEdit ? <input type="number" value={editDep.amount} onChange={e=>setEditDep({...editDep,amount:e.target.value})} placeholder="存款金額" autoFocus style={{padding:2,fontSize:11,border:"1px solid #4361ee",borderRadius:3,width:80,fontWeight:600}} /> : (amtMissing?"⚠️ 請補填":fmt(d.amount))}
+                    <td style={{padding:6,fontWeight:600,color:amtMissing&&!isEdit?"var(--danger)":"inherit"}}>
+                      {isEdit ? <input type="number" value={editDep.amount} onChange={e=>setEditDep({...editDep,amount:e.target.value})} placeholder="存款金額" autoFocus style={{padding:2,fontSize:11,border:"1px solid var(--brand-strong)",borderRadius:3,width:80,fontWeight:600}} /> : (amtMissing?"⚠️ 請補填":fmt(d.amount))}
                     </td>
                     <td style={{padding:6}}>{fmt(d.expected_cash)}</td>
-                    <td style={{padding:6,color:diffAbs>500?"#b91c1c":"#0a7c42",fontWeight:600}}>{isEdit?"(存檔後重算)":fmt(d.difference)}</td>
+                    <td style={{padding:6,color:diffAbs>500?"var(--danger)":"var(--success)",fontWeight:600}}>{isEdit?"(存檔後重算)":fmt(d.difference)}</td>
                     <td style={{padding:6}}>
                       <input defaultValue={d.difference_explanation||""} placeholder={diffAbs>500?"請說明差異原因":"-"}
                         onBlur={e=>{if(e.target.value!==( d.difference_explanation||""))ap("/api/admin/deposits",{action:"update",deposit_id:d.id,difference_explanation:e.target.value});}}
@@ -2689,13 +2689,13 @@ export default function AdminPage() {
                     <td style={{padding:6,whiteSpace:"nowrap"}}>
                       {isEdit ? (
                         <>
-                          <button onClick={saveEdit} title="儲存" style={{background:"#0a7c42",border:"none",color:"#fff",cursor:"pointer",fontSize:10,padding:"2px 6px",borderRadius:3,marginRight:2}}>💾</button>
-                          <button onClick={()=>setEditDep(null)} title="取消" style={{background:"none",border:"1px solid #ddd",cursor:"pointer",fontSize:10,padding:"2px 6px",borderRadius:3}}>✕</button>
+                          <button onClick={saveEdit} title="儲存" style={{background:"var(--success)",border:"none",color:"#fff",cursor:"pointer",fontSize:10,padding:"2px 6px",borderRadius:3,marginRight:2}}>💾</button>
+                          <button onClick={()=>setEditDep(null)} title="取消" style={{background:"none",border:"1px solid var(--border)",cursor:"pointer",fontSize:10,padding:"2px 6px",borderRadius:3}}>✕</button>
                         </>
                       ) : (
                         <>
                           <button onClick={()=>setEditDep({id:d.id,amount:d.amount||"",deposit_date:d.deposit_date||"",period_start:d.period_start||"",period_end:d.period_end||""})} title="手動修正" style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>✏️</button>
-                          <button onClick={async()=>{if(!confirm("刪除此筆存款紀錄？"))return;await sap("/api/admin/deposits",{action:"delete",deposit_id:d.id});load();}} title="刪除" style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
+                          <button onClick={async()=>{if(!confirm("刪除此筆存款紀錄？"))return;await sap("/api/admin/deposits",{action:"delete",deposit_id:d.id});load();}} title="刪除" style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"var(--danger)"}}>🗑</button>
                         </>
                       )}
                     </td>
@@ -2711,12 +2711,12 @@ export default function AdminPage() {
           <div>
             <div style={{display:"flex",gap:4,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
               {[["all","全部"],["petty_cash","💰零用金"],["vendor","📦月結"],["hq_advance","🏢代付"]].map(([k,l])=>(
-                <button key={k} onClick={()=>setExpType(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:expType===k?"#1a1a1a":"#fff",color:expType===k?"#fff":"#666",fontSize:11,cursor:"pointer"}}>{l}</button>
+                <button key={k} onClick={()=>setExpType(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--border)",background:expType===k?"var(--ink)":"#fff",color:expType===k?"#fff":"var(--text-2)",fontSize:11,cursor:"pointer"}}>{l}</button>
               ))}
               <input value={expSearch} onChange={e=>setExpSearch(e.target.value)} placeholder="搜尋廠商..."
-                style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11,width:120}} />
+                style={{padding:"4px 8px",borderRadius:5,border:"1px solid var(--border)",fontSize:11,width:120}} />
               {/* 後台上傳：費用 3 種類型（hq_advance 可不選門市＝總部均攤） */}
-              <span style={{marginLeft:8,fontSize:10,color:"#888"}}>📷 後台上傳：</span>
+              <span style={{marginLeft:8,fontSize:10,color:"var(--text-3)"}}>📷 後台上傳：</span>
               {[["vendor","廠商月結",true],["petty_cash","零用金",true],["hq_advance","總部代付",false]].map(([t,l,reqStore])=>(
                 <button key={t} onClick={()=>{
                   if (reqStore && !sf) { alert("請先在上方選擇門市篩選（"+l+"需指定門市）"); return; }
@@ -2726,7 +2726,7 @@ export default function AdminPage() {
                   const store = stores.find(s=>s.id===sf);
                   const params = new URLSearchParams({type:"expense",expense_type:t,store_id:sf||"",store_name:store?.name||"",employee_id:auth?.employee_id||"",employee_name:auth?.name||""});
                   window.open("/upload?"+params.toString(),"_blank");
-                }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #b45309",background:"#fff",color:"#b45309",fontSize:11,fontWeight:600,cursor:"pointer"}}>{l}</button>
+                }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--warning)",background:"#fff",color:"var(--warning)",fontSize:11,fontWeight:600,cursor:"pointer"}}>{l}</button>
               ))}
               <button onClick={()=>{
                 const filtered = exps.filter(e=>(expType==="all"||e.expense_type===expType)&&(!expSearch||(e.vendor_name||"").includes(expSearch)));
@@ -2745,20 +2745,20 @@ export default function AdminPage() {
                     e.image_url||""
                   ])
                 );
-              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #0a7c42",background:"transparent",color:"#0a7c42",fontSize:11,cursor:"pointer"}}>📥 匯出 Excel</button>
+              }} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--success)",background:"transparent",color:"var(--success)",fontSize:11,cursor:"pointer"}}>📥 匯出 Excel</button>
             </div>
             {/* 統計卡片 */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
-              <div style={{background:"#fff8e6",borderRadius:8,padding:"8px 12px"}}>
-                <div style={{fontSize:10,color:"#8a6d00"}}>💰 零用金</div>
+              <div style={{background:"var(--warning-bg)",borderRadius:8,padding:"8px 12px"}}>
+                <div style={{fontSize:10,color:"var(--warning)"}}>💰 零用金</div>
                 <div style={{fontSize:15,fontWeight:600}}>{fmt(exps.filter(e=>e.expense_type==="petty_cash"&&e.status!=="draft"&&e.status!=="rejected").reduce((s,e)=>s+Number(e.amount||0),0))}</div>
               </div>
-              <div style={{background:"#e6f1fb",borderRadius:8,padding:"8px 12px"}}>
-                <div style={{fontSize:10,color:"#185fa5"}}>📦 月結</div>
+              <div style={{background:"var(--info-bg)",borderRadius:8,padding:"8px 12px"}}>
+                <div style={{fontSize:10,color:"var(--info)"}}>📦 月結</div>
                 <div style={{fontSize:15,fontWeight:600}}>{fmt(exps.filter(e=>e.expense_type==="vendor"&&e.status!=="draft"&&e.status!=="rejected").reduce((s,e)=>s+Number(e.amount||0),0))}</div>
               </div>
-              <div style={{background:"#fde8e8",borderRadius:8,padding:"8px 12px"}}>
-                <div style={{fontSize:10,color:"#b91c1c"}}>🏢 總部代付</div>
+              <div style={{background:"var(--danger-bg)",borderRadius:8,padding:"8px 12px"}}>
+                <div style={{fontSize:10,color:"var(--danger)"}}>🏢 總部代付</div>
                 <div style={{fontSize:15,fontWeight:600}}>{fmt(exps.filter(e=>e.expense_type==="hq_advance"&&e.status!=="draft"&&e.status!=="rejected").reduce((s,e)=>s+Number(e.amount||0),0))}</div>
               </div>
             </div>
@@ -2774,13 +2774,13 @@ export default function AdminPage() {
                     const storeExp = exps.filter(e=>e.store_id===s.id).reduce((sum,e)=>sum+Number(e.amount||0),0);
                     const pct = Math.round(storeExp/s.monthly_expense_budget*100);
                     return (
-                      <div key={s.id} style={{flex:1,minWidth:140,background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px"}}>
-                        <div style={{fontSize:10,color:"#888"}}>{s.name+" 預算"}</div>
+                      <div key={s.id} style={{flex:1,minWidth:140,background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"8px 12px"}}>
+                        <div style={{fontSize:10,color:"var(--text-3)"}}>{s.name+" 預算"}</div>
                         <div style={{fontSize:12,fontWeight:600}}>{fmt(storeExp)+" / "+fmt(s.monthly_expense_budget)}</div>
                         <div style={{height:6,background:"#f0f0f0",borderRadius:3,marginTop:4}}>
-                          <div style={{height:"100%",width:Math.min(100,pct)+"%",background:pct>100?"#b91c1c":pct>80?"#fbbf24":"#0a7c42",borderRadius:3}} />
+                          <div style={{height:"100%",width:Math.min(100,pct)+"%",background:pct>100?"var(--danger)":pct>80?"#fbbf24":"var(--success)",borderRadius:3}} />
                         </div>
-                        <div style={{fontSize:9,color:pct>100?"#b91c1c":pct>80?"#b45309":"#888",marginTop:2}}>{pct+"%"}{pct>100?" ⚠️超標":pct>80?" ⚠️注意":""}</div>
+                        <div style={{fontSize:9,color:pct>100?"var(--danger)":pct>80?"var(--warning)":"var(--text-3)",marginTop:2}}>{pct+"%"}{pct>100?" ⚠️超標":pct>80?" ⚠️注意":""}</div>
                       </div>
                     );
                   })}
@@ -2793,9 +2793,9 @@ export default function AdminPage() {
               exps.forEach(e => { const c = e.category_suggestion || "未分類"; catTotals[c] = (catTotals[c]||0) + Number(e.amount||0); });
               const sorted = Object.entries(catTotals).sort((a,b) => b[1]-a[1]);
               const total = sorted.reduce((s,[,v]) => s+v, 0);
-              const colors = ["#4361ee","#0a7c42","#b45309","#b91c1c","#8a6d00","#993556","#185fa5","#666"];
+              const colors = ["var(--brand-strong)","var(--success)","var(--warning)","var(--danger)","var(--warning)","#993556","var(--info)","var(--text-2)"];
               return sorted.length > 0 ? (
-                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8}}>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12,marginBottom:8}}>
                   <h4 style={{fontSize:12,fontWeight:500,marginBottom:8}}>📊 費用分類佔比</h4>
                   <div style={{height:12,borderRadius:6,overflow:"hidden",display:"flex",marginBottom:8}}>
                     {sorted.map(([cat,amt],i) => (
@@ -2808,7 +2808,7 @@ export default function AdminPage() {
                         <div style={{width:8,height:8,borderRadius:2,background:colors[i%colors.length]}} />
                         <span>{cat}</span>
                         <span style={{fontWeight:600}}>{fmt(amt)}</span>
-                        <span style={{color:"#888"}}>{"("+Math.round(amt/total*100)+"%)"}</span>
+                        <span style={{color:"var(--text-3)"}}>{"("+Math.round(amt/total*100)+"%)"}</span>
                       </div>
                     ))}
                   </div>
@@ -2816,20 +2816,20 @@ export default function AdminPage() {
               ) : null;
             })()}
             {/* 費用列表 */}
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+            <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["日期","門市","類型","廠商","分類","提交人","金額","📸","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"var(--surface-warm)"}}>{["日期","門市","類型","廠商","分類","提交人","金額","📸","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                 <tbody>
                   {exps.filter(e=>(expType==="all"||e.expense_type===expType)&&(!expSearch||(e.vendor_name||"").includes(expSearch))).map(e=>(
-                    <tr key={e.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                    <tr key={e.id} style={{borderBottom:"1px solid var(--divider)"}}>
                       <td style={{padding:6}}>{e.date}</td>
-                      <td style={{padding:6}}>{e.stores?e.stores.name:<span style={{color:"#b45309",fontSize:10}}>🏢總部</span>}</td>
+                      <td style={{padding:6}}>{e.stores?e.stores.name:<span style={{color:"var(--warning)",fontSize:10}}>🏢總部</span>}</td>
                       <td style={{padding:6}}>{e.expense_type==="vendor"?"📦":e.expense_type==="hq_advance"?"🏢":"💰"}</td>
                       <td style={{padding:6}}>
                         <div style={{fontWeight:500}}>{e.vendor_name||"-"}</div>
-                        {e.invoice_number && <div style={{fontSize:9,color:"#4361ee"}}>{"🧾"+e.invoice_number}</div>}
+                        {e.invoice_number && <div style={{fontSize:9,color:"var(--brand-strong)"}}>{"🧾"+e.invoice_number}</div>}
                       </td>
-                      <td style={{padding:6,fontSize:10}}>{e.category_suggestion?<span style={{background:"#e6f1fb",color:"#185fa5",padding:"1px 4px",borderRadius:3,fontSize:9}}>{e.category_suggestion}</span>:<span style={{color:"#ccc"}}>-</span>}</td>
+                      <td style={{padding:6,fontSize:10}}>{e.category_suggestion?<span style={{background:"var(--info-bg)",color:"var(--info)",padding:"1px 4px",borderRadius:3,fontSize:9}}>{e.category_suggestion}</span>:<span style={{color:"#ccc"}}>-</span>}</td>
                       <td style={{padding:6,fontSize:10}}>{e.employees?.name||e.submitted_by_name||"-"}</td>
                       <td style={{padding:6,fontWeight:600}}>{fmt(e.amount)}</td>
                       <td style={{padding:6}}>{e.image_url?<button onClick={()=>setSi(e.image_url)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12}}>📸</button>:<span style={{color:"#ccc"}}>-</span>}</td>
@@ -2837,12 +2837,12 @@ export default function AdminPage() {
                       <td style={{padding:6}}>
                         {e.status==="pending" && (
                           <span>
-                            <button onClick={()=>rvExp(e.id,"approved")} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>✅</button>
-                            <button onClick={()=>rvExp(e.id,"rejected")} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>❌</button>
+                            <button onClick={()=>rvExp(e.id,"approved")} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--success)",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>✅</button>
+                            <button onClick={()=>rvExp(e.id,"rejected")} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--danger)",color:"#fff",fontSize:9,cursor:"pointer",marginRight:2}}>❌</button>
                           </span>
                         )}
                         {(e.status==="draft"||e.status==="rejected") && (
-                          <button onClick={async()=>{ if(!confirm("確定刪除此筆？"))return; await ap("/api/admin/expenses",{action:"delete",expense_id:e.id}); setExps(exps.filter(x=>x.id!==e.id)); }} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#666",color:"#fff",fontSize:9,cursor:"pointer"}}>🗑</button>
+                          <button onClick={async()=>{ if(!confirm("確定刪除此筆？"))return; await ap("/api/admin/expenses",{action:"delete",expense_id:e.id}); setExps(exps.filter(x=>x.id!==e.id)); }} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--text-2)",color:"#fff",fontSize:9,cursor:"pointer"}}>🗑</button>
                         )}
                       </td>
                     </tr>
@@ -2878,34 +2878,34 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"💳 "+month+" 撥款"}</h3>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
-              <div style={{background:"#fff8e6",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#8a6d00"}}>待撥款</div><div style={{fontSize:18,fontWeight:600,color:"#b91c1c"}}>{fmt(pmtSum.pending)}</div></div>
-              <div style={{background:"#e6f9f0",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#0a7c42"}}>已撥款</div><div style={{fontSize:18,fontWeight:600,color:"#0a7c42"}}>{fmt(pmtSum.paid)}</div></div>
+              <div style={{background:"var(--warning-bg)",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"var(--warning)"}}>待撥款</div><div style={{fontSize:18,fontWeight:600,color:"var(--danger)"}}>{fmt(pmtSum.pending)}</div></div>
+              <div style={{background:"var(--success-bg)",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"var(--success)"}}>已撥款</div><div style={{fontSize:18,fontWeight:600,color:"var(--success)"}}>{fmt(pmtSum.paid)}</div></div>
             </div>
 
             {/* 待撥款：按提交人分組 */}
             <div style={{marginBottom:14}}>
-              <h4 style={{fontSize:12,fontWeight:600,marginBottom:6,color:"#b91c1c"}}>📋 待撥款（按收款對象分組）</h4>
-              {sortedGroups.length===0 && <div style={{padding:14,background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",fontSize:11,color:"#888",textAlign:"center"}}>目前沒有待撥款項目</div>}
+              <h4 style={{fontSize:12,fontWeight:600,marginBottom:6,color:"var(--danger)"}}>📋 待撥款（按收款對象分組）</h4>
+              {sortedGroups.length===0 && <div style={{padding:14,background:"#fff",borderRadius:8,border:"1px solid var(--border)",fontSize:11,color:"var(--text-3)",textAlign:"center"}}>目前沒有待撥款項目</div>}
               {sortedGroups.map(([key, g])=>(
-                <div key={key} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",marginBottom:6,overflow:"hidden"}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:"#faf8f5"}}>
+                <div key={key} style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",marginBottom:6,overflow:"hidden"}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:"var(--surface-warm)"}}>
                     <div>
                       <span style={{fontWeight:600,fontSize:13}}>{g.isEmployee?"👤 ":"🏪 "}{g.name}</span>
-                      <span style={{marginLeft:8,fontSize:10,color:"#888"}}>{g.items.length} 筆</span>
+                      <span style={{marginLeft:8,fontSize:10,color:"var(--text-3)"}}>{g.items.length} 筆</span>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontWeight:700,color:"#b91c1c"}}>{fmt(g.total)}</span>
-                      <button onClick={()=>markGroupPaid(g.items)} style={{padding:"3px 8px",borderRadius:4,border:"none",background:"#0a7c42",color:"#fff",fontSize:10,cursor:"pointer"}}>✅ 全部已撥</button>
+                      <span style={{fontWeight:700,color:"var(--danger)"}}>{fmt(g.total)}</span>
+                      <button onClick={()=>markGroupPaid(g.items)} style={{padding:"3px 8px",borderRadius:4,border:"none",background:"var(--success)",color:"#fff",fontSize:10,cursor:"pointer"}}>✅ 全部已撥</button>
                     </div>
                   </div>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                     <tbody>{g.items.map(p=>(
-                      <tr key={p.id} style={{borderTop:"1px solid #f0eeea"}}>
-                        <td style={{padding:"4px 12px",width:90,color:"#666"}}>{typeLabel(p.type)}</td>
+                      <tr key={p.id} style={{borderTop:"1px solid var(--divider)"}}>
+                        <td style={{padding:"4px 12px",width:90,color:"var(--text-2)"}}>{typeLabel(p.type)}</td>
                         <td style={{padding:"4px 6px"}}>{p.notes||"-"}</td>
                         <td style={{padding:"4px 6px",fontWeight:600,textAlign:"right"}}>{fmt(p.amount)}</td>
                         <td style={{padding:"4px 12px",textAlign:"right",width:60}}>
-                          <button onClick={()=>markPaid(p.id)} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #0a7c42",background:"#fff",color:"#0a7c42",fontSize:9,cursor:"pointer"}}>單筆已撥</button>
+                          <button onClick={()=>markPaid(p.id)} style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--success)",background:"#fff",color:"var(--success)",fontSize:9,cursor:"pointer"}}>單筆已撥</button>
                         </td>
                       </tr>
                     ))}</tbody>
@@ -2916,18 +2916,18 @@ export default function AdminPage() {
 
             {/* 已撥款 */}
             <div>
-              <h4 style={{fontSize:12,fontWeight:600,marginBottom:6,color:"#0a7c42"}}>✅ 已撥款（本月）</h4>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+              <h4 style={{fontSize:12,fontWeight:600,marginBottom:6,color:"var(--success)"}}>✅ 已撥款（本月）</h4>
+              <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                  <thead><tr style={{background:"#faf8f5"}}>{["撥款日","類型","收款對象","明細","金額"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{background:"var(--surface-warm)"}}>{["撥款日","類型","收款對象","明細","金額"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {paidPmts.length===0 && <tr><td colSpan={5} style={{padding:12,textAlign:"center",color:"#888"}}>本月尚無已撥款紀錄</td></tr>}
+                    {paidPmts.length===0 && <tr><td colSpan={5} style={{padding:12,textAlign:"center",color:"var(--text-3)"}}>本月尚無已撥款紀錄</td></tr>}
                     {paidPmts.map(p=>(
-                      <tr key={p.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                        <td style={{padding:6,color:"#0a7c42",fontWeight:500}}>{p.paid_date||"-"}</td>
-                        <td style={{padding:6,color:"#666"}}>{typeLabel(p.type)}</td>
+                      <tr key={p.id} style={{borderBottom:"1px solid var(--divider)"}}>
+                        <td style={{padding:6,color:"var(--success)",fontWeight:500}}>{p.paid_date||"-"}</td>
+                        <td style={{padding:6,color:"var(--text-2)"}}>{typeLabel(p.type)}</td>
                         <td style={{padding:6,fontWeight:500}}>{p.employees?.name||p.recipient||"-"}</td>
-                        <td style={{padding:6,color:"#888"}}>{p.notes||"-"}</td>
+                        <td style={{padding:6,color:"var(--text-3)"}}>{p.notes||"-"}</td>
                         <td style={{padding:6,fontWeight:600,textAlign:"right"}}>{fmt(p.amount)}</td>
                       </tr>
                     ))}
@@ -2944,28 +2944,28 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"📊 "+month+" 損益表"}</h3>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
-              <div style={{background:"#e6f9f0",borderRadius:8,padding:10,textAlign:"center"}}>
-                <div style={{fontSize:9,color:"#0a7c42"}}>總收入</div>
-                <div style={{fontSize:18,fontWeight:700,color:"#0a7c42"}}>{fmt(pnl.profit?.total_income)}</div>
+              <div style={{background:"var(--success-bg)",borderRadius:8,padding:10,textAlign:"center"}}>
+                <div style={{fontSize:9,color:"var(--success)"}}>總收入</div>
+                <div style={{fontSize:18,fontWeight:700,color:"var(--success)"}}>{fmt(pnl.profit?.total_income)}</div>
               </div>
-              <div style={{background:"#fde8e8",borderRadius:8,padding:10,textAlign:"center"}}>
-                <div style={{fontSize:9,color:"#b91c1c"}}>總支出</div>
-                <div style={{fontSize:18,fontWeight:700,color:"#b91c1c"}}>{fmt(pnl.expenses?.total)}</div>
+              <div style={{background:"var(--danger-bg)",borderRadius:8,padding:10,textAlign:"center"}}>
+                <div style={{fontSize:9,color:"var(--danger)"}}>總支出</div>
+                <div style={{fontSize:18,fontWeight:700,color:"var(--danger)"}}>{fmt(pnl.expenses?.total)}</div>
               </div>
-              <div style={{background:pnl.profit?.net>=0?"#e6f9f0":"#fde8e8",borderRadius:8,padding:10,textAlign:"center"}}>
+              <div style={{background:pnl.profit?.net>=0?"var(--success-bg)":"var(--danger-bg)",borderRadius:8,padding:10,textAlign:"center"}}>
                 <div style={{fontSize:9}}>淨利（{pnl.profit?.margin}%）</div>
-                <div style={{fontSize:18,fontWeight:700,color:pnl.profit?.net>=0?"#0a7c42":"#b91c1c"}}>{fmt(pnl.profit?.net)}</div>
+                <div style={{fontSize:18,fontWeight:700,color:pnl.profit?.net>=0?"var(--success)":"var(--danger)"}}>{fmt(pnl.profit?.net)}</div>
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
-                <h4 style={{fontSize:12,color:"#0a7c42",marginBottom:6}}>收入明細</h4>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12}}>
+                <h4 style={{fontSize:12,color:"var(--success)",marginBottom:6}}>收入明細</h4>
                 <Row l="門市營收" v={<b>{fmt(pnl.revenue?.total)}</b>} />
                 {pnl.revenue?.b2b > 0 && <Row l="B2B批發" v={fmt(pnl.revenue.b2b)} />}
                 {pnl.revenue?.oem > 0 && <Row l="OEM代工" v={fmt(pnl.revenue.oem)} />}
               </div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
-                <h4 style={{fontSize:12,color:"#b91c1c",marginBottom:6}}>支出明細</h4>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12}}>
+                <h4 style={{fontSize:12,color:"var(--danger)",marginBottom:6}}>支出明細</h4>
                 <Row l="月結廠商" v={fmt(pnl.expenses?.vendor)} />
                 <Row l="零用金" v={fmt(pnl.expenses?.petty_cash)} />
                 {pnl.expenses?.hq_advance > 0 && <Row l="總部代付" v={fmt(pnl.expenses.hq_advance)} />}
@@ -2975,16 +2975,16 @@ export default function AdminPage() {
             </div>
             {/* ✦26 門市比較 */}
             {pnl.storeComparison && pnl.storeComparison.length > 0 && (
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:10}}>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12,marginBottom:10}}>
                 <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>🏠 門市別比較</h4>
                 <div style={{display:"grid",gridTemplateColumns:"repeat("+pnl.storeComparison.length+",1fr)",gap:6}}>
                   {pnl.storeComparison.map(s=>(
-                    <div key={s.name} style={{textAlign:"center",padding:6,background:"#faf8f5",borderRadius:6}}>
+                    <div key={s.name} style={{textAlign:"center",padding:6,background:"var(--surface-warm)",borderRadius:6}}>
                       <div style={{fontSize:11,fontWeight:600,marginBottom:4}}>{s.name}</div>
-                      <div style={{fontSize:10}}>收入 <b style={{color:"#0a7c42"}}>{fmt(s.revenue)}</b></div>
-                      <div style={{fontSize:10}}>支出 <b style={{color:"#b91c1c"}}>{fmt(s.expense)}</b></div>
-                      <div style={{fontSize:12,fontWeight:700,color:s.profit>=0?"#0a7c42":"#b91c1c",marginTop:2}}>{fmt(s.profit)}</div>
-                      <div style={{fontSize:9,color:"#888"}}>{s.margin}%</div>
+                      <div style={{fontSize:10}}>收入 <b style={{color:"var(--success)"}}>{fmt(s.revenue)}</b></div>
+                      <div style={{fontSize:10}}>支出 <b style={{color:"var(--danger)"}}>{fmt(s.expense)}</b></div>
+                      <div style={{fontSize:12,fontWeight:700,color:s.profit>=0?"var(--success)":"var(--danger)",marginTop:2}}>{fmt(s.profit)}</div>
+                      <div style={{fontSize:9,color:"var(--text-3)"}}>{s.margin}%</div>
                     </div>
                   ))}
                 </div>
@@ -2992,7 +2992,7 @@ export default function AdminPage() {
             )}
             {/* ✦27 趨勢圖 */}
             {pnl.trend && pnl.trend.length > 0 && (
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12}}>
                 <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>📈 營收趨勢（近6月）</h4>
                 <div style={{display:"flex",alignItems:"flex-end",gap:4,height:100}}>
                   {(() => {
@@ -3000,8 +3000,8 @@ export default function AdminPage() {
                     return pnl.trend.map(t => (
                       <div key={t.month} style={{flex:1,textAlign:"center"}}>
                         <div style={{fontSize:9,fontWeight:600,marginBottom:2}}>{t.revenue>0?fmt(t.revenue):""}</div>
-                        <div style={{height:Math.max(4, t.revenue/maxR*80),background:t.month===month?"#0a7c42":"#d1e7dd",borderRadius:3,minHeight:4}} />
-                        <div style={{fontSize:8,color:"#888",marginTop:2}}>{t.month.slice(5)}</div>
+                        <div style={{height:Math.max(4, t.revenue/maxR*80),background:t.month===month?"var(--success)":"#d1e7dd",borderRadius:3,minHeight:4}} />
+                        <div style={{fontSize:8,color:"var(--text-3)",marginTop:2}}>{t.month.slice(5)}</div>
                       </div>
                     ));
                   })()}
@@ -3016,16 +3016,16 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📋 配方管理</h3>
             <button onClick={async()=>{const n=prompt("產品名稱：");if(!n)return;const c=prompt("分類：","泡芙");const y=prompt("每批產出：","50");const p=prompt("售價：","0");await ap("/api/admin/recipes",{action:"create",name:n,category:c,yield_qty:Number(y),selling_price:Number(p)});load();}}
-              style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>＋新增配方</button>
+              style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>＋新增配方</button>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:8}}>
               {recipeList.map(r=>(
-                <div key={r.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
+                <div key={r.id} style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12}}>
                   <div style={{fontSize:13,fontWeight:600}}>{r.name}</div>
-                  <div style={{fontSize:10,color:"#888"}}>{r.category} · 每批{r.yield_qty}{r.yield_unit||"個"}</div>
+                  <div style={{fontSize:10,color:"var(--text-3)"}}>{r.category} · 每批{r.yield_qty}{r.yield_unit||"個"}</div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:4,fontSize:10,marginTop:4}}>
-                    <div><span style={{color:"#888"}}>成本</span><div style={{fontWeight:600}}>{fmt(r.cost_per_unit)}</div></div>
-                    <div><span style={{color:"#888"}}>售價</span><div style={{fontWeight:600}}>{fmt(r.selling_price)}</div></div>
-                    <div><span style={{color:"#888"}}>毛利</span><div style={{fontWeight:600,color:"#0a7c42"}}>{r.margin_percent?r.margin_percent+"%":"-"}</div></div>
+                    <div><span style={{color:"var(--text-3)"}}>成本</span><div style={{fontWeight:600}}>{fmt(r.cost_per_unit)}</div></div>
+                    <div><span style={{color:"var(--text-3)"}}>售價</span><div style={{fontWeight:600}}>{fmt(r.selling_price)}</div></div>
+                    <div><span style={{color:"var(--text-3)"}}>毛利</span><div style={{fontWeight:600,color:"var(--success)"}}>{r.margin_percent?r.margin_percent+"%":"-"}</div></div>
                   </div>
                 </div>
               ))}
@@ -3038,17 +3038,17 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{"🏭 "+month+" 生產"}</h3>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}}>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px"}}><div style={{fontSize:10,color:"#888"}}>工單</div><div style={{fontSize:18,fontWeight:600}}>{prodSum.count||0}</div></div>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px"}}><div style={{fontSize:10,color:"#888"}}>計劃/實際</div><div style={{fontSize:18,fontWeight:600}}>{(prodSum.totalPlanned||0)+"/"+(prodSum.totalActual||0)}</div></div>
-              <div style={{background:"#e6f9f0",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#888"}}>良率</div><div style={{fontSize:18,fontWeight:700,color:"#0a7c42"}}>{(prodSum.avgYield||0)+"%"}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"8px 12px"}}><div style={{fontSize:10,color:"var(--text-3)"}}>工單</div><div style={{fontSize:18,fontWeight:600}}>{prodSum.count||0}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"8px 12px"}}><div style={{fontSize:10,color:"var(--text-3)"}}>計劃/實際</div><div style={{fontSize:18,fontWeight:600}}>{(prodSum.totalPlanned||0)+"/"+(prodSum.totalActual||0)}</div></div>
+              <div style={{background:"var(--success-bg)",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"var(--text-3)"}}>良率</div><div style={{fontSize:18,fontWeight:700,color:"var(--success)"}}>{(prodSum.avgYield||0)+"%"}</div></div>
             </div>
             <button onClick={async()=>{const rn=prompt("配方名稱：");if(!rn)return;const qty=prompt("數量：","50");await ap("/api/admin/production",{action:"create",recipe_name:rn,planned_qty:Number(qty),production_date:new Date().toLocaleDateString("sv-SE")});load();}}
-              style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>＋新增工單</button>
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+              style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>＋新增工單</button>
+            <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["單號","產品","計劃","實際","良率","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"var(--surface-warm)"}}>{["單號","產品","計劃","實際","良率","狀態","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                 <tbody>{prodList.map(p=>(
-                  <tr key={p.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                  <tr key={p.id} style={{borderBottom:"1px solid var(--divider)"}}>
                     <td style={{padding:6,fontSize:10}}>{p.order_number}</td>
                     <td style={{padding:6,fontWeight:500}}>{p.recipe_name}</td>
                     <td style={{padding:6}}>{p.planned_qty}</td>
@@ -3056,8 +3056,8 @@ export default function AdminPage() {
                     <td style={{padding:6}}>{p.yield_rate?p.yield_rate+"%":"-"}</td>
                     <td style={{padding:6}}><Badge status={p.status} /></td>
                     <td style={{padding:6}}>
-                      {p.status==="planned"&&<button onClick={async()=>{await ap("/api/admin/production",{action:"start",order_id:p.id});load();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#4361ee",color:"#fff",fontSize:9,cursor:"pointer"}}>開工</button>}
-                      {p.status==="in_progress"&&<button onClick={async()=>{const q=prompt("實際產出：");if(!q)return;await ap("/api/admin/production",{action:"complete",order_id:p.id,actual_qty:Number(q)});load();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer"}}>完工</button>}
+                      {p.status==="planned"&&<button onClick={async()=>{await ap("/api/admin/production",{action:"start",order_id:p.id});load();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--brand-strong)",color:"#fff",fontSize:9,cursor:"pointer"}}>開工</button>}
+                      {p.status==="in_progress"&&<button onClick={async()=>{const q=prompt("實際產出：");if(!q)return;await ap("/api/admin/production",{action:"complete",order_id:p.id,actual_qty:Number(q)});load();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--success)",color:"#fff",fontSize:9,cursor:"pointer"}}>完工</button>}
                     </td>
                   </tr>
                 ))}</tbody>
@@ -3073,7 +3073,7 @@ export default function AdminPage() {
             {/* 子分頁切換 */}
             <div style={{display:"flex",gap:4,marginBottom:10}}>
               {[["items","品項清單"],["suggestions","📋 明日建議"],["gap","🔍 銷售缺口檢核"]].map(([k,l])=>(
-                <button key={k} onClick={()=>setInvSubview(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid #ddd",background:invSubview===k?"#1a1a1a":"#fff",color:invSubview===k?"#fff":"#666",fontSize:11,cursor:"pointer",fontWeight:600}}>{l}</button>
+                <button key={k} onClick={()=>setInvSubview(k)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid var(--border)",background:invSubview===k?"var(--ink)":"#fff",color:invSubview===k?"#fff":"var(--text-2)",fontSize:11,cursor:"pointer",fontWeight:600}}>{l}</button>
               ))}
             </div>
 
@@ -3086,42 +3086,42 @@ export default function AdminPage() {
             {invSubview === "items" && <>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
               <button onClick={async()=>{const n=prompt("品項名稱：");if(!n)return;const t=prompt("類型(raw_material/finished/packaging)：","raw_material");const u=prompt("單位：","個");const c=prompt("單位成本：","0");const ss=prompt("安全庫存：","0");const par=prompt("標準存量(par_level)：","0");const z=prompt("區域(refrig=冷藏 / freezer=冷凍 / ambient=常溫 / display=展示櫃，留空=不分區)：","");const cat=prompt("分類（可留空，例：原物料/包材/麵包/甜點）：","");const ki=confirm("是否為「重點品項」（高風險/高成本）？\n按確定=是、取消=否");const ip=confirm("是否為「現場製作類」（要總部備半成品/麵糊等）？\n按確定=是、取消=否（一般進貨原物料）");await ap("/api/admin/inventory",{action:"create",name:n,type:t,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss),par_level:Number(par)||null,zone:z||null,category:cat||null,is_key_item:ki,is_production:ip});load();}}
-                style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增品項</button>
+                style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增品項</button>
               <button onClick={async()=>{const from=prompt("來源門市ID：");const to=prompt("目標門市ID：");const item=prompt("品項ID：");const qty=prompt("數量：");if(!from||!to||!item||!qty)return;await ap("/api/admin/inventory",{action:"movement",item_id:item,store_id:from,type:"transfer_out",quantity:-Number(qty),notes:"調撥至其他門市"});await ap("/api/admin/inventory",{action:"movement",item_id:item,store_id:to,type:"transfer_in",quantity:Number(qty),notes:"從其他門市調入"});alert("調撥完成");load();}}
-                style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"transparent",color:"#4361ee",fontSize:11,cursor:"pointer"}}>🔄 門市調撥</button>
+                style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--brand-strong)",fontSize:11,cursor:"pointer"}}>🔄 門市調撥</button>
             </div>
             {/* 叫貨單區塊 */}
             {(() => {
               const pending = invOrders.filter(o => o.status === "pending");
               const recent = invOrders.filter(o => o.status !== "pending").slice(0, 5);
               return (
-                <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:10,marginBottom:8}}>
+                <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:10,marginBottom:8}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                     <span style={{fontSize:12,fontWeight:600}}>📦 叫貨單（待收 {pending.length}）</span>
-                    <button onClick={async()=>{ await ap("/api/admin/inventory?type=orders").then(r=>setInvOrders(r.data||[])); }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>↻ 刷新</button>
+                    <button onClick={async()=>{ await ap("/api/admin/inventory?type=orders").then(r=>setInvOrders(r.data||[])); }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid var(--border)",background:"#fff",fontSize:10,cursor:"pointer"}}>↻ 刷新</button>
                   </div>
-                  {pending.length === 0 && recent.length === 0 && <div style={{fontSize:10,color:"#999",padding:6}}>尚無叫貨紀錄</div>}
+                  {pending.length === 0 && recent.length === 0 && <div style={{fontSize:10,color:"var(--text-3)",padding:6}}>尚無叫貨紀錄</div>}
                   {pending.map(o => (
-                    <div key={o.id} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 4px",borderBottom:"1px solid #f0eeea",fontSize:11}}>
-                      <span style={{flex:1}}><b>{o.inventory_items?.name||"?"}</b> × {o.quantity}{o.unit||""} <span style={{color:"#888"}}>({o.stores?.name||"-"})</span></span>
-                      <span style={{fontSize:9,color:"#888"}}>{o.requested_by_name||""} · {o.requested_at?.slice(5,10)}</span>
+                    <div key={o.id} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 4px",borderBottom:"1px solid var(--divider)",fontSize:11}}>
+                      <span style={{flex:1}}><b>{o.inventory_items?.name||"?"}</b> × {o.quantity}{o.unit||""} <span style={{color:"var(--text-3)"}}>({o.stores?.name||"-"})</span></span>
+                      <span style={{fontSize:9,color:"var(--text-3)"}}>{o.requested_by_name||""} · {o.requested_at?.slice(5,10)}</span>
                       <button onClick={async()=>{
                         const q=prompt("實收數量：",String(o.quantity));if(!q)return;
                         const c=prompt("實際單價（留空沿用）：",String(o.unit_cost||""));
                         const r=await ap("/api/admin/inventory",{action:"order_receive",order_id:o.id,received_qty:Number(q),unit_cost:c?Number(c):undefined,received_by_name:auth?.name||"admin"});
                         if(r.error){alert("收貨失敗："+r.error);return;}
                         load();
-                      }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid #0a7c42",background:"#e6f9f0",color:"#0a7c42",fontSize:10,cursor:"pointer"}}>✅收貨</button>
+                      }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid var(--success)",background:"var(--success-bg)",color:"var(--success)",fontSize:10,cursor:"pointer"}}>✅收貨</button>
                       <button onClick={async()=>{
                         const reason=prompt("取消原因：","");if(reason===null)return;
                         await ap("/api/admin/inventory",{action:"order_cancel",order_id:o.id,cancelled_reason:reason});load();
-                      }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid #888",background:"#fff",color:"#888",fontSize:10,cursor:"pointer"}}>✕取消</button>
+                      }} style={{padding:"2px 8px",borderRadius:4,border:"1px solid var(--text-3)",background:"#fff",color:"var(--text-3)",fontSize:10,cursor:"pointer"}}>✕取消</button>
                     </div>
                   ))}
                   {recent.length > 0 && <details style={{marginTop:6}}>
-                    <summary style={{fontSize:10,color:"#888",cursor:"pointer"}}>近期已處理 {recent.length} 筆</summary>
+                    <summary style={{fontSize:10,color:"var(--text-3)",cursor:"pointer"}}>近期已處理 {recent.length} 筆</summary>
                     {recent.map(o => (
-                      <div key={o.id} style={{fontSize:10,color:"#888",padding:"3px 4px",borderBottom:"1px solid #f8f6f1"}}>
+                      <div key={o.id} style={{fontSize:10,color:"var(--text-3)",padding:"3px 4px",borderBottom:"1px solid #f8f6f1"}}>
                         {o.status==="received"?"✅":"✕"} {o.inventory_items?.name} × {o.received_qty||o.quantity}{o.unit||""} · {o.received_at?.slice(0,10)||o.requested_at?.slice(0,10)}
                       </div>
                     ))}
@@ -3131,32 +3131,32 @@ export default function AdminPage() {
             })()}
             {/* ✦19 效期警示 */}
             {invItems.filter(i=>i.expiry_days>0).length>0 && (
-              <div style={{background:"#fef9c3",borderRadius:6,padding:8,marginBottom:8,fontSize:10}}>
+              <div style={{background:"var(--warning-bg)",borderRadius:6,padding:8,marginBottom:8,fontSize:10}}>
                 {"⚠️ 有效期品項："+invItems.filter(i=>i.expiry_days>0).map(i=>i.name+"("+i.expiry_days+"天)").join("、")}
               </div>
             )}
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+            <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["品項","類型","區域","分類","各店庫存","總量","安全量","單價","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"var(--surface-warm)"}}>{["品項","類型","區域","分類","各店庫存","總量","安全量","單價","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                 {(() => {
                   const ZONES = [
-                    { key:"refrig", label:"🧊 冷藏", bg:"#e0f2fe" },
+                    { key:"refrig", label:"🧊 冷藏", bg:"var(--info-bg)" },
                     { key:"freezer", label:"❄️ 冷凍", bg:"#dbeafe" },
-                    { key:"ambient", label:"🌡 常溫", bg:"#fef3c7" },
+                    { key:"ambient", label:"🌡 常溫", bg:"var(--warning-bg)" },
                     { key:"display", label:"🪟 展示櫃", bg:"#fce7f3" },
                     { key:"other", label:"📦 未分區", bg:"#f3f4f6" },
                   ];
                   const groups = ZONES.map(z => ({ ...z, items: invItems.filter(i => (i.zone||"other") === z.key) })).filter(g => g.items.length > 0);
                   return groups.map(g => (
                     <tbody key={g.key}>
-                      <tr style={{background:g.bg}}><td colSpan={9} style={{padding:"4px 6px",fontSize:11,fontWeight:600,color:"#444"}}>{g.label}（{g.items.length}）</td></tr>
+                      <tr style={{background:g.bg}}><td colSpan={9} style={{padding:"4px 6px",fontSize:11,fontWeight:600,color:"var(--text-2)"}}>{g.label}（{g.items.length}）</td></tr>
                       {g.items.map(i=>(
-                  <tr key={i.id} style={{borderBottom:"1px solid #f0eeea",background:i.safe_stock>0&&i.current_stock<=i.safe_stock?"#fef9c3":"transparent"}}>
-                    <td style={{padding:6,fontWeight:500}}>{i.name}{i.is_key_item&&<span style={{fontSize:9,color:"#b45309",marginLeft:3,background:"#fff8e6",padding:"1px 4px",borderRadius:3}}>★重點</span>}{i.safe_stock>0&&i.current_stock<=i.safe_stock&&<span style={{color:"#b91c1c",fontSize:9}}> ⚠️低</span>}</td>
+                  <tr key={i.id} style={{borderBottom:"1px solid var(--divider)",background:i.safe_stock>0&&i.current_stock<=i.safe_stock?"var(--warning-bg)":"transparent"}}>
+                    <td style={{padding:6,fontWeight:500}}>{i.name}{i.is_key_item&&<span style={{fontSize:9,color:"var(--warning)",marginLeft:3,background:"var(--warning-bg)",padding:"1px 4px",borderRadius:3}}>★重點</span>}{i.safe_stock>0&&i.current_stock<=i.safe_stock&&<span style={{color:"var(--danger)",fontSize:9}}> ⚠️低</span>}</td>
                     <td style={{padding:6,fontSize:10}}>{i.type==="raw_material"?"原料":i.type==="finished"?"成品":"包材"}</td>
                     <td style={{padding:6,fontSize:10}}>{i.zone==="refrig"?"🧊冷藏":i.zone==="freezer"?"❄️冷凍":i.zone==="ambient"?"🌡常溫":i.zone==="display"?"🪟展示櫃":"-"}</td>
                     <td style={{padding:6,fontSize:10}}>{i.category||"-"}</td>
-                    <td style={{padding:6,fontSize:9,color:"#555"}}>{stores.filter(s=>s.is_active!==false).map(s=>{const q=(i.stocks_by_store||{})[s.id]||0;return s.name.slice(0,2)+":"+q;}).join(" | ")||"-"}</td>
+                    <td style={{padding:6,fontSize:9,color:"var(--text-2)"}}>{stores.filter(s=>s.is_active!==false).map(s=>{const q=(i.stocks_by_store||{})[s.id]||0;return s.name.slice(0,2)+":"+q;}).join(" | ")||"-"}</td>
                     <td style={{padding:6,fontWeight:600}}>{i.current_stock+" "+(i.unit||"")}</td>
                     <td style={{padding:6}}>{i.safe_stock||"-"}</td>
                     <td style={{padding:6}}>{fmt(i.cost_per_unit)}</td>
@@ -3171,20 +3171,20 @@ export default function AdminPage() {
                         const par=prompt("標準存量(par_level)：",String(i.par_level||0));
                         const ki=confirm("此品項是否為「重點品項」（高風險/高成本，銷售對帳優先）？\n按確定=是、取消=否");
                         await ap("/api/admin/inventory",{action:"update",item_id:i.id,name:n,zone:z||null,category:cat||null,unit:u,cost_per_unit:Number(c),safe_stock:Number(ss),par_level:Number(par)||null,is_key_item:ki});load();
-                      }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #4361ee",background:"transparent",fontSize:9,cursor:"pointer",color:"#4361ee"}}>編輯</button>
+                      }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--brand-strong)",background:"transparent",fontSize:9,cursor:"pointer",color:"var(--brand-strong)"}}>編輯</button>
                       <button onClick={async()=>{
                         const q=prompt("叫貨數量（向總部叫貨）：","");if(!q)return;
                         const exp=prompt("預計到貨日 YYYY-MM-DD（可空）：","");
                         const r=await ap("/api/admin/inventory",{action:"order_create",item_id:i.id,quantity:Number(q),store_id:i.store_id||sf||null,expected_date:exp||undefined,requested_by_name:auth?.name||"admin"});
                         if(r.error){alert("叫貨失敗："+r.error);return;}
                         alert("✅ 已建立叫貨單");load();
-                      }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b45309",background:"transparent",fontSize:9,cursor:"pointer",color:"#b45309",marginLeft:2}}>📦叫貨</button>
+                      }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--warning)",background:"transparent",fontSize:9,cursor:"pointer",color:"var(--warning)",marginLeft:2}}>📦叫貨</button>
                       <button onClick={async()=>{const q=prompt("入庫數量：");if(!q)return;await ap("/api/admin/inventory",{action:"movement",item_id:i.id,store_id:sf||null,type:"purchase",quantity:Number(q),notes:"手動入庫"});load();}}
-                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid #0a7c42",background:"transparent",fontSize:9,cursor:"pointer",color:"#0a7c42",marginLeft:2}}>+入庫</button>
+                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--success)",background:"transparent",fontSize:9,cursor:"pointer",color:"var(--success)",marginLeft:2}}>+入庫</button>
                       <button onClick={async()=>{const q=prompt("出庫數量：");if(!q)return;await ap("/api/admin/inventory",{action:"movement",item_id:i.id,store_id:sf||null,type:"usage",quantity:-Number(q),notes:"手動出庫"});load();}}
-                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b91c1c",background:"transparent",fontSize:9,cursor:"pointer",color:"#b91c1c",marginLeft:2}}>-出庫</button>
+                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--danger)",background:"transparent",fontSize:9,cursor:"pointer",color:"var(--danger)",marginLeft:2}}>-出庫</button>
                       <button onClick={async()=>{if(!confirm("確定刪除「"+i.name+"」？"))return;await ap("/api/admin/inventory",{action:"delete",item_id:i.id});load();}}
-                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid #888",background:"transparent",fontSize:9,cursor:"pointer",color:"#888",marginLeft:2}}>刪除</button>
+                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--text-3)",background:"transparent",fontSize:9,cursor:"pointer",color:"var(--text-3)",marginLeft:2}}>刪除</button>
                     </td>
                   </tr>
                 ))}</tbody>
@@ -3229,7 +3229,7 @@ export default function AdminPage() {
             setShipBuildStore(""); setShipBuildLines([]); reloadShip();
           };
           const STATUS_LABEL = { draft: "📝 草稿", shipped: "🚚 已出貨", received: "✅ 已收貨", partial: "⚠️ 部分差異", cancelled: "✕ 取消" };
-          const STATUS_COLOR = { draft: "#888", shipped: "#b45309", received: "#0a7c42", partial: "#b91c1c", cancelled: "#888" };
+          const STATUS_COLOR = { draft: "var(--text-3)", shipped: "var(--warning)", received: "var(--success)", partial: "var(--danger)", cancelled: "var(--text-3)" };
           return (
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
@@ -3243,20 +3243,20 @@ export default function AdminPage() {
                   if (!st) { alert("無效編號"); return; }
                   setShipBuildStore(st.id);
                   setShipBuildLines([{ item_id:"", item_name:"", unit:"", requested_qty:0, shipped_qty:"", order_id:null }]);
-                }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"#b45309",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>＋新增出貨單</button>
+                }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"var(--warning)",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>＋新增出貨單</button>
               </div>
 
               {/* 待出貨：依門市彙總 pending 叫貨 */}
-              <div style={{background:"#fff8e6",borderRadius:8,border:"1px solid #f0e6c8",padding:10,marginBottom:10}}>
-                <div style={{fontSize:12,fontWeight:600,color:"#b45309",marginBottom:8}}>📋 待出貨：各門市待處理叫貨單</div>
-                {shipPending.length === 0 && <div style={{fontSize:11,color:"#999",padding:6}}>目前沒有待處理叫貨單</div>}
+              <div style={{background:"var(--warning-bg)",borderRadius:8,border:"1px solid #f0e6c8",padding:10,marginBottom:10}}>
+                <div style={{fontSize:12,fontWeight:600,color:"var(--warning)",marginBottom:8}}>📋 待出貨：各門市待處理叫貨單</div>
+                {shipPending.length === 0 && <div style={{fontSize:11,color:"var(--text-3)",padding:6}}>目前沒有待處理叫貨單</div>}
                 {shipPending.map(b => (
                   <div key={b.store_id} style={{background:"#fff",borderRadius:6,padding:8,marginBottom:6}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                       <span style={{fontSize:12,fontWeight:600}}>🏠 {b.store_name}（{b.orders.length} 項）</span>
-                      <button onClick={() => startBuild(b)} style={{padding:"3px 10px",borderRadius:4,border:"none",background:"#b45309",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>📦 建立出貨單</button>
+                      <button onClick={() => startBuild(b)} style={{padding:"3px 10px",borderRadius:4,border:"none",background:"var(--warning)",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>📦 建立出貨單</button>
                     </div>
-                    <div style={{fontSize:10,color:"#666"}}>
+                    <div style={{fontSize:10,color:"var(--text-2)"}}>
                       {b.orders.slice(0, 8).map(o => (o.inventory_items?.name || "?") + " ×" + o.quantity + (o.inventory_items?.unit || "")).join("、")}
                       {b.orders.length > 8 && " … 共 " + b.orders.length + " 項"}
                     </div>
@@ -3266,68 +3266,68 @@ export default function AdminPage() {
 
               {/* 建立中的出貨單編輯區 */}
               {shipBuildStore && (
-                <div style={{background:"#fff",borderRadius:8,border:"2px solid #b45309",padding:12,marginBottom:10}}>
+                <div style={{background:"#fff",borderRadius:8,border:"2px solid var(--warning)",padding:12,marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                    <span style={{fontSize:13,fontWeight:600,color:"#b45309"}}>📦 編輯出貨內容（{stores.find(s=>s.id===shipBuildStore)?.name||"-"}）</span>
-                    <button onClick={() => { setShipBuildStore(""); setShipBuildLines([]); }} style={{padding:"3px 10px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>取消</button>
+                    <span style={{fontSize:13,fontWeight:600,color:"var(--warning)"}}>📦 編輯出貨內容（{stores.find(s=>s.id===shipBuildStore)?.name||"-"}）</span>
+                    <button onClick={() => { setShipBuildStore(""); setShipBuildLines([]); }} style={{padding:"3px 10px",borderRadius:4,border:"1px solid var(--border)",background:"#fff",fontSize:11,cursor:"pointer"}}>取消</button>
                   </div>
-                  <div style={{fontSize:10,color:"#888",marginBottom:6}}>※ 實際出貨數量可不同於叫貨數量。可加入未叫貨的補貨品項。</div>
+                  <div style={{fontSize:10,color:"var(--text-3)",marginBottom:6}}>※ 實際出貨數量可不同於叫貨數量。可加入未叫貨的補貨品項。</div>
                   <table style={{width:"100%",fontSize:11,borderCollapse:"collapse"}}>
-                    <thead><tr style={{background:"#faf8f5"}}>
-                      <th style={{padding:4,textAlign:"left",fontWeight:500,color:"#666"}}>品項</th>
-                      <th style={{padding:4,textAlign:"center",fontWeight:500,color:"#666"}}>叫貨</th>
-                      <th style={{padding:4,textAlign:"center",fontWeight:500,color:"#666"}}>實出</th>
+                    <thead><tr style={{background:"var(--surface-warm)"}}>
+                      <th style={{padding:4,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>品項</th>
+                      <th style={{padding:4,textAlign:"center",fontWeight:500,color:"var(--text-2)"}}>叫貨</th>
+                      <th style={{padding:4,textAlign:"center",fontWeight:500,color:"var(--text-2)"}}>實出</th>
                       <th></th>
                     </tr></thead>
                     <tbody>{shipBuildLines.map((l, idx) => (
-                      <tr key={idx} style={{borderBottom:"1px solid #f0eeea"}}>
+                      <tr key={idx} style={{borderBottom:"1px solid var(--divider)"}}>
                         <td style={{padding:4}}>
                           {l.item_id
-                            ? <span>{l.item_name}{l.is_key_item && <span style={{fontSize:9,color:"#b45309",marginLeft:3,background:"#fff8e6",padding:"1px 3px",borderRadius:3}}>★</span>}</span>
-                            : <select value={l.item_id} onChange={e => { const it=invItems.find(x=>x.id===e.target.value); const n=[...shipBuildLines]; n[idx]={...n[idx],item_id:e.target.value,item_name:it?.name||"",unit:it?.unit||"",is_key_item:it?.is_key_item}; setShipBuildLines(n); }} style={{padding:4,fontSize:11,borderRadius:4,border:"1px solid #ddd",width:"100%"}}>
+                            ? <span>{l.item_name}{l.is_key_item && <span style={{fontSize:9,color:"var(--warning)",marginLeft:3,background:"var(--warning-bg)",padding:"1px 3px",borderRadius:3}}>★</span>}</span>
+                            : <select value={l.item_id} onChange={e => { const it=invItems.find(x=>x.id===e.target.value); const n=[...shipBuildLines]; n[idx]={...n[idx],item_id:e.target.value,item_name:it?.name||"",unit:it?.unit||"",is_key_item:it?.is_key_item}; setShipBuildLines(n); }} style={{padding:4,fontSize:11,borderRadius:4,border:"1px solid var(--border)",width:"100%"}}>
                                 <option value="">補貨品項...</option>
                                 {invItems.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                               </select>}
                         </td>
-                        <td style={{padding:4,textAlign:"center",color:"#888"}}>{l.requested_qty || "-"}{l.unit}</td>
+                        <td style={{padding:4,textAlign:"center",color:"var(--text-3)"}}>{l.requested_qty || "-"}{l.unit}</td>
                         <td style={{padding:4,textAlign:"center"}}>
-                          <input type="number" value={l.shipped_qty} onChange={e => { const n=[...shipBuildLines]; n[idx].shipped_qty=e.target.value; setShipBuildLines(n); }} style={{width:50,padding:3,fontSize:12,textAlign:"center",borderRadius:4,border:"1px solid #ddd"}} />{l.unit}
+                          <input type="number" value={l.shipped_qty} onChange={e => { const n=[...shipBuildLines]; n[idx].shipped_qty=e.target.value; setShipBuildLines(n); }} style={{width:50,padding:3,fontSize:12,textAlign:"center",borderRadius:4,border:"1px solid var(--border)"}} />{l.unit}
                         </td>
                         <td style={{padding:4}}>
-                          <button onClick={() => setShipBuildLines(shipBuildLines.filter((_,i)=>i!==idx))} style={{border:"none",background:"none",color:"#b91c1c",cursor:"pointer"}}>✕</button>
+                          <button onClick={() => setShipBuildLines(shipBuildLines.filter((_,i)=>i!==idx))} style={{border:"none",background:"none",color:"var(--danger)",cursor:"pointer"}}>✕</button>
                         </td>
                       </tr>
                     ))}</tbody>
                   </table>
                   <div style={{display:"flex",gap:6,marginTop:8}}>
                     <button onClick={addBlankLine} style={{flex:1,padding:6,borderRadius:6,border:"1px dashed #ccc",background:"transparent",fontSize:11,cursor:"pointer"}}>＋ 加品項</button>
-                    <button onClick={() => submitShip(false)} style={{flex:1,padding:6,borderRadius:6,border:"1px solid #888",background:"#fff",fontSize:11,cursor:"pointer"}}>💾 存草稿</button>
-                    <button onClick={() => submitShip(true)} style={{flex:2,padding:6,borderRadius:6,border:"none",background:"#b45309",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>🚚 確認並出貨（推 LINE）</button>
+                    <button onClick={() => submitShip(false)} style={{flex:1,padding:6,borderRadius:6,border:"1px solid var(--text-3)",background:"#fff",fontSize:11,cursor:"pointer"}}>💾 存草稿</button>
+                    <button onClick={() => submitShip(true)} style={{flex:2,padding:6,borderRadius:6,border:"none",background:"var(--warning)",color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer"}}>🚚 確認並出貨（推 LINE）</button>
                   </div>
                 </div>
               )}
 
               {/* 出貨單列表 */}
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
-                <div style={{padding:8,borderBottom:"1px solid #f0eeea",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
+                <div style={{padding:8,borderBottom:"1px solid var(--divider)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <span style={{fontSize:12,fontWeight:600}}>📋 所有出貨單（最近 200 筆）</span>
-                  <button onClick={reloadShip} style={{padding:"2px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>↻ 刷新</button>
+                  <button onClick={reloadShip} style={{padding:"2px 8px",borderRadius:4,border:"1px solid var(--border)",background:"#fff",fontSize:10,cursor:"pointer"}}>↻ 刷新</button>
                 </div>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                  <thead><tr style={{background:"#faf8f5"}}>{["編號","門市","狀態","品項","建立","出貨","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{background:"var(--surface-warm)"}}>{["編號","門市","狀態","品項","建立","出貨","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                   <tbody>{shipList.map(s => (
-                    <tr key={s.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                    <tr key={s.id} style={{borderBottom:"1px solid var(--divider)"}}>
                       <td style={{padding:6,fontWeight:600,fontSize:10}}>{s.shipment_number}</td>
                       <td style={{padding:6}}>{s.stores?.name || "-"}</td>
                       <td style={{padding:6,fontSize:10,color:STATUS_COLOR[s.status]}}>{STATUS_LABEL[s.status] || s.status}</td>
                       <td style={{padding:6,fontSize:10}}>{s.line_summary?.received || 0}/{s.line_summary?.total || 0}</td>
-                      <td style={{padding:6,fontSize:10,color:"#888"}}>{s.created_at?.slice(5, 16)?.replace("T", " ")}</td>
-                      <td style={{padding:6,fontSize:10,color:"#888"}}>{s.shipped_at?.slice(5, 16)?.replace("T", " ") || "-"}</td>
+                      <td style={{padding:6,fontSize:10,color:"var(--text-3)"}}>{s.created_at?.slice(5, 16)?.replace("T", " ")}</td>
+                      <td style={{padding:6,fontSize:10,color:"var(--text-3)"}}>{s.shipped_at?.slice(5, 16)?.replace("T", " ") || "-"}</td>
                       <td style={{padding:6,whiteSpace:"nowrap"}}>
-                        <button onClick={() => { setShipDetailId(s.id); ap("/api/admin/shipments?type=detail&id=" + s.id).then(r => setShipDetail(r.data||null)); }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #4361ee",background:"transparent",fontSize:9,cursor:"pointer",color:"#4361ee"}}>查看</button>
-                        {s.status === "draft" && <button onClick={async()=>{ await sap("/api/admin/shipments",{action:"ship",shipment_id:s.id,shipped_by_name:auth?.name||"admin"}); reloadShip(); }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b45309",background:"transparent",fontSize:9,cursor:"pointer",color:"#b45309",marginLeft:2}}>🚚出貨</button>}
-                        {(s.status === "draft" || s.status === "shipped") && <button onClick={async()=>{ const r=prompt("取消原因：",""); if(r===null)return; await sap("/api/admin/shipments",{action:"cancel",shipment_id:s.id,cancelled_reason:r}); reloadShip(); }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #888",background:"transparent",fontSize:9,cursor:"pointer",color:"#888",marginLeft:2}}>✕取消</button>}
-                        {auth?.role === "admin" && <button onClick={async()=>{ if(!confirm("admin 強制刪除「"+s.shipment_number+"」？")) return; await sap("/api/admin/shipments",{action:"admin_delete",shipment_id:s.id}); reloadShip(); }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #b91c1c",background:"transparent",fontSize:9,cursor:"pointer",color:"#b91c1c",marginLeft:2}}>🗑</button>}
+                        <button onClick={() => { setShipDetailId(s.id); ap("/api/admin/shipments?type=detail&id=" + s.id).then(r => setShipDetail(r.data||null)); }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--brand-strong)",background:"transparent",fontSize:9,cursor:"pointer",color:"var(--brand-strong)"}}>查看</button>
+                        {s.status === "draft" && <button onClick={async()=>{ await sap("/api/admin/shipments",{action:"ship",shipment_id:s.id,shipped_by_name:auth?.name||"admin"}); reloadShip(); }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--warning)",background:"transparent",fontSize:9,cursor:"pointer",color:"var(--warning)",marginLeft:2}}>🚚出貨</button>}
+                        {(s.status === "draft" || s.status === "shipped") && <button onClick={async()=>{ const r=prompt("取消原因：",""); if(r===null)return; await sap("/api/admin/shipments",{action:"cancel",shipment_id:s.id,cancelled_reason:r}); reloadShip(); }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--text-3)",background:"transparent",fontSize:9,cursor:"pointer",color:"var(--text-3)",marginLeft:2}}>✕取消</button>}
+                        {auth?.role === "admin" && <button onClick={async()=>{ if(!confirm("admin 強制刪除「"+s.shipment_number+"」？")) return; await sap("/api/admin/shipments",{action:"admin_delete",shipment_id:s.id}); reloadShip(); }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--danger)",background:"transparent",fontSize:9,cursor:"pointer",color:"var(--danger)",marginLeft:2}}>🗑</button>}
                       </td>
                     </tr>
                   ))}</tbody>
@@ -3342,20 +3342,20 @@ export default function AdminPage() {
                       <h4 style={{fontSize:14,fontWeight:600,margin:0}}>📋 {shipDetail.shipment_number}</h4>
                       <button onClick={() => { setShipDetailId(null); setShipDetail(null); }} style={{border:"none",background:"none",fontSize:18,cursor:"pointer"}}>✕</button>
                     </div>
-                    <div style={{fontSize:11,color:"#666",marginBottom:8}}>
+                    <div style={{fontSize:11,color:"var(--text-2)",marginBottom:8}}>
                       🏠 {shipDetail.stores?.name} · <span style={{color:STATUS_COLOR[shipDetail.status]}}>{STATUS_LABEL[shipDetail.status]}</span>
                       <br />建立：{shipDetail.created_by_name || "-"} {shipDetail.created_at?.slice(0, 16).replace("T", " ")}
                       {shipDetail.shipped_at && <><br />出貨：{shipDetail.shipped_by_name || "-"} {shipDetail.shipped_at?.slice(0, 16).replace("T", " ")}</>}
                     </div>
-                    {shipDetail.notes && <div style={{fontSize:11,padding:6,background:"#faf8f5",borderRadius:4,marginBottom:8}}>📝 {shipDetail.notes}</div>}
+                    {shipDetail.notes && <div style={{fontSize:11,padding:6,background:"var(--surface-warm)",borderRadius:4,marginBottom:8}}>📝 {shipDetail.notes}</div>}
                     <table style={{width:"100%",fontSize:11,borderCollapse:"collapse"}}>
-                      <thead><tr style={{background:"#faf8f5"}}>{["品項","出貨","實收","差異","狀態",auth?.role==="admin"?"修改":""].filter(Boolean).map(h=><th key={h} style={{padding:4,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{background:"var(--surface-warm)"}}>{["品項","出貨","實收","差異","狀態",auth?.role==="admin"?"修改":""].filter(Boolean).map(h=><th key={h} style={{padding:4,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                       <tbody>{(shipDetail.lines || []).map(l => (
-                        <tr key={l.id} style={{borderBottom:"1px solid #f0eeea"}}>
-                          <td style={{padding:4}}>{l.inventory_items?.name}{l.inventory_items?.is_key_item && <span style={{fontSize:9,color:"#b45309",marginLeft:3}}>★</span>}</td>
+                        <tr key={l.id} style={{borderBottom:"1px solid var(--divider)"}}>
+                          <td style={{padding:4}}>{l.inventory_items?.name}{l.inventory_items?.is_key_item && <span style={{fontSize:9,color:"var(--warning)",marginLeft:3}}>★</span>}</td>
                           <td style={{padding:4}}>{l.shipped_qty}{l.unit||""}</td>
                           <td style={{padding:4}}>{l.received_qty != null ? l.received_qty + (l.unit||"") : "-"}</td>
-                          <td style={{padding:4,color:l.variance ? "#b91c1c" : "#888"}}>{l.variance ? (l.variance>0?"+":"") + l.variance : "-"}</td>
+                          <td style={{padding:4,color:l.variance ? "var(--danger)" : "var(--text-3)"}}>{l.variance ? (l.variance>0?"+":"") + l.variance : "-"}</td>
                           <td style={{padding:4,fontSize:10}}>{l.status==="received"?"✅":l.status==="variance"?"⚠️":"⏳"}</td>
                           {auth?.role === "admin" && <td style={{padding:4}}>
                             <button onClick={async()=>{
@@ -3366,7 +3366,7 @@ export default function AdminPage() {
                               await sap("/api/admin/shipments",patch);
                               ap("/api/admin/shipments?type=detail&id="+shipDetail.id).then(r=>setShipDetail(r.data||null));
                               reloadShip();
-                            }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #4361ee",background:"transparent",fontSize:9,cursor:"pointer",color:"#4361ee"}}>改</button>
+                            }} style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--brand-strong)",background:"transparent",fontSize:9,cursor:"pointer",color:"var(--brand-strong)"}}>改</button>
                           </td>}
                         </tr>
                       ))}</tbody>
@@ -3386,24 +3386,24 @@ export default function AdminPage() {
               const n=prompt("產品名稱：");if(!n)return;
               const c=prompt("分類（泡芙/餅乾/冰淇淋/棕櫚糖/飲品/其他）：","泡芙");
               await ap("/api/admin/products",{action:"create",name:n,category:c});load();
-            }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
+            }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>
               ＋新增產品
             </button>
             {productList.map(p=>(
-              <div key={p.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8}}>
+              <div key={p.id} style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12,marginBottom:8}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                   <div>
                     <span style={{fontSize:14,fontWeight:600}}>{p.name}</span>
-                    <span style={{fontSize:10,color:"#888",marginLeft:6,background:"#faf8f5",padding:"1px 6px",borderRadius:3}}>{p.category||""}</span>
+                    <span style={{fontSize:10,color:"var(--text-3)",marginLeft:6,background:"var(--surface-warm)",padding:"1px 6px",borderRadius:3}}>{p.category||""}</span>
                     <button onClick={async()=>{
                       const n=prompt("修改產品名稱：",p.name);if(!n)return;
                       const c=prompt("分類：",p.category||"");
                       await ap("/api/admin/products",{action:"update",product_id:p.id,name:n,category:c});load();
-                    }} style={{fontSize:9,color:"#4361ee",background:"none",border:"none",cursor:"pointer",marginLeft:4}}>✏️</button>
+                    }} style={{fontSize:9,color:"var(--brand-strong)",background:"none",border:"none",cursor:"pointer",marginLeft:4}}>✏️</button>
                     <button onClick={async()=>{
                       if(!confirm("刪除產品「"+p.name+"」及所有規格？"))return;
                       await ap("/api/admin/products",{action:"delete",product_id:p.id});load();
-                    }} style={{fontSize:9,color:"#b91c1c",background:"none",border:"none",cursor:"pointer"}}>🗑</button>
+                    }} style={{fontSize:9,color:"var(--danger)",background:"none",border:"none",cursor:"pointer"}}>🗑</button>
                   </div>
                   <button onClick={async()=>{
                     const sn=prompt("規格名稱（如：原味6入）：");if(!sn)return;
@@ -3415,25 +3415,25 @@ export default function AdminPage() {
                     const cp=prompt("成本價：","0");
                     await ap("/api/admin/products",{action:"add_variant",product_id:p.id,spec_name:sn,unit:u,retail_price:Number(rp),wholesale_price:Number(wp),dealer_price:Number(dp),oem_price:Number(op),cost_price:Number(cp)});
                     load();
-                  }} style={{padding:"3px 8px",borderRadius:4,border:"1px solid #4361ee",background:"transparent",color:"#4361ee",fontSize:10,cursor:"pointer"}}>
+                  }} style={{padding:"3px 8px",borderRadius:4,border:"1px solid var(--brand-strong)",background:"transparent",color:"var(--brand-strong)",fontSize:10,cursor:"pointer"}}>
                     ＋規格
                   </button>
                 </div>
                 {(p.variants||[]).length > 0 ? (
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:10}}>
-                    <thead><tr style={{background:"#faf8f5"}}>{["規格","單位","零售價","批發價","經銷價","代工價","成本","毛利率","操作"].map(h=><th key={h} style={{padding:4,textAlign:"center",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                    <thead><tr style={{background:"var(--surface-warm)"}}>{["規格","單位","零售價","批發價","經銷價","代工價","成本","毛利率","操作"].map(h=><th key={h} style={{padding:4,textAlign:"center",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                     <tbody>{(p.variants||[]).map(v=>{
                       const margin=v.retail_price>0?Math.round((v.retail_price-v.cost_price)/v.retail_price*100):0;
                       return (
-                        <tr key={v.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                        <tr key={v.id} style={{borderBottom:"1px solid var(--divider)"}}>
                           <td style={{padding:4,fontWeight:500}}>{v.spec_name}{v.sku&&<span style={{fontSize:8,color:"#ccc",marginLeft:3}}>{v.sku}</span>}</td>
                           <td style={{padding:4,textAlign:"center"}}>{v.unit}</td>
-                          <td style={{padding:4,textAlign:"center",color:"#0a7c42",fontWeight:600}}>{fmt(v.retail_price)}</td>
-                          <td style={{padding:4,textAlign:"center",color:"#185fa5"}}>{fmt(v.wholesale_price)}</td>
-                          <td style={{padding:4,textAlign:"center",color:"#8a6d00"}}>{v.dealer_price>0?fmt(v.dealer_price):"-"}</td>
+                          <td style={{padding:4,textAlign:"center",color:"var(--success)",fontWeight:600}}>{fmt(v.retail_price)}</td>
+                          <td style={{padding:4,textAlign:"center",color:"var(--info)"}}>{fmt(v.wholesale_price)}</td>
+                          <td style={{padding:4,textAlign:"center",color:"var(--warning)"}}>{v.dealer_price>0?fmt(v.dealer_price):"-"}</td>
                           <td style={{padding:4,textAlign:"center",color:"#993556"}}>{v.oem_price>0?fmt(v.oem_price):"-"}</td>
-                          <td style={{padding:4,textAlign:"center",color:"#888"}}>{fmt(v.cost_price)}</td>
-                          <td style={{padding:4,textAlign:"center",fontWeight:600,color:margin>=50?"#0a7c42":margin>=30?"#b45309":"#b91c1c"}}>{margin+"%"}</td>
+                          <td style={{padding:4,textAlign:"center",color:"var(--text-3)"}}>{fmt(v.cost_price)}</td>
+                          <td style={{padding:4,textAlign:"center",fontWeight:600,color:margin>=50?"var(--success)":margin>=30?"var(--warning)":"var(--danger)"}}>{margin+"%"}</td>
                           <td style={{padding:4,textAlign:"center"}}>
                             <button onClick={async()=>{
                               const rp=prompt("零售價：",v.retail_price);if(rp===null)return;
@@ -3443,9 +3443,9 @@ export default function AdminPage() {
                               const cp=prompt("成本價：",v.cost_price);
                               await ap("/api/admin/products",{action:"update_variant",variant_id:v.id,retail_price:Number(rp),wholesale_price:Number(wp||0),dealer_price:Number(dp||0),oem_price:Number(op||0),cost_price:Number(cp||0)});
                               load();
-                            }} style={{fontSize:9,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️</button>
+                            }} style={{fontSize:9,color:"var(--brand-strong)",background:"none",border:"none",cursor:"pointer"}}>✏️</button>
                             <button onClick={async()=>{if(!confirm("刪除此規格？"))return;await ap("/api/admin/products",{action:"delete_variant",variant_id:v.id});load();}}
-                              style={{fontSize:9,color:"#b91c1c",background:"none",border:"none",cursor:"pointer"}}>✕</button>
+                              style={{fontSize:9,color:"var(--danger)",background:"none",border:"none",cursor:"pointer"}}>✕</button>
                           </td>
                         </tr>
                       );
@@ -3464,31 +3464,31 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📦 每日盤點</h3>
             <div style={{display:"flex",gap:4,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
-              <input type="date" value={stockDate} onChange={e=>setStockDate(e.target.value)} style={{padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:11}} />
+              <input type="date" value={stockDate} onChange={e=>setStockDate(e.target.value)} style={{padding:"4px 8px",borderRadius:5,border:"1px solid var(--border)",fontSize:11}} />
               <button onClick={async()=>{
                 const sid=sf||stores[0]?.id;if(!sid){alert("請選門市");return;}
                 const r=await ap("/api/admin/stock?type=variance&store_id="+sid+"&date="+stockDate);
                 setStockReport(r.data||[]);
-              }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"#4361ee",color:"#fff",fontSize:11,cursor:"pointer"}}>📊 載入差異報告</button>
+              }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"var(--brand-strong)",color:"#fff",fontSize:11,cursor:"pointer"}}>📊 載入差異報告</button>
               <button onClick={async()=>{
                 const r=await ap("/api/admin/stock?type=restock");
                 setRestockNeeds(r.data||[]);
-              }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"#b45309",color:"#fff",fontSize:11,cursor:"pointer"}}>📋 明日備料需求</button>
+              }} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"var(--warning)",color:"#fff",fontSize:11,cursor:"pointer"}}>📋 明日備料需求</button>
             </div>
 
             {/* 備料需求 */}
             {restockNeeds.length>0&&(
-              <div style={{background:"#fff8e6",borderRadius:8,border:"1px solid #f0e6c8",padding:12,marginBottom:12}}>
-                <h4 style={{fontSize:12,fontWeight:600,color:"#b45309",marginBottom:6}}>📋 備料需求（庫存低於標準量）</h4>
+              <div style={{background:"var(--warning-bg)",borderRadius:8,border:"1px solid #f0e6c8",padding:12,marginBottom:12}}>
+                <h4 style={{fontSize:12,fontWeight:600,color:"var(--warning)",marginBottom:6}}>📋 備料需求（庫存低於標準量）</h4>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                  <thead><tr style={{background:"#fef3c7"}}>{["門市","品項","現有","標準","需補","單位"].map(h=><th key={h} style={{padding:4,textAlign:"left",fontWeight:500,color:"#92400e"}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{background:"var(--warning-bg)"}}>{["門市","品項","現有","標準","需補","單位"].map(h=><th key={h} style={{padding:4,textAlign:"left",fontWeight:500,color:"#92400e"}}>{h}</th>)}</tr></thead>
                   <tbody>{restockNeeds.map((n,i)=>(
-                    <tr key={i} style={{borderBottom:"1px solid #f0eeea"}}>
+                    <tr key={i} style={{borderBottom:"1px solid var(--divider)"}}>
                       <td style={{padding:4}}>{n.store_name}</td>
                       <td style={{padding:4,fontWeight:500}}>{n.item_name}</td>
-                      <td style={{padding:4,color:"#b91c1c",fontWeight:600}}>{n.current}</td>
+                      <td style={{padding:4,color:"var(--danger)",fontWeight:600}}>{n.current}</td>
                       <td style={{padding:4}}>{n.par_level}</td>
-                      <td style={{padding:4,color:"#0a7c42",fontWeight:600}}>{n.need}</td>
+                      <td style={{padding:4,color:"var(--success)",fontWeight:600}}>{n.need}</td>
                       <td style={{padding:4}}>{n.unit}</td>
                     </tr>
                   ))}</tbody>
@@ -3498,18 +3498,18 @@ export default function AdminPage() {
 
             {/* 差異報告 */}
             {stockReport.length>0&&(
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto",marginBottom:12}}>
+              <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto",marginBottom:12}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:500}}>
-                  <thead><tr style={{background:"#faf8f5"}}>{["品項","早盤","進貨","銷售","理論","晚盤","差異","狀態"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{background:"var(--surface-warm)"}}>{["品項","早盤","進貨","銷售","理論","晚盤","差異","狀態"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                   <tbody>{stockReport.map((r,i)=>(
-                    <tr key={i} style={{borderBottom:"1px solid #f0eeea",background:r.alert?"#fef2f2":r.need_restock?"#fffbeb":"transparent"}}>
-                      <td style={{padding:6,fontWeight:500}}>{r.name}<span style={{fontSize:9,color:"#888",marginLeft:4}}>{r.unit}</span></td>
+                    <tr key={i} style={{borderBottom:"1px solid var(--divider)",background:r.alert?"var(--danger-bg)":r.need_restock?"#fffbeb":"transparent"}}>
+                      <td style={{padding:6,fontWeight:500}}>{r.name}<span style={{fontSize:9,color:"var(--text-3)",marginLeft:4}}>{r.unit}</span></td>
                       <td style={{padding:6}}>{r.morning!==null?r.morning:"-"}</td>
-                      <td style={{padding:6,color:r.delivered>0?"#0a7c42":"#ccc"}}>{r.delivered>0?"+"+r.delivered:"-"}</td>
-                      <td style={{padding:6,color:r.sold>0?"#b91c1c":"#ccc"}}>{r.sold>0?"-"+r.sold:"-"}</td>
-                      <td style={{padding:6,color:"#888"}}>{r.theoretical!==null?r.theoretical:"-"}</td>
+                      <td style={{padding:6,color:r.delivered>0?"var(--success)":"#ccc"}}>{r.delivered>0?"+"+r.delivered:"-"}</td>
+                      <td style={{padding:6,color:r.sold>0?"var(--danger)":"#ccc"}}>{r.sold>0?"-"+r.sold:"-"}</td>
+                      <td style={{padding:6,color:"var(--text-3)"}}>{r.theoretical!==null?r.theoretical:"-"}</td>
                       <td style={{padding:6,fontWeight:600}}>{r.evening!==null?r.evening:"-"}</td>
-                      <td style={{padding:6,fontWeight:600,color:r.alert?"#b91c1c":r.variance!==null&&r.variance!==0?"#b45309":"#0a7c42"}}>{r.variance!==null?(r.variance>0?"+":"")+r.variance:"-"}</td>
+                      <td style={{padding:6,fontWeight:600,color:r.alert?"var(--danger)":r.variance!==null&&r.variance!==0?"var(--warning)":"var(--success)"}}>{r.variance!==null?(r.variance>0?"+":"")+r.variance:"-"}</td>
                       <td style={{padding:6}}>{r.alert?"🚨異常":r.need_restock?"⚠️要補":"✅"}</td>
                     </tr>
                   ))}</tbody>
@@ -3518,13 +3518,13 @@ export default function AdminPage() {
             )}
 
             {/* 盤點品項管理 */}
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:12}}>
+            <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12,marginBottom:12}}>
               <h4 style={{fontSize:12,fontWeight:600,marginBottom:6}}>⚙️ 盤點品項設定</h4>
               <div style={{display:"flex",gap:4,marginBottom:8}}>
                 <button onClick={async()=>{
                   const sid=sf||stores[0]?.id;if(!sid){alert("請選門市");return;}
                   const r=await ap("/api/admin/stock?type=items&store_id="+sid);setStockItems(r.data||[]);
-                }} style={{padding:"4px 10px",borderRadius:4,border:"1px solid #ddd",fontSize:10,cursor:"pointer"}}>🔄 載入品項</button>
+                }} style={{padding:"4px 10px",borderRadius:4,border:"1px solid var(--border)",fontSize:10,cursor:"pointer"}}>🔄 載入品項</button>
                 <button onClick={async()=>{
                   const sid=sf||stores[0]?.id;if(!sid){alert("請選門市");return;}
                   const name=prompt("品項名稱：");if(!name)return;
@@ -3533,38 +3533,38 @@ export default function AdminPage() {
                   const par=prompt("標準庫存量（低於此值→要補）：","10");
                   await ap("/api/admin/stock",{action:"add_item",store_id:sid,name,category:cat,unit,par_level:Number(par)});
                   const r=await ap("/api/admin/stock?type=items&store_id="+sid);setStockItems(r.data||[]);
-                }} style={{padding:"4px 10px",borderRadius:4,border:"none",background:"#1a1a1a",color:"#fff",fontSize:10,cursor:"pointer"}}>＋新增品項</button>
+                }} style={{padding:"4px 10px",borderRadius:4,border:"none",background:"var(--ink)",color:"#fff",fontSize:10,cursor:"pointer"}}>＋新增品項</button>
                 {stores.length>1&&<button onClick={async()=>{
                   const from=sf||stores[0]?.id;const toName=prompt("複製品項到哪個門市？\n"+stores.map(s=>s.name).join(" / "));                  const to=stores.find(s=>s.name.includes(toName));if(!to){alert("找不到門市");return;}
                   const r=await ap("/api/admin/stock",{action:"copy_items",from_store_id:from,to_store_id:to.id});
                   alert("已複製 "+(r.copied||0)+" 項到 "+to.name);
-                }} style={{padding:"4px 10px",borderRadius:4,border:"1px solid #ddd",fontSize:10,cursor:"pointer"}}>📋 複製到其他門市</button>}
+                }} style={{padding:"4px 10px",borderRadius:4,border:"1px solid var(--border)",fontSize:10,cursor:"pointer"}}>📋 複製到其他門市</button>}
               </div>
               {stockItems.length>0&&(
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                  <thead><tr style={{background:"#faf8f5"}}>{["品項","分類","單位","標準量","警示值","操作"].map(h=><th key={h} style={{padding:4,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{background:"var(--surface-warm)"}}>{["品項","分類","單位","標準量","警示值","操作"].map(h=><th key={h} style={{padding:4,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                   {(() => {
                     const ZONES = [
-                      { key:"refrig", label:"🧊 冷藏", bg:"#e0f2fe" },
+                      { key:"refrig", label:"🧊 冷藏", bg:"var(--info-bg)" },
                       { key:"freezer", label:"❄️ 冷凍", bg:"#dbeafe" },
-                      { key:"ambient", label:"🌡 常溫", bg:"#fef3c7" },
+                      { key:"ambient", label:"🌡 常溫", bg:"var(--warning-bg)" },
                       { key:"display", label:"🪟 展示櫃", bg:"#fce7f3" },
                       { key:"other", label:"📦 未分區", bg:"#f3f4f6" },
                     ];
                     const groups = ZONES.map(z => ({ ...z, items: stockItems.filter(it => (it.zone||"other") === z.key) })).filter(g => g.items.length > 0);
                     return groups.map(g => (
                       <tbody key={g.key}>
-                        <tr style={{background:g.bg}}><td colSpan={6} style={{padding:"4px 6px",fontSize:11,fontWeight:600,color:"#444"}}>{g.label}（{g.items.length}）</td></tr>
+                        <tr style={{background:g.bg}}><td colSpan={6} style={{padding:"4px 6px",fontSize:11,fontWeight:600,color:"var(--text-2)"}}>{g.label}（{g.items.length}）</td></tr>
                         {g.items.map(item=>(
-                          <tr key={item.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                          <tr key={item.id} style={{borderBottom:"1px solid var(--divider)"}}>
                             <td style={{padding:4,fontWeight:500}}>{item.name}</td>
-                            <td style={{padding:4,fontSize:10,color:"#888"}}>{item.category}</td>
+                            <td style={{padding:4,fontSize:10,color:"var(--text-3)"}}>{item.category}</td>
                             <td style={{padding:4}}>{item.unit}</td>
                             <td style={{padding:4}}>{item.par_level}</td>
                             <td style={{padding:4}}>{item.alert_threshold}</td>
                             <td style={{padding:4}}>
                               <button onClick={async()=>{const par=prompt("標準量：",item.par_level);if(par===null)return;await ap("/api/admin/stock",{action:"update_item",item_id:item.id,par_level:Number(par)});const r=await ap("/api/admin/stock?type=items&store_id="+(sf||stores[0]?.id));setStockItems(r.data||[]);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10}}>✏️</button>
-                              <button onClick={async()=>{if(!confirm("停用「"+item.name+"」？"))return;await ap("/api/admin/stock",{action:"delete_item",item_id:item.id});const r=await ap("/api/admin/stock?type=items&store_id="+(sf||stores[0]?.id));setStockItems(r.data||[]);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
+                              <button onClick={async()=>{if(!confirm("停用「"+item.name+"」？"))return;await ap("/api/admin/stock",{action:"delete_item",item_id:item.id});const r=await ap("/api/admin/stock?type=items&store_id="+(sf||stores[0]?.id));setStockItems(r.data||[]);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:"var(--danger)"}}>🗑</button>
                             </td>
                           </tr>
                         ))}
@@ -3582,10 +3582,10 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>👥 客戶管理</h3>
             <button onClick={async()=>{const n=prompt("客戶名稱：");if(!n)return;const t=prompt("類型(oem/b2b)：","b2b");const p=prompt("聯絡人：","");const ph=prompt("電話：","");await ap("/api/admin/clients",{action:"create",name:n,type:t,contact_person:p,phone:ph});load();}}
-              style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>＋新增客戶</button>
+              style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>＋新增客戶</button>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:8}}>
               {clientList.map(c=>(
-                <div key={c.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12}}>
+                <div key={c.id} style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                     <div style={{fontSize:13,fontWeight:600}}>{c.name}</div>
                     <div style={{display:"flex",gap:2,alignItems:"center"}}>
@@ -3598,15 +3598,15 @@ export default function AdminPage() {
                         const tax=prompt("統編：",c.tax_id||"");
                         const pt=prompt("付款條件：",c.payment_terms||"");
                         await ap("/api/admin/clients",{action:"update",client_id:c.id,name:n,contact_person:p,phone:ph,address:addr,tax_id:tax,payment_terms:pt});load();
-                      }} style={{fontSize:10,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️</button>
+                      }} style={{fontSize:10,color:"var(--brand-strong)",background:"none",border:"none",cursor:"pointer"}}>✏️</button>
                       <button onClick={async()=>{
                         if(!confirm("刪除客戶「"+c.name+"」？"))return;
                         await ap("/api/admin/clients",{action:"delete",client_id:c.id});load();
-                      }} style={{fontSize:10,color:"#b91c1c",background:"none",border:"none",cursor:"pointer"}}>🗑</button>
+                      }} style={{fontSize:10,color:"var(--danger)",background:"none",border:"none",cursor:"pointer"}}>🗑</button>
                     </div>
                   </div>
-                  <div style={{fontSize:11,color:"#888"}}>{c.contact_person}{c.phone?" · "+c.phone:""}</div>
-                  <div style={{fontSize:10,color:"#888"}}>{c.payment_terms||""}{c.tax_id?" · 統編"+c.tax_id:""}{c.address?" · "+c.address:""}</div>
+                  <div style={{fontSize:11,color:"var(--text-3)"}}>{c.contact_person}{c.phone?" · "+c.phone:""}</div>
+                  <div style={{fontSize:10,color:"var(--text-3)"}}>{c.payment_terms||""}{c.tax_id?" · 統編"+c.tax_id:""}{c.address?" · "+c.address:""}</div>
                 </div>
               ))}
             </div>
@@ -3618,8 +3618,8 @@ export default function AdminPage() {
           <div>
             <h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>📝 訂單管理</h3>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:10}}>
-              <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:"8px 12px"}}><div style={{fontSize:10,color:"#888"}}>訂單數</div><div style={{fontSize:18,fontWeight:600}}>{orderSum.count||0}</div></div>
-              <div style={{background:"#fde8e8",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"#b91c1c"}}>應收帳款</div><div style={{fontSize:18,fontWeight:700,color:"#b91c1c"}}>{fmt(orderSum.unpaid)}</div></div>
+              <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:"8px 12px"}}><div style={{fontSize:10,color:"var(--text-3)"}}>訂單數</div><div style={{fontSize:18,fontWeight:600}}>{orderSum.count||0}</div></div>
+              <div style={{background:"var(--danger-bg)",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:10,color:"var(--danger)"}}>應收帳款</div><div style={{fontSize:18,fontWeight:700,color:"var(--danger)"}}>{fmt(orderSum.unpaid)}</div></div>
               {/* ✦22 帳齡分析 */}
               {(() => {
                 const today = new Date();
@@ -3633,42 +3633,42 @@ export default function AdminPage() {
                 });
                 return (
                   <>
-                    <div style={{background:"#e6f9f0",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:9,color:"#0a7c42"}}>0-30天</div><div style={{fontSize:14,fontWeight:600,color:"#0a7c42"}}>{fmt(aging.a)}</div></div>
-                    <div style={{background:aging.d>0?"#fde8e8":"#fff8e6",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:9,color:aging.d>0?"#b91c1c":"#8a6d00"}}>{"31-60" + (aging.c+aging.d>0?" / 60+":"")}</div><div style={{fontSize:14,fontWeight:600,color:aging.d>0?"#b91c1c":"#8a6d00"}}>{fmt(aging.b+aging.c+aging.d)}</div></div>
+                    <div style={{background:"var(--success-bg)",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:9,color:"var(--success)"}}>0-30天</div><div style={{fontSize:14,fontWeight:600,color:"var(--success)"}}>{fmt(aging.a)}</div></div>
+                    <div style={{background:aging.d>0?"var(--danger-bg)":"var(--warning-bg)",borderRadius:8,padding:"8px 12px"}}><div style={{fontSize:9,color:aging.d>0?"var(--danger)":"var(--warning)"}}>{"31-60" + (aging.c+aging.d>0?" / 60+":"")}</div><div style={{fontSize:14,fontWeight:600,color:aging.d>0?"var(--danger)":"var(--warning)"}}>{fmt(aging.b+aging.c+aging.d)}</div></div>
                   </>
                 );
               })()}
             </div>
             <div style={{display:"flex",gap:4,marginBottom:8}}>
               <button onClick={async()=>{if(!clientList.length){alert("請先新增客戶");return;}const cn=prompt("客戶("+clientList.map(c=>c.name).join("/")+")：");const cl=clientList.find(c=>c.name.includes(cn));if(!cl)return alert("找不到");const pn=prompt("產品：");const q=prompt("數量：");const pr=prompt("單價：");const tt=prompt("含稅/未稅(included/excluded)：","included");await ap("/api/admin/orders",{action:"create",client_id:cl.id,type:cl.type==="oem"?"oem":"b2b",tax_type:tt,items:[{product_name:pn,quantity:Number(q),unit_price:Number(pr)}]});load();}}
-                style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增訂單</button>
+                style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增訂單</button>
             </div>
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+            <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["單號","客戶","小計","稅額","總額","稅別","帳齡","狀態","付款","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"var(--surface-warm)"}}>{["單號","客戶","小計","稅額","總額","稅別","帳齡","狀態","付款","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                 <tbody>{orderList.map(o=>{
                   const days = Math.floor((new Date() - new Date(o.order_date||o.created_at)) / 86400000);
-                  const agingColor = days>90?"#b91c1c":days>60?"#b45309":days>30?"#8a6d00":"#0a7c42";
+                  const agingColor = days>90?"var(--danger)":days>60?"var(--warning)":days>30?"var(--warning)":"var(--success)";
                   return (
-                  <tr key={o.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                  <tr key={o.id} style={{borderBottom:"1px solid var(--divider)"}}>
                     <td style={{padding:6,fontSize:10}}>{o.order_number}</td>
                     <td style={{padding:6,fontWeight:500}}>{o.clients?o.clients.name:""}</td>
                     <td style={{padding:6,fontSize:10}}>{fmt(o.subtotal||o.total_amount)}</td>
-                    <td style={{padding:6,fontSize:10,color:"#888"}}>{o.tax_amount>0?fmt(o.tax_amount):"-"}</td>
+                    <td style={{padding:6,fontSize:10,color:"var(--text-3)"}}>{o.tax_amount>0?fmt(o.tax_amount):"-"}</td>
                     <td style={{padding:6,fontWeight:600}}>{fmt(o.total_amount)}</td>
-                    <td style={{padding:6,fontSize:9,color:"#888"}}>{o.tax_type==="excluded"?"未稅+5%":"含稅"}</td>
+                    <td style={{padding:6,fontSize:9,color:"var(--text-3)"}}>{o.tax_type==="excluded"?"未稅+5%":"含稅"}</td>
                     <td style={{padding:6,fontSize:10,color:agingColor,fontWeight:600}}>{days+"天"}</td>
                     <td style={{padding:6}}><Badge status={o.status} /></td>
                     <td style={{padding:6}}><Badge status={o.payment_status} /></td>
                     <td style={{padding:6,whiteSpace:"nowrap"}}>
-                      {o.status==="confirmed"&&<button onClick={async()=>{await ap("/api/admin/orders",{action:"update_status",order_id:o.id,status:"shipped"});load();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#4361ee",color:"#fff",fontSize:9,cursor:"pointer"}}>出貨</button>}
-                      {o.payment_status!=="paid"&&<button onClick={async()=>{await ap("/api/admin/orders",{action:"update_status",order_id:o.id,status:"paid",paid_amount:o.total_amount});load();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b45309",color:"#fff",fontSize:9,cursor:"pointer",marginLeft:2}}>收款</button>}
+                      {o.status==="confirmed"&&<button onClick={async()=>{await ap("/api/admin/orders",{action:"update_status",order_id:o.id,status:"shipped"});load();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--brand-strong)",color:"#fff",fontSize:9,cursor:"pointer"}}>出貨</button>}
+                      {o.payment_status!=="paid"&&<button onClick={async()=>{await ap("/api/admin/orders",{action:"update_status",order_id:o.id,status:"paid",paid_amount:o.total_amount});load();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--warning)",color:"#fff",fontSize:9,cursor:"pointer",marginLeft:2}}>收款</button>}
                       {/* ✦23 訂單→工單 */}
-                      {o.status==="confirmed"&&<button onClick={async()=>{const pn=o.items?.[0]?.product_name||prompt("產品名稱：");if(!pn)return;await ap("/api/admin/production",{action:"create",product_name:pn,planned_quantity:o.items?.[0]?.quantity||0,order_id:o.id,notes:"訂單#"+o.order_number});alert("生產工單已建立");load();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",fontSize:9,cursor:"pointer",marginLeft:2}}>🏭工單</button>}
+                      {o.status==="confirmed"&&<button onClick={async()=>{const pn=o.items?.[0]?.product_name||prompt("產品名稱：");if(!pn)return;await ap("/api/admin/production",{action:"create",product_name:pn,planned_quantity:o.items?.[0]?.quantity||0,order_id:o.id,notes:"訂單#"+o.order_number});alert("生產工單已建立");load();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--success)",color:"#fff",fontSize:9,cursor:"pointer",marginLeft:2}}>🏭工單</button>}
                       <button onClick={async()=>{const r=await ap("/api/admin/orders?id="+o.id);const items=r.data?.items||[];alert("📦 "+o.order_number+" 明細\n"+items.map(i=>i.product_name+" ×"+i.quantity+" @"+i.unit_price+" = $"+i.total_price).join("\n")+"\n\n合計: $"+o.total_amount);}}
-                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid #ddd",background:"transparent",fontSize:9,cursor:"pointer",marginLeft:2}}>📋</button>
+                        style={{padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",background:"transparent",fontSize:9,cursor:"pointer",marginLeft:2}}>📋</button>
                       {o.status!=="shipped"&&o.status!=="paid"&&o.payment_status!=="paid"&&<button onClick={async()=>{if(!confirm("刪除訂單 "+o.order_number+"？"))return;await ap("/api/admin/orders",{action:"delete",order_id:o.id});load();}}
-                        style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#b91c1c",color:"#fff",fontSize:9,cursor:"pointer",marginLeft:2}}>🗑</button>}
+                        style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--danger)",color:"#fff",fontSize:9,cursor:"pointer",marginLeft:2}}>🗑</button>}
                     </td>
                   </tr>);
                 })}</tbody>
@@ -3681,21 +3681,21 @@ export default function AdminPage() {
         {!ld && tab === "shifts" && (
           <div>
             {/* 崗位管理 */}
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:10}}>
+            <div style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12,marginBottom:10}}>
               <h4 style={{fontSize:13,fontWeight:600,marginBottom:8}}>🏷️ 崗位管理</h4>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                <thead><tr style={{background:"#faf8f5"}}><th style={{padding:6,textAlign:"left",color:"#666",fontWeight:500}}>顏色</th><th style={{padding:6,textAlign:"left",color:"#666",fontWeight:500}}>崗位名稱</th><th style={{padding:6,textAlign:"center",color:"#666",fontWeight:500,width:60}}>操作</th></tr></thead>
+                <thead><tr style={{background:"var(--surface-warm)"}}><th style={{padding:6,textAlign:"left",color:"var(--text-2)",fontWeight:500}}>顏色</th><th style={{padding:6,textAlign:"left",color:"var(--text-2)",fontWeight:500}}>崗位名稱</th><th style={{padding:6,textAlign:"center",color:"var(--text-2)",fontWeight:500,width:60}}>操作</th></tr></thead>
                 <tbody>
                   {positions.map((p,i) => (
-                    <tr key={i} style={{borderBottom:"1px solid #f0eeea"}}>
+                    <tr key={i} style={{borderBottom:"1px solid var(--divider)"}}>
                       <td style={{padding:6,width:50}}>
                         <input type="color" value={p.color} onChange={e=>{const np=[...positions];np[i]={...np[i],color:e.target.value};setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});}} style={{width:32,height:28,border:"none",borderRadius:4,cursor:"pointer",padding:0}} />
                       </td>
                       <td style={{padding:6}}>
-                        <input value={p.name} onChange={e=>{const np=[...positions];np[i]={...np[i],name:e.target.value};setPositions(np);}} onBlur={()=>ap("/api/admin/system",{action:"set",key:"positions",value:positions})} style={{width:"100%",padding:"4px 8px",borderRadius:5,border:"1px solid #ddd",fontSize:12,fontWeight:500,color:p.color}} />
+                        <input value={p.name} onChange={e=>{const np=[...positions];np[i]={...np[i],name:e.target.value};setPositions(np);}} onBlur={()=>ap("/api/admin/system",{action:"set",key:"positions",value:positions})} style={{width:"100%",padding:"4px 8px",borderRadius:5,border:"1px solid var(--border)",fontSize:12,fontWeight:500,color:p.color}} />
                       </td>
                       <td style={{padding:6,textAlign:"center"}}>
-                        <button onClick={()=>{if(!confirm("刪除崗位「"+p.name+"」？"))return;const np=positions.filter((_,j)=>j!==i);setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});}} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"#b91c1c"}}>🗑</button>
+                        <button onClick={()=>{if(!confirm("刪除崗位「"+p.name+"」？"))return;const np=positions.filter((_,j)=>j!==i);setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});}} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"var(--danger)"}}>🗑</button>
                       </td>
                     </tr>
                   ))}
@@ -3703,7 +3703,7 @@ export default function AdminPage() {
                   <tr style={{borderTop:"1px dashed #ddd"}}>
                     <td style={{padding:6}}><input type="color" id="new-pos-color" defaultValue={["#0a7c42","#4361ee","#b45309","#b91c1c","#7c3aed","#0891b2","#be185d","#555"][positions.length%8]} style={{width:32,height:28,border:"none",borderRadius:4,cursor:"pointer",padding:0}} /></td>
                     <td style={{padding:6}}><input id="new-pos-name" placeholder="輸入新崗位名稱..." style={{width:"100%",padding:"4px 8px",borderRadius:5,border:"1px dashed #ccc",fontSize:12}} onKeyDown={e=>{if(e.key==="Enter"){const name=e.target.value.trim();if(!name)return;const color=document.getElementById("new-pos-color").value;const np=[...positions,{name,color}];setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});e.target.value="";}}} /></td>
-                    <td style={{padding:6,textAlign:"center"}}><button onClick={()=>{const name=document.getElementById("new-pos-name").value.trim();if(!name){alert("請輸入名稱");return;}const color=document.getElementById("new-pos-color").value;const np=[...positions,{name,color}];setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});document.getElementById("new-pos-name").value="";}} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"#0a7c42",color:"#fff",fontSize:11,cursor:"pointer"}}>＋</button></td>
+                    <td style={{padding:6,textAlign:"center"}}><button onClick={()=>{const name=document.getElementById("new-pos-name").value.trim();if(!name){alert("請輸入名稱");return;}const color=document.getElementById("new-pos-color").value;const np=[...positions,{name,color}];setPositions(np);ap("/api/admin/system",{action:"set",key:"positions",value:np});document.getElementById("new-pos-name").value="";}} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"var(--success)",color:"#fff",fontSize:11,cursor:"pointer"}}>＋</button></td>
                   </tr>
                 </tbody>
               </table>
@@ -3714,29 +3714,29 @@ export default function AdminPage() {
               const ss = shifts.filter(s=>s.store_id===store.id).sort((a,b) => (a.role||"").localeCompare(b.role||"") || (a.start_time||"").localeCompare(b.start_time||""));
               return (
                 <div key={store.id} style={{marginBottom:10}}>
-                  <h4 style={{fontSize:12,fontWeight:600,color:"#444",marginBottom:4,padding:"4px 8px",background:"#faf8f5",borderRadius:4}}>
+                  <h4 style={{fontSize:12,fontWeight:600,color:"var(--text-2)",marginBottom:4,padding:"4px 8px",background:"var(--surface-warm)",borderRadius:4}}>
                     {"🏠 "+store.name+"（"+ss.length+"）"}
                   </h4>
-                  <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+                  <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                      <thead><tr style={{background:"#faf8f5"}}>{["崗位","上班","下班","休息","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{background:"var(--surface-warm)"}}>{["崗位","上班","下班","休息","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                       <tbody>
-                        {ss.map(s=>{const pc=positions.find(p=>p.name===s.role)?.color||s.color||"#0a7c42";const isEdit=es?.id===s.id;return(
-                        <tr key={s.id} style={{borderBottom:"1px solid #f0eeea",background:isEdit?"#f0f8ff":"transparent"}}>
-                          <td style={{padding:6}}>{isEdit?<select value={sf2.role} onChange={e=>{const p=positions.find(x=>x.name===e.target.value);setSf2({...sf2,role:e.target.value,color:p?.color||sf2.color});}} style={{padding:3,borderRadius:4,border:"1px solid #4361ee",fontSize:11}}>{positions.map(p=><option key={p.name} value={p.name}>{p.name}</option>)}</select>:<span style={{padding:"2px 8px",borderRadius:4,background:pc+"20",color:pc,fontWeight:500,fontSize:11}}>{s.role==="all"?"全場":s.role||"全場"}</span>}</td>
-                          <td style={{padding:6}}>{isEdit?<input type="time" value={sf2.start_time} onChange={e=>setSf2({...sf2,start_time:e.target.value})} style={{padding:2,borderRadius:4,border:"1px solid #4361ee",fontSize:11}} />:<span style={{fontWeight:500}}>{(s.start_time||"").slice(0,5)}</span>}</td>
-                          <td style={{padding:6}}>{isEdit?<input type="time" value={sf2.end_time} onChange={e=>setSf2({...sf2,end_time:e.target.value})} style={{padding:2,borderRadius:4,border:"1px solid #4361ee",fontSize:11}} />:<span style={{fontWeight:500}}>{(s.end_time||"").slice(0,5)}</span>}</td>
-                          <td style={{padding:6}}>{isEdit?<input type="number" value={sf2.break_minutes} onChange={e=>setSf2({...sf2,break_minutes:Number(e.target.value)})} style={{width:50,padding:2,borderRadius:4,border:"1px solid #4361ee",fontSize:11}} />:s.break_minutes+"分"}</td>
+                        {ss.map(s=>{const pc=positions.find(p=>p.name===s.role)?.color||s.color||"var(--success)";const isEdit=es?.id===s.id;return(
+                        <tr key={s.id} style={{borderBottom:"1px solid var(--divider)",background:isEdit?"#f0f8ff":"transparent"}}>
+                          <td style={{padding:6}}>{isEdit?<select value={sf2.role} onChange={e=>{const p=positions.find(x=>x.name===e.target.value);setSf2({...sf2,role:e.target.value,color:p?.color||sf2.color});}} style={{padding:3,borderRadius:4,border:"1px solid var(--brand-strong)",fontSize:11}}>{positions.map(p=><option key={p.name} value={p.name}>{p.name}</option>)}</select>:<span style={{padding:"2px 8px",borderRadius:4,background:pc+"20",color:pc,fontWeight:500,fontSize:11}}>{s.role==="all"?"全場":s.role||"全場"}</span>}</td>
+                          <td style={{padding:6}}>{isEdit?<input type="time" value={sf2.start_time} onChange={e=>setSf2({...sf2,start_time:e.target.value})} style={{padding:2,borderRadius:4,border:"1px solid var(--brand-strong)",fontSize:11}} />:<span style={{fontWeight:500}}>{(s.start_time||"").slice(0,5)}</span>}</td>
+                          <td style={{padding:6}}>{isEdit?<input type="time" value={sf2.end_time} onChange={e=>setSf2({...sf2,end_time:e.target.value})} style={{padding:2,borderRadius:4,border:"1px solid var(--brand-strong)",fontSize:11}} />:<span style={{fontWeight:500}}>{(s.end_time||"").slice(0,5)}</span>}</td>
+                          <td style={{padding:6}}>{isEdit?<input type="number" value={sf2.break_minutes} onChange={e=>setSf2({...sf2,break_minutes:Number(e.target.value)})} style={{width:50,padding:2,borderRadius:4,border:"1px solid var(--brand-strong)",fontSize:11}} />:s.break_minutes+"分"}</td>
                           <td style={{padding:6,whiteSpace:"nowrap"}}>{isEdit?<>
-                            <button onClick={async()=>{await saveShift();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#0a7c42",color:"#fff",cursor:"pointer",fontSize:10,marginRight:2}}>💾</button>
-                            <button onClick={()=>{setEs(null);setSsf(false);}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"#888",color:"#fff",cursor:"pointer",fontSize:10}}>✕</button>
+                            <button onClick={async()=>{await saveShift();}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--success)",color:"#fff",cursor:"pointer",fontSize:10,marginRight:2}}>💾</button>
+                            <button onClick={()=>{setEs(null);setSsf(false);}} style={{padding:"1px 6px",borderRadius:3,border:"none",background:"var(--text-3)",color:"#fff",cursor:"pointer",fontSize:10}}>✕</button>
                           </>:<>
-                            <button onClick={()=>editShift(s)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,marginRight:2}}>✏️</button>
-                            <button onClick={()=>delShift(s.id)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid #ddd",background:"transparent",cursor:"pointer",fontSize:10,color:"#b91c1c"}}>🗑</button>
+                            <button onClick={()=>editShift(s)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",background:"transparent",cursor:"pointer",fontSize:10,marginRight:2}}>✏️</button>
+                            <button onClick={()=>delShift(s.id)} style={{padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",background:"transparent",cursor:"pointer",fontSize:10,color:"var(--danger)"}}>🗑</button>
                           </>}</td>
                         </tr>);})}
                         {/* 新增列 */}
-                        <tr style={{borderTop:"1px dashed #ccc",background:"#faf8f5"}}>
+                        <tr style={{borderTop:"1px dashed #ccc",background:"var(--surface-warm)"}}>
                           <td style={{padding:6}}>
                             <select id={"ns-role-"+store.id} style={{padding:3,borderRadius:4,border:"1px dashed #ccc",fontSize:11}}>
                               {positions.map(p=><option key={p.name} value={p.name}>{p.name}</option>)}
@@ -3751,10 +3751,10 @@ export default function AdminPage() {
                               const start=document.getElementById("ns-start-"+store.id).value;
                               const end=document.getElementById("ns-end-"+store.id).value;
                               const brk=document.getElementById("ns-break-"+store.id).value;
-                              const pc=positions.find(p=>p.name===role)?.color||"#0a7c42";
+                              const pc=positions.find(p=>p.name===role)?.color||"var(--success)";
                               await ap("/api/admin/shifts",{action:"create",store_id:store.id,name:role+" "+start+"~"+end,role,color:pc,start_time:start,end_time:end,break_minutes:Number(brk)});
                               load();
-                            }} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"#0a7c42",color:"#fff",fontSize:10,cursor:"pointer"}}>＋新增</button>
+                            }} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"var(--success)",color:"#fff",fontSize:10,cursor:"pointer"}}>＋新增</button>
                           </td>
                         </tr>
                       </tbody>
@@ -3787,13 +3787,13 @@ export default function AdminPage() {
               <h3 style={{fontSize:14,fontWeight:600,margin:0}}>📢 公告</h3>
               {auth.role !== "store_manager" && (
                 <button onClick={()=>setAnnForm({title:"",content:"",tag:"",store_id:sf||"",priority:"normal",starts_at:today,expires_at:"",push_line:false,attachments:[]})}
-                  style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增公告</button>
+                  style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer"}}>＋新增公告</button>
               )}
             </div>
             <div style={{display:"flex",gap:4,marginBottom:10,flexWrap:"wrap"}}>
-              <button onClick={()=>setAnnTagFilter("")} style={{padding:"3px 8px",borderRadius:12,border:"1px solid #ddd",background:annTagFilter===""?"#1a1a1a":"#fff",color:annTagFilter===""?"#fff":"#666",fontSize:10,cursor:"pointer"}}>全部</button>
+              <button onClick={()=>setAnnTagFilter("")} style={{padding:"3px 8px",borderRadius:12,border:"1px solid var(--border)",background:annTagFilter===""?"var(--ink)":"#fff",color:annTagFilter===""?"#fff":"var(--text-2)",fontSize:10,cursor:"pointer"}}>全部</button>
               {TAGS.map(t=>(
-                <button key={t} onClick={()=>setAnnTagFilter(t)} style={{padding:"3px 8px",borderRadius:12,border:"1px solid #ddd",background:annTagFilter===t?TAG_COLORS[t]:"#fff",color:annTagFilter===t?"#fff":"#666",fontSize:10,cursor:"pointer"}}>{t}</button>
+                <button key={t} onClick={()=>setAnnTagFilter(t)} style={{padding:"3px 8px",borderRadius:12,border:"1px solid var(--border)",background:annTagFilter===t?TAG_COLORS[t]:"#fff",color:annTagFilter===t?"#fff":"var(--text-2)",fontSize:10,cursor:"pointer"}}>{t}</button>
               ))}
             </div>
             {filtered.length===0 && <div style={{background:"#fff",borderRadius:8,padding:30,textAlign:"center",color:"#ccc"}}>無公告</div>}
@@ -3801,40 +3801,40 @@ export default function AdminPage() {
               const active = isActive(a);
               const tagColor = TAG_COLORS[a.tag] || "#6b7280";
               return (
-                <div key={a.id} style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",padding:12,marginBottom:8,opacity:active?1:0.5}}>
+                <div key={a.id} style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",padding:12,marginBottom:8,opacity:active?1:0.5}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                       {a.tag && <span style={{background:tagColor,color:"#fff",padding:"2px 6px",borderRadius:4,fontSize:9,fontWeight:600}}>{a.tag}</span>}
                       <div style={{fontWeight:600,fontSize:13}}>{a.priority==="urgent"?"🔴 ":""}{a.title}</div>
-                      {!active && <span style={{background:"#f0f0f0",color:"#999",padding:"1px 5px",borderRadius:3,fontSize:9}}>{a.expires_at&&a.expires_at<today?"已過期":"未開始"}</span>}
+                      {!active && <span style={{background:"#f0f0f0",color:"var(--text-3)",padding:"1px 5px",borderRadius:3,fontSize:9}}>{a.expires_at&&a.expires_at<today?"已過期":"未開始"}</span>}
                     </div>
                     {auth.role !== "store_manager" && (
                       <div style={{display:"flex",gap:4}}>
                         <button onClick={()=>setAnnForm({id:a.id,title:a.title,content:a.content,tag:a.tag||"",store_id:a.store_id||"",priority:a.priority||"normal",starts_at:a.starts_at||"",expires_at:a.expires_at||"",push_line:false,attachments:Array.isArray(a.attachments)?a.attachments:[]})}
-                          style={{fontSize:10,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>✏️</button>
+                          style={{fontSize:10,color:"var(--brand-strong)",background:"none",border:"none",cursor:"pointer"}}>✏️</button>
                         <button onClick={async()=>{if(!confirm("確定刪除公告？"))return;await ap("/api/admin/announcements",{action:"delete",announcement_id:a.id});load();}}
-                          style={{fontSize:10,color:"#b91c1c",background:"none",border:"none",cursor:"pointer"}}>🗑</button>
+                          style={{fontSize:10,color:"var(--danger)",background:"none",border:"none",cursor:"pointer"}}>🗑</button>
                       </div>
                     )}
                   </div>
-                  <div style={{marginTop:8,padding:"8px 12px",background:"#fafaf8",borderRadius:6,border:"1px solid #f0eeea"}}>
+                  <div style={{marginTop:8,padding:"8px 12px",background:"#fafaf8",borderRadius:6,border:"1px solid var(--divider)"}}>
                     <MarkdownView content={a.content} dense={true} />
                   </div>
                   {Array.isArray(a.attachments) && a.attachments.length>0 && (
                     <div style={{marginTop:6,display:"flex",gap:6,flexWrap:"wrap"}}>
                       {a.attachments.map((att,ai)=>(
-                        <a key={ai} href={att.url} target="_blank" rel="noreferrer" style={{fontSize:10,padding:"2px 8px",borderRadius:4,background:"#faf5e8",border:"1px solid #e8dfc4",textDecoration:"none",color:"#666"}}>
+                        <a key={ai} href={att.url} target="_blank" rel="noreferrer" style={{fontSize:10,padding:"2px 8px",borderRadius:4,background:"var(--surface-warm)",border:"1px solid #e8dfc4",textDecoration:"none",color:"var(--text-2)"}}>
                           {att.type==="image"?"🖼":"📄"} {att.name||"附件"}
                         </a>
                       ))}
                     </div>
                   )}
-                  <div style={{fontSize:10,color:"#aaa",marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <div style={{fontSize:10,color:"var(--text-hint)",marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}>
                     <span>{a.created_at?new Date(a.created_at).toLocaleDateString():""}</span>
                     {(a.starts_at||a.expires_at) && <span>📅 {a.starts_at||"—"} ~ {a.expires_at||"長期"}</span>}
                     {a.store_id && <span>🏠 {stores.find(s=>s.id===a.store_id)?.name||""}</span>}
                     {!a.store_id && <span>🌐 全體</span>}
-                    <span style={{color: a.read_count>0?"#16a34a":"#aaa",fontWeight:a.read_count>0?600:400}}>👁 已讀 {a.read_count||0} 人</span>
+                    <span style={{color: a.read_count>0?"var(--success)":"var(--text-hint)",fontWeight:a.read_count>0?600:400}}>👁 已讀 {a.read_count||0} 人</span>
                   </div>
                 </div>
               );
@@ -3846,21 +3846,21 @@ export default function AdminPage() {
                 <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:10,padding:20,maxWidth:500,width:"100%",maxHeight:"90vh",overflow:"auto"}}>
                   <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600}}>{annForm.id?"編輯公告":"新增公告"}</h3>
                   <div style={{display:"grid",gap:10}}>
-                    <label style={{fontSize:11,color:"#666"}}>標題 *
-                      <input value={annForm.title} onChange={e=>setAnnForm({...annForm,title:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}/>
+                    <label style={{fontSize:11,color:"var(--text-2)"}}>標題 *
+                      <input value={annForm.title} onChange={e=>setAnnForm({...annForm,title:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid var(--border)",fontSize:12,marginTop:4}}/>
                     </label>
-                    <label style={{fontSize:11,color:"#666"}}>內容 *
+                    <label style={{fontSize:11,color:"var(--text-2)"}}>內容 *
                       <textarea value={annForm.content} onChange={e=>setAnnForm({...annForm,content:e.target.value})} rows={10} placeholder={`支援 Markdown 排版，例如：\n\n# 大標題\n## 中標題\n### 小標題\n\n**粗體** 內文連結 https://example.com\n\n- 列表第一項\n- 列表第二項\n\n1. 第一步\n2. 第二步\n\n> 重點提示框（米色背景）\n\n| 標題1 | 標題2 |\n|------|------|\n| 內容 | 內容 |\n\n---（橫線分隔）`}
-                        style={{width:"100%",padding:"8px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4,resize:"vertical",fontFamily:"ui-monospace, monospace",lineHeight:1.6}}/>
+                        style={{width:"100%",padding:"8px 10px",borderRadius:6,border:"1px solid var(--border)",fontSize:12,marginTop:4,resize:"vertical",fontFamily:"ui-monospace, monospace",lineHeight:1.6}}/>
                     </label>
-                    <div style={{fontSize:10,color:"#888",marginTop:-6,padding:"6px 10px",background:"#faf5e8",borderRadius:6,border:"1px solid #e8dfc4"}}>
+                    <div style={{fontSize:10,color:"var(--text-3)",marginTop:-6,padding:"6px 10px",background:"var(--surface-warm)",borderRadius:6,border:"1px solid #e8dfc4"}}>
                       💡 內容支援 Markdown：<code>#</code> 標題、<code>**粗體**</code>、<code>- 列表</code>、<code>{">"}</code> 提示框、<code>| 表格 |</code>、<code>---</code> 分隔線、URL 自動連結
                     </div>
                     {/* 附件 */}
                     <div>
-                      <div style={{fontSize:11,color:"#666",marginBottom:4}}>附件（圖片或檔案）</div>
+                      <div style={{fontSize:11,color:"var(--text-2)",marginBottom:4}}>附件（圖片或檔案）</div>
                       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
-                        <label style={{padding:"4px 10px",borderRadius:6,border:"1px dashed #4361ee",background:"#fff",color:"#4361ee",fontSize:11,cursor:"pointer"}}>
+                        <label style={{padding:"4px 10px",borderRadius:6,border:"1px dashed var(--brand-strong)",background:"#fff",color:"var(--brand-strong)",fontSize:11,cursor:"pointer"}}>
                           📷 加圖片
                           <input type="file" accept="image/*" style={{display:"none"}} onChange={async(ev)=>{
                             const f = ev.target.files?.[0]; if (!f) return;
@@ -3876,7 +3876,7 @@ export default function AdminPage() {
                             ev.target.value = "";
                           }}/>
                         </label>
-                        <label style={{padding:"4px 10px",borderRadius:6,border:"1px dashed #b45309",background:"#fff",color:"#b45309",fontSize:11,cursor:"pointer"}}>
+                        <label style={{padding:"4px 10px",borderRadius:6,border:"1px dashed var(--warning)",background:"#fff",color:"var(--warning)",fontSize:11,cursor:"pointer"}}>
                           📎 加檔案
                           <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" style={{display:"none"}} onChange={async(ev)=>{
                             const f = ev.target.files?.[0]; if (!f) return;
@@ -3897,52 +3897,52 @@ export default function AdminPage() {
                       {(annForm.attachments||[]).length>0 && (
                         <div style={{display:"flex",flexDirection:"column",gap:4}}>
                           {(annForm.attachments||[]).map((att,ai)=>(
-                            <div key={ai} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",background:"#faf8f5",borderRadius:4,border:"1px solid #eee",fontSize:11}}>
+                            <div key={ai} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",background:"var(--surface-warm)",borderRadius:4,border:"1px solid #eee",fontSize:11}}>
                               <span>{att.type==="image"?"🖼":"📄"}</span>
                               <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{att.name||"附件"}</span>
-                              <a href={att.url} target="_blank" rel="noreferrer" style={{color:"#4361ee",fontSize:10,textDecoration:"none"}}>預覽</a>
+                              <a href={att.url} target="_blank" rel="noreferrer" style={{color:"var(--brand-strong)",fontSize:10,textDecoration:"none"}}>預覽</a>
                               <button type="button" onClick={()=>setAnnForm(prev=>({...prev,attachments:prev.attachments.filter((_,i)=>i!==ai)}))}
-                                style={{background:"none",border:"none",color:"#b91c1c",fontSize:13,cursor:"pointer"}}>✕</button>
+                                style={{background:"none",border:"none",color:"var(--danger)",fontSize:13,cursor:"pointer"}}>✕</button>
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
-                    <label style={{fontSize:11,color:"#666"}}>標籤
+                    <label style={{fontSize:11,color:"var(--text-2)"}}>標籤
                       <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
                         {TAGS.map(t=>(
                           <button key={t} type="button" onClick={()=>setAnnForm({...annForm,tag:annForm.tag===t?"":t})}
-                            style={{padding:"3px 10px",borderRadius:12,border:"1px solid #ddd",background:annForm.tag===t?TAG_COLORS[t]:"#fff",color:annForm.tag===t?"#fff":"#666",fontSize:11,cursor:"pointer"}}>{t}</button>
+                            style={{padding:"3px 10px",borderRadius:12,border:"1px solid var(--border)",background:annForm.tag===t?TAG_COLORS[t]:"#fff",color:annForm.tag===t?"#fff":"var(--text-2)",fontSize:11,cursor:"pointer"}}>{t}</button>
                         ))}
                       </div>
                     </label>
-                    <label style={{fontSize:11,color:"#666"}}>適用門市
-                      <select value={annForm.store_id} onChange={e=>setAnnForm({...annForm,store_id:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}>
+                    <label style={{fontSize:11,color:"var(--text-2)"}}>適用門市
+                      <select value={annForm.store_id} onChange={e=>setAnnForm({...annForm,store_id:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid var(--border)",fontSize:12,marginTop:4}}>
                         <option value="">全體（所有門市）</option>
                         {stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
                       </select>
                     </label>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                      <label style={{fontSize:11,color:"#666"}}>開始日期
-                        <input type="date" value={annForm.starts_at} onChange={e=>setAnnForm({...annForm,starts_at:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}/>
+                      <label style={{fontSize:11,color:"var(--text-2)"}}>開始日期
+                        <input type="date" value={annForm.starts_at} onChange={e=>setAnnForm({...annForm,starts_at:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid var(--border)",fontSize:12,marginTop:4}}/>
                       </label>
-                      <label style={{fontSize:11,color:"#666"}}>結束日期
-                        <input type="date" value={annForm.expires_at} onChange={e=>setAnnForm({...annForm,expires_at:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}/>
+                      <label style={{fontSize:11,color:"var(--text-2)"}}>結束日期
+                        <input type="date" value={annForm.expires_at} onChange={e=>setAnnForm({...annForm,expires_at:e.target.value})} style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid var(--border)",fontSize:12,marginTop:4}}/>
                       </label>
                     </div>
-                    <label style={{fontSize:11,color:"#666",display:"flex",alignItems:"center",gap:6}}>
+                    <label style={{fontSize:11,color:"var(--text-2)",display:"flex",alignItems:"center",gap:6}}>
                       <input type="checkbox" checked={annForm.priority==="urgent"} onChange={e=>setAnnForm({...annForm,priority:e.target.checked?"urgent":"normal"})}/>
                       🔴 設為急件
                     </label>
                     {!annForm.id && (
-                      <label style={{fontSize:11,color:"#666",display:"flex",alignItems:"center",gap:6}}>
+                      <label style={{fontSize:11,color:"var(--text-2)",display:"flex",alignItems:"center",gap:6}}>
                         <input type="checkbox" checked={annForm.push_line} onChange={e=>setAnnForm({...annForm,push_line:e.target.checked})}/>
                         📱 同步推送到員工 LINE
                       </label>
                     )}
                   </div>
                   <div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:16}}>
-                    <button onClick={()=>setAnnForm(null)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>取消</button>
+                    <button onClick={()=>setAnnForm(null)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid var(--border)",background:"#fff",fontSize:11,cursor:"pointer"}}>取消</button>
                     <button onClick={async()=>{
                       if(!annForm.title||!annForm.content){alert("請填寫標題與內容");return;}
                       if(annForm.starts_at&&annForm.expires_at&&annForm.starts_at>annForm.expires_at){alert("開始日期不可晚於結束日期");return;}
@@ -3953,7 +3953,7 @@ export default function AdminPage() {
                       if(r.error){alert("錯誤："+r.error);return;}
                       if(r.line_sent)alert("已建立，LINE 推送 "+r.line_sent+" 位");
                       setAnnForm(null); load();
-                    }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer"}}>{annForm.id?"儲存":"建立"}</button>
+                    }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer"}}>{annForm.id?"儲存":"建立"}</button>
                   </div>
                 </div>
               </div>
@@ -3967,14 +3967,14 @@ export default function AdminPage() {
         {/* AUDIT LOGS */}
         {!ld && tab === "audit" && (
           <div>
-            <button onClick={async()=>{const r=await ap("/api/admin/audit?month="+month);setAuditLogs(r.data||[]);}} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#1a1a1a",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>🔄 載入{month}日誌</button>
-            <div style={{background:"#fff",borderRadius:8,border:"1px solid #e8e6e1",overflow:"auto"}}>
+            <button onClick={async()=>{const r=await ap("/api/admin/audit?month="+month);setAuditLogs(r.data||[]);}} style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--ink)",color:"#fff",fontSize:11,cursor:"pointer",marginBottom:8}}>🔄 載入{month}日誌</button>
+            <div className="sb-table-wrap" style={{background:"#fff",borderRadius:8,border:"1px solid var(--border)",overflow:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:10,minWidth:600}}>
-                <thead><tr style={{background:"#faf8f5"}}>{["時間","操作者","動作","對象","詳情"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#666"}}>{h}</th>)}</tr></thead>
+                <thead><tr style={{background:"var(--surface-warm)"}}>{["時間","操作者","動作","對象","詳情"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"var(--text-2)"}}>{h}</th>)}</tr></thead>
                 <tbody>{auditLogs.length===0?<tr><td colSpan={5} style={{padding:20,textAlign:"center",color:"#ccc"}}>按上方按鈕載入日誌</td></tr>:auditLogs.map(l=>{
                   const actionLabels={login:"🔐登入",employee_update:"👤修改員工",employee_delete:"🗑刪除員工",settlement_update:"💰修改日結",settlement_delete:"🗑刪除日結",schedule_publish:"📢發布班表",schedule_delete:"🗑刪除排班",leave_approved:"✅核准休假",leave_rejected:"❌駁回休假",payroll_generate:"💰結算薪資",expense_approved:"✅核准費用",expense_rejected:"❌駁回費用"};
                   return(
-                  <tr key={l.id} style={{borderBottom:"1px solid #f0eeea"}}>
+                  <tr key={l.id} style={{borderBottom:"1px solid var(--divider)"}}>
                     <td style={{padding:6,fontSize:9,whiteSpace:"nowrap"}}>{l.created_at?new Date(l.created_at).toLocaleString("zh-TW",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):""}</td>
                     <td style={{padding:6,fontWeight:500}}>{l.user_name||l.user_id?.slice(0,8)||"系統"}</td>
                     <td style={{padding:6}}>{actionLabels[l.action]||l.action}</td>
@@ -3999,45 +3999,45 @@ export default function AdminPage() {
               <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:10,padding:20,maxWidth:440,width:"100%"}}>
                 <h3 style={{margin:"0 0 14px",fontSize:14,fontWeight:600}}>📢 發布班表</h3>
                 <div style={{display:"grid",gap:12}}>
-                  <label style={{fontSize:11,color:"#666"}}>門市 *
+                  <label style={{fontSize:11,color:"var(--text-2)"}}>門市 *
                     <select value={pubForm.store_id} onChange={e=>setPubForm({...pubForm,store_id:e.target.value})}
-                      style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}>
+                      style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid var(--border)",fontSize:12,marginTop:4}}>
                       <option value="">請選擇門市</option>
                       {stores.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
-                    <div style={{fontSize:9,color:"#888",marginTop:3}}>各店分開發布，避免誤推其他門市</div>
+                    <div style={{fontSize:9,color:"var(--text-3)",marginTop:3}}>各店分開發布，避免誤推其他門市</div>
                   </label>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                    <label style={{fontSize:11,color:"#666"}}>開始日期 *
+                    <label style={{fontSize:11,color:"var(--text-2)"}}>開始日期 *
                       <input type="date" value={pubForm.start} onChange={e=>setPubForm({...pubForm,start:e.target.value})}
-                        style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}/>
+                        style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid var(--border)",fontSize:12,marginTop:4}}/>
                     </label>
-                    <label style={{fontSize:11,color:"#666"}}>結束日期 *
+                    <label style={{fontSize:11,color:"var(--text-2)"}}>結束日期 *
                       <input type="date" value={pubForm.end} onChange={e=>setPubForm({...pubForm,end:e.target.value})}
-                        style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #ddd",fontSize:12,marginTop:4}}/>
+                        style={{width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid var(--border)",fontSize:12,marginTop:4}}/>
                     </label>
                   </div>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                     <button onClick={()=>{const d=new Date();d.setDate(d.getDate()-d.getDay());const e=new Date(d);e.setDate(e.getDate()+6);setPubForm({...pubForm,start:d.toLocaleDateString("sv-SE"),end:e.toLocaleDateString("sv-SE")});}}
-                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>本週</button>
+                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid var(--border)",background:"#fff",fontSize:10,cursor:"pointer"}}>本週</button>
                     <button onClick={()=>{const d=new Date();d.setDate(d.getDate()-d.getDay()+7);const e=new Date(d);e.setDate(e.getDate()+6);setPubForm({...pubForm,start:d.toLocaleDateString("sv-SE"),end:e.toLocaleDateString("sv-SE")});}}
-                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>下週</button>
+                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid var(--border)",background:"#fff",fontSize:10,cursor:"pointer"}}>下週</button>
                     <button onClick={()=>{const d=new Date();d.setDate(d.getDate()-d.getDay());const e=new Date(d);e.setDate(e.getDate()+13);setPubForm({...pubForm,start:d.toLocaleDateString("sv-SE"),end:e.toLocaleDateString("sv-SE")});}}
-                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>本+下週</button>
+                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid var(--border)",background:"#fff",fontSize:10,cursor:"pointer"}}>本+下週</button>
                     <button onClick={()=>{const t=new Date();const s=new Date(t.getFullYear(),t.getMonth(),1);const e=new Date(t.getFullYear(),t.getMonth()+1,0);setPubForm({...pubForm,start:s.toLocaleDateString("sv-SE"),end:e.toLocaleDateString("sv-SE")});}}
-                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>本月</button>
+                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid var(--border)",background:"#fff",fontSize:10,cursor:"pointer"}}>本月</button>
                     <button onClick={()=>{const t=new Date();const s=new Date(t.getFullYear(),t.getMonth()+1,1);const e=new Date(t.getFullYear(),t.getMonth()+2,0);setPubForm({...pubForm,start:s.toLocaleDateString("sv-SE"),end:e.toLocaleDateString("sv-SE")});}}
-                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid #ddd",background:"#fff",fontSize:10,cursor:"pointer"}}>下個月</button>
+                      style={{padding:"3px 8px",borderRadius:4,border:"1px solid var(--border)",background:"#fff",fontSize:10,cursor:"pointer"}}>下個月</button>
                   </div>
                   {pubForm.store_id && pubForm.start && pubForm.end && (
                     <div style={{padding:"8px 10px",background:"#f0fdf4",borderRadius:6,border:"1px solid #bbf7d0",fontSize:11,color:"#166534"}}>
                       將發布 <b>{storeName}</b> {pubForm.start} ～ {pubForm.end}（共 {dayCount} 天）<br/>
-                      <span style={{fontSize:10,color:"#888"}}>發布後該店員工才能在 LINE / 我的班表頁看到</span>
+                      <span style={{fontSize:10,color:"var(--text-3)"}}>發布後該店員工才能在 LINE / 我的班表頁看到</span>
                     </div>
                   )}
                 </div>
                 <div style={{display:"flex",gap:6,justifyContent:"flex-end",marginTop:16}}>
-                  <button onClick={()=>setPubForm(null)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:11,cursor:"pointer"}}>取消</button>
+                  <button onClick={()=>setPubForm(null)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid var(--border)",background:"#fff",fontSize:11,cursor:"pointer"}}>取消</button>
                   <button onClick={async()=>{
                     if(!pubForm.store_id){alert("請選擇門市");return;}
                     if(!pubForm.start||!pubForm.end){alert("請選擇日期區間");return;}
@@ -4046,7 +4046,7 @@ export default function AdminPage() {
                     if(r.error){alert("錯誤："+r.error);return;}
                     alert("✅ "+(r.message||`已發布 ${r.published||0} 筆，通知 ${r.notified||0} 人`));
                     setPubForm(null); load();
-                  }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"#0a7c42",color:"#fff",fontSize:11,cursor:"pointer",fontWeight:600}}>📢 確認發布</button>
+                  }} style={{padding:"6px 14px",borderRadius:6,border:"none",background:"var(--success)",color:"#fff",fontSize:11,cursor:"pointer",fontWeight:600}}>📢 確認發布</button>
                 </div>
               </div>
             </div>
@@ -4106,74 +4106,74 @@ export default function AdminPage() {
                 <button onClick={() => setSchPop(null)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer" }}>✕</button>
               </div>
               {/* 假日提醒 */}
-              {popHol && <div style={{ background: "#fde8e8", borderRadius: 6, padding: "6px 10px", marginBottom: 8, fontSize: 11, color: "#b91c1c", fontWeight: 500 }}>{"🔴 國定假日：" + popHol.name}</div>}
+              {popHol && <div style={{ background: "var(--danger-bg)", borderRadius: 6, padding: "6px 10px", marginBottom: 8, fontSize: 11, color: "var(--danger)", fontWeight: 500 }}>{"🔴 國定假日：" + popHol.name}</div>}
               {popHol && holMode === "choose" && holPending && (
-                <div style={{ background: "#fff8e6", borderRadius: 8, border: "1px solid #f0e6c8", padding: 10, marginBottom: 8 }}>
+                <div style={{ background: "var(--warning-bg)", borderRadius: 8, border: "1px solid #f0e6c8", padding: 10, marginBottom: 8 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>🔴 {popHol.name} — {holPending.shiftName || "排班"}</div>
-                  <div style={{ fontSize: 10, color: "#888", marginBottom: 8 }}>請選擇此日處理方式：</div>
+                  <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 8 }}>請選擇此日處理方式：</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <button onClick={() => confirmHol("off")} style={{ padding: 10, borderRadius: 6, border: "1px solid #0a7c42", background: "#e6f9f0", cursor: "pointer", fontSize: 11, textAlign: "left" }}>
-                      <span style={{ fontWeight: 600, color: "#0a7c42" }}>🏖 放假（不出勤）</span>
-                      <span style={{ fontSize: 9, color: "#888", marginLeft: 6 }}>標記國定假日休假</span>
+                    <button onClick={() => confirmHol("off")} style={{ padding: 10, borderRadius: 6, border: "1px solid var(--success)", background: "var(--success-bg)", cursor: "pointer", fontSize: 11, textAlign: "left" }}>
+                      <span style={{ fontWeight: 600, color: "var(--success)" }}>🏖 放假（不出勤）</span>
+                      <span style={{ fontSize: 9, color: "var(--text-3)", marginLeft: 6 }}>標記國定假日休假</span>
                     </button>
-                    <button onClick={() => setHolMode("transfer")} style={{ padding: 10, borderRadius: 6, border: "1px solid #4361ee", background: "#e6f1fb", cursor: "pointer", fontSize: 11, textAlign: "left" }}>
-                      <span style={{ fontWeight: 600, color: "#185fa5" }}>📅 出勤＋擇日補休</span>
-                      <span style={{ fontSize: 9, color: "#888", marginLeft: 6 }}>上班並選另一天補假</span>
+                    <button onClick={() => setHolMode("transfer")} style={{ padding: 10, borderRadius: 6, border: "1px solid var(--brand-strong)", background: "var(--info-bg)", cursor: "pointer", fontSize: 11, textAlign: "left" }}>
+                      <span style={{ fontWeight: 600, color: "var(--info)" }}>📅 出勤＋擇日補休</span>
+                      <span style={{ fontSize: 9, color: "var(--text-3)", marginLeft: 6 }}>上班並選另一天補假</span>
                     </button>
-                    <button onClick={() => setHolMode("work")} style={{ padding: 10, borderRadius: 6, border: "1px solid #b91c1c", background: "#fde8e8", cursor: "pointer", fontSize: 11, textAlign: "left" }}>
-                      <span style={{ fontWeight: 600, color: "#b91c1c" }}>💰 出勤加班（雙倍薪）</span>
-                      <span style={{ fontSize: 9, color: "#888", marginLeft: 6 }}>不補假，加發一日工資</span>
+                    <button onClick={() => setHolMode("work")} style={{ padding: 10, borderRadius: 6, border: "1px solid var(--danger)", background: "var(--danger-bg)", cursor: "pointer", fontSize: 11, textAlign: "left" }}>
+                      <span style={{ fontWeight: 600, color: "var(--danger)" }}>💰 出勤加班（雙倍薪）</span>
+                      <span style={{ fontSize: 9, color: "var(--text-3)", marginLeft: 6 }}>不補假，加發一日工資</span>
                     </button>
                   </div>
-                  <button onClick={() => { setHolMode(null); setHolPending(null); }} style={{ fontSize: 10, color: "#888", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ 取消</button>
+                  <button onClick={() => { setHolMode(null); setHolPending(null); }} style={{ fontSize: 10, color: "var(--text-3)", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ 取消</button>
                 </div>
               )}
               {popHol && holMode === "transfer" && holPending && (
-                <div style={{ background: "#e6f1fb", borderRadius: 8, border: "1px solid #a3c9f1", padding: 10, marginBottom: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#185fa5", marginBottom: 6 }}>📅 選擇補假日期</div>
-                  <div style={{ fontSize: 10, color: "#666", marginBottom: 6 }}>{holPending.shiftName} 在 {schPop.date}（{popHol.name}）出勤</div>
+                <div style={{ background: "var(--info-bg)", borderRadius: 8, border: "1px solid #a3c9f1", padding: 10, marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--info)", marginBottom: 6 }}>📅 選擇補假日期</div>
+                  <div style={{ fontSize: 10, color: "var(--text-2)", marginBottom: 6 }}>{holPending.shiftName} 在 {schPop.date}（{popHol.name}）出勤</div>
                   <input type="date" value={holCompDate} onChange={e => setHolCompDate(e.target.value)}
-                    style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, marginBottom: 8 }} />
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#185fa5", marginBottom: 4 }}>補假來源：</div>
+                    style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 13, marginBottom: 8 }} />
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--info)", marginBottom: 4 }}>補假來源：</div>
                   <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
                     <button onClick={() => setHolCompSource("salary")}
-                      style={{ flex: 1, padding: "6px 8px", borderRadius: 5, border: "1px solid #ddd", background: holCompSource === "salary" ? "#185fa5" : "#fff", color: holCompSource === "salary" ? "#fff" : "#666", fontSize: 11, cursor: "pointer", fontWeight: holCompSource === "salary" ? 600 : 400 }}>
+                      style={{ flex: 1, padding: "6px 8px", borderRadius: 5, border: "1px solid var(--border)", background: holCompSource === "salary" ? "var(--info)" : "#fff", color: holCompSource === "salary" ? "#fff" : "var(--text-2)", fontSize: 11, cursor: "pointer", fontWeight: holCompSource === "salary" ? 600 : 400 }}>
                       💰 扣月薪（預設）
                     </button>
                     <button onClick={() => setHolCompSource("annual_leave")}
-                      style={{ flex: 1, padding: "6px 8px", borderRadius: 5, border: "1px solid #ddd", background: holCompSource === "annual_leave" ? "#0a7c42" : "#fff", color: holCompSource === "annual_leave" ? "#fff" : "#666", fontSize: 11, cursor: "pointer", fontWeight: holCompSource === "annual_leave" ? 600 : 400 }}>
+                      style={{ flex: 1, padding: "6px 8px", borderRadius: 5, border: "1px solid var(--border)", background: holCompSource === "annual_leave" ? "var(--success)" : "#fff", color: holCompSource === "annual_leave" ? "#fff" : "var(--text-2)", fontSize: 11, cursor: "pointer", fontWeight: holCompSource === "annual_leave" ? 600 : 400 }}>
                       🏖 扣特休
                     </button>
                   </div>
-                  <div style={{ fontSize: 9, color: "#888", marginBottom: 8 }}>
+                  <div style={{ fontSize: 9, color: "var(--text-3)", marginBottom: 8 }}>
                     {holCompSource === "salary"
                       ? "5/1 加給的 1 日工資會從 5/2 補假扣回，員工實領 = 月薪"
                       : "5/1 加給的 1 日工資正常給；5/2 補假扣員工 1 天特休餘額"}
                   </div>
                   <button onClick={() => confirmHol("transfer")} disabled={!holCompDate}
-                    style={{ width: "100%", padding: 10, borderRadius: 6, border: "none", background: holCompDate ? "#4361ee" : "#ccc", color: "#fff", fontSize: 13, fontWeight: 600, cursor: holCompDate ? "pointer" : "default", marginBottom: 6 }}>
+                    style={{ width: "100%", padding: 10, borderRadius: 6, border: "none", background: holCompDate ? "var(--brand-strong)" : "#ccc", color: "#fff", fontSize: 13, fontWeight: 600, cursor: holCompDate ? "pointer" : "default", marginBottom: 6 }}>
                     ✅ 確認排班＋補假 {holCompDate || ""}
                   </button>
-                  <button onClick={() => setHolMode("choose")} style={{ fontSize: 10, color: "#888", background: "none", border: "none", cursor: "pointer" }}>← 返回選擇</button>
+                  <button onClick={() => setHolMode("choose")} style={{ fontSize: 10, color: "var(--text-3)", background: "none", border: "none", cursor: "pointer" }}>← 返回選擇</button>
                 </div>
               )}
               {popHol && holMode === "work" && holPending && (
-                <div style={{ background: "#fde8e8", borderRadius: 8, border: "1px solid #f5c6c6", padding: 10, marginBottom: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#b91c1c", marginBottom: 4 }}>💰 國定假日出勤（雙倍薪）</div>
-                  <div style={{ fontSize: 10, color: "#666", marginBottom: 8 }}>{holPending.shiftName} — 月薪制加發 1 日工資，時薪制全時數×2</div>
+                <div style={{ background: "var(--danger-bg)", borderRadius: 8, border: "1px solid #f5c6c6", padding: 10, marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--danger)", marginBottom: 4 }}>💰 國定假日出勤（雙倍薪）</div>
+                  <div style={{ fontSize: 10, color: "var(--text-2)", marginBottom: 8 }}>{holPending.shiftName} — 月薪制加發 1 日工資，時薪制全時數×2</div>
                   <button onClick={() => confirmHol("work")}
-                    style={{ width: "100%", padding: 10, borderRadius: 6, border: "none", background: "#b91c1c", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 6 }}>
+                    style={{ width: "100%", padding: 10, borderRadius: 6, border: "none", background: "var(--danger)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 6 }}>
                     ✅ 確認出勤（雙倍薪）
                   </button>
-                  <button onClick={() => setHolMode("choose")} style={{ fontSize: 10, color: "#888", background: "none", border: "none", cursor: "pointer" }}>← 返回選擇</button>
+                  <button onClick={() => setHolMode("choose")} style={{ fontSize: 10, color: "var(--text-3)", background: "none", border: "none", cursor: "pointer" }}>← 返回選擇</button>
                 </div>
               )}
               {/* 已有排班 */}
               {scheds.filter(s => s.date === schPop.date && (schPop.storeId === "__hq__" ? !emps.find(e => e.id === s.employee_id)?.store_id : emps.find(e => e.id === s.employee_id)?.store_id === schPop.storeId)).map(s => (
-                <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", marginBottom: 4, borderRadius: 6, background: s.type === "leave" ? (LT[s.leave_type] || LT.off).bg : s.published ? "#e6f9f0" : "#fff8e6", border: s.published ? "1px solid #0a7c42" : "1px dashed #d4a017" }}>
+                <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", marginBottom: 4, borderRadius: 6, background: s.type === "leave" ? (LT[s.leave_type] || LT.off).bg : s.published ? "var(--success-bg)" : "var(--warning-bg)", border: s.published ? "1px solid var(--success)" : "1px dashed #d4a017" }}>
                   <div>
                     <span style={{ fontSize: 11 }}>{(s.employees?.name || "") + " " + (s.type === "leave" ? (LT[s.leave_type] || LT.off).l : (s.shifts?.role&&s.shifts.role!=="all"?s.shifts.role:"全場") + " " + (s.shifts?(s.shifts.start_time||"").slice(0,5)+"~"+(s.shifts.end_time||"").slice(0,5):"") + (s.day_type === "rest_day" ? " 💰休息日" : ""))}</span>
-                    {s.notes && <div style={{ fontSize: 8, color: "#888" }}>{s.notes}</div>}
+                    {s.notes && <div style={{ fontSize: 8, color: "var(--text-3)" }}>{s.notes}</div>}
                   </div>
                   <button onClick={async () => {
                     let r = await ap("/api/admin/schedules", { action: "delete", schedule_id: s.id });
@@ -4183,26 +4183,26 @@ export default function AdminPage() {
                       await ap("/api/admin/schedules", { action: "delete", schedule_id: s.id, attendance_mode: c === "1" ? "keep" : "delete" });
                     }
                     load();
-                  }} style={{ background: "none", border: "none", color: "#b91c1c", cursor: "pointer", fontSize: 11 }}>✕刪</button>
+                  }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", fontSize: 11 }}>✕刪</button>
                 </div>
               ))}
               <div style={{ borderTop: "1px solid #eee", marginTop: 8, paddingTop: 8 }}>
-                <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>選員工 + 崗位排入：</div>
-                <select id="pop-emp" style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, marginBottom: 6 }}>
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6 }}>選員工 + 崗位排入：</div>
+                <select id="pop-emp" style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 12, marginBottom: 6 }}>
                   <option value="">選員工</option>
                   {ae.filter(e => schPop.storeId === "__hq__" ? !e.store_id : e.store_id === schPop.storeId).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                  {shifts.filter(s => schPop.storeId === "__hq__" || s.store_id === schPop.storeId).map(s => {const pc=positions.find(p=>p.name===s.role)?.color||s.color||"#0a7c42";return(
+                  {shifts.filter(s => schPop.storeId === "__hq__" || s.store_id === schPop.storeId).map(s => {const pc=positions.find(p=>p.name===s.role)?.color||s.color||"var(--success)";return(
                     <button key={s.id} onClick={() => { const eid = document.getElementById("pop-emp").value; if (!eid) { alert("請選員工"); return; } schedOnHol(eid, s.id, s.name); }}
-                      style={{ padding: "8px", borderRadius: 6, border: "1px solid #ddd", background: pc+"10", fontSize: 11, cursor: "pointer", textAlign: "left" }}><span style={{color:pc,fontWeight:600}}>{s.role==="all"?"全場":s.role||"全場"}</span><div style={{ fontSize: 9, color: "#888" }}>{(s.start_time || "").slice(0, 5) + "~" + (s.end_time || "").slice(0, 5)}</div></button>
+                      style={{ padding: "8px", borderRadius: 6, border: "1px solid var(--border)", background: pc+"10", fontSize: 11, cursor: "pointer", textAlign: "left" }}><span style={{color:pc,fontWeight:600}}>{s.role==="all"?"全場":s.role||"全場"}</span><div style={{ fontSize: 9, color: "var(--text-3)" }}>{(s.start_time || "").slice(0, 5) + "~" + (s.end_time || "").slice(0, 5)}</div></button>
                   );})}
                 </div>
                 {/* 💰 休息日出勤 — 選班別直接建 rest_day 排班 */}
-                <div style={{ marginTop: 8, padding: "6px 0", borderTop: "1px solid #e8e6e1" }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: "#b45309", marginBottom: 4 }}>💰 休息日出勤（選班別 → 自動推同意書）</div>
+                <div style={{ marginTop: 8, padding: "6px 0", borderTop: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: "var(--warning)", marginBottom: 4 }}>💰 休息日出勤（選班別 → 自動推同意書）</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                    {shifts.filter(s => schPop.storeId === "__hq__" || s.store_id === schPop.storeId).map(s => {const pc=positions.find(p=>p.name===s.role)?.color||s.color||"#b45309";return(
+                    {shifts.filter(s => schPop.storeId === "__hq__" || s.store_id === schPop.storeId).map(s => {const pc=positions.find(p=>p.name===s.role)?.color||s.color||"var(--warning)";return(
                       <button key={"rest-"+s.id} onClick={async () => {
                         const eid = document.getElementById("pop-emp").value;
                         if (!eid) { alert("請選員工"); return; }
@@ -4212,9 +4212,9 @@ export default function AdminPage() {
                         else alert("✅ 已排休息日出勤，同意書已推送");
                         load();
                       }}
-                        style={{ padding: "6px", borderRadius: 6, border: "1px dashed #b45309", background: "#fff8e6", fontSize: 10, cursor: "pointer", textAlign: "left" }}>
-                        <span style={{color:"#b45309",fontWeight:600}}>💰 {s.role==="all"?"全場":s.role||"全場"}</span>
-                        <div style={{ fontSize: 8, color: "#888" }}>{(s.start_time || "").slice(0, 5) + "~" + (s.end_time || "").slice(0, 5)}</div>
+                        style={{ padding: "6px", borderRadius: 6, border: "1px dashed var(--warning)", background: "var(--warning-bg)", fontSize: 10, cursor: "pointer", textAlign: "left" }}>
+                        <span style={{color:"var(--warning)",fontWeight:600}}>💰 {s.role==="all"?"全場":s.role||"全場"}</span>
+                        <div style={{ fontSize: 8, color: "var(--text-3)" }}>{(s.start_time || "").slice(0, 5) + "~" + (s.end_time || "").slice(0, 5)}</div>
                       </button>
                     );})}
                   </div>
@@ -4224,7 +4224,7 @@ export default function AdminPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginTop: 6 }}>
                   {[["off","⬛ 例假"],["rest","🔲 休息日(不上班)"],["annual","🏖 特休"],["advance","📌 預假"],["holiday_comp","🔴 國定補假"],["personal","📋 事假"],["sick","🤒 病假"]].map(([k, l]) => (
                     <button key={k} onClick={async () => { const eid = document.getElementById("pop-emp").value; if (!eid) { alert("請選員工"); return; } const r = await ap("/api/admin/schedules", { action: "add_leave", employee_id: eid, date: schPop.date, leave_type: k }); if (r.message) alert(r.message); if (r.error) alert(r.error); load(); }}
-                      style={{ padding: "6px", borderRadius: 6, border: "1px solid #ddd", background: "#faf8f5", fontSize: 11, cursor: "pointer" }}>{l}</button>
+                      style={{ padding: "6px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface-warm)", fontSize: 11, cursor: "pointer" }}>{l}</button>
                   ))}
                 </div>
               </div>
@@ -4239,10 +4239,10 @@ export default function AdminPage() {
             <div style={{display:"none",color:"#fff",textAlign:"center",padding:20}}>
               <div style={{fontSize:40,marginBottom:10}}>⚠️</div>
               <div style={{fontSize:14,marginBottom:8}}>圖片無法載入</div>
-              <div style={{fontSize:11,color:"#aaa"}}>請至 Supabase → Storage → receipts bucket → 開啟 Public</div>
-              <div style={{fontSize:10,color:"#666",marginTop:8,wordBreak:"break-all",maxWidth:400}}>{si}</div>
+              <div style={{fontSize:11,color:"var(--text-hint)"}}>請至 Supabase → Storage → receipts bucket → 開啟 Public</div>
+              <div style={{fontSize:10,color:"var(--text-2)",marginTop:8,wordBreak:"break-all",maxWidth:400}}>{si}</div>
             </div>
-            <button onClick={()=>setSi(null)} style={{marginTop:12,padding:"8px 20px",borderRadius:6,border:"none",background:"#fff",color:"#333",fontSize:13,cursor:"pointer"}}>✕ 關閉</button>
+            <button onClick={()=>setSi(null)} style={{marginTop:12,padding:"8px 20px",borderRadius:6,border:"none",background:"#fff",color:"var(--text)",fontSize:13,cursor:"pointer"}}>✕ 關閉</button>
           </div>
         )}
 
