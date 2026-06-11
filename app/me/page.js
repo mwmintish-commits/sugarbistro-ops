@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import MarkdownView from "../components/MarkdownView";
 import { checkAppVersion, nukeCache } from "../../lib/cache-buster";
+import { PageShell, LoadingSkeleton, ErrorState } from "../components/ui";
 
 const webUrl = (path, eid) => `${path}?eid=${eid}`;
 
@@ -166,10 +167,8 @@ export default function MePanel() {
     setMarkingRead(null);
   };
 
-  const wrap = { maxWidth: 480, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "#f7f5f0", minHeight: "100vh" };
-
-  if (loading) return <div style={wrap}><p style={{ textAlign: "center", color: "#888", padding: 60 }}>載入中...</p></div>;
-  if (err)     return <div style={wrap}><p style={{ textAlign: "center", color: "#b91c1c", padding: 60 }}>{err}</p></div>;
+  if (loading) return <PageShell><LoadingSkeleton kind="grid" /></PageShell>;
+  if (err)     return <PageShell><ErrorState message={err} onRetry={() => window.location.reload()} /></PageShell>;
 
   const isAuditRole = ["admin", "manager"].includes(emp?.role);
   const items = buildItems(eid || "", emp);
@@ -186,8 +185,8 @@ export default function MePanel() {
   }
 
   return (
-    <div style={wrap}>
-      <div style={{ background: isAuditRole ? "linear-gradient(135deg, #6366f1, #4338ca)" : "linear-gradient(135deg, #fbbf24, #f59e0b)", borderRadius: 16, padding: "20px 18px", marginBottom: 14, color: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
+    <PageShell>
+      <div style={{ background: isAuditRole ? "var(--audit-grad)" : "var(--brand-grad)", borderRadius: "var(--radius-lg)", padding: "20px 18px", marginBottom: 14, color: "#fff", boxShadow: "var(--shadow-float)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: 11, opacity: 0.9 }}>{isAuditRole ? "🛡️ 小食糖稽核面板" : "🍯 小食糖員工面板"}</div>
@@ -209,8 +208,8 @@ export default function MePanel() {
             const unread = anns.filter(a => !a.is_read).length;
             return (
               <div style={{ display: "flex", alignItems: "center", marginBottom: 8, gap: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#333" }}>📢 公告</span>
-                {unread > 0 && <span style={{ background: "#ef4444", color: "#fff", borderRadius: 99, fontSize: 11, fontWeight: 700, padding: "1px 8px" }}>{unread} 則未讀</span>}
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>📢 公告</span>
+                {unread > 0 && <span style={{ background: "var(--danger)", color: "#fff", borderRadius: 99, fontSize: 11, fontWeight: 700, padding: "1px 8px" }}>{unread} 則未讀</span>}
               </div>
             );
           })()}
@@ -219,17 +218,17 @@ export default function MePanel() {
               const isExpanded = expandedAnn === ann.id;
               const isUrgent = ann.priority === "urgent";
               return (
-                <div key={ann.id} style={{ background: "#fff", borderRadius: 12, border: isUrgent ? "1.5px solid #ef4444" : "1px solid #e8e6e1", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+                <div key={ann.id} style={{ background: "var(--surface)", borderRadius: "var(--radius)", border: isUrgent ? "1.5px solid var(--danger)" : "1px solid var(--border)", overflow: "hidden", boxShadow: "var(--shadow-card)" }}>
                   <button
                     onClick={() => setExpandedAnn(isExpanded ? null : ann.id)}
                     style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
                     <span style={{ fontSize: 16 }}>{isUrgent ? "🔴" : "📣"}</span>
-                    <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: isUrgent ? "#b91c1c" : "#222", lineHeight: 1.3 }}>{ann.title}</span>
-                    <span style={{ fontSize: 11, color: ann.is_read ? "#4ade80" : "#f59e0b", fontWeight: 700, whiteSpace: "nowrap" }}>{ann.is_read ? "✓ 已讀" : "未讀"}</span>
-                    <span style={{ fontSize: 12, color: "#aaa", marginLeft: 4 }}>{isExpanded ? "▲" : "▼"}</span>
+                    <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: isUrgent ? "var(--danger)" : "var(--text)", lineHeight: 1.3 }}>{ann.title}</span>
+                    <span style={{ fontSize: 11, color: ann.is_read ? "var(--success)" : "var(--brand-strong)", fontWeight: 700, whiteSpace: "nowrap" }}>{ann.is_read ? "✓ 已讀" : "未讀"}</span>
+                    <span style={{ fontSize: 12, color: "var(--text-hint)", marginLeft: 4 }}>{isExpanded ? "▲" : "▼"}</span>
                   </button>
                   {isExpanded && (
-                    <div style={{ borderTop: "1px solid #f0ede8", padding: "16px 18px 18px" }}>
+                    <div style={{ borderTop: "1px solid var(--divider)", padding: "16px 18px 18px" }}>
                       <MarkdownView content={ann.content} />
                       {Array.isArray(ann.attachments) && ann.attachments.length > 0 && (
                         <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -244,7 +243,7 @@ export default function MePanel() {
                             }
                             return (
                               <a key={ai} href={att.url} target="_blank" rel="noreferrer"
-                                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#faf5e8", border: "1px solid #e8dfc4", borderRadius: 8, textDecoration: "none", color: "#222" }}>
+                                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "var(--surface-warm)", border: "1px solid var(--border)", borderRadius: 8, textDecoration: "none", color: "var(--text)" }}>
                                 <span style={{ fontSize: 22 }}>📎</span>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{att.name || "附件"}</div>
@@ -256,12 +255,12 @@ export default function MePanel() {
                           })}
                         </div>
                       )}
-                      {ann.tag && <div style={{ marginTop: 12, display: "inline-block", fontSize: 11, color: "#6b7280", background: "#f3f4f6", padding: "2px 8px", borderRadius: 99 }}>#{ann.tag}</div>}
+                      {ann.tag && <div style={{ marginTop: 12, display: "inline-block", fontSize: 11, color: "var(--text-3)", background: "var(--surface-warm)", padding: "2px 8px", borderRadius: 99 }}>#{ann.tag}</div>}
                       {!ann.is_read && (
                         <button
                           onClick={() => markRead(ann.id)}
                           disabled={markingRead === ann.id}
-                          style={{ marginTop: 16, width: "100%", padding: "12px 0", background: "#22c55e", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: markingRead === ann.id ? "wait" : "pointer", opacity: markingRead === ann.id ? 0.6 : 1 }}>
+                          style={{ marginTop: 16, width: "100%", padding: "12px 0", background: "var(--success)", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: markingRead === ann.id ? "wait" : "pointer", opacity: markingRead === ann.id ? 0.6 : 1 }}>
                           {markingRead === ann.id ? "處理中..." : "✓ 閱讀完畢"}
                         </button>
                       )}
@@ -284,21 +283,21 @@ export default function MePanel() {
               disabled={isLoading}
               style={{
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                background: "#fff", borderRadius: 14, padding: "16px 6px",
-                border: "1px solid #e8e6e1", boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                background: "var(--surface)", borderRadius: 14, padding: "16px 6px",
+                border: "1px solid var(--border)", boxShadow: "var(--shadow-card)",
                 minHeight: 96, cursor: isLoading ? "wait" : "pointer", opacity: isLoading ? 0.6 : 1,
               }}>
               <div style={{ width: 44, height: 44, borderRadius: "50%", background: it.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, marginBottom: 6 }}>
                 {isLoading ? "⏳" : it.icon}
               </div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#222" }}>{isLoading ? "處理中..." : it.label}</div>
-              <div style={{ fontSize: 9, color: "#888", marginTop: 2 }}>{it.desc}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{isLoading ? "處理中..." : it.label}</div>
+              <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 2 }}>{it.desc}</div>
             </button>
           );
         })}
       </div>
 
-      <div style={{ marginTop: 18, textAlign: "center", fontSize: 11, color: "#888" }}>
+      <div style={{ marginTop: 18, textAlign: "center", fontSize: 11, color: "var(--text-3)" }}>
         {isAuditRole ? "面板聚焦稽核與審核作業，個人事項請至後台查詢" : "打卡/補打卡/請假/班表/薪資 在網頁內完成，不消耗 LINE 訊息"}
       </div>
       <div style={{ marginTop: 8, textAlign: "center" }}>
@@ -306,10 +305,10 @@ export default function MePanel() {
           if (!confirm("這會清掉本裝置所有快取並重新整理。\n用於排解「載入卡住、頁面異常」。確定？")) return;
           nukeCache();
           setTimeout(() => window.location.reload(true), 300);
-        }} style={{ fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+        }} style={{ fontSize: 11, color: "var(--text-hint)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: "8px 12px" }}>
           載入有問題？點此強制清快取
         </button>
       </div>
-    </div>
+    </PageShell>
   );
 }

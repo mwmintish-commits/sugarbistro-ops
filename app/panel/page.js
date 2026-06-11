@@ -50,13 +50,14 @@ export default function PanelLanding() {
   useEffect(() => { boot(); }, [boot, attempt]);
 
   return (
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",fontFamily:"system-ui,'Noto Sans TC',sans-serif",background:"#f7f5f0",padding:20,textAlign:"center"}}>
-      <div>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100dvh",background:"var(--bg)",padding:20,textAlign:"center"}}>
+      <div style={{width:"100%",maxWidth:320}}>
         <div style={{fontSize:40,marginBottom:12}}>🍯</div>
-        <div style={{fontSize:14,color:"#666",marginBottom:16,whiteSpace:"pre-line"}}>{msg}</div>
+        {!canRetry && <div className="sb-skel" style={{height:8,width:160,margin:"0 auto 14px",borderRadius:99}} />}
+        <div style={{fontSize:14,color:"var(--text-2)",marginBottom:16,whiteSpace:"pre-line"}}>{msg}</div>
         {canRetry && (
           <button onClick={() => setAttempt(a => a + 1)}
-            style={{padding:"8px 20px",borderRadius:8,border:"none",background:"#0a7c42",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>
+            className="sb-btn sb-btn-success" style={{width:"auto",padding:"0 24px"}}>
             🔄 重試
           </button>
         )}
