@@ -15,7 +15,7 @@ export async function POST(request) {
   if (!emp.is_active) return Response.json({ error: "員工尚未啟用，請聯繫主管" }, { status: 403 });
 
   const token = crypto.randomBytes(16).toString("hex");
-  const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 分鐘有效
+  const expires = new Date(Date.now() + 20 * 60 * 1000); // 20 分鐘有效（GPS 慢/被打斷的緩衝）
 
   const { error } = await supabase.from("clockin_tokens").insert({
     token, employee_id, type, store_id: emp.store_id || null,

@@ -39,6 +39,21 @@ export default function ClockInPage() {
     return () => { clearTimeout(timer); ctrl.abort(); };
   }, []);
 
+  // 進頁就自動定位，與 token 載入並行（原本要等載入完再手動點「取得位置」，
+  // 串行等待 + 多一次點擊；失敗時按鈕仍在，可手動重試）
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("token")) {
+      getLocation();
+    }
+  }, []);
+
+  // GPS 與門市資料各自非同步到達：兩者都齊了才算距離
+  useEffect(() => {
+    if (position && info?.store?.latitude && info?.store?.longitude) {
+      setDistance(calcDist(position.lat, position.lng, info.store.latitude, info.store.longitude));
+    }
+  }, [position, info]);
+
   function calcDist(lat1, lon1, lat2, lon2) {
     const R = 6371000, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
@@ -184,7 +199,7 @@ export default function ClockInPage() {
           <div className="sb-card" style={{ borderRadius: 10, padding: 14, marginBottom: 10 }}>
             {!position ? (
               <button onClick={getLocation} disabled={gpsLoading} className="sb-btn sb-btn-primary" style={{ fontSize: 15 }}>
-                {gpsLoading ? "📍 定位中（約5秒）..." : "📍 取得目前位置"}
+                {gpsLoading ? "📍 定位中..." : "📍 重新定位"}
               </button>
             ) : (
               <div>

@@ -17,13 +17,16 @@ export async function GET(request) {
   if (t.used) return Response.json({ error: "Token already used" }, { status: 400 });
   if (new Date(t.expires_at) < new Date()) return Response.json({ error: "Token expired" }, { status: 400 });
 
-  const { data: emp } = await supabase.from("employees").select("name, store_id, stores!store_id(*)").eq("id", t.employee_id).single();
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Taipei" });
-  const { data: schedule } = await supabase.from("schedules").select("*, shifts(*)").eq("employee_id", t.employee_id).eq("date", today).single();
+  // 並行查詢：員工與今日排班互不依賴，省一次 round-trip（冷啟動時差更明顯）
+  const [{ data: emp }, { data: schedule }] = await Promise.all([
+    supabase.from("employees").select("name, store_id, stores!store_id(*)").eq("id", t.employee_id).single(),
+    supabase.from("schedules").select("*, shifts(*)").eq("employee_id", t.employee_id).eq("date", today).single(),
+  ]);
 
   return Response.json({
     employee_name: emp?.name, employee_id: t.employee_id, type: t.type,
-    store: emp?.stores ? { name: emp.stores.name, latitude: emp.stores.latitude, longitude: emp.stores.longitude, radius_m: emp.stores.radius_m } : null,
+    store: emp?.stores ? { id: emp.stores.id, name: emp.stores.name, latitude: emp.stores.latitude, longitude: emp.stores.longitude, radius_m: emp.stores.radius_m } : null,
     schedule: schedule ? { shift_name: schedule.shifts?.name, start_time: schedule.shifts?.start_time, end_time: schedule.shifts?.end_time } : null,
   });
 }
@@ -46,16 +49,24 @@ export async function POST(request) {
     const { data: existing } = await supabase.from("clockin_tokens").select("used, expires_at").eq("token", token).maybeSingle();
     if (!existing) return Response.json({ error: "打卡連結無效，請從 LINE 重新開啟" }, { status: 404 });
     if (existing.used) return Response.json({ error: "此打卡連結已使用，請重新從 LINE 取得新連結" }, { status: 400 });
-    return Response.json({ error: "打卡連結已過期（10 分鐘），請重新開啟" }, { status: 400 });
+    return Response.json({ error: "打卡連結已過期，請重新從 LINE 開啟" }, { status: 400 });
   }
 
   // 並行抓員工 + 今日排班，加快 cold start 場景
   const now = new Date();
   const taipeiNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
   const today = taipeiNow.toLocaleDateString("sv-SE");
-  const [{ data: emp }, { data: schedule }] = await Promise.all([
+  const todayStart = today + "T00:00:00+08:00";
+  const todayEnd = today + "T23:59:59+08:00";
+  const [{ data: emp }, { data: schedule }, { data: todayRecs }, { data: settings }] = await Promise.all([
     supabase.from("employees").select("name, line_uid, store_id, hourly_rate, monthly_salary, stores!store_id(*)").eq("id", t.employee_id).maybeSingle(),
     supabase.from("schedules").select("*, shifts(*)").eq("employee_id", t.employee_id).eq("date", today).maybeSingle(),
+    supabase.from("attendances").select("id, timestamp, is_amendment")
+      .eq("employee_id", t.employee_id).eq("type", t.type)
+      .gte("timestamp", todayStart).lte("timestamp", todayEnd)
+      .order("timestamp", { ascending: false }),
+    // maybeSingle 防 0 row 時 throw（attendance_settings 沒設定時整個 API 會 crash）
+    supabase.from("attendance_settings").select("*").limit(1).maybeSingle(),
   ]);
   if (!emp) {
     // 取消已鎖定的 token（恢復 used=false）讓使用者可再試
@@ -88,14 +99,6 @@ export async function POST(request) {
   // 2) 達當日上限（單班=1次，雙班=2次）→ 拒絕，請走補打卡流程
   {
     const typeLabel = t.type === "clock_in" ? "上班" : "下班";
-    const todayStart = today + "T00:00:00+08:00";
-    const todayEnd = today + "T23:59:59+08:00";
-    const { data: todayRecs } = await supabase.from("attendances")
-      .select("id, timestamp, is_amendment")
-      .eq("employee_id", t.employee_id)
-      .eq("type", t.type)
-      .gte("timestamp", todayStart).lte("timestamp", todayEnd)
-      .order("timestamp", { ascending: false });
     const normalRecs = (todayRecs || []).filter(r => !r.is_amendment);
 
     if (normalRecs[0]) {
@@ -117,9 +120,6 @@ export async function POST(request) {
       }, { status: 409 });
     }
   }
-  // maybeSingle 防 0 row 時 throw（attendance_settings 沒設定時整個 API 會 crash）
-  const { data: settings } = await supabase.from("attendance_settings").select("*").limit(1).maybeSingle();
-
   // 自動矯正：下班超過 end_time 但未達加班起算門檻 → 視為準時下班（記錄為排班 end_time）
   if (t.type === "clock_out" && schedule?.shifts?.end_time) {
     const [eh0, em0] = schedule.shifts.end_time.split(":").map(Number);
@@ -193,18 +193,7 @@ export async function POST(request) {
   if (!isValid) msg += `\n⚠️ 超出範圍（${distance}m > ${store?.radius_m}m）`;
   if (lateMinutes > 0) msg += `\n⏰ 遲到 ${lateMinutes} 分鐘`;
   if (earlyLeaveMinutes > 0) msg += `\n🏃 早退 ${earlyLeaveMinutes} 分鐘`;
-  await pushText(emp?.line_uid, msg).catch(() => {});
-
-  // 上班打卡後自動發送工作日誌連結
-  if (t.type === "clock_in" && emp?.line_uid) {
-    const baseUrl = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
-    const wlUrl = `${baseUrl}/worklog?eid=${t.employee_id}&sid=${store?.id || ""}&name=${encodeURIComponent(emp.name)}`;
-    const { lineClient } = await import("@/lib/line");
-    await lineClient.pushMessage({
-      to: emp.line_uid,
-      messages: [{ type: "template", altText: "填寫工作日誌", template: { type: "buttons", title: "📋 每日工作日誌", text: "請確認今日工作項目", actions: [{ type: "uri", label: "填寫工作日誌", uri: wlUrl }] } }],
-    }).catch(() => {});
-  }
+  // 注意：msg 在下方加班判定後才推播（加班行要拼進去），所有推播最後一次並行送出
 
   // 下班打卡：自動偵測加班（依 schedule.day_type 區分費率，與 payroll 邏輯一致）
   // 整段以 try-catch 包覆 — 加班記錄失敗不影響打卡成功
@@ -274,14 +263,26 @@ export async function POST(request) {
     }
   } catch (e) { console.error("OT block error:", e?.message); }
 
-  // 分層通知：該店店長 + 區經理（失敗不影響打卡）
+  // 所有 LINE 推播並行送出（成功訊息/工作日誌卡片/遲到早退通知），縮短員工等待時間
   try {
+    const pushes = [pushText(emp?.line_uid, msg)];
+    if (t.type === "clock_in" && emp?.line_uid) {
+      const baseUrl = process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app";
+      const wlUrl = `${baseUrl}/worklog?eid=${t.employee_id}&sid=${store?.id || ""}&name=${encodeURIComponent(emp.name)}`;
+      const { lineClient } = await import("@/lib/line");
+      pushes.push(lineClient.pushMessage({
+        to: emp.line_uid,
+        messages: [{ type: "template", altText: "填寫工作日誌", template: { type: "buttons", title: "📋 每日工作日誌", text: "請確認今日工作項目", actions: [{ type: "uri", label: "填寫工作日誌", uri: wlUrl }] } }],
+      }));
+    }
     if (lateMinutes > 0 || earlyLeaveMinutes > 0) {
       const { getStoreManagers } = await import("@/lib/notify");
-      const recipients = await getStoreManagers(supabase, store?.id);
       const tag = lateMinutes > 0 ? `⏰ 遲到 ${lateMinutes}分鐘` : `🏃 早退 ${earlyLeaveMinutes}分鐘`;
-      for (const r of recipients) await pushText(r.line_uid, `${tag}｜${emp?.name}（${store?.name}）`).catch(() => {});
+      pushes.push(getStoreManagers(supabase, store?.id).then(recipients =>
+        Promise.allSettled(recipients.map(r => pushText(r.line_uid, `${tag}｜${emp?.name}（${store?.name}）`)))
+      ));
     }
+    await Promise.allSettled(pushes);
   } catch (e) { console.error("Notify block error:", e?.message); }
 
   return Response.json({ success: true, type: t.type, time: currentTime, distance, is_valid: isValid, late_minutes: lateMinutes, early_leave_minutes: earlyLeaveMinutes, store_name: store?.name });

@@ -63,9 +63,9 @@ async function handleClockAction(rt, emp, type) {
     const url = `${process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app"}/onboarding?bind_code=${emp.bind_code}`;
     return replyText(rt, "❌ 帳號尚未啟用，請聯繫主管核准\n\n如未完成報到：\n👉 " + url);
   }
-  const token = crypto.randomBytes(24).toString("hex");
-  await supabase.from("clockin_tokens").insert({ token, employee_id: emp.id, type, store_id: emp.store_id, expires_at: new Date(Date.now() + 600000).toISOString() });
-  const url = `${process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app"}/clockin?token=${token}`;
+  // 永久連結：點按鈕當下才產 token（/api/clockin/go 產生後 302 到 /clockin）
+  // 聊天室裡的舊打卡卡片因此永遠有效，不會再出現「連結已過期/已使用」
+  const url = `${process.env.SITE_URL || "https://sugarbistro-ops.zeabur.app"}/api/clockin/go?eid=${emp.id}&type=${type}`;
   const label = type === "clock_in" ? "上班" : "下班";
   return lineClient.replyMessage({ replyToken: rt, messages: [{ type: "template", altText: `${label}打卡`, template: { type: "buttons", title: `📍 ${label}打卡`, text: `👤 ${emp.name}\n點擊下方按鈕`, actions: [{ type: "uri", label: `開始${label}打卡`, uri: url }] } }] });
 }
