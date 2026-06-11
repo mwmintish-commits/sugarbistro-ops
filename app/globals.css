@@ -1,0 +1,193 @@
+/* ============================================================
+   小食糖 Sugar Bistro — 全站設計系統
+   Design tokens 採用「小食糖會員系統」品牌色票（標準色 sugar-500 #c8975d）
+   class 一律 sb- 前綴，避免與既有 inline style 衝突
+   ============================================================ */
+
+:root {
+  /* 糖色階 Sugar（主色） */
+  --sugar-50: #fbf7ef;
+  --sugar-100: #f4e9d3;
+  --sugar-200: #e7d0a5;
+  --sugar-300: #dab679;
+  --sugar-400: #d2a66a;
+  --sugar-500: #c8975d; /* ★ 標準色 */
+  --sugar-600: #b38449;
+  --sugar-700: #8f6938;
+  --sugar-800: #6b4f2a;
+  --sugar-900: #3c2d19;
+
+  /* 底色 / 中性 Neutral */
+  --cream: #faf6ee;
+  --paper: #f3ecdd;
+  --line: #e6ddc9;
+  --ink: #2f2a22;
+  --ink-soft: #4a4238;
+  --muted: #8a7f6f;
+
+  /* 輔助色 Accent */
+  --earth-500: #8b6f47;
+  --earth-700: #6a5434;
+  --matcha-500: #7a8f6a;
+  --matcha-700: #5d7050;
+
+  /* ---- 語意層（頁面一律用這層） ---- */
+  --bg: var(--cream);
+  --surface: #fff;
+  --surface-warm: var(--paper);
+  --border: var(--line);
+  --divider: #efe8d8;
+  --text: var(--ink);
+  --text-2: var(--ink-soft);
+  --text-3: var(--muted);
+  --text-hint: #b3a892;
+
+  --brand: var(--sugar-500);
+  --brand-strong: var(--sugar-700); /* 白字按鈕用，對比足夠 */
+  --brand-grad: linear-gradient(135deg, var(--sugar-400), var(--sugar-600));
+  --audit-grad: linear-gradient(135deg, var(--earth-500), var(--earth-700));
+
+  --success: var(--matcha-700);
+  --success-bg: #eef2ea;
+  --danger: #b5544a; /* 色票無紅，補低飽和磚紅 */
+  --danger-bg: #f9e9e7;
+  --warning: var(--earth-700);
+  --warning-bg: var(--sugar-100);
+  --info: var(--earth-500);
+  --info-bg: var(--paper);
+
+  /* 幾何 */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --shadow-card: 0 1px 3px rgba(60, 45, 25, 0.08);
+  --shadow-float: 0 2px 8px rgba(60, 45, 25, 0.16);
+
+  /* 字型：維持系統字型棧（不載 webfont，LINE webview 首載才快） */
+  --font: system-ui, -apple-system, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+
+  /* 版面 */
+  --page-max: 480px;
+  --tap-min: 44px;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+
+/* 16px 以上 iOS 聚焦才不會自動放大 */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+@keyframes sb-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.9; }
+}
+
+/* ---- 員工端共用 class ---- */
+
+.sb-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+
+.sb-btn {
+  min-height: var(--tap-min);
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  padding: 0 16px;
+}
+.sb-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.sb-btn-primary { background: var(--brand-strong); color: #fff; }
+.sb-btn-success { background: var(--success); color: #fff; }
+.sb-btn-danger { background: var(--danger); color: #fff; }
+.sb-btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+}
+
+.sb-skel {
+  background: var(--line);
+  border-radius: 8px;
+  animation: sb-pulse 1.4s ease-in-out infinite;
+}
+
+/* ============================================================
+   管理後台（app/page.js）響應式區段
+   ============================================================ */
+
+.sb-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-sm);
+}
+.sb-table-wrap table th:first-child,
+.sb-table-wrap table td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+.sb-table-wrap table thead th:first-child {
+  z-index: 2;
+}
+
+.sb-admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (max-width: 768px) {
+  .sb-admin-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .sb-admin-tabs::-webkit-scrollbar { display: none; }
+  .sb-admin-tabs > * { flex: 0 0 auto; }
+
+  .sb-admin-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .sb-admin-toolbar > * { width: 100%; }
+
+  .sb-admin-header { padding: 8px 10px !important; }
+
+  .sb-admin button,
+  .sb-admin select,
+  .sb-admin input[type="date"],
+  .sb-admin input[type="month"] {
+    min-height: var(--tap-min);
+  }
+}
