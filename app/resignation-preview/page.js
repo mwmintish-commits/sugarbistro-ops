@@ -98,16 +98,16 @@ export default function ResignationPreviewPage() {
   };
 
   return (
-    <div style={{ background: "#222", minHeight: "100vh", padding: "20px 12px", fontFamily: "system-ui, 'Noto Sans TC', sans-serif" }}>
+    <div style={{ background: "var(--text)", minHeight: "100vh", padding: "20px 12px", fontFamily: "system-ui, 'Noto Sans TC', sans-serif" }}>
       {/* 預覽控制列 */}
-      <div style={{ maxWidth: 520, margin: "0 auto 12px", padding: 10, background: "#444", borderRadius: 8, color: "#fff", fontSize: 12 }}>
+      <div style={{ maxWidth: 520, margin: "0 auto 12px", padding: 10, background: "var(--text-2)", borderRadius: 8, color: "#fff", fontSize: 12 }}>
         <div style={{ fontWeight: 700, marginBottom: 6 }}>🔍 預覽模式（不會實際送出，可隨意操作）</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <span>切換情境：</span>
           {Object.keys(MOCK).map(k => (
             <button key={k} onClick={() => setScenario(k)}
               style={{ padding: "2px 10px", borderRadius: 4, border: "none",
-                background: scenario === k ? "#fff" : "#666",
+                background: scenario === k ? "#fff" : "var(--text-2)",
                 color: scenario === k ? "#000" : "#fff",
                 fontSize: 11, cursor: "pointer" }}>
               {TYPE_LABEL[k]}
@@ -120,15 +120,15 @@ export default function ResignationPreviewPage() {
       </div>
 
       {/* 以下完全複製 /resignation-sign 的版面 */}
-      <div style={{ maxWidth: 520, margin: "0 auto", padding: 16, background: "#f7f5f0", borderRadius: 12 }}>
+      <div style={{ maxWidth: 520, margin: "0 auto", padding: 16, background: "var(--bg)", borderRadius: 12 }}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 28 }}>📋</div>
           <h1 style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>離職同意書</h1>
-          <p style={{ fontSize: 11, color: "#888" }}>小食糖 SUGARbISTRO</p>
+          <p style={{ fontSize: 11, color: "var(--text-3)" }}>小食糖 SUGARbISTRO</p>
         </div>
 
         {/* 同意書本文 */}
-        <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: "16px 14px", fontSize: 13, lineHeight: 1.85 }}>
+        <div style={{ background: "#fff", borderRadius: 10, border: "1px solid var(--border)", padding: "16px 14px", fontSize: 13, lineHeight: 1.85 }}>
           <div style={{ marginBottom: 12 }}>
             <Row l="姓名" v={info.employee_name} />
             {info.employee_id_number && <Row l="身分證字號" v={info.employee_id_number} />}
@@ -161,19 +161,19 @@ export default function ResignationPreviewPage() {
         </div>
 
         {/* 簽署區 */}
-        <div style={{ background: "#fff", borderRadius: 10, border: "2px solid #b45309", padding: 14, marginTop: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#b45309", marginBottom: 6 }}>✍️ 員工簽名</div>
-          <div style={{ background: "#faf8f5", borderRadius: 6, padding: 4, position: "relative" }}>
+        <div style={{ background: "#fff", borderRadius: 10, border: "2px solid var(--warning)", padding: 14, marginTop: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--warning)", marginBottom: 6 }}>✍️ 員工簽名</div>
+          <div style={{ background: "var(--surface-warm)", borderRadius: 6, padding: 4, position: "relative" }}>
             <canvas ref={(c) => { canvasRef.current = c; setupCanvas(c); }} style={{ width: "100%", height: 160, background: "#fff", borderRadius: 4, border: "1px dashed #ddd", touchAction: "none", display: "block" }} />
             {!hasInk && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "#bbb", fontSize: 12, pointerEvents: "none" }}>請在此區域簽名</div>}
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-            <button onClick={clear} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", fontSize: 11, cursor: "pointer" }}>🔄 重簽</button>
-            <span style={{ fontSize: 10, color: "#888" }}>簽署日期：{new Date().toLocaleDateString("zh-TW")}</span>
+            <button onClick={clear} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "#fff", fontSize: 11, cursor: "pointer" }}>🔄 重簽</button>
+            <span style={{ fontSize: 10, color: "var(--text-3)" }}>簽署日期：{new Date().toLocaleDateString("zh-TW")}</span>
           </div>
         </div>
 
-        <label style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 12, fontSize: 12, cursor: "pointer", padding: 10, background: agreed ? "#e6f9f0" : "#fff", border: "1px solid " + (agreed ? "#0a7c42" : "#ddd"), borderRadius: 6 }}>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 12, fontSize: 12, cursor: "pointer", padding: 10, background: agreed ? "var(--success-bg)" : "#fff", border: "1px solid " + (agreed ? "var(--success)" : "var(--border)"), borderRadius: 6 }}>
           <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ marginTop: 2 }} />
           <span>我已詳閱以上內容，確認所有資訊正確無誤，並同意以電子簽名方式簽署本離職同意書。</span>
         </label>
@@ -181,14 +181,14 @@ export default function ResignationPreviewPage() {
         <button onClick={() => alert("（預覽模式，不會實際送出）")}
           disabled={!hasInk || !agreed}
           style={{ width: "100%", padding: 14, borderRadius: 10, border: "none",
-            background: (hasInk && agreed) ? "#b91c1c" : "#ccc",
+            background: (hasInk && agreed) ? "var(--danger)" : "#ccc",
             color: "#fff", fontSize: 16, fontWeight: 700,
             cursor: (hasInk && agreed) ? "pointer" : "not-allowed",
             marginTop: 12,
           }}>
           ✅ 確認簽署並送出
         </button>
-        <p style={{ fontSize: 10, color: "#888", textAlign: "center", marginTop: 8 }}>送出後將無法修改，請確認資料正確</p>
+        <p style={{ fontSize: 10, color: "var(--text-3)", textAlign: "center", marginTop: 8 }}>送出後將無法修改，請確認資料正確</p>
       </div>
     </div>
   );
@@ -196,8 +196,8 @@ export default function ResignationPreviewPage() {
 
 function Row({ l, v }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12, borderBottom: "1px solid #f0eeea" }}>
-      <span style={{ color: "#888" }}>{l}</span>
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12, borderBottom: "1px solid var(--divider)" }}>
+      <span style={{ color: "var(--text-3)" }}>{l}</span>
       <span>{v}</span>
     </div>
   );

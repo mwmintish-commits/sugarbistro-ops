@@ -83,27 +83,27 @@ export default function ExpenseReview() {
 
   const typeLabel = data?.expense_type === "vendor" ? "📦 月結" : data?.expense_type === "hq_advance" ? "🏢 代付" : "💰 零用金";
 
-  if (loading) return <Box><p style={{ textAlign: "center", color: "#888", padding: 40 }}>載入中...</p></Box>;
-  if (err) return <Box><p style={{ textAlign: "center", color: "#b91c1c", padding: 40 }}>{err}</p></Box>;
+  if (loading) return <Box><p style={{ textAlign: "center", color: "var(--text-3)", padding: 40 }}>載入中...</p></Box>;
+  if (err) return <Box><p style={{ textAlign: "center", color: "var(--danger)", padding: 40 }}>{err}</p></Box>;
   if (done) return <Box><div style={{ padding: 32, textAlign: "center" }}>
     <div style={{ fontSize: 48, marginBottom: 8 }}>✅</div>
     <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>費用已送出，等待審核</div>
-    <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>{data?.stores?.name || "🏢 總部均攤"}</div>
-    <div style={{ background: "#f7f5f0", borderRadius: 8, padding: 16, textAlign: "left", margin: "0 auto", maxWidth: 320 }}>
+    <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 16 }}>{data?.stores?.name || "🏢 總部均攤"}</div>
+    <div style={{ background: "var(--bg)", borderRadius: 8, padding: 16, textAlign: "left", margin: "0 auto", maxWidth: 320 }}>
       <Row l="廠商" v={form.vendor_name || "(無)"} />
       <Row l="金額" v={fmt(form.amount)} />
       <Row l="日期" v={form.date || "-"} />
       {form.invoice_number && <Row l="發票" v={form.invoice_number} />}
       <Row l="分類" v={form.category_suggestion || "其他"} />
-      <Row l="狀態" v={<span style={{ color: "#b45309", fontWeight: 600 }}>待審核</span>} />
+      <Row l="狀態" v={<span style={{ color: "var(--warning)", fontWeight: 600 }}>待審核</span>} />
     </div>
-    <p style={{ color: "#888", marginTop: 16, fontSize: 12 }}>LINE 也會收到送出通知，可關閉此頁面。</p>
+    <p style={{ color: "var(--text-3)", marginTop: 16, fontSize: 12 }}>LINE 也會收到送出通知，可關閉此頁面。</p>
   </div></Box>;
 
   return (
     <Box>
       <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{typeLabel} 核對</h2>
-      <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>{data?.stores?.name || "總部"}</div>
+      <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 12 }}>{data?.stores?.name || "總部"}</div>
 
       {/* 照片（預設展開） */}
       {data?.image_url && (
@@ -114,20 +114,20 @@ export default function ExpenseReview() {
 
       {/* AI 辨識按鈕 */}
       <button onClick={() => runAI()} disabled={aiLoading}
-        style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #4361ee", background: aiLoading ? "#e6f1fb" : "#fff", color: "#4361ee", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12 }}>
+        style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid var(--brand-strong)", background: aiLoading ? "var(--info-bg)" : "#fff", color: "var(--brand-strong)", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12 }}>
         {aiLoading ? "🤖 AI 辨識中..." : "🤖 AI 自動辨識"}
       </button>
 
       {/* 表單 */}
-      <div style={{ background: "#faf8f5", borderRadius: 10, padding: 12, marginBottom: 12 }}>
+      <div style={{ background: "var(--surface-warm)", borderRadius: 10, padding: 12, marginBottom: 12 }}>
         <Field label="💰 金額" type="number" value={form.amount} onChange={v => setForm({ ...form, amount: v })} big />
         <Field label="🏢 廠商" value={form.vendor_name} onChange={v => setForm({ ...form, vendor_name: v })} />
         <Field label="📅 日期" type="date" value={form.date} onChange={v => setForm({ ...form, date: v })} />
         <Field label="📋 說明" value={form.description} onChange={v => setForm({ ...form, description: v })} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <label style={{ fontSize: 12, color: "#666", minWidth: 70 }}>📁 分類</label>
+          <label style={{ fontSize: 12, color: "var(--text-2)", minWidth: 70 }}>📁 分類</label>
           <select value={form.category_suggestion} onChange={e => setForm({ ...form, category_suggestion: e.target.value })}
-            style={{ flex: 1, maxWidth: 200, padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13 }}>
+            style={{ flex: 1, maxWidth: 200, padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 13 }}>
             {CATS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
@@ -136,28 +136,28 @@ export default function ExpenseReview() {
         {/* 總部代付：歸屬選擇 */}
         {data?.expense_type === "hq_advance" && (
           <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed #ddd" }}>
-            <div style={{ fontSize: 12, color: "#666", marginBottom: 6, fontWeight: 600 }}>🏢 費用歸屬</div>
+            <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 6, fontWeight: 600 }}>🏢 費用歸屬</div>
             <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
               <button type="button" onClick={() => setHqMode("shared")}
-                style={{ flex: 1, padding: "8px 6px", borderRadius: 6, border: hqMode === "shared" ? "2px solid #4338ca" : "1px solid #ddd",
-                  background: hqMode === "shared" ? "#e0e7ff" : "#fff", color: hqMode === "shared" ? "#4338ca" : "#666",
+                style={{ flex: 1, padding: "8px 6px", borderRadius: 6, border: hqMode === "shared" ? "2px solid #4338ca" : "1px solid var(--border)",
+                  background: hqMode === "shared" ? "#e0e7ff" : "#fff", color: hqMode === "shared" ? "#4338ca" : "var(--text-2)",
                   fontSize: 12, fontWeight: hqMode === "shared" ? 600 : 400, cursor: "pointer" }}>
                 🏢 總部均攤
               </button>
               <button type="button" onClick={() => setHqMode(stores[0]?.id || "")}
-                style={{ flex: 1, padding: "8px 6px", borderRadius: 6, border: hqMode !== "shared" ? "2px solid #4338ca" : "1px solid #ddd",
-                  background: hqMode !== "shared" ? "#e0e7ff" : "#fff", color: hqMode !== "shared" ? "#4338ca" : "#666",
+                style={{ flex: 1, padding: "8px 6px", borderRadius: 6, border: hqMode !== "shared" ? "2px solid #4338ca" : "1px solid var(--border)",
+                  background: hqMode !== "shared" ? "#e0e7ff" : "#fff", color: hqMode !== "shared" ? "#4338ca" : "var(--text-2)",
                   fontSize: 12, fontWeight: hqMode !== "shared" ? 600 : 400, cursor: "pointer" }}>
                 🏪 指定門市
               </button>
             </div>
             {hqMode !== "shared" && (
               <select value={hqMode} onChange={e => setHqMode(e.target.value)}
-                style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13 }}>
+                style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 13 }}>
                 {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             )}
-            <div style={{ fontSize: 10, color: "#888", marginTop: 4 }}>
+            <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 4 }}>
               {hqMode === "shared" ? "此費用將平均分攤到所有門市的損益" : "此費用將整筆計入指定門市的損益"}
             </div>
           </div>
@@ -165,16 +165,16 @@ export default function ExpenseReview() {
       </div>
 
       {/* 修改原因 */}
-      {data?.amount > 0 && <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="修改原因（選填）" style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #ddd", fontSize: 12, marginBottom: 12, minHeight: 40, resize: "vertical" }} />}
+      {data?.amount > 0 && <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="修改原因（選填）" style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid var(--border)", fontSize: 12, marginBottom: 12, minHeight: 40, resize: "vertical" }} />}
 
       {/* 按鈕 */}
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={() => submit("pending")} disabled={!form.amount || Number(form.amount) <= 0}
-          style={{ flex: 1, padding: 14, borderRadius: 8, border: "none", background: Number(form.amount) > 0 ? "#0a7c42" : "#ddd", color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+          style={{ flex: 1, padding: 14, borderRadius: 8, border: "none", background: Number(form.amount) > 0 ? "var(--success)" : "var(--border)", color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
           ✅ 確認送出
         </button>
       </div>
-      <p style={{ fontSize: 10, color: "#888", textAlign: "center", marginTop: 8 }}>送出後管理員會收到通知</p>
+      <p style={{ fontSize: 10, color: "var(--text-3)", textAlign: "center", marginTop: 8 }}>送出後管理員會收到通知</p>
     </Box>
   );
 }
@@ -182,12 +182,12 @@ export default function ExpenseReview() {
 function Field({ label, value, onChange, type, big, placeholder }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-      <label style={{ fontSize: 12, color: "#666", minWidth: 70 }}>{label}</label>
+      <label style={{ fontSize: 12, color: "var(--text-2)", minWidth: 70 }}>{label}</label>
       <input type={type || "text"} inputMode={type === "number" ? "decimal" : undefined} value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder || ""}
-        style={{ flex: 1, maxWidth: 200, padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: big ? 18 : 13, fontWeight: big ? 700 : 400, textAlign: type === "number" ? "right" : "left", color: big ? "#0a7c42" : "inherit" }} />
+        style={{ flex: 1, maxWidth: 200, padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: big ? 18 : 13, fontWeight: big ? 700 : 400, textAlign: type === "number" ? "right" : "left", color: big ? "var(--success)" : "inherit" }} />
     </div>
   );
 }
 
 function Box({ children }) { return <div style={{ maxWidth: 420, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif" }}>{children}</div>; }
-function Row({ l, v }) { return <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, borderBottom: "1px solid #e8e6e1" }}><span style={{ color: "#888" }}>{l}</span><span style={{ fontWeight: 500 }}>{v}</span></div>; }
+function Row({ l, v }) { return <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, borderBottom: "1px solid var(--border)" }}><span style={{ color: "var(--text-3)" }}>{l}</span><span style={{ fontWeight: 500 }}>{v}</span></div>; }

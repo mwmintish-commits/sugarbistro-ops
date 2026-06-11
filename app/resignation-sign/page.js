@@ -117,8 +117,8 @@ export default function ResignationSignPage() {
     setSubmitting(false);
   };
 
-  if (loading) return <Box><p style={{ textAlign: "center", padding: 40, color: "#888" }}>載入中…</p></Box>;
-  if (error) return <Box><div style={{ padding: 30, textAlign: "center", color: "#b91c1c" }}>
+  if (loading) return <Box><p style={{ textAlign: "center", padding: 40, color: "var(--text-3)" }}>載入中…</p></Box>;
+  if (error) return <Box><div style={{ padding: 30, textAlign: "center", color: "var(--danger)" }}>
     <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
     <div style={{ fontSize: 14 }}>{error}</div>
   </div></Box>;
@@ -126,7 +126,7 @@ export default function ResignationSignPage() {
     <div style={{ padding: 30, textAlign: "center" }}>
       <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
       <h1 style={{ fontSize: 18, fontWeight: 600 }}>離職同意書簽署完成</h1>
-      <p style={{ fontSize: 13, color: "#666", marginTop: 12, lineHeight: 1.8 }}>
+      <p style={{ fontSize: 13, color: "var(--text-2)", marginTop: 12, lineHeight: 1.8 }}>
         感謝您的貢獻，本同意書已儲存於總部。<br />
         在最後工作日之前，請依正常班表上班。<br />
         系統將於最後工作日次日自動解除您的 LINE 登入權限。<br />
@@ -141,11 +141,11 @@ export default function ResignationSignPage() {
       <div style={{ textAlign: "center", marginBottom: 16 }}>
         <div style={{ fontSize: 28 }}>📋</div>
         <h1 style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>離職同意書</h1>
-        <p style={{ fontSize: 11, color: "#888" }}>小食糖 SUGARbISTRO</p>
+        <p style={{ fontSize: 11, color: "var(--text-3)" }}>小食糖 SUGARbISTRO</p>
       </div>
 
       {/* 同意書本文 */}
-      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: "16px 14px", fontSize: 13, lineHeight: 1.85 }}>
+      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid var(--border)", padding: "16px 14px", fontSize: 13, lineHeight: 1.85 }}>
         <div style={{ marginBottom: 12 }}>
           <Row l="姓名" v={info.employee_name} />
           {info.employee_id_number && <Row l="身分證字號" v={info.employee_id_number} />}
@@ -178,46 +178,46 @@ export default function ResignationSignPage() {
       </div>
 
       {/* 簽署區 */}
-      <div style={{ background: "#fff", borderRadius: 10, border: "2px solid #b45309", padding: 14, marginTop: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#b45309", marginBottom: 6 }}>✍️ 員工簽名</div>
-        <div style={{ background: "#faf8f5", borderRadius: 6, padding: 4, position: "relative" }}>
+      <div style={{ background: "#fff", borderRadius: 10, border: "2px solid var(--warning)", padding: 14, marginTop: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--warning)", marginBottom: 6 }}>✍️ 員工簽名</div>
+        <div style={{ background: "var(--surface-warm)", borderRadius: 6, padding: 4, position: "relative" }}>
           <canvas ref={canvasRef} style={{ width: "100%", height: 160, background: "#fff", borderRadius: 4, border: "1px dashed #ddd", touchAction: "none", display: "block" }} />
           {!hasInk && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", color: "#bbb", fontSize: 12, pointerEvents: "none" }}>請在此區域簽名</div>}
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-          <button onClick={clearSig} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", fontSize: 11, cursor: "pointer" }}>🔄 重簽</button>
-          <span style={{ fontSize: 10, color: "#888" }}>簽署日期：{new Date().toLocaleDateString("zh-TW")}</span>
+          <button onClick={clearSig} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "#fff", fontSize: 11, cursor: "pointer" }}>🔄 重簽</button>
+          <span style={{ fontSize: 10, color: "var(--text-3)" }}>簽署日期：{new Date().toLocaleDateString("zh-TW")}</span>
         </div>
       </div>
 
       {/* 同意 + 送出 */}
-      <label style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 12, fontSize: 12, cursor: "pointer", padding: 10, background: agreed ? "#e6f9f0" : "#fff", border: "1px solid " + (agreed ? "#0a7c42" : "#ddd"), borderRadius: 6 }}>
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 12, fontSize: 12, cursor: "pointer", padding: 10, background: agreed ? "var(--success-bg)" : "#fff", border: "1px solid " + (agreed ? "var(--success)" : "var(--border)"), borderRadius: 6 }}>
         <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ marginTop: 2 }} />
         <span>我已詳閱以上內容，確認所有資訊正確無誤，並同意以電子簽名方式簽署本離職同意書。</span>
       </label>
 
       <button onClick={submit} disabled={!hasInk || !agreed || submitting}
         style={{ width: "100%", padding: 14, borderRadius: 10, border: "none",
-          background: (hasInk && agreed && !submitting) ? "#b91c1c" : "#ccc",
+          background: (hasInk && agreed && !submitting) ? "var(--danger)" : "#ccc",
           color: "#fff", fontSize: 16, fontWeight: 700, cursor: (hasInk && agreed && !submitting) ? "pointer" : "not-allowed",
           marginTop: 12,
         }}>
         {submitting ? "送出中…" : "✅ 確認簽署並送出"}
       </button>
-      <p style={{ fontSize: 10, color: "#888", textAlign: "center", marginTop: 8 }}>送出後將無法修改，請確認資料正確</p>
+      <p style={{ fontSize: 10, color: "var(--text-3)", textAlign: "center", marginTop: 8 }}>送出後將無法修改，請確認資料正確</p>
     </Box>
   );
 }
 
 function Row({ l, v }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12, borderBottom: "1px solid #f0eeea" }}>
-      <span style={{ color: "#888" }}>{l}</span>
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12, borderBottom: "1px solid var(--divider)" }}>
+      <span style={{ color: "var(--text-3)" }}>{l}</span>
       <span>{v}</span>
     </div>
   );
 }
 
 function Box({ children }) {
-  return <div style={{ maxWidth: 520, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", minHeight: "100vh", background: "#f7f5f0" }}>{children}</div>;
+  return <div style={{ maxWidth: 520, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", minHeight: "100vh", background: "var(--bg)" }}>{children}</div>;
 }

@@ -225,12 +225,12 @@ export default function UploadPage() {
         {results.map((r, idx) => {
           if (!r.draft_id || !r.success) {
             return (
-              <div key={idx} style={{ background: r.error ? "#fde8e8" : "#e6f9f0", borderRadius: 8, padding: 10, marginBottom: 8, fontSize: 12 }}>
+              <div key={idx} style={{ background: r.error ? "var(--danger-bg)" : "var(--success-bg)", borderRadius: 8, padding: 10, marginBottom: 8, fontSize: 12 }}>
                 <div style={{ fontWeight: 600 }}>
                   {r.imported !== undefined ? `📊 匯入 ${r.imported}/${r.total} 筆` : `第 ${r.index} 張`}
                 </div>
-                {r.error && <div style={{ color: "#b91c1c" }}>❌ {r.error}</div>}
-                {!r.error && r.success && <div style={{ color: "#0a7c42" }}>✅ 完成</div>}
+                {r.error && <div style={{ color: "var(--danger)" }}>❌ {r.error}</div>}
+                {!r.error && r.success && <div style={{ color: "var(--success)" }}>✅ 完成</div>}
               </div>
             );
           }
@@ -239,24 +239,24 @@ export default function UploadPage() {
           const needsFix = !f.amount || Number(f.amount) <= 0;
           return (
             <div key={idx} style={{
-              background: r.finalized ? "#e6f9f0" : needsFix ? "#fef3c7" : "#fff",
-              border: "1px solid " + (r.finalized ? "#0a7c42" : needsFix ? "#f59e0b" : "#e8e6e1"),
+              background: r.finalized ? "var(--success-bg)" : needsFix ? "var(--warning-bg)" : "#fff",
+              border: "1px solid " + (r.finalized ? "var(--success)" : needsFix ? "#f59e0b" : "var(--border)"),
               borderRadius: 10, padding: 10, marginBottom: 10
             }}>
               <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                 <img src={r.image_url} alt="" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 6, border: "1px solid #eee" }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, fontWeight: 600 }}>
-                    第 {r.index} 張 {r.finalized && <span style={{ color: "#0a7c42" }}>✓ 已送審</span>}
-                    {needsFix && !r.finalized && <span style={{ color: "#b45309" }}> ⚠️ 需填金額</span>}
+                    第 {r.index} 張 {r.finalized && <span style={{ color: "var(--success)" }}>✓ 已送審</span>}
+                    {needsFix && !r.finalized && <span style={{ color: "var(--warning)" }}> ⚠️ 需填金額</span>}
                   </div>
-                  <a href={r.image_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "#4361ee" }}>🔍 看原檔</a>
+                  <a href={r.image_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "var(--brand-strong)" }}>🔍 看原檔</a>
                 </div>
               </div>
               {!r.finalized && (
                 <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 6px", fontSize: 11 }}>
                   <label style={lbl}>💰 金額</label>
-                  <input type="number" inputMode="decimal" value={f.amount} onChange={e => updateResultForm(idx, "amount", e.target.value)} style={{ ...inp, fontWeight: 700, color: "#0a7c42", fontSize: 14, textAlign: "right" }} />
+                  <input type="number" inputMode="decimal" value={f.amount} onChange={e => updateResultForm(idx, "amount", e.target.value)} style={{ ...inp, fontWeight: 700, color: "var(--success)", fontSize: 14, textAlign: "right" }} />
 
                   <label style={lbl}>🏢 廠商</label>
                   <input value={f.vendor_name} onChange={e => updateResultForm(idx, "vendor_name", e.target.value)} style={inp} />
@@ -275,10 +275,10 @@ export default function UploadPage() {
               )}
               {!r.finalized && (
                 <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                  <button onClick={() => saveResult(idx)} disabled={needsFix} style={btn(r.saved ? "#888" : "#4361ee", needsFix)}>
+                  <button onClick={() => saveResult(idx)} disabled={needsFix} style={btn(r.saved ? "var(--text-3)" : "var(--brand-strong)", needsFix)}>
                     {r.saved ? "✓ 已儲存" : "💾 暫存修改"}
                   </button>
-                  <button onClick={() => finalizeResult(idx)} disabled={needsFix} style={btn("#0a7c42", needsFix)}>
+                  <button onClick={() => finalizeResult(idx)} disabled={needsFix} style={btn("var(--success)", needsFix)}>
                     ✅ 送審
                   </button>
                 </div>
@@ -288,16 +288,16 @@ export default function UploadPage() {
         })}
 
         {anyDraft && (
-          <button onClick={finalizeAll} style={{ width: "100%", padding: 12, borderRadius: 8, border: "none", background: "#0a7c42", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", marginTop: 8 }}>
+          <button onClick={finalizeAll} style={{ width: "100%", padding: 12, borderRadius: 8, border: "none", background: "var(--success)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", marginTop: 8 }}>
             ✅ 全部送審
           </button>
         )}
 
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button onClick={() => { setResults([]); setPhotos([]); setDone(false); }} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ddd", background: "#fff", fontSize: 12, cursor: "pointer" }}>
+          <button onClick={() => { setResults([]); setPhotos([]); setDone(false); }} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "#fff", fontSize: 12, cursor: "pointer" }}>
             📷 繼續上傳
           </button>
-          <button onClick={() => { window.close(); }} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ddd", background: "#fff", fontSize: 12, cursor: "pointer" }}>
+          <button onClick={() => { window.close(); }} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "#fff", fontSize: 12, cursor: "pointer" }}>
             🚪 完成關閉
           </button>
         </div>
@@ -309,16 +309,16 @@ export default function UploadPage() {
   return (
     <Box>
       <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{typeLabels[type] || "📸 上傳"}</h2>
-      <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>{storeName} {empName ? "— " + empName : ""}</div>
+      <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 12 }}>{storeName} {empName ? "— " + empName : ""}</div>
 
       {/* 月結／代付：先選廠商/類別 */}
       {isExpense && expenseType === "vendor" && (
         <div style={{ background: "#dbeafe", borderRadius: 8, padding: 10, marginBottom: 12, border: presetVendor ? "1px solid #1d4ed8" : "2px solid #f59e0b" }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: "#1d4ed8", marginBottom: 6 }}>
-            📦 月結廠商 {!presetVendor && <span style={{ color: "#b45309" }}>← 請先選擇</span>}
+            📦 月結廠商 {!presetVendor && <span style={{ color: "var(--warning)" }}>← 請先選擇</span>}
           </div>
           <select value={presetVendor} onChange={e => setPresetVendor(e.target.value)}
-            style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #ddd", fontSize: 13 }}>
+            style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid var(--border)", fontSize: 13 }}>
             <option value="">-- 選擇月結廠商 --</option>
             {MONTHLY_VENDORS.map(v => <option key={v} value={v}>{v}</option>)}
           </select>
@@ -327,16 +327,16 @@ export default function UploadPage() {
       {isExpense && expenseType === "hq_advance" && (
         <div style={{ background: "#e0e7ff", borderRadius: 8, padding: 10, marginBottom: 12, border: presetCategory ? "1px solid #4338ca" : "2px solid #f59e0b" }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: "#4338ca", marginBottom: 6 }}>
-            🏢 代付類別 {!presetCategory && <span style={{ color: "#b45309" }}>← 請先選擇</span>}
+            🏢 代付類別 {!presetCategory && <span style={{ color: "var(--warning)" }}>← 請先選擇</span>}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4 }}>
             {HQ_ADVANCE_CATEGORIES.map(c => (
               <button key={c} onClick={() => setPresetCategory(c)} type="button"
                 style={{
                   padding: "8px 4px", borderRadius: 6, fontSize: 11, cursor: "pointer",
-                  border: presetCategory === c ? "2px solid #4338ca" : "1px solid #ddd",
+                  border: presetCategory === c ? "2px solid #4338ca" : "1px solid var(--border)",
                   background: presetCategory === c ? "#4338ca" : "#fff",
-                  color: presetCategory === c ? "#fff" : "#666",
+                  color: presetCategory === c ? "#fff" : "var(--text-2)",
                   fontWeight: presetCategory === c ? 600 : 400,
                 }}>{c}</button>
             ))}
@@ -346,8 +346,8 @@ export default function UploadPage() {
 
       {/* 模式切換 */}
       <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
-        <button onClick={() => setExcelData(null)} style={{ flex: 1, padding: 8, borderRadius: 8, border: !excelData ? "2px solid #1a1a1a" : "1px solid #ddd", background: !excelData ? "#1a1a1a" : "#fff", color: !excelData ? "#fff" : "#666", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📸 拍照上傳</button>
-        <button onClick={() => setPhotos([])} style={{ flex: 1, padding: 8, borderRadius: 8, border: excelData ? "2px solid #1a1a1a" : "1px solid #ddd", background: excelData ? "#1a1a1a" : "#fff", color: excelData ? "#fff" : "#666", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+        <button onClick={() => setExcelData(null)} style={{ flex: 1, padding: 8, borderRadius: 8, border: !excelData ? "2px solid var(--ink)" : "1px solid var(--border)", background: !excelData ? "var(--ink)" : "#fff", color: !excelData ? "#fff" : "var(--text-2)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📸 拍照上傳</button>
+        <button onClick={() => setPhotos([])} style={{ flex: 1, padding: 8, borderRadius: 8, border: excelData ? "2px solid var(--ink)" : "1px solid var(--border)", background: excelData ? "var(--ink)" : "#fff", color: excelData ? "#fff" : "var(--text-2)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
           <label style={{ cursor: "pointer" }}>📊 Excel/CSV
             <input type="file" accept=".csv,.tsv,.xlsx" onChange={e => { if (e.target.files[0]) handleExcel(e.target.files[0]); }} style={{ display: "none" }} />
           </label>
@@ -366,25 +366,25 @@ export default function UploadPage() {
               </div>
             </div>
           ))}
-          <label style={{ borderRadius: 8, border: "2px dashed #ccc", aspectRatio: "1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", background: "#faf8f5" }}>
+          <label style={{ borderRadius: 8, border: "2px dashed #ccc", aspectRatio: "1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", background: "var(--surface-warm)" }}>
             <div style={{ fontSize: 28, color: "#ccc" }}>+</div>
-            <div style={{ fontSize: 10, color: "#888" }}>選多張</div>
+            <div style={{ fontSize: 10, color: "var(--text-3)" }}>選多張</div>
             <input type="file" accept="image/*,application/pdf" multiple onChange={e => addPhotos(e.target.files)} style={{ display: "none" }} />
           </label>
-          <label style={{ borderRadius: 8, border: "2px dashed #ccc", aspectRatio: "1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", background: "#faf8f5" }}>
+          <label style={{ borderRadius: 8, border: "2px dashed #ccc", aspectRatio: "1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", background: "var(--surface-warm)" }}>
             <div style={{ fontSize: 28, color: "#ccc" }}>📷</div>
-            <div style={{ fontSize: 10, color: "#888" }}>拍照</div>
+            <div style={{ fontSize: 10, color: "var(--text-3)" }}>拍照</div>
             <input type="file" accept="image/*" capture="environment" onChange={e => addPhotos(e.target.files)} style={{ display: "none" }} />
           </label>
         </div>
-        <div style={{ fontSize: 10, color: "#888", textAlign: "center", marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: "var(--text-3)", textAlign: "center", marginBottom: 8 }}>
           {compressing && "壓縮中..."}
           {!compressing && photos.length > 0 && `已選 ${photos.length} 張（自動壓縮為長邊 ≤ 1600px）`}
           {!compressing && photos.length === 0 && "支援多張，每張會獨立辨識並可內嵌修正"}
         </div>
         <button onClick={submitPhotos} disabled={uploading || compressing || photos.length === 0 || (needsPreset && !presetReady)}
           style={{ width: "100%", padding: 14, borderRadius: 8, border: "none",
-            background: (photos.length === 0 || (needsPreset && !presetReady) || compressing) ? "#ddd" : uploading ? "#888" : "#0a7c42",
+            background: (photos.length === 0 || (needsPreset && !presetReady) || compressing) ? "var(--border)" : uploading ? "var(--text-3)" : "var(--success)",
             color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
           {uploading ? `⏳ ${progress.status}（${progress.current}/${progress.total}）` :
            compressing ? "⏳ 圖片壓縮中..." :
@@ -395,19 +395,19 @@ export default function UploadPage() {
 
       {/* Excel/CSV 模式 */}
       {excelData && <>
-        <div style={{ background: "#faf8f5", borderRadius: 8, padding: 10, marginBottom: 12 }}>
+        <div style={{ background: "var(--surface-warm)", borderRadius: 8, padding: 10, marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>📊 {excelData.filename}</div>
-          <div style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>共 {excelData.rows.length} 筆資料</div>
+          <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 8 }}>共 {excelData.rows.length} 筆資料</div>
           <div style={{ maxHeight: 200, overflow: "auto", borderRadius: 6, border: "1px solid #eee" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
-              <thead><tr style={{ background: "#e6f1fb" }}>{excelData.headers.slice(0, 6).map(h => <th key={h} style={{ padding: 4, textAlign: "left", fontWeight: 500 }}>{h}</th>)}</tr></thead>
+              <thead><tr style={{ background: "var(--info-bg)" }}>{excelData.headers.slice(0, 6).map(h => <th key={h} style={{ padding: 4, textAlign: "left", fontWeight: 500 }}>{h}</th>)}</tr></thead>
               <tbody>{excelData.rows.slice(0, 10).map((r, i) => <tr key={i} style={{ borderBottom: "1px solid #f0f0f0" }}>{excelData.headers.slice(0, 6).map(h => <td key={h} style={{ padding: 3 }}>{r[h] || ""}</td>)}</tr>)}</tbody>
             </table>
-            {excelData.rows.length > 10 && <div style={{ padding: 4, fontSize: 10, color: "#888", textAlign: "center" }}>... 還有 {excelData.rows.length - 10} 筆</div>}
+            {excelData.rows.length > 10 && <div style={{ padding: 4, fontSize: 10, color: "var(--text-3)", textAlign: "center" }}>... 還有 {excelData.rows.length - 10} 筆</div>}
           </div>
         </div>
         <button onClick={submitExcel} disabled={uploading}
-          style={{ width: "100%", padding: 14, borderRadius: 8, border: "none", background: uploading ? "#888" : "#4361ee", color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+          style={{ width: "100%", padding: 14, borderRadius: 8, border: "none", background: uploading ? "var(--text-3)" : "var(--brand-strong)", color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
           {uploading ? "⏳ 匯入中..." : `📊 匯入 ${excelData.rows.length} 筆費用`}
         </button>
       </>}
@@ -415,11 +415,11 @@ export default function UploadPage() {
   );
 }
 
-const lbl = { fontSize: 10, color: "#666", alignSelf: "center", whiteSpace: "nowrap" };
-const inp = { padding: "4px 6px", borderRadius: 5, border: "1px solid #ddd", fontSize: 11 };
+const lbl = { fontSize: 10, color: "var(--text-2)", alignSelf: "center", whiteSpace: "nowrap" };
+const inp = { padding: "4px 6px", borderRadius: 5, border: "1px solid var(--border)", fontSize: 11 };
 const btn = (color, disabled) => ({
   flex: 1, padding: "8px 4px", borderRadius: 6, border: "none",
-  background: disabled ? "#ddd" : color, color: "#fff",
+  background: disabled ? "var(--border)" : color, color: "#fff",
   fontSize: 12, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer",
 });
 

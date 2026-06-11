@@ -156,25 +156,25 @@ export default function OnboardingPage() {
   if (done) return <Box><C>
     <div style={{fontSize:48,marginBottom:12}}>✅</div>
     <h1 style={{fontSize:20,fontWeight:600,marginBottom:8}}>報到完成！</h1>
-    <p style={{fontSize:14,color:"#666"}}>所有文件已簽署存檔，可以開始打卡了。</p>
-    <p style={{fontSize:12,color:"#999",marginTop:6}}>合約副本已寄至你的 Email</p>
+    <p style={{fontSize:14,color:"var(--text-2)"}}>所有文件已簽署存檔，可以開始打卡了。</p>
+    <p style={{fontSize:12,color:"var(--text-3)",marginTop:6}}>合約副本已寄至你的 Email</p>
   </C></Box>;
-  if (err && !rec) return <Box><C><p style={{color:"#b91c1c"}}>{err}</p></C></Box>;
+  if (err && !rec) return <Box><C><p style={{color:"var(--danger)"}}>{err}</p></C></Box>;
 
   return (
     <Box>
       <div style={{textAlign:"center",padding:"10px 0 6px"}}>
         <div style={{fontSize:28}}>🍯</div>
         <h1 style={{fontSize:16,fontWeight:600}}>小食糖 新人報到</h1>
-        <p style={{fontSize:11,color:"#999"}}>{"👤 "+(rec?.name||"")+"｜🏠 "+(rec?.store_name||"")}</p>
+        <p style={{fontSize:11,color:"var(--text-3)"}}>{"👤 "+(rec?.name||"")+"｜🏠 "+(rec?.store_name||"")}</p>
       </div>
       <div style={{display:"flex",gap:2,margin:"8px 0 12px"}}>
         {STEPS.map((s,i)=><div key={i} style={{flex:1,textAlign:"center"}}>
-          <div style={{height:4,borderRadius:2,background:i<=step?"#0a7c42":"#e8e6e1",marginBottom:2}} />
-          <div style={{fontSize:8,color:i===step?"#0a7c42":"#aaa"}}>{(i+1)+". "+s}</div>
+          <div style={{height:4,borderRadius:2,background:i<=step?"var(--success)":"var(--border)",marginBottom:2}} />
+          <div style={{fontSize:8,color:i===step?"var(--success)":"var(--text-hint)"}}>{(i+1)+". "+s}</div>
         </div>)}
       </div>
-      {err && <div style={{background:"#fde8e8",color:"#b91c1c",padding:8,borderRadius:6,fontSize:12,marginBottom:8}}>{err}</div>}
+      {err && <div style={{background:"var(--danger-bg)",color:"var(--danger)",padding:8,borderRadius:6,fontSize:12,marginBottom:8}}>{err}</div>}
 
       {/* Step 0: 基本資料 */}
       {step===0 && <Card title="📋 基本資料">
@@ -189,9 +189,9 @@ export default function OnboardingPage() {
           <F l="關係" v={form.emergency_relation} c={v=>setForm({...form,emergency_relation:v})} p="父/母/配偶" />
           <Full><F l="緊急聯絡電話" v={form.emergency_phone} c={v=>setForm({...form,emergency_phone:v})} t="tel" r /></Full>
           <div style={{marginBottom:8}}>
-            <label style={{fontSize:11,color:"#888",display:"block",marginBottom:2}}>銀行<span style={{color:"#b91c1c"}}> *</span></label>
+            <label style={{fontSize:11,color:"var(--text-3)",display:"block",marginBottom:2}}>銀行<span style={{color:"var(--danger)"}}> *</span></label>
             <select value={form.bank_name} onChange={e=>setForm({...form,bank_name:e.target.value})}
-              style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #ddd",fontSize:13,background:"#fff"}}>
+              style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid var(--border)",fontSize:13,background:"#fff"}}>
               <option value="">請選擇銀行</option>
               {[["004","臺灣銀行"],["005","土地銀行"],["006","合庫銀行"],["007","第一銀行"],["008","華南銀行"],["009","彰化銀行"],["011","上海銀行"],["012","台北富邦"],["013","國泰世華"],["017","兆豐銀行"],["021","花旗銀行"],["048","王道銀行"],["050","臺灣企銀"],["052","渣打銀行"],["053","台中銀行"],["081","匯豐銀行"],["103","新光銀行"],["108","陽信銀行"],["118","板信銀行"],["700","中華郵政"],["803","聯邦銀行"],["805","遠東銀行"],["806","元大銀行"],["807","永豐銀行"],["808","玉山銀行"],["809","凱基銀行"],["810","星展銀行"],["812","台新銀行"],["816","安泰銀行"],["822","中國信託"]].map(([code,name])=>(
                 <option key={code} value={code+"-"+name}>{code+"-"+name}</option>
@@ -204,12 +204,12 @@ export default function OnboardingPage() {
 
       {/* Step 1: 文件上傳（選填，可稍後補） */}
       {step===1 && <Card title="📄 文件上傳（選填）">
-        <div style={{background:"#fff8e6",borderRadius:8,padding:8,marginBottom:10,fontSize:10,color:"#8a6d00"}}>
+        <div style={{background:"var(--warning-bg)",borderRadius:8,padding:8,marginBottom:10,fontSize:10,color:"var(--warning)"}}>
           💡 可先跳過，稍後由主管在後台補上傳。<br/>
           📷 拍照建議：將文件平放在桌面，光線充足，避免反光。
         </div>
         <Up label="🏥 體檢表" desc="選填，近三個月內有效" file={files.health_check} onFile={async f=>{setFiles({...files,health_check:await f2b(f)});}} />
-        <p style={{fontSize:11,fontWeight:600,color:"#333",margin:"8px 0 4px"}}>🪪 身分證（正反面分開上傳）</p>
+        <p style={{fontSize:11,fontWeight:600,color:"var(--text)",margin:"8px 0 4px"}}>🪪 身分證（正反面分開上傳）</p>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
           <Up label="正面" desc="選填" file={files.id_front} onFile={async f=>{setFiles({...files,id_front:await f2b(f)});}} small />
           <Up label="反面" desc="選填" file={files.id_back} onFile={async f=>{setFiles({...files,id_back:await f2b(f)});}} small />
@@ -219,16 +219,16 @@ export default function OnboardingPage() {
       {/* Step 2: 員工守則暨福利（必須捲到底才能勾選） */}
       {step===2 && <>
         <div data-scrollkey="handbook" onScroll={onScrollEnd("handbook")}
-          style={{background:"#fff",borderRadius:10,border:"1px solid #e8e6e1",padding:14,marginBottom:6,maxHeight:420,overflowY:"auto",position:"relative"}}>
+          style={{background:"#fff",borderRadius:10,border:"1px solid var(--border)",padding:14,marginBottom:6,maxHeight:420,overflowY:"auto",position:"relative"}}>
           <h3 style={{fontSize:14,fontWeight:600,marginBottom:4,textAlign:"center"}}>📖 員工守則暨福利條款</h3>
-          <p style={{fontSize:10,color:"#888",textAlign:"center",marginBottom:10}}>小食糖 SUGARbISTRO｜到職日起即受本規範約束</p>
+          <p style={{fontSize:10,color:"var(--text-3)",textAlign:"center",marginBottom:10}}>小食糖 SUGARbISTRO｜到職日起即受本規範約束</p>
           {[...handbook, bonusSec].map((ch,i)=><div key={i} style={{marginBottom:10}}>
-            <h4 style={{fontSize:12,fontWeight:600,padding:"4px 8px",borderRadius:4,background:(ch.title||"").includes("零容忍")||(ch.title||"").includes("最高")?"#fde8e8":"#faf8f5",color:(ch.title||"").includes("零容忍")||(ch.title||"").includes("最高")?"#b91c1c":"#333",marginBottom:4}}>{ch.title}</h4>
-            {(ch.items||[]).map((item,j)=><div key={j} style={{fontSize:11,lineHeight:1.8,color:"#444",paddingLeft:10}}>{"▸ "+item}</div>)}
+            <h4 style={{fontSize:12,fontWeight:600,padding:"4px 8px",borderRadius:4,background:(ch.title||"").includes("零容忍")||(ch.title||"").includes("最高")?"var(--danger-bg)":"var(--surface-warm)",color:(ch.title||"").includes("零容忍")||(ch.title||"").includes("最高")?"var(--danger)":"var(--text)",marginBottom:4}}>{ch.title}</h4>
+            {(ch.items||[]).map((item,j)=><div key={j} style={{fontSize:11,lineHeight:1.8,color:"var(--text-2)",paddingLeft:10}}>{"▸ "+item}</div>)}
           </div>)}
-          <div style={{textAlign:"center",fontSize:10,color:scrolled.handbook?"#0a7c42":"#b91c1c",fontWeight:600,padding:"6px 0"}}>{scrolled.handbook?"✅ 已詳閱完畢":"— 請繼續往下捲動 —"}</div>
+          <div style={{textAlign:"center",fontSize:10,color:scrolled.handbook?"var(--success)":"var(--danger)",fontWeight:600,padding:"6px 0"}}>{scrolled.handbook?"✅ 已詳閱完畢":"— 請繼續往下捲動 —"}</div>
         </div>
-        <div style={{fontSize:10,color:scrolled.handbook?"#888":"#b91c1c",textAlign:"center",marginBottom:10}}>
+        <div style={{fontSize:10,color:scrolled.handbook?"var(--text-3)":"var(--danger)",textAlign:"center",marginBottom:10}}>
           {scrolled.handbook?"📖 已捲動到底，請於下方勾選同意":"⬇ 必須完整閱讀（捲動至最下方）後才能勾選同意"}
         </div>
         <Card title="">
@@ -236,19 +236,19 @@ export default function OnboardingPage() {
             <input type="checkbox" disabled={!scrolled.handbook} checked={agreed.handbook} onChange={e=>setAgreed({...agreed,handbook:e.target.checked})} style={{width:18,height:18,marginTop:2}} />
             <span style={{fontSize:12,lineHeight:1.6}}>本人已詳閱「員工守則暨福利條款」全部內容（含獎金與福利說明），了解相關獎金與福利均屬恩惠性給與，公司保留調整與停發之裁量權，本人同意遵守。</span>
           </label>
-          <p style={{fontSize:10,color:"#888",marginTop:8,lineHeight:1.5}}>※ 守則內容後台可隨時查閱，與簽署版本一致；正式簽名於下一步「工作合約」一併完成。</p>
+          <p style={{fontSize:10,color:"var(--text-3)",marginTop:8,lineHeight:1.5}}>※ 守則內容後台可隨時查閱，與簽署版本一致；正式簽名於下一步「工作合約」一併完成。</p>
         </Card>
       </>}
 
       {/* Step 3: 工作合約（必須捲到底才能勾選與簽名） */}
       {step===3 && <>
         <div data-scrollkey="contract" onScroll={onScrollEnd("contract")}
-          style={{background:"#fff",borderRadius:10,border:"1px solid #e8e6e1",padding:14,marginBottom:6,maxHeight:420,overflowY:"auto"}}>
+          style={{background:"#fff",borderRadius:10,border:"1px solid var(--border)",padding:14,marginBottom:6,maxHeight:420,overflowY:"auto"}}>
           <h3 style={{fontSize:14,fontWeight:600,marginBottom:10,textAlign:"center"}}>📝 工作合約</h3>
-          <div style={{fontSize:12,lineHeight:1.8,color:"#444"}}>
+          <div style={{fontSize:12,lineHeight:1.8,color:"var(--text-2)"}}>
             <div style={{textAlign:"center",marginBottom:10}}>
               <b style={{fontSize:14}}>小食糖 SUGARbISTRO</b><br/>
-              <span style={{fontSize:12,color:"#888"}}>勞動契約書</span>
+              <span style={{fontSize:12,color:"var(--text-3)"}}>勞動契約書</span>
             </div>
             <p><b>甲方（雇主）：</b>小食糖 SUGARbISTRO</p>
             <p><b>乙方（員工）：</b>{form.signature_name}</p>
@@ -259,26 +259,26 @@ export default function OnboardingPage() {
             <p style={{fontWeight:600,marginBottom:6}}>雙方同意依下列條款訂定本勞動契約：</p>
             {contractText.split("\n").filter(Boolean).map((line,i)=><p key={i} style={{paddingLeft:4}}>{line}</p>)}
           </div>
-          <div style={{textAlign:"center",fontSize:10,color:scrolled.contract?"#0a7c42":"#b91c1c",fontWeight:600,padding:"6px 0"}}>{scrolled.contract?"✅ 已詳閱完畢":"— 請繼續往下捲動 —"}</div>
+          <div style={{textAlign:"center",fontSize:10,color:scrolled.contract?"var(--success)":"var(--danger)",fontWeight:600,padding:"6px 0"}}>{scrolled.contract?"✅ 已詳閱完畢":"— 請繼續往下捲動 —"}</div>
         </div>
-        <div style={{fontSize:10,color:scrolled.contract?"#888":"#b91c1c",textAlign:"center",marginBottom:10}}>
+        <div style={{fontSize:10,color:scrolled.contract?"var(--text-3)":"var(--danger)",textAlign:"center",marginBottom:10}}>
           {scrolled.contract?"📝 已捲動到底，請於下方勾選同意並簽名":"⬇ 必須完整閱讀（捲動至最下方）後才能勾選同意"}
         </div>
-        <div style={{background:"#fff",borderRadius:10,border:"2px solid "+(scrolled.contract?"#0a7c42":"#ddd"),padding:14,marginBottom:10,opacity:scrolled.contract?1:0.55}}>
+        <div style={{background:"#fff",borderRadius:10,border:"2px solid "+(scrolled.contract?"var(--success)":"var(--border)"),padding:14,marginBottom:10,opacity:scrolled.contract?1:0.55}}>
           <label style={{display:"flex",gap:8,cursor:scrolled.contract?"pointer":"not-allowed",marginBottom:10}}>
             <input type="checkbox" disabled={!scrolled.contract} checked={agreed.contract} onChange={e=>setAgreed({...agreed,contract:e.target.checked})} style={{width:18,height:18,marginTop:2}} />
             <span style={{fontSize:12,lineHeight:1.6}}>本人確認以上資料正確無誤，同意簽署工作合約</span>
           </label>
           {scrolled.contract
             ? <SigPad label="合約簽名" sig={sigs.contract} onSign={d=>setSigs({...sigs,contract:d})} />
-            : <div style={{border:"2px dashed #ddd",borderRadius:8,padding:20,background:"#fafafa",textAlign:"center",fontSize:12,color:"#aaa"}}>🔒 詳閱合約後才能簽名</div>}
+            : <div style={{border:"2px dashed #ddd",borderRadius:8,padding:20,background:"#fafafa",textAlign:"center",fontSize:12,color:"var(--text-hint)"}}>🔒 詳閱合約後才能簽名</div>}
         </div>
       </>}
 
       {!done && <div style={{display:"flex",gap:8,marginTop:4}}>
-        {step>0 && <button onClick={()=>{setErr("");setStep(step-1);}} style={{flex:1,padding:12,borderRadius:10,border:"1px solid #ddd",background:"#fff",fontSize:14,cursor:"pointer"}}>←</button>}
+        {step>0 && <button onClick={()=>{setErr("");setStep(step-1);}} style={{flex:1,padding:12,borderRadius:10,border:"1px solid var(--border)",background:"#fff",fontSize:14,cursor:"pointer"}}>←</button>}
         <button onClick={goNext} disabled={sub}
-          style={{flex:2,padding:12,borderRadius:10,border:"none",background:sub?"#ccc":"#0a7c42",color:"#fff",fontSize:15,fontWeight:600,cursor:sub?"default":"pointer"}}>
+          style={{flex:2,padding:12,borderRadius:10,border:"none",background:sub?"#ccc":"var(--success)",color:"#fff",fontSize:15,fontWeight:600,cursor:sub?"default":"pointer"}}>
           {sub?"提交中...":step===3?"✅ 確認簽署完成報到":"下一步 →"}
         </button>
       </div>}
@@ -286,23 +286,23 @@ export default function OnboardingPage() {
   );
 }
 
-function F({l,v,c,t,p,r}){return <div style={{marginBottom:8}}><label style={{fontSize:11,color:"#888",display:"block",marginBottom:2}}>{l}{r&&<span style={{color:"#b91c1c"}}> *</span>}</label><input type={t||"text"} value={v} onChange={e=>c(e.target.value)} placeholder={p||""} style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #ddd",fontSize:13}} /></div>;}
-function Card({title,children}){return <div style={{background:"#fff",borderRadius:10,border:"1px solid #e8e6e1",padding:14,marginBottom:10}}>{title&&<h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{title}</h3>}{children}</div>;}
+function F({l,v,c,t,p,r}){return <div style={{marginBottom:8}}><label style={{fontSize:11,color:"var(--text-3)",display:"block",marginBottom:2}}>{l}{r&&<span style={{color:"var(--danger)"}}> *</span>}</label><input type={t||"text"} value={v} onChange={e=>c(e.target.value)} placeholder={p||""} style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid var(--border)",fontSize:13}} /></div>;}
+function Card({title,children}){return <div style={{background:"#fff",borderRadius:10,border:"1px solid var(--border)",padding:14,marginBottom:10}}>{title&&<h3 style={{fontSize:14,fontWeight:600,marginBottom:10}}>{title}</h3>}{children}</div>;}
 function Grid({children}){return <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 8px"}}>{children}</div>;}
 function Full({children}){return <div style={{gridColumn:"1/-1"}}>{children}</div>;}
-function Sec({t,items,warn}){return <div style={{marginBottom:8}}><h4 style={{fontSize:12,fontWeight:600,padding:"3px 6px",borderRadius:4,background:warn?"#fde8e8":"#faf8f5",color:warn?"#b91c1c":"#333",marginBottom:3}}>{t}</h4>{items.map((i,j)=><div key={j} style={{fontSize:11,lineHeight:1.7,color:"#555",paddingLeft:8}}>{"▸ "+i}</div>)}</div>;}
+function Sec({t,items,warn}){return <div style={{marginBottom:8}}><h4 style={{fontSize:12,fontWeight:600,padding:"3px 6px",borderRadius:4,background:warn?"var(--danger-bg)":"var(--surface-warm)",color:warn?"var(--danger)":"var(--text)",marginBottom:3}}>{t}</h4>{items.map((i,j)=><div key={j} style={{fontSize:11,lineHeight:1.7,color:"var(--text-2)",paddingLeft:8}}>{"▸ "+i}</div>)}</div>;}
 
 function Up({label,desc,file,onFile,small}){
   const camRef=useRef();const fileRef=useRef();
-  return <div style={{border:"2px dashed "+(file?"#0a7c42":"#ddd"),borderRadius:10,padding:small?10:16,textAlign:"center",marginBottom:small?0:10,background:file?"#e6f9f0":"#faf8f5"}}>
+  return <div style={{border:"2px dashed "+(file?"var(--success)":"var(--border)"),borderRadius:10,padding:small?10:16,textAlign:"center",marginBottom:small?0:10,background:file?"var(--success-bg)":"var(--surface-warm)"}}>
     <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{if(e.target.files[0])onFile(e.target.files[0]);e.target.value="";}} />
     <input ref={fileRef} type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={e=>{if(e.target.files[0])onFile(e.target.files[0]);e.target.value="";}} />
     <div style={{fontSize:small?20:28}}>{file?"✅":"📄"}</div>
     <div style={{fontSize:small?11:13,fontWeight:600,marginTop:2}}>{label}</div>
-    <div style={{fontSize:small?8:10,color:"#888",marginBottom:6}}>{file?"已上傳（點擊更換）":desc}</div>
+    <div style={{fontSize:small?8:10,color:"var(--text-3)",marginBottom:6}}>{file?"已上傳（點擊更換）":desc}</div>
     <div style={{display:"flex",gap:8,justifyContent:"center"}}>
-      <button type="button" onClick={()=>camRef.current?.click()} style={{padding:"6px 12px",borderRadius:6,border:"1px solid #4361ee",background:"#fff",color:"#4361ee",fontSize:11,cursor:"pointer"}}>📷 拍照</button>
-      <button type="button" onClick={()=>fileRef.current?.click()} style={{padding:"6px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",color:"#666",fontSize:11,cursor:"pointer"}}>📁 選檔案</button>
+      <button type="button" onClick={()=>camRef.current?.click()} style={{padding:"6px 12px",borderRadius:6,border:"1px solid var(--brand-strong)",background:"#fff",color:"var(--brand-strong)",fontSize:11,cursor:"pointer"}}>📷 拍照</button>
+      <button type="button" onClick={()=>fileRef.current?.click()} style={{padding:"6px 12px",borderRadius:6,border:"1px solid var(--border)",background:"#fff",color:"var(--text-2)",fontSize:11,cursor:"pointer"}}>📁 選檔案</button>
     </div>
   </div>;
 }
@@ -312,38 +312,38 @@ function SigPad({label,sig,onSign}){
   const[dr,setDr]=useState(false);const[full,setFull]=useState(false);
   const gp=(e,cvs)=>{const r=cvs.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};};
   const start=(e,cvs)=>{e.preventDefault();setDr(true);const ctx=cvs.getContext("2d");const p=gp(e,cvs);ctx.beginPath();ctx.moveTo(p.x,p.y);};
-  const draw=(e,cvs)=>{if(!dr)return;e.preventDefault();const ctx=cvs.getContext("2d");const p=gp(e,cvs);ctx.lineTo(p.x,p.y);ctx.strokeStyle="#1a1a1a";ctx.lineWidth=3;ctx.lineCap="round";ctx.stroke();};
+  const draw=(e,cvs)=>{if(!dr)return;e.preventDefault();const ctx=cvs.getContext("2d");const p=gp(e,cvs);ctx.lineTo(p.x,p.y);ctx.strokeStyle="var(--ink)";ctx.lineWidth=3;ctx.lineCap="round";ctx.stroke();};
   const end=()=>{setDr(false);};
   const clear=(cvs)=>{if(cvs)cvs.getContext("2d").clearRect(0,0,cvs.width,cvs.height);};
   const confirm=()=>{if(fullRef.current)onSign(fullRef.current.toDataURL());setFull(false);};
   const openFull=()=>{setFull(true);setTimeout(()=>{if(fullRef.current){fullRef.current.width=fullRef.current.parentElement.clientWidth-32;fullRef.current.height=Math.min(300,window.innerHeight*0.5);clear(fullRef.current);}},50);};
   return <div>
     <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-      <span style={{fontSize:11,color:"#888"}}>{label}</span>
-      {sig && <button onClick={()=>onSign(null)} type="button" style={{fontSize:10,color:"#4361ee",background:"none",border:"none",cursor:"pointer"}}>清除重簽</button>}
+      <span style={{fontSize:11,color:"var(--text-3)"}}>{label}</span>
+      {sig && <button onClick={()=>onSign(null)} type="button" style={{fontSize:10,color:"var(--brand-strong)",background:"none",border:"none",cursor:"pointer"}}>清除重簽</button>}
     </div>
     {sig ? (
-      <div onClick={openFull} style={{border:"1px solid #0a7c42",borderRadius:8,padding:8,background:"#fff",cursor:"pointer",textAlign:"center"}}>
+      <div onClick={openFull} style={{border:"1px solid var(--success)",borderRadius:8,padding:8,background:"#fff",cursor:"pointer",textAlign:"center"}}>
         <img src={sig} alt="簽名" style={{maxHeight:60,maxWidth:"100%"}} />
-        <div style={{fontSize:10,color:"#0a7c42",marginTop:2}}>✅ 已簽名</div>
+        <div style={{fontSize:10,color:"var(--success)",marginTop:2}}>✅ 已簽名</div>
       </div>
     ) : (
       <div onClick={openFull} style={{border:"2px dashed #ddd",borderRadius:8,padding:20,background:"#fff",cursor:"pointer",textAlign:"center"}}>
         <div style={{fontSize:24}}>✍️</div>
-        <div style={{fontSize:12,color:"#888"}}>點擊這裡簽名</div>
+        <div style={{fontSize:12,color:"var(--text-3)"}}>點擊這裡簽名</div>
       </div>
     )}
     {full && (
       <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",zIndex:9999,display:"flex",flexDirection:"column",justifyContent:"center",padding:16}}>
         <div style={{background:"#fff",borderRadius:12,padding:16,maxWidth:600,width:"100%",margin:"0 auto"}}>
           <div style={{fontSize:14,fontWeight:600,marginBottom:8,textAlign:"center"}}>{label}</div>
-          <canvas ref={fullRef} style={{width:"100%",border:"1px solid #ddd",borderRadius:8,background:"#fefefe",touchAction:"none"}}
+          <canvas ref={fullRef} style={{width:"100%",border:"1px solid var(--border)",borderRadius:8,background:"#fefefe",touchAction:"none"}}
             onMouseDown={e=>start(e,fullRef.current)} onMouseMove={e=>draw(e,fullRef.current)} onMouseUp={end} onMouseLeave={end}
             onTouchStart={e=>start(e,fullRef.current)} onTouchMove={e=>draw(e,fullRef.current)} onTouchEnd={end} />
           <div style={{display:"flex",gap:10,marginTop:12}}>
-            <button type="button" onClick={()=>clear(fullRef.current)} style={{flex:1,padding:"10px",borderRadius:8,border:"1px solid #ddd",background:"#fff",fontSize:13,cursor:"pointer"}}>🔄 清除</button>
-            <button type="button" onClick={()=>setFull(false)} style={{flex:1,padding:"10px",borderRadius:8,border:"1px solid #ddd",background:"#fff",fontSize:13,cursor:"pointer",color:"#888"}}>取消</button>
-            <button type="button" onClick={confirm} style={{flex:2,padding:"10px",borderRadius:8,border:"none",background:"#0a7c42",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>✅ 確認簽名</button>
+            <button type="button" onClick={()=>clear(fullRef.current)} style={{flex:1,padding:"10px",borderRadius:8,border:"1px solid var(--border)",background:"#fff",fontSize:13,cursor:"pointer"}}>🔄 清除</button>
+            <button type="button" onClick={()=>setFull(false)} style={{flex:1,padding:"10px",borderRadius:8,border:"1px solid var(--border)",background:"#fff",fontSize:13,cursor:"pointer",color:"var(--text-3)"}}>取消</button>
+            <button type="button" onClick={confirm} style={{flex:2,padding:"10px",borderRadius:8,border:"none",background:"var(--success)",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>✅ 確認簽名</button>
           </div>
         </div>
       </div>
@@ -351,5 +351,5 @@ function SigPad({label,sig,onSign}){
   </div>;
 }
 
-function Box({children}){return <div style={{maxWidth:460,margin:"0 auto",padding:"14px 10px",fontFamily:"system-ui,'Noto Sans TC',sans-serif",background:"#faf8f5",minHeight:"100vh"}}>{children}</div>;}
+function Box({children}){return <div style={{maxWidth:460,margin:"0 auto",padding:"14px 10px",fontFamily:"system-ui,'Noto Sans TC',sans-serif",background:"var(--surface-warm)",minHeight:"100vh"}}>{children}</div>;}
 function C({children}){return <div style={{minHeight:"60vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>{children}</div>;}

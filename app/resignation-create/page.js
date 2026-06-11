@@ -44,8 +44,8 @@ export default function ResignationCreatePage() {
     });
   }, [eid]);
 
-  if (loading) return <Box><p style={{ textAlign: "center", padding: 40, color: "#888" }}>載入中…</p></Box>;
-  if (err) return <Box><p style={{ textAlign: "center", padding: 40, color: "#b91c1c" }}>{err}</p></Box>;
+  if (loading) return <Box><p style={{ textAlign: "center", padding: 40, color: "var(--text-3)" }}>載入中…</p></Box>;
+  if (err) return <Box><p style={{ textAlign: "center", padding: 40, color: "var(--danger)" }}>{err}</p></Box>;
 
   const months = emp.service_months || 0;
   const noticeAuto = months < 3 ? 0 : months < 12 ? 10 : months < 36 ? 20 : 30;
@@ -110,16 +110,16 @@ export default function ResignationCreatePage() {
     <div style={{ padding: 20, textAlign: "center" }}>
       <div style={{ fontSize: 44, marginBottom: 8 }}>📤</div>
       <h2 style={{ fontSize: 16, fontWeight: 700 }}>離職同意書已發送</h2>
-      <p style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
+      <p style={{ fontSize: 12, color: "var(--text-2)", marginTop: 6 }}>
         員工會在 LINE 收到簽署連結。<br />
         若員工沒收到，可複製下方連結直接傳給員工：
       </p>
       <input value={created.sign_url} readOnly onClick={e => e.target.select()}
-        style={{ width: "100%", padding: 8, marginTop: 10, borderRadius: 6, border: "1px solid #ddd", fontSize: 11 }} />
+        style={{ width: "100%", padding: 8, marginTop: 10, borderRadius: 6, border: "1px solid var(--border)", fontSize: 11 }} />
       <button onClick={() => navigator.clipboard.writeText(created.sign_url)}
-        style={{ marginTop: 8, padding: "6px 14px", borderRadius: 6, border: "1px solid #4361ee", background: "#fff", color: "#4361ee", fontSize: 12, cursor: "pointer" }}>📋 複製連結</button>
+        style={{ marginTop: 8, padding: "6px 14px", borderRadius: 6, border: "1px solid var(--brand-strong)", background: "#fff", color: "var(--brand-strong)", fontSize: 12, cursor: "pointer" }}>📋 複製連結</button>
       <div style={{ marginTop: 20 }}>
-        <a href="/" style={{ color: "#666", fontSize: 12 }}>← 返回後台</a>
+        <a href="/" style={{ color: "var(--text-2)", fontSize: 12 }}>← 返回後台</a>
       </div>
     </div>
   </Box>;
@@ -127,22 +127,22 @@ export default function ResignationCreatePage() {
   return (
     <Box>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
-        <a href="/" style={{ fontSize: 11, color: "#666" }}>← 返回後台</a>
+        <a href="/" style={{ fontSize: 11, color: "var(--text-2)" }}>← 返回後台</a>
       </div>
       <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>🚪 建立離職同意書</h1>
-      <p style={{ fontSize: 12, color: "#888", marginBottom: 14 }}>
+      <p style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 14 }}>
         員工：<b>{emp.name}</b>{emp.stores?.name ? "｜🏠 " + emp.stores.name : ""}
       </p>
 
       {/* 歷史紀錄 */}
       {history.length > 0 && (
-        <div style={{ background: "#fef3c7", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 11 }}>
+        <div style={{ background: "var(--warning-bg)", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 11 }}>
           <div style={{ fontWeight: 600, color: "#92400e", marginBottom: 4 }}>📜 此員工歷史離職紀錄</div>
           {history.map(h => (
             <div key={h.id} style={{ padding: "6px 0", borderBottom: "1px dashed #fbbf24", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div>{h.last_working_date}｜{TYPES.find(t => t.id === h.resignation_type)?.label || h.resignation_type}</div>
-                <div style={{ color: "#666" }}>狀態：{
+                <div style={{ color: "var(--text-2)" }}>狀態：{
                   h.status === "pending" ? "⏳ 待簽署" :
                   h.status === "signed" ? "✅ 已簽署 " + new Date(h.signed_at).toLocaleDateString("zh-TW") :
                   h.status === "cancelled" ? "❌ 已取消" : h.status
@@ -150,12 +150,12 @@ export default function ResignationCreatePage() {
               </div>
               {h.status === "pending" && (
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button onClick={() => resend(h.id)} style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid #4361ee", background: "#fff", color: "#4361ee", fontSize: 10, cursor: "pointer" }}>🔁 重發</button>
-                  <button onClick={() => cancelResignation(h.id)} style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid #b91c1c", background: "#fff", color: "#b91c1c", fontSize: 10, cursor: "pointer" }}>取消</button>
+                  <button onClick={() => resend(h.id)} style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid var(--brand-strong)", background: "#fff", color: "var(--brand-strong)", fontSize: 10, cursor: "pointer" }}>🔁 重發</button>
+                  <button onClick={() => cancelResignation(h.id)} style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid var(--danger)", background: "#fff", color: "var(--danger)", fontSize: 10, cursor: "pointer" }}>取消</button>
                 </div>
               )}
               {h.status === "signed" && h.signature_url && (
-                <a href={h.signature_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "#4361ee" }}>看簽名</a>
+                <a href={h.signature_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "var(--brand-strong)" }}>看簽名</a>
               )}
             </div>
           ))}
@@ -163,21 +163,21 @@ export default function ResignationCreatePage() {
       )}
 
       {pendingExists && (
-        <div style={{ background: "#fde8e8", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: "#b91c1c" }}>
+        <div style={{ background: "var(--danger-bg)", borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 12, color: "var(--danger)" }}>
           ⚠️ 此員工有待簽署的離職單，請先處理或取消才能建立新的。
         </div>
       )}
 
-      <div style={{ background: "#fff", border: "1px solid #e8e6e1", borderRadius: 10, padding: 14 }}>
+      <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 10, padding: 14 }}>
         <Row label="🏷 離職類型">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
             {TYPES.map(t => (
               <button key={t.id} onClick={() => setForm({ ...form, resignation_type: t.id })} type="button"
                 style={{
                   padding: 8, borderRadius: 6, fontSize: 12, cursor: "pointer",
-                  border: form.resignation_type === t.id ? "2px solid #b91c1c" : "1px solid #ddd",
-                  background: form.resignation_type === t.id ? "#fde8e8" : "#fff",
-                  color: form.resignation_type === t.id ? "#b91c1c" : "#666",
+                  border: form.resignation_type === t.id ? "2px solid var(--danger)" : "1px solid var(--border)",
+                  background: form.resignation_type === t.id ? "var(--danger-bg)" : "#fff",
+                  color: form.resignation_type === t.id ? "var(--danger)" : "var(--text-2)",
                   fontWeight: form.resignation_type === t.id ? 600 : 400,
                 }}>{t.label}</button>
             ))}
@@ -203,7 +203,7 @@ export default function ResignationCreatePage() {
 
         <hr style={{ border: "none", borderTop: "1px dashed #ddd", margin: "12px 0" }} />
 
-        <div style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>📊 自動試算（可覆蓋）</div>
+        <div style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}>📊 自動試算（可覆蓋）</div>
 
         <Row label="服務年資">
           <span style={{ fontSize: 13 }}>{Math.floor(months / 12)} 年 {months % 12} 個月</span>
@@ -224,26 +224,26 @@ export default function ResignationCreatePage() {
 
         <Row label="💰 特休結算">
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <span style={{ fontSize: 13, color: "#0a7c42", fontWeight: 600 }}>{fmt(settlementAuto)}</span>
+            <span style={{ fontSize: 13, color: "var(--success)", fontWeight: 600 }}>{fmt(settlementAuto)}</span>
             <input type="number" value={form.settlement_override} onChange={e => setForm({ ...form, settlement_override: e.target.value })}
               placeholder="覆蓋"
               style={{ ...inp, width: 90, padding: "4px 6px" }} />
           </div>
         </Row>
 
-        <div style={{ fontSize: 10, color: "#888", marginTop: 4 }}>
+        <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 4 }}>
           結算金額預設 = 未休特休天數 × 日薪（月薪/30 或時薪×8）。可填覆蓋值。
         </div>
       </div>
 
       <button onClick={submit} disabled={submitting || pendingExists}
         style={{ width: "100%", padding: 14, borderRadius: 10, border: "none",
-          background: (submitting || pendingExists) ? "#ccc" : "#b91c1c",
+          background: (submitting || pendingExists) ? "#ccc" : "var(--danger)",
           color: "#fff", fontSize: 15, fontWeight: 700, cursor: (submitting || pendingExists) ? "not-allowed" : "pointer",
           marginTop: 12 }}>
         {submitting ? "送出中…" : "📤 發送離職同意書給員工簽署"}
       </button>
-      <p style={{ fontSize: 10, color: "#888", textAlign: "center", marginTop: 6 }}>
+      <p style={{ fontSize: 10, color: "var(--text-3)", textAlign: "center", marginTop: 6 }}>
         發送後員工會在 LINE 收到簽署連結。員工簽完只存簽名留底；
         系統將於「最後工作日」次日 00:00 自動解除其 LINE 綁定與系統登入權限。
         薪資與特休結算為獨立流程，請至「薪資 / 撥款」Tab 處理。
@@ -252,17 +252,17 @@ export default function ResignationCreatePage() {
   );
 }
 
-const inp = { width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13 };
+const inp = { width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 13 };
 
 function Row({ label, children }) {
   return (
     <div style={{ marginBottom: 10 }}>
-      <label style={{ display: "block", fontSize: 11, color: "#666", marginBottom: 4, fontWeight: 600 }}>{label}</label>
+      <label style={{ display: "block", fontSize: 11, color: "var(--text-2)", marginBottom: 4, fontWeight: 600 }}>{label}</label>
       {children}
     </div>
   );
 }
 
 function Box({ children }) {
-  return <div style={{ maxWidth: 520, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", minHeight: "100vh", background: "#f7f5f0" }}>{children}</div>;
+  return <div style={{ maxWidth: 520, margin: "0 auto", padding: 16, fontFamily: "system-ui, 'Noto Sans TC', sans-serif", minHeight: "100vh", background: "var(--bg)" }}>{children}</div>;
 }

@@ -68,6 +68,8 @@ export default function WorkLogPage() {
       fetch("/api/admin/inventory?store_id=" + sid).then(r => r.json()).catch(() => ({ data: [] })),
     ]).then(([wl, st, stl, sk]) => {
       setItems(wl.data || []); setStockItems(sk.data || []);
+      // 報廢登記 + 叫貨共用同一份庫存品項，避免重複再抓一次 inventory
+      setWasteItems(sk.data || []); setInvItems(sk.data || []);
       const store = (st.data || []).find(s => s.id === sid);
       const mode = store?.shift_mode || "single";
       setShiftMode(mode);
@@ -91,11 +93,6 @@ export default function WorkLogPage() {
     fetch("/api/admin/waste?type=today&store_id=" + storeId).then(r => r.json()).then(r => setWasteToday(r.data || { no_waste: false, wastes: [] }));
   }, [storeId]);
   useEffect(() => { loadWasteToday(); }, [loadWasteToday]);
-  // 載入該店的庫存品項（報廢登記 + 叫貨用）
-  useEffect(() => {
-    if (!storeId) return;
-    fetch("/api/admin/inventory?store_id=" + storeId).then(r => r.json()).then(r => { setWasteItems(r.data || []); setInvItems(r.data || []); }).catch(() => {});
-  }, [storeId]);
   // 載入待收叫貨單
   const loadPendingOrders = useCallback(() => {
     if (!storeId) return;
@@ -259,9 +256,9 @@ export default function WorkLogPage() {
   for (const c of WL_CATS) if (groupedRaw[c]) grouped[c] = groupedRaw[c];
   for (const c of Object.keys(groupedRaw)) if (!grouped[c]) grouped[c] = groupedRaw[c];
   const STOCK_ZONES = [
-    { key:"refrig", label:"🧊 冷藏", bg:"#e0f2fe" },
+    { key:"refrig", label:"🧊 冷藏", bg:"var(--info-bg)" },
     { key:"freezer", label:"❄️ 冷凍", bg:"#dbeafe" },
-    { key:"ambient", label:"🌡 常溫", bg:"#fef3c7" },
+    { key:"ambient", label:"🌡 常溫", bg:"var(--warning-bg)" },
     { key:"display", label:"🪟 展示櫃", bg:"#fce7f3" },
     { key:"other", label:"📦 未分區", bg:"#f3f4f6" },
   ];
@@ -289,75 +286,75 @@ export default function WorkLogPage() {
       <div style={{ textAlign: "center", marginBottom: 8 }}>
         <div style={{ fontSize: 22 }}>🍯</div>
         <div style={{ fontSize: 15, fontWeight: 700 }}>小食糖工作日誌</div>
-        <div style={{ fontSize: 11, color: "#888" }}>{today + "（" + dayNames[todayDow] + "）" + empName}</div>
+        <div style={{ fontSize: 11, color: "var(--text-3)" }}>{today + "（" + dayNames[todayDow] + "）" + empName}</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
-        <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: "8px 10px" }}>
-          <div style={{ fontSize: 10, color: "#888" }}>今日營收</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: revenue.ta >= revenue.dt && revenue.dt > 0 ? "#0a7c42" : "#333" }}>{"$" + revenue.ta.toLocaleString()}</div>
-          {revenue.dt > 0 && <><div style={{ marginTop: 3, height: 6, background: "#f0f0f0", borderRadius: 3 }}><div style={{ height: "100%", width: Math.min(100, Math.round(revenue.ta / revenue.dt * 100)) + "%", background: revenue.ta >= revenue.dt ? "#0a7c42" : "#fbbf24", borderRadius: 3 }} /></div><div style={{ fontSize: 9, color: "#888", marginTop: 2 }}>{"目標$" + revenue.dt.toLocaleString()}</div></>}
+        <div style={{ background: "#fff", borderRadius: 10, border: "1px solid var(--border)", padding: "8px 10px" }}>
+          <div style={{ fontSize: 10, color: "var(--text-3)" }}>今日營收</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: revenue.ta >= revenue.dt && revenue.dt > 0 ? "var(--success)" : "var(--text)" }}>{"$" + revenue.ta.toLocaleString()}</div>
+          {revenue.dt > 0 && <><div style={{ marginTop: 3, height: 6, background: "#f0f0f0", borderRadius: 3 }}><div style={{ height: "100%", width: Math.min(100, Math.round(revenue.ta / revenue.dt * 100)) + "%", background: revenue.ta >= revenue.dt ? "var(--success)" : "#fbbf24", borderRadius: 3 }} /></div><div style={{ fontSize: 9, color: "var(--text-3)", marginTop: 2 }}>{"目標$" + revenue.dt.toLocaleString()}</div></>}
         </div>
-        <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: "8px 10px" }}>
-          <div style={{ fontSize: 10, color: "#888" }}>本月累積</div>
+        <div style={{ background: "#fff", borderRadius: 10, border: "1px solid var(--border)", padding: "8px 10px" }}>
+          <div style={{ fontSize: 10, color: "var(--text-3)" }}>本月累積</div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>{"$" + revenue.mm.toLocaleString()}</div>
-          {revenue.mt > 0 && <><div style={{ marginTop: 3, height: 6, background: "#f0f0f0", borderRadius: 3 }}><div style={{ height: "100%", width: Math.min(100, Math.round(revenue.mm / revenue.mt * 100)) + "%", background: revenue.mm >= revenue.mt ? "#0a7c42" : "#4361ee", borderRadius: 3 }} /></div><div style={{ fontSize: 9, color: "#888", marginTop: 2 }}>{"月目標$" + revenue.mt.toLocaleString()}</div></>}
+          {revenue.mt > 0 && <><div style={{ marginTop: 3, height: 6, background: "#f0f0f0", borderRadius: 3 }}><div style={{ height: "100%", width: Math.min(100, Math.round(revenue.mm / revenue.mt * 100)) + "%", background: revenue.mm >= revenue.mt ? "var(--success)" : "var(--brand-strong)", borderRadius: 3 }} /></div><div style={{ fontSize: 9, color: "var(--text-3)", marginTop: 2 }}>{"月目標$" + revenue.mt.toLocaleString()}</div></>}
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${TABS.length}, 1fr)`, gap: 4, margin: "8px 0 10px" }}>
-        {TABS.map(t => <button key={t.id} onClick={() => { setTab(t.id); setStockQty({}); setDeliveryMode(false); }} style={{ padding: "10px 2px", borderRadius: 10, border: tab === t.id ? "2px solid #1a1a1a" : "1px solid #ddd", background: tab === t.id ? "#1a1a1a" : "#fff", color: tab === t.id ? "#fff" : "#666", fontSize: 12, fontWeight: tab === t.id ? 700 : 400, cursor: "pointer" }}>{t.l}</button>)}
+        {TABS.map(t => <button key={t.id} onClick={() => { setTab(t.id); setStockQty({}); setDeliveryMode(false); }} style={{ padding: "10px 2px", borderRadius: 10, border: tab === t.id ? "2px solid var(--ink)" : "1px solid var(--border)", background: tab === t.id ? "var(--ink)" : "#fff", color: tab === t.id ? "#fff" : "var(--text-2)", fontSize: 12, fontWeight: tab === t.id ? 700 : 400, cursor: "pointer" }}>{t.l}</button>)}
       </div>
       {tab !== "deep" && <>
-        {(tasksTotal + stockTotal) > 0 && <div style={{ background: pct === 100 ? "#e6f9f0" : "#fff", borderRadius: 10, border: "1px solid " + (pct === 100 ? "#0a7c42" : "#e8e6e1"), padding: "10px 12px", marginBottom: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}><span style={{ fontSize: 13, fontWeight: 600 }}>{pct === 100 ? "🎉 全部完成！" : TABS.find(x => x.id === tab)?.l}</span><span style={{ fontSize: 20, fontWeight: 700, color: pct === 100 ? "#0a7c42" : "#b45309" }}>{pct + "%"}</span></div>
-          <div style={{ height: 8, background: "#f0f0f0", borderRadius: 4, overflow: "hidden" }}><div style={{ height: "100%", width: pct + "%", background: pct === 100 ? "#0a7c42" : "#fbbf24", borderRadius: 4, transition: "width 0.3s" }} /></div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 10, color: "#888" }}><span>{"✅" + tasksDone + "/" + tasksTotal}</span>{showStock && <span>{"📦" + (stockSubmitted[stockPeriod] ? stockItems.length : stockFilled) + "/" + stockItems.length}</span>}</div>
+        {(tasksTotal + stockTotal) > 0 && <div style={{ background: pct === 100 ? "var(--success-bg)" : "#fff", borderRadius: 10, border: "1px solid " + (pct === 100 ? "var(--success)" : "var(--border)"), padding: "10px 12px", marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}><span style={{ fontSize: 13, fontWeight: 600 }}>{pct === 100 ? "🎉 全部完成！" : TABS.find(x => x.id === tab)?.l}</span><span style={{ fontSize: 20, fontWeight: 700, color: pct === 100 ? "var(--success)" : "var(--warning)" }}>{pct + "%"}</span></div>
+          <div style={{ height: 8, background: "#f0f0f0", borderRadius: 4, overflow: "hidden" }}><div style={{ height: "100%", width: pct + "%", background: pct === 100 ? "var(--success)" : "#fbbf24", borderRadius: 4, transition: "width 0.3s" }} /></div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 10, color: "var(--text-3)" }}><span>{"✅" + tasksDone + "/" + tasksTotal}</span>{showStock && <span>{"📦" + (stockSubmitted[stockPeriod] ? stockItems.length : stockFilled) + "/" + stockItems.length}</span>}</div>
         </div>}
         {tab === "during" && !orderMode && !receiveMode && <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-          <button onClick={() => { setOrderMode(true); setOrderLines([{ item_id: "", quantity: "", notes: "" }]); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "2px dashed #b45309", background: "#fff8e6", color: "#b45309", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📦 向總部叫貨</button>
-          <button onClick={() => setReceiveMode(true)} style={{ flex: 1, padding: 12, borderRadius: 10, border: "2px dashed #0a7c42", background: "#e6f9f0", color: "#0a7c42", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📥 進貨{openShipments.reduce((s, sh) => s + (sh.lines || []).filter(l => l.status === "pending").length, 0) > 0 ? "（" + openShipments.reduce((s, sh) => s + (sh.lines || []).filter(l => l.status === "pending").length, 0) + "）" : ""}</button>
+          <button onClick={() => { setOrderMode(true); setOrderLines([{ item_id: "", quantity: "", notes: "" }]); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "2px dashed var(--warning)", background: "var(--warning-bg)", color: "var(--warning)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📦 向總部叫貨</button>
+          <button onClick={() => setReceiveMode(true)} style={{ flex: 1, padding: 12, borderRadius: 10, border: "2px dashed var(--success)", background: "var(--success-bg)", color: "var(--success)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>📥 進貨{openShipments.reduce((s, sh) => s + (sh.lines || []).filter(l => l.status === "pending").length, 0) > 0 ? "（" + openShipments.reduce((s, sh) => s + (sh.lines || []).filter(l => l.status === "pending").length, 0) + "）" : ""}</button>
         </div>}
-        {orderMode && <div style={{ background: "#fff8e6", borderRadius: 10, border: "1px solid #f0e6c8", padding: 12, marginBottom: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#b45309", marginBottom: 8 }}>📦 向總部叫貨</div>
+        {orderMode && <div style={{ background: "var(--warning-bg)", borderRadius: 10, border: "1px solid #f0e6c8", padding: 12, marginBottom: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--warning)", marginBottom: 8 }}>📦 向總部叫貨</div>
           {orderLines.map((d, idx) => (<div key={idx} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
-            <select value={d.item_id} onChange={e => { const n = [...orderLines]; n[idx].item_id = e.target.value; setOrderLines(n); }} style={{ flex: 2, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 12 }}>
+            <select value={d.item_id} onChange={e => { const n = [...orderLines]; n[idx].item_id = e.target.value; setOrderLines(n); }} style={{ flex: 2, padding: 8, borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}>
               <option value="">選品項</option>
               {invItems.map(i => <option key={i.id} value={i.id}>{i.name + (i.unit ? " (" + i.unit + ")" : "")}</option>)}
             </select>
-            <input type="number" inputMode="decimal" value={d.quantity} onChange={e => { const n = [...orderLines]; n[idx].quantity = e.target.value; setOrderLines(n); }} placeholder="數量" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 14, textAlign: "center" }} />
-            <button onClick={() => setOrderLines(orderLines.filter((_, i) => i !== idx))} style={{ border: "none", background: "none", color: "#b91c1c", fontSize: 16, cursor: "pointer" }}>✕</button>
+            <input type="number" inputMode="decimal" value={d.quantity} onChange={e => { const n = [...orderLines]; n[idx].quantity = e.target.value; setOrderLines(n); }} placeholder="數量" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--border)", fontSize: 14, textAlign: "center" }} />
+            <button onClick={() => setOrderLines(orderLines.filter((_, i) => i !== idx))} style={{ border: "none", background: "none", color: "var(--danger)", fontSize: 16, cursor: "pointer" }}>✕</button>
           </div>))}
           <div style={{ display: "flex", gap: 6 }}>
             <button onClick={() => setOrderLines([...orderLines, { item_id: "", quantity: "", notes: "" }])} style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px dashed #ccc", background: "transparent", fontSize: 12, cursor: "pointer" }}>＋</button>
-            <button onClick={submitOrder} style={{ flex: 1, padding: 8, borderRadius: 8, border: "none", background: "#b45309", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>送出叫貨</button>
-            <button onClick={() => { setOrderMode(false); setOrderLines([]); }} style={{ padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 12, cursor: "pointer" }}>取消</button>
+            <button onClick={submitOrder} style={{ flex: 1, padding: 8, borderRadius: 8, border: "none", background: "var(--warning)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>送出叫貨</button>
+            <button onClick={() => { setOrderMode(false); setOrderLines([]); }} style={{ padding: 8, borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, cursor: "pointer" }}>取消</button>
           </div>
         </div>}
-        {receiveMode && <div style={{ background: "#e6f9f0", borderRadius: 10, border: "1px solid #c8e6d4", padding: 12, marginBottom: 10 }}>
+        {receiveMode && <div style={{ background: "var(--success-bg)", borderRadius: 10, border: "1px solid #c8e6d4", padding: 12, marginBottom: 10 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#0a7c42" }}>📥 進貨（總部出貨單核對）</span>
-            <button onClick={() => setReceiveMode(false)} style={{ padding: "2px 8px", borderRadius: 6, border: "1px solid #ddd", background: "#fff", fontSize: 11, cursor: "pointer" }}>關閉</button>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--success)" }}>📥 進貨（總部出貨單核對）</span>
+            <button onClick={() => setReceiveMode(false)} style={{ padding: "2px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "#fff", fontSize: 11, cursor: "pointer" }}>關閉</button>
           </div>
-          {openShipments.length === 0 && <div style={{ fontSize: 12, color: "#666", textAlign: "center", padding: 12 }}>目前沒有待收的出貨單</div>}
+          {openShipments.length === 0 && <div style={{ fontSize: 12, color: "var(--text-2)", textAlign: "center", padding: 12 }}>目前沒有待收的出貨單</div>}
           {openShipments.map(sh => (
             <div key={sh.id} style={{ background: "#fff", borderRadius: 8, border: "1px solid #d4e6d8", padding: 10, marginBottom: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "#0a7c42" }}>📋 {sh.shipment_number} <span style={{ fontSize: 10, color: "#888", fontWeight: 400 }}>· 出貨：{sh.shipped_at?.slice(5, 16)?.replace("T", " ") || "-"}</span></div>
-              {sh.notes && <div style={{ fontSize: 10, color: "#666", marginBottom: 6, padding: "4px 6px", background: "#faf8f5", borderRadius: 4 }}>📝 {sh.notes}</div>}
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--success)" }}>📋 {sh.shipment_number} <span style={{ fontSize: 10, color: "var(--text-3)", fontWeight: 400 }}>· 出貨：{sh.shipped_at?.slice(5, 16)?.replace("T", " ") || "-"}</span></div>
+              {sh.notes && <div style={{ fontSize: 10, color: "var(--text-2)", marginBottom: 6, padding: "4px 6px", background: "var(--surface-warm)", borderRadius: 4 }}>📝 {sh.notes}</div>}
               {(sh.lines || []).map(l => {
                 const done = l.status !== "pending";
                 return (
-                  <div key={l.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "6px 0", borderBottom: "1px solid #f0eeea" }}>
+                  <div key={l.id} style={{ display: "flex", gap: 6, alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--divider)" }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: done ? "#aaa" : "#333", textDecoration: done ? "line-through" : "none" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: done ? "var(--text-hint)" : "var(--text)", textDecoration: done ? "line-through" : "none" }}>
                         {l.inventory_items?.name || "?"}
-                        {l.inventory_items?.is_key_item && <span style={{ fontSize: 9, color: "#b45309", marginLeft: 4, background: "#fff8e6", padding: "1px 4px", borderRadius: 3 }}>★重點</span>}
+                        {l.inventory_items?.is_key_item && <span style={{ fontSize: 9, color: "var(--warning)", marginLeft: 4, background: "var(--warning-bg)", padding: "1px 4px", borderRadius: 3 }}>★重點</span>}
                       </div>
-                      <div style={{ fontSize: 10, color: "#666" }}>出 {l.shipped_qty}{l.unit || ""}{done && ` · 已收 ${l.received_qty}${l.unit || ""}${l.variance ? `（差${l.variance > 0 ? "+" : ""}${l.variance}）` : ""}`}</div>
+                      <div style={{ fontSize: 10, color: "var(--text-2)" }}>出 {l.shipped_qty}{l.unit || ""}{done && ` · 已收 ${l.received_qty}${l.unit || ""}${l.variance ? `（差${l.variance > 0 ? "+" : ""}${l.variance}）` : ""}`}</div>
                     </div>
                     {!done && <>
-                      <input type="number" inputMode="decimal" id={"recv-" + l.id} defaultValue={l.shipped_qty} style={{ width: 60, padding: 6, borderRadius: 6, border: "1px solid #ddd", fontSize: 14, textAlign: "center", fontWeight: 600 }} />
-                      <button onClick={() => { const v = document.getElementById("recv-" + l.id)?.value; if (v === "" || v === null || Number(v) < 0) { alert("請輸入實收數量"); return; } receiveLine(l.id, v); }} style={{ padding: "6px 10px", borderRadius: 6, border: "none", background: "#0a7c42", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>✅收</button>
+                      <input type="number" inputMode="decimal" id={"recv-" + l.id} defaultValue={l.shipped_qty} style={{ width: 60, padding: 6, borderRadius: 6, border: "1px solid var(--border)", fontSize: 14, textAlign: "center", fontWeight: 600 }} />
+                      <button onClick={() => { const v = document.getElementById("recv-" + l.id)?.value; if (v === "" || v === null || Number(v) < 0) { alert("請輸入實收數量"); return; } receiveLine(l.id, v); }} style={{ padding: "6px 10px", borderRadius: 6, border: "none", background: "var(--success)", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>✅收</button>
                     </>}
-                    {done && <span style={{ fontSize: 11, color: l.status === "variance" ? "#b91c1c" : "#0a7c42" }}>{l.status === "variance" ? "⚠差異" : "✅"}</span>}
+                    {done && <span style={{ fontSize: 11, color: l.status === "variance" ? "var(--danger)" : "var(--success)" }}>{l.status === "variance" ? "⚠差異" : "✅"}</span>}
                   </div>
                 );
               })}
@@ -367,12 +364,12 @@ export default function WorkLogPage() {
         {closingTabs.includes(tab) && <div style={{ marginBottom: 10 }}>
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #f0d6d6", padding: 10, marginBottom: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#b91c1c" }}>🗑 食材報廢稽核</span>
-              <span style={{ fontSize: 10, color: "#888" }}>{wasteToday.no_waste ? "✅ 本日已確認無報廢" : (wasteToday.wastes?.length > 0 ? "本日已登記 " + wasteToday.wastes.length + " 筆" : "尚未登記")}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--danger)" }}>🗑 食材報廢稽核</span>
+              <span style={{ fontSize: 10, color: "var(--text-3)" }}>{wasteToday.no_waste ? "✅ 本日已確認無報廢" : (wasteToday.wastes?.length > 0 ? "本日已登記 " + wasteToday.wastes.length + " 筆" : "尚未登記")}</span>
             </div>
             {!wasteMode && <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => setWasteMode(true)} style={{ flex: 2, padding: 10, borderRadius: 8, border: "2px dashed #b91c1c", background: "#fff5f5", color: "#b91c1c", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🗑 報廢登記</button>
-              <button onClick={confirmNoWaste} disabled={wasteToday.no_waste} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid " + (wasteToday.no_waste ? "#ccc" : "#0a7c42"), background: wasteToday.no_waste ? "#eee" : "#e6f9f0", color: wasteToday.no_waste ? "#999" : "#0a7c42", fontSize: 12, fontWeight: 600, cursor: wasteToday.no_waste ? "default" : "pointer" }}>{wasteToday.no_waste ? "✅ 已確認" : "本日無報廢"}</button>
+              <button onClick={() => setWasteMode(true)} style={{ flex: 2, padding: 10, borderRadius: 8, border: "2px dashed var(--danger)", background: "#fff5f5", color: "var(--danger)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🗑 報廢登記</button>
+              <button onClick={confirmNoWaste} disabled={wasteToday.no_waste} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid " + (wasteToday.no_waste ? "#ccc" : "var(--success)"), background: wasteToday.no_waste ? "var(--divider)" : "var(--success-bg)", color: wasteToday.no_waste ? "var(--text-3)" : "var(--success)", fontSize: 12, fontWeight: 600, cursor: wasteToday.no_waste ? "default" : "pointer" }}>{wasteToday.no_waste ? "✅ 已確認" : "本日無報廢"}</button>
             </div>}
             {wasteMode && <div style={{ marginTop: 4 }}>
               {/* 簡化 UX：直接選品項（依 zone 分組顯示），選擇後自動帶位置 */}
@@ -385,7 +382,7 @@ export default function WorkLogPage() {
                   <select value={wasteForm.item_id} onChange={e => {
                     const it = wasteItems.find(x => x.id === e.target.value);
                     setWasteForm({ ...wasteForm, item_id: e.target.value, patrol_location: it?.zone || "ambient" });
-                  }} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13, marginBottom: 6 }}>
+                  }} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid var(--border)", fontSize: 13, marginBottom: 6 }}>
                     <option value="">{wasteItems.length === 0 ? "（此門市無報廢品項，請聯絡管理員）" : "📦 選擇品項..."}</option>
                     {order.filter(z => groups[z]).map(z => (
                       <optgroup key={z} label={zoneLabel[z] || "未分區"}>
@@ -396,8 +393,8 @@ export default function WorkLogPage() {
                 );
               })()}
               <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-                <input type="number" inputMode="decimal" value={wasteForm.quantity} onChange={e => setWasteForm({ ...wasteForm, quantity: e.target.value })} placeholder="報廢數量" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 14, textAlign: "center" }} />
-                <select value={wasteForm.waste_reason} onChange={e => setWasteForm({ ...wasteForm, waste_reason: e.target.value })} style={{ flex: 2, padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }}>
+                <input type="number" inputMode="decimal" value={wasteForm.quantity} onChange={e => setWasteForm({ ...wasteForm, quantity: e.target.value })} placeholder="報廢數量" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--border)", fontSize: 14, textAlign: "center" }} />
+                <select value={wasteForm.waste_reason} onChange={e => setWasteForm({ ...wasteForm, waste_reason: e.target.value })} style={{ flex: 2, padding: 8, borderRadius: 8, border: "1px solid var(--border)", fontSize: 13 }}>
                   <option value="">原因...</option>
                   <option value="過期">過期</option>
                   <option value="受潮/變質">受潮/變質</option>
@@ -407,44 +404,44 @@ export default function WorkLogPage() {
                   <option value="其他">其他</option>
                 </select>
               </div>
-              <input type="text" value={wasteForm.note} onChange={e => setWasteForm({ ...wasteForm, note: e.target.value })} placeholder="補充說明（可選）" style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 12, marginBottom: 6 }} />
-              <label style={{ display: "block", padding: 10, borderRadius: 8, border: "2px dashed " + (wastePhoto ? "#0a7c42" : "#b91c1c"), background: wastePhoto ? "#e6f9f0" : "#fff5f5", color: wastePhoto ? "#0a7c42" : "#b91c1c", fontSize: 12, textAlign: "center", cursor: "pointer", marginBottom: 6 }}>
+              <input type="text" value={wasteForm.note} onChange={e => setWasteForm({ ...wasteForm, note: e.target.value })} placeholder="補充說明（可選）" style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, marginBottom: 6 }} />
+              <label style={{ display: "block", padding: 10, borderRadius: 8, border: "2px dashed " + (wastePhoto ? "var(--success)" : "var(--danger)"), background: wastePhoto ? "var(--success-bg)" : "#fff5f5", color: wastePhoto ? "var(--success)" : "var(--danger)", fontSize: 12, textAlign: "center", cursor: "pointer", marginBottom: 6 }}>
                 {wastePhoto ? "✅ 已拍照（含浮水印）— 點此重拍" : "📷 拍照佐證（含垃圾袋入鏡，自動加 GPS+時間浮水印）"}
                 <input type="file" accept="image/*" capture="environment" onChange={e => handleWastePhoto(e.target.files?.[0])} style={{ display: "none" }} />
               </label>
               {wastePhoto && <img src={wastePhoto} alt="預覽" style={{ width: "100%", borderRadius: 8, marginBottom: 6 }} />}
-              {wasteAiHint && <div style={{ padding: "6px 8px", borderRadius: 6, background: "#fff8e6", color: "#92400e", fontSize: 11, marginBottom: 6 }}>{wasteAiHint}</div>}
+              {wasteAiHint && <div style={{ padding: "6px 8px", borderRadius: 6, background: "var(--warning-bg)", color: "#92400e", fontSize: 11, marginBottom: 6 }}>{wasteAiHint}</div>}
               <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={submitWaste} disabled={wasteUploading} style={{ flex: 2, padding: 10, borderRadius: 8, border: "none", background: wasteUploading ? "#ccc" : "#b91c1c", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{wasteUploading ? "送出中..." : "送出報廢"}</button>
-                <button onClick={() => { setWasteMode(false); setWastePhoto(null); setWasteForm({ item_id: "", quantity: "", patrol_location: "", waste_reason: "過期", note: "" }); }} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ddd", background: "#fff", fontSize: 12, cursor: "pointer" }}>取消</button>
+                <button onClick={submitWaste} disabled={wasteUploading} style={{ flex: 2, padding: 10, borderRadius: 8, border: "none", background: wasteUploading ? "#ccc" : "var(--danger)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{wasteUploading ? "送出中..." : "送出報廢"}</button>
+                <button onClick={() => { setWasteMode(false); setWastePhoto(null); setWasteForm({ item_id: "", quantity: "", patrol_location: "", waste_reason: "過期", note: "" }); }} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid var(--border)", background: "#fff", fontSize: 12, cursor: "pointer" }}>取消</button>
               </div>
             </div>}
-            {wasteToday.wastes?.length > 0 && <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0eeea" }}>
-              {wasteToday.wastes.map(w => (<div key={w.id} style={{ fontSize: 11, color: "#666", padding: "3px 0" }}>
+            {wasteToday.wastes?.length > 0 && <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--divider)" }}>
+              {wasteToday.wastes.map(w => (<div key={w.id} style={{ fontSize: 11, color: "var(--text-2)", padding: "3px 0" }}>
                 {"• " + (w.inventory_items?.name || "?") + " " + Math.abs(w.quantity) + (w.inventory_items?.unit || "") + " · " + (w.waste_reason || "") + " · "}
-                <span style={{ color: w.audit_status === "approved" ? "#0a7c42" : w.audit_status === "rejected" ? "#b91c1c" : "#b45309" }}>{w.audit_status === "approved" ? "已核准" : w.audit_status === "rejected" ? "已退回" : w.audit_status === "observe" ? "觀察中" : "待稽核"}</span>
+                <span style={{ color: w.audit_status === "approved" ? "var(--success)" : w.audit_status === "rejected" ? "var(--danger)" : "var(--warning)" }}>{w.audit_status === "approved" ? "已核准" : w.audit_status === "rejected" ? "已退回" : w.audit_status === "observe" ? "觀察中" : "待稽核"}</span>
               </div>))}
             </div>}
           </div>
         </div>}
-        {Object.entries(grouped).map(([cat, ci]) => (<div key={cat} style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 4, padding: "0 4px" }}>{cat}</div><div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1" }}>{ci.map(item => <CI key={item.id} item={item} toggle={() => toggle(item, false)} submitValue={submitValue} />)}</div></div>))}
-        {showStock && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "#b45309", marginBottom: 4, padding: "0 4px" }}>📦 庫存盤點</div><div style={{ background: stockSubmitted[stockPeriod] ? "#e6f9f0" : "#fff", borderRadius: 10, border: "1px solid " + (stockSubmitted[stockPeriod] ? "#0a7c42" : "#e8e6e1") }}>{stockSubmitted[stockPeriod] ? <div style={{ padding: 20, textAlign: "center" }}><div style={{ fontSize: 28 }}>✅</div><div style={{ fontSize: 13, fontWeight: 600, color: "#0a7c42" }}>{(openingTabs.includes(tab) ? "開店" : "閉店") + "盤點已送出"}</div></div> : <>{stockZoneGroups.map(g => <div key={g.key}><div style={{ fontSize: 10, fontWeight: 600, color: "#444", padding: "8px 12px 2px", background: g.bg }}>{g.label + "（" + g.items.length + "）"}</div>{g.items.map(item => <div key={item.id} style={{ display: "flex", alignItems: "center", padding: "10px 12px", borderBottom: "1px solid #f0eeea", gap: 10 }}><div style={{ flex: 1 }}><div style={{ fontSize: 14 }}>{item.name}</div>{item.par_level > 0 && <div style={{ fontSize: 10, color: "#888" }}>{"標準" + item.par_level + item.unit}</div>}</div><input type="number" inputMode="decimal" value={stockQty[item.id] || ""} onChange={e => setStockQty({ ...stockQty, [item.id]: e.target.value })} placeholder="0" style={{ width: 60, padding: "6px 4px", borderRadius: 8, border: "2px solid " + (stockQty[item.id] ? "#b45309" : "#ddd"), fontSize: 16, textAlign: "center", fontWeight: 700 }} /><span style={{ fontSize: 11, color: "#888" }}>{item.unit}</span></div>)}</div>)}<div style={{ padding: 12 }}><button onClick={() => submitStock(stockPeriod)} style={{ width: "100%", padding: 12, borderRadius: 10, border: "none", background: stockFilled > 0 ? "#b45309" : "#ddd", color: "#fff", fontSize: 14, fontWeight: 600, cursor: stockFilled > 0 ? "pointer" : "default" }}>{"📦送出" + (openingTabs.includes(tab) ? "開店" : "閉店") + "盤點（" + stockFilled + "/" + stockItems.length + "）"}</button></div></>}</div></div>}
+        {Object.entries(grouped).map(([cat, ci]) => (<div key={cat} style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-3)", marginBottom: 4, padding: "0 4px" }}>{cat}</div><div style={{ background: "#fff", borderRadius: 10, border: "1px solid var(--border)" }}>{ci.map(item => <CI key={item.id} item={item} toggle={() => toggle(item, false)} submitValue={submitValue} />)}</div></div>))}
+        {showStock && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "var(--warning)", marginBottom: 4, padding: "0 4px" }}>📦 庫存盤點</div><div style={{ background: stockSubmitted[stockPeriod] ? "var(--success-bg)" : "#fff", borderRadius: 10, border: "1px solid " + (stockSubmitted[stockPeriod] ? "var(--success)" : "var(--border)") }}>{stockSubmitted[stockPeriod] ? <div style={{ padding: 20, textAlign: "center" }}><div style={{ fontSize: 28 }}>✅</div><div style={{ fontSize: 13, fontWeight: 600, color: "var(--success)" }}>{(openingTabs.includes(tab) ? "開店" : "閉店") + "盤點已送出"}</div></div> : <>{stockZoneGroups.map(g => <div key={g.key}><div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-2)", padding: "8px 12px 2px", background: g.bg }}>{g.label + "（" + g.items.length + "）"}</div>{g.items.map(item => <div key={item.id} style={{ display: "flex", alignItems: "center", padding: "10px 12px", borderBottom: "1px solid var(--divider)", gap: 10 }}><div style={{ flex: 1 }}><div style={{ fontSize: 14 }}>{item.name}</div>{item.par_level > 0 && <div style={{ fontSize: 10, color: "var(--text-3)" }}>{"標準" + item.par_level + item.unit}</div>}</div><input type="number" inputMode="decimal" value={stockQty[item.id] || ""} onChange={e => setStockQty({ ...stockQty, [item.id]: e.target.value })} placeholder="0" style={{ width: 60, padding: "6px 4px", borderRadius: 8, border: "2px solid " + (stockQty[item.id] ? "var(--warning)" : "var(--border)"), fontSize: 16, textAlign: "center", fontWeight: 700 }} /><span style={{ fontSize: 11, color: "var(--text-3)" }}>{item.unit}</span></div>)}</div>)}<div style={{ padding: 12 }}><button onClick={() => submitStock(stockPeriod)} style={{ width: "100%", padding: 12, borderRadius: 10, border: "none", background: stockFilled > 0 ? "var(--warning)" : "var(--border)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: stockFilled > 0 ? "pointer" : "default" }}>{"📦送出" + (openingTabs.includes(tab) ? "開店" : "閉店") + "盤點（" + stockFilled + "/" + stockItems.length + "）"}</button></div></>}</div></div>}
         {tasksTotal === 0 && !showStock && <div style={{ textAlign: "center", padding: 30, color: "#ccc", fontSize: 12 }}>此時段無工作項目</div>}
       </>}
       {tab === "deep" && <div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
-          <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: 10, textAlign: "center" }}><div style={{ fontSize: 10, color: "#888" }}>本週</div><div style={{ fontSize: 20, fontWeight: 700, color: weekDone >= deepWeekly.length && deepWeekly.length > 0 ? "#0a7c42" : "#333" }}>{weekDone + "/" + deepWeekly.length}</div>{deepWeekly.length > 0 && <div style={{ height: 5, background: "#f0f0f0", borderRadius: 3, marginTop: 4 }}><div style={{ height: "100%", width: Math.round(weekDone / deepWeekly.length * 100) + "%", background: "#0a7c42", borderRadius: 3 }} /></div>}</div>
-          <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: 10, textAlign: "center" }}><div style={{ fontSize: 10, color: "#888" }}>本月</div><div style={{ fontSize: 20, fontWeight: 700, color: monthDone >= deepMonthly.length && deepMonthly.length > 0 ? "#0a7c42" : "#333" }}>{monthDone + "/" + deepMonthly.length}</div>{deepMonthly.length > 0 && <div style={{ height: 5, background: "#f0f0f0", borderRadius: 3, marginTop: 4 }}><div style={{ height: "100%", width: Math.round(monthDone / deepMonthly.length * 100) + "%", background: "#4361ee", borderRadius: 3 }} /></div>}</div>
+          <div style={{ background: "#fff", borderRadius: 10, border: "1px solid var(--border)", padding: 10, textAlign: "center" }}><div style={{ fontSize: 10, color: "var(--text-3)" }}>本週</div><div style={{ fontSize: 20, fontWeight: 700, color: weekDone >= deepWeekly.length && deepWeekly.length > 0 ? "var(--success)" : "var(--text)" }}>{weekDone + "/" + deepWeekly.length}</div>{deepWeekly.length > 0 && <div style={{ height: 5, background: "#f0f0f0", borderRadius: 3, marginTop: 4 }}><div style={{ height: "100%", width: Math.round(weekDone / deepWeekly.length * 100) + "%", background: "var(--success)", borderRadius: 3 }} /></div>}</div>
+          <div style={{ background: "#fff", borderRadius: 10, border: "1px solid var(--border)", padding: 10, textAlign: "center" }}><div style={{ fontSize: 10, color: "var(--text-3)" }}>本月</div><div style={{ fontSize: 20, fontWeight: 700, color: monthDone >= deepMonthly.length && deepMonthly.length > 0 ? "var(--success)" : "var(--text)" }}>{monthDone + "/" + deepMonthly.length}</div>{deepMonthly.length > 0 && <div style={{ height: 5, background: "#f0f0f0", borderRadius: 3, marginTop: 4 }}><div style={{ height: "100%", width: Math.round(monthDone / deepMonthly.length * 100) + "%", background: "var(--brand-strong)", borderRadius: 3 }} /></div>}</div>
         </div>
-        <a href={`/cleaning?eid=${empId || ""}&sid=${storeId || ""}&name=${encodeURIComponent(empName || "")}`} style={{ display: "block", background: "linear-gradient(135deg, #0e7490, #155e75)", color: "#fff", borderRadius: 10, padding: "10px 12px", textDecoration: "none", marginBottom: 10, textAlign: "center", fontSize: 13, fontWeight: 600 }}>📋 看完整清潔紀錄（歷史 + 排行）→</a>
-        {deepWeekly.length > 0 && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 4 }}>🗓 每週</div><div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1" }}>{deepWeekly.map(item => <CI key={item.id} item={item} toggle={() => toggle(item, true)} freq="週" />)}</div></div>}
-        {deepMonthly.length > 0 && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "#888", marginBottom: 4 }}>📅 每月</div><div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1" }}>{deepMonthly.map(item => <CI key={item.id} item={item} toggle={() => toggle(item, true)} freq="月" />)}</div></div>}
+        <a href={`/cleaning?eid=${empId || ""}&sid=${storeId || ""}&name=${encodeURIComponent(empName || "")}`} style={{ display: "block", background: "var(--brand-grad)", color: "#fff", borderRadius: 10, padding: "10px 12px", textDecoration: "none", marginBottom: 10, textAlign: "center", fontSize: 13, fontWeight: 600 }}>📋 看完整清潔紀錄（歷史 + 排行）→</a>
+        {deepWeekly.length > 0 && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-3)", marginBottom: 4 }}>🗓 每週</div><div style={{ background: "#fff", borderRadius: 10, border: "1px solid var(--border)" }}>{deepWeekly.map(item => <CI key={item.id} item={item} toggle={() => toggle(item, true)} freq="週" />)}</div></div>}
+        {deepMonthly.length > 0 && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-3)", marginBottom: 4 }}>📅 每月</div><div style={{ background: "#fff", borderRadius: 10, border: "1px solid var(--border)" }}>{deepMonthly.map(item => <CI key={item.id} item={item} toggle={() => toggle(item, true)} freq="月" />)}</div></div>}
         {deepWeekly.length === 0 && deepMonthly.length === 0 && <div style={{ textAlign: "center", padding: 30, color: "#ccc", fontSize: 12 }}>尚未設定細部清潔項目</div>}
-        <div style={{ marginTop: 10, background: "#fff", borderRadius: 10, border: "1px solid #e8e6e1", padding: 12 }}>
+        <div style={{ marginTop: 10, background: "#fff", borderRadius: 10, border: "1px solid var(--border)", padding: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>⚠️ 回報異常</div>
-          <select value={incType} onChange={e => setIncType(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 12, marginBottom: 6 }}><option>設備故障</option><option>食安問題</option><option>客訴事件</option><option>缺料/斷貨</option><option>人員問題</option><option>其他</option></select>
-          <textarea value={incDesc} onChange={e => setIncDesc(e.target.value)} rows={3} placeholder="描述異常..." style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid #ddd", fontSize: 12, resize: "vertical", marginBottom: 6 }} />
-          <button onClick={async () => { if (!incDesc) return; setIncSending(true); await fetch("/api/admin/worklogs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "report_incident", store_id: storeId, employee_id: empId, employee_name: empName, type: incType, description: incDesc }) }); setIncDesc(""); setIncSending(false); alert("已回報"); }} disabled={!incDesc || incSending} style={{ width: "100%", padding: 10, borderRadius: 10, border: "none", background: incDesc ? "#b91c1c" : "#ddd", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{incSending ? "送出中..." : "🚨 送出異常回報"}</button>
+          <select value={incType} onChange={e => setIncType(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, marginBottom: 6 }}><option>設備故障</option><option>食安問題</option><option>客訴事件</option><option>缺料/斷貨</option><option>人員問題</option><option>其他</option></select>
+          <textarea value={incDesc} onChange={e => setIncDesc(e.target.value)} rows={3} placeholder="描述異常..." style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid var(--border)", fontSize: 12, resize: "vertical", marginBottom: 6 }} />
+          <button onClick={async () => { if (!incDesc) return; setIncSending(true); await fetch("/api/admin/worklogs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "report_incident", store_id: storeId, employee_id: empId, employee_name: empName, type: incType, description: incDesc }) }); setIncDesc(""); setIncSending(false); alert("已回報"); }} disabled={!incDesc || incSending} style={{ width: "100%", padding: 10, borderRadius: 10, border: "none", background: incDesc ? "var(--danger)" : "var(--border)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{incSending ? "送出中..." : "🚨 送出異常回報"}</button>
         </div>
       </div>}
       <div style={{ textAlign: "center", marginTop: 16, fontSize: 10, color: "#ccc" }}>每30秒自動同步</div>
@@ -452,15 +449,15 @@ export default function WorkLogPage() {
   );
 }
 function CI({ item, toggle, submitValue, freq }) {
-  return (<div style={{ padding: "10px 12px", borderBottom: "1px solid #f0eeea" }}>
+  return (<div style={{ padding: "10px 12px", borderBottom: "1px solid var(--divider)" }}>
     <div onClick={() => !item.requires_value && toggle()} style={{ display: "flex", alignItems: "center", gap: 10, cursor: item.requires_value ? "default" : "pointer" }}>
-      <div style={{ width: 26, height: 26, borderRadius: 8, border: item.completed ? "none" : "2px solid #ddd", background: item.is_abnormal ? "#b91c1c" : item.completed ? "#0a7c42" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{item.completed && <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>{item.is_abnormal ? "!" : "✓"}</span>}</div>
+      <div style={{ width: 26, height: 26, borderRadius: 8, border: item.completed ? "none" : "2px solid var(--border)", background: item.is_abnormal ? "var(--danger)" : item.completed ? "var(--success)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>{item.completed && <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>{item.is_abnormal ? "!" : "✓"}</span>}</div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, color: item.is_abnormal ? "#b91c1c" : item.completed ? "#aaa" : "#333", textDecoration: item.completed && !item.requires_value ? "line-through" : "none" }}>{item.item_name}{freq && <span style={{ fontSize: 10, color: "#b45309", marginLeft: 4 }}>{"(" + freq + ")"}</span>}</div>
-        {item.completed && item.completed_by_name && <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>{item.completed_by_name + (item.completed_at ? " · " + new Date(item.completed_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" }) : "") + (item.value != null ? " · " + item.value : "")}</div>}
+        <div style={{ fontSize: 14, color: item.is_abnormal ? "var(--danger)" : item.completed ? "var(--text-hint)" : "var(--text)", textDecoration: item.completed && !item.requires_value ? "line-through" : "none" }}>{item.item_name}{freq && <span style={{ fontSize: 10, color: "var(--warning)", marginLeft: 4 }}>{"(" + freq + ")"}</span>}</div>
+        {item.completed && item.completed_by_name && <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 2 }}>{item.completed_by_name + (item.completed_at ? " · " + new Date(item.completed_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" }) : "") + (item.value != null ? " · " + item.value : "")}</div>}
       </div>
     </div>
-    {item.requires_value && !item.completed && submitValue && <div style={{ display: "flex", gap: 6, marginTop: 8, marginLeft: 36 }}><input type="number" inputMode="decimal" id={"val-" + item.id} placeholder={item.value_label || "數值"} style={{ width: 80, padding: "6px 8px", borderRadius: 8, border: "2px solid #ddd", fontSize: 14, textAlign: "center", fontWeight: 600 }} /><button onClick={() => { const v = document.getElementById("val-" + item.id)?.value; if (v) submitValue(item, v); }} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#0a7c42", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>記錄</button></div>}
+    {item.requires_value && !item.completed && submitValue && <div style={{ display: "flex", gap: 6, marginTop: 8, marginLeft: 36 }}><input type="number" inputMode="decimal" id={"val-" + item.id} placeholder={item.value_label || "數值"} style={{ width: 80, padding: "6px 8px", borderRadius: 8, border: "2px solid var(--border)", fontSize: 14, textAlign: "center", fontWeight: 600 }} /><button onClick={() => { const v = document.getElementById("val-" + item.id)?.value; if (v) submitValue(item, v); }} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "var(--success)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>記錄</button></div>}
   </div>);
 }
-function Box({ children }) { return <div style={{ maxWidth: 460, margin: "0 auto", padding: "12px 10px", fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "#faf8f5", minHeight: "100vh" }}>{children}</div>; }
+function Box({ children }) { return <div style={{ maxWidth: 460, margin: "0 auto", padding: "12px 10px", fontFamily: "system-ui, 'Noto Sans TC', sans-serif", background: "var(--surface-warm)", minHeight: "100vh" }}>{children}</div>; }
