@@ -94,6 +94,7 @@ export default function AdminPage() {
   const [scheds, setScheds] = useState([]);
   const [att, setAtt] = useState([]);
   const [lr, setLr] = useState([]);
+  const [resignations, setResignations] = useState([]);
   const [exps, setExps] = useState([]);
   const [stockItems, setStockItems] = useState([]);
   const [stockReport, setStockReport] = useState([]);
@@ -166,6 +167,12 @@ export default function AdminPage() {
   const [productList, setProductList] = useState([]);
   const pl = lr.filter(l => l.status === "pending");
   const ae = emps.filter(e => e.is_active);
+  // 離職員工：簽過離職單且 cron 已解除權限 → 跟「新人待啟用」明確區分
+  const resignationByEmp = {};
+  for (const r of resignations) {
+    if (r.status === "signed" && r.processed_at && r.employee_id) resignationByEmp[r.employee_id] = r;
+  }
+  const resignedIds = new Set(Object.keys(resignationByEmp));
 
   useEffect(() => {
     // 版本檢查（舊版本會自動清快取+reload，新版進來不影響）
@@ -239,6 +246,7 @@ export default function AdminPage() {
     const needExp    = need(["dashboard","expenses","pnl"]);
     const needPnl    = T === "pnl" && myTabs.includes("pnl");
     const needAnn    = need(["dashboard","announcements","store_staff"]);
+    const needResig  = need(["employees","store_staff"]);
 
     Promise.all([
       needSettle ? ap("/api/admin/settlements?" + p) : Promise.resolve({data:[],summary:{}}),
@@ -252,7 +260,8 @@ export default function AdminPage() {
       needExp    ? ap("/api/admin/expenses?" + p + "&type=" + expType) : Promise.resolve({data:[]}),
       needPnl    ? ap("/api/admin/pnl?month=" + month + "&compare=stores" + (sf ? "&store_id=" + sf : "")) : Promise.resolve(null),
       needAnn    ? ap("/api/admin/announcements") : Promise.resolve({data:[]}),
-    ]).then(([s,d,e,shs,sc,at2,as3,lr2,ex,pl2,an]) => {
+      needResig  ? ap("/api/admin/resignations?status=signed") : Promise.resolve({data:[]}),
+    ]).then(([s,d,e,shs,sc,at2,as3,lr2,ex,pl2,an,rg]) => {
       if (needSettle) { setStl(s.data||[]); setSum(s.summary||{}); }
       if (needDep) setDep(d.data||[]);
       setEmps(e.data||[]); if (needShifts) setShifts(shs.data||[]);
@@ -267,6 +276,7 @@ export default function AdminPage() {
       if (needExp) { setExps(ex.data||[]); setExpSum({total:ex.total,byCategory:ex.byCategory}); }
       if (needPnl) setPnl(pl2);
       if (needAnn) setAnns(an.data||[]);
+      if (needResig) setResignations(rg.data||[]);
       setLoaded(l => ({ ...l, core: true }));
       setLd(false);
     }).catch(err => {
@@ -669,14 +679,14 @@ export default function AdminPage() {
               ＋新增員工
             </button>
 
-            {/* 待啟用 */}
-            {emps.filter(e=>!e.is_active).length > 0 && (
+            {/* 待啟用（新人）— 排除已處理離職員工 */}
+            {emps.filter(e=>!e.is_active && !resignedIds.has(e.id)).length > 0 && (
               <div style={{marginBottom:12}}>
-                <h4 style={{fontSize:12,color:"#b45309",marginBottom:4}}>{"⏳ 待審核（"+emps.filter(e=>!e.is_active).length+"）"}</h4>
+                <h4 style={{fontSize:12,color:"#b45309",marginBottom:4}}>{"⏳ 待審核（新人，"+emps.filter(e=>!e.is_active && !resignedIds.has(e.id)).length+"）"}</h4>
                 <div style={{background:"#fff8e6",borderRadius:8,border:"1px solid #f0e6c8",overflow:"auto"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                     <thead><tr style={{background:"#fef3c7"}}>{["姓名","門市","合約","文件","LINE","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#92400e"}}>{h}</th>)}</tr></thead>
-                    <tbody>{emps.filter(e=>!e.is_active).map(e=>{
+                    <tbody>{emps.filter(e=>!e.is_active && !resignedIds.has(e.id)).map(e=>{
                       const REQ=[["health_check","體檢"],["id_card_front","身證正"],["id_card_back","身證反"]];
                       const has=docMap[e.id]||[];
                       const missing=REQ.filter(([k])=>!has.includes(k));
@@ -770,6 +780,36 @@ export default function AdminPage() {
                 </div>
               );
             })}
+
+            {/* 離職區 — 預設摺疊 */}
+            {emps.filter(e=>!e.is_active && resignedIds.has(e.id)).length > 0 && (
+              <details style={{marginTop:12}}>
+                <summary style={{fontSize:12,fontWeight:600,color:"#666",cursor:"pointer",padding:"4px 8px",background:"#f5f5f5",borderRadius:4,listStyle:"none"}}>
+                  {"📦 離職區（"+emps.filter(e=>!e.is_active && resignedIds.has(e.id)).length+"）"}
+                </summary>
+                <div style={{background:"#fafafa",borderRadius:8,border:"1px solid #e5e5e5",overflow:"auto",marginTop:4}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                    <thead><tr style={{background:"#eee"}}>{["姓名","門市","離職日","類型","結算金額","操作"].map(h=><th key={h} style={{padding:6,textAlign:"left",fontWeight:500,color:"#555"}}>{h}</th>)}</tr></thead>
+                    <tbody>{emps.filter(e=>!e.is_active && resignedIds.has(e.id)).map(e=>{
+                      const r = resignationByEmp[e.id];
+                      const TYPE_LABEL = {voluntary:"自願",company_terminated:"資遣",contract_end:"約滿",retirement:"退休"};
+                      return (
+                      <tr key={e.id} style={{borderBottom:"1px solid #ececec"}}>
+                        <td style={{padding:6,fontWeight:500,cursor:"pointer",color:"#4361ee"}} onClick={()=>setDetailId(e.id)}>{e.name}</td>
+                        <td style={{padding:6,color:"#666"}}>{e.stores?e.stores.name:(r?.store_name||"總部")}</td>
+                        <td style={{padding:6,color:"#666"}}>{r?.last_working_date||"—"}</td>
+                        <td style={{padding:6,color:"#666"}}>{TYPE_LABEL[r?.resignation_type]||r?.resignation_type||"—"}</td>
+                        <td style={{padding:6,color:"#666"}}>{r?.settlement_amount?"$"+Number(r.settlement_amount).toLocaleString():"—"}</td>
+                        <td style={{padding:6,whiteSpace:"nowrap"}}>
+                          <a href={"/resignation-create?eid="+e.id} target="_blank" rel="noreferrer"
+                            style={{padding:"2px 8px",borderRadius:4,border:"1px solid #999",background:"#fff",color:"#444",fontSize:10,textDecoration:"none"}}>📄 離職單</a>
+                        </td>
+                      </tr>
+                    );})}</tbody>
+                  </table>
+                </div>
+              </details>
+            )}
           </div>
         )}
 
